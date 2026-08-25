@@ -164,6 +164,14 @@
     display:flex; gap:10px; padding:5px 10px; min-height:36px; border-bottom:1px solid var(--line); cursor:pointer; align-items:center;
   }
   .co-row:hover{ background:var(--bg); }
+  /* 미수금 금액 대신 업체 카드 맨 앞에 붙는 검정 패널. 금액은 노출하지 않고
+     미수금이 남아 있다는 상태만 한눈에 구분한다. */
+  .co-row.has-receivable{ position:relative; padding-left:54px; }
+  .co-row.has-receivable::before{
+    content:'미수'; position:absolute; left:0; top:0; bottom:0; width:44px;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; background:#111827; font-size:10.5px; font-weight:800; letter-spacing:.04em;
+  }
   .col-name{ flex:1.1 1 140px; min-width:0; display:flex; flex-direction:column; gap:2px; font-weight:600; color:var(--text); font-size:13px; }
   /* §최근 실적 독립 컬럼 복원 라운드: 업체명 오른쪽에 최근 실적을 붙였던 걸 취소하고, 다시
      독립 컬럼(.col-pour)으로 분리했다 — 협력사 컬럼(.col-name-top)에는 등급/업체명/미수금
@@ -1061,7 +1069,7 @@
      stats 하나만 남아 자연스러운 한 줄이 되도록 grid-template-columns를 없앴다. */
   .cdash-glance-row{ margin-bottom:12px; }
   .cdash-glance-summary{ margin-bottom:0; }
-  .cdash-glance-stats{ display:grid; grid-template-columns:repeat(6,1fr); gap:0; border:1px solid var(--line); border-radius:8px; background:#fff; overflow:hidden; }
+  .cdash-glance-stats{ display:grid; grid-template-columns:repeat(5,1fr); gap:0; border:1px solid var(--line); border-radius:8px; background:#fff; overflow:hidden; }
   .cdash-glance-stat{ padding:10px 12px; border-left:1px solid var(--line); min-width:0; }
   .cdash-glance-stat:first-child{ border-left:none; }
   .cdash-glance-stat-label{ font-size:11px; color:var(--text-muted); margin-bottom:4px; }
@@ -1960,9 +1968,6 @@ html,body{background:radial-gradient(circle at 75% -10%,rgba(11,91,211,.055),tra
              행 왼쪽 빨간 라인(.co-row.is-overdue) 강조는 그대로 두고, 배지 버튼(#crmOverdueBadge)
              과 그걸 부르던 renderOverdueBadge() 호출만 없앴다(§ "기능 자체를 삭제하지 마세요,
              상단 경고에서만 제거"). -->
-        <!-- §2026 매출/자재판매/미수금 라운드: 미수금 업체 알림 배지 — 위 배지와 같은 규칙
-             (0건이면 렌더링 안 함, 클릭 시 목록 패널). -->
-        <button type="button" class="overdue-badge" id="crmReceivableBadge" style="display:none;"></button>
       </div>
       <div class="list-secondary-actions">
         <!-- §데이터 가져오기 버튼 통합 라운드: 평소에 늘 보이던 큰 버튼 2개를 작은 [데이터
@@ -5553,9 +5558,6 @@ window.SHIN2_CRM_APP_INIT = function(){
     renderUnregisteredBadge();
     // §상단 경고 정리 라운드: renderOverdueBadge() 호출을 없앴다 — "기한 초과" 배지는
     // 더 이상 메인 첫화면 상단에 안 보인다(함수 자체는 아래에 그대로 남아있다, §요청).
-    // §2026 매출/자재판매/미수금 라운드: 미수금 업체 배지는 계속 같은 규칙(별도 저장 없이
-    // 매번 재계산, 0건이면 숨김).
-    renderReceivableBadge();
     // §최근 요청 라운드: 업체마다 전체 POUR 스냅샷/전체 활동기록을 다시 훑으면
     // O(업체수 × 데이터크기)가 되므로(§22 성능 요구), 목록 전체에 필요한 "최근 시공"과
     // "최근 요청"은 여기서 딱 한 번만 인덱스로 계산해 두고 아래 각 행에서는 조회만 한다.
@@ -5650,13 +5652,9 @@ window.SHIN2_CRM_APP_INIT = function(){
       const yrRevenueHtml = revenue2026 == null
         ? '<span class="data-none">매출자료 없음</span>'
         : `<button type="button" class="revenue-cell-btn" data-revenue-detail="${esc(co.id)}">${esc(fmtKrwCompact(revenue2026.total))}</button>`;
-      // §15: 미수금이 있는 업체는 업체명 옆에 작은 빨간 배지 — 절제된 경고(옅은 빨강 배경/
-      // 진한 빨강 글자), 행 전체를 칠하지 않는다. getCompanyReceivable은 미수금 데이터가
-      // 아예 없으면 null, 있으면 합계를 반환하므로 여기서 "합계 > 0"만 배지로 표시한다(§14).
+      // 미수금 금액은 노출하지 않고, 합계가 0보다 큰 업체에만 카드 앞 검정 패널을 붙인다.
       const receivable = D.getCompanyReceivable(co);
-      const receivableBadgeHtml = (receivable && receivable.total > 0)
-        ? `<button type="button" class="receivable-inline-badge" data-receivable-detail="${esc(co.id)}">미수금 ${esc(fmtKrwCompact(receivable.total))}</button>`
-        : '';
+      const receivablePenaltyClass = (receivable && receivable.total > 0) ? ' has-receivable' : '';
       // §최근 요청 라운드에서 "최근 시공"을 협력사 컬럼 안으로 옮겼다가, §최근 시공 위치
       // 변경 라운드에서 업체명 오른쪽(같은 줄)으로 바꿨는데, 업체명 길이에 따라 위치가
       // 흔들려 지저분하다는 피드백으로 §최근 실적 독립 컬럼 복원 라운드에서 다시 독립
@@ -5772,10 +5770,10 @@ window.SHIN2_CRM_APP_INIT = function(){
             ${relEntries.length > 1 ? `<span class="relation-badge">+${relEntries.length - 1}</span>` : ''}
           </div>` : '';
       return `
-      <div class="co-row${rowOverdueClass}" data-id="${esc(co.id)}">
+      <div class="co-row${rowOverdueClass}${receivablePenaltyClass}" data-id="${esc(co.id)}">
         <div class="col-name">
           <div class="col-name-top">
-            <span class="co-name-badges">${partnerGlyphHtml(co)}<span class="co-name-text">${esc(co.name)}</span>${receivableBadgeHtml}</span>
+            <span class="co-name-badges">${partnerGlyphHtml(co)}<span class="co-name-text">${esc(co.name)}</span></span>
           </div>
           ${relationRowHtml}
         </div>
@@ -5835,14 +5833,6 @@ window.SHIN2_CRM_APP_INIT = function(){
         e.stopPropagation();
         const co = D.findCompany(btn.getAttribute('data-total-revenue-detail'));
         if(co) openTotalRevenuePopover(co, btn);
-      });
-    });
-    // §16: 미수금 배지 클릭 -> 미수금 상세 팝업.
-    listEl.querySelectorAll('[data-receivable-detail]').forEach(btn=>{
-      btn.addEventListener('click', (e)=>{
-        e.stopPropagation();
-        const co = D.findCompany(btn.getAttribute('data-receivable-detail'));
-        if(co) openReceivableDetailModal(co);
       });
     });
     // §3/§7/§시공실적 Drawer 통합 라운드 §10: "최근 실적" 영역 클릭 -> 시공실적 Drawer
@@ -6002,17 +5992,6 @@ window.SHIN2_CRM_APP_INIT = function(){
     const totalRevenueText = (revAll && !revAll.ambiguous && typeof revAll.total === 'number') ? fmtKrwCompact(revAll.total) : null;
     const rev2026 = D.getCompany2026Revenue(co);
     const revenue2026Text = (rev2026 && typeof rev2026.total === 'number') ? fmtKrwCompact(rev2026.total) : null;
-    const receivable = D.getCompanyReceivable(co);
-    // §고객카드 레이아웃 재배치 라운드 §3: 미수금을 "총 매출" 칸의 서브텍스트가 아니라
-    // 독립된 6번째 칸으로 분리한다(§ "총 매출 아래에 미수금을 중복 표시하지 않는다") —
-    // 계산 함수(D.getCompanyReceivable)는 그대로, 세 가지 상태를 구분해서 넘긴다: 실제
-    // 미수금이 있으면(> 0) 강조 표시 대상, 자료가 있는데 정확히 0원이면 "0원"(중립), 자료
-    // 자체가 없으면(receivable===null) "데이터 없음"(중립) — 0원과 데이터 없음을 절대
-    // 섞지 않는다(§ 기존 원칙 그대로).
-    const receivableHasAmount = !!(receivable && typeof receivable.total === 'number' && receivable.total > 0);
-    const receivableText = (receivable && typeof receivable.total === 'number')
-      ? fmtKrwCompact(receivable.total)
-      : '데이터 없음';
     return {
       stageText,
       stageNote,
@@ -6021,9 +6000,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       pourCount: usage ? usage.totalCount : 0,
       pourLatestYear: usage ? usage.latestYear : null,
       totalRevenueText,
-      revenue2026Text,
-      receivableText,
-      receivableHasAmount
+      revenue2026Text
     };
   }
   function renderGlanceRow(co){
@@ -6041,7 +6018,6 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="cdash-glance-stat"><div class="cdash-glance-stat-label">총 실적</div><div class="cdash-glance-stat-value">${g.pourCount ? `${g.pourCount}건` : '없음'}</div>${g.pourLatestYear ? `<div class="cdash-glance-stat-sub">최근 ${esc(g.pourLatestYear)}년</div>` : ''}</div>
       <div class="cdash-glance-stat"><div class="cdash-glance-stat-label">총 매출</div><div class="cdash-glance-stat-value${g.totalRevenueText ? '' : ' is-muted'}">${g.totalRevenueText ? esc(g.totalRevenueText) : '데이터 없음'}</div></div>
       <div class="cdash-glance-stat"><div class="cdash-glance-stat-label">2026 매출</div><div class="cdash-glance-stat-value${g.revenue2026Text ? '' : ' is-muted'}">${g.revenue2026Text ? esc(g.revenue2026Text) : '데이터 없음'}</div></div>
-      <div class="cdash-glance-stat"><div class="cdash-glance-stat-label">미수금</div><div class="cdash-glance-stat-value${g.receivableHasAmount ? ' is-receivable' : ' is-muted'}">${esc(g.receivableText)}</div></div>
     `;
   }
 
