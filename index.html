@@ -164,13 +164,11 @@
     display:flex; gap:10px; padding:5px 10px; min-height:36px; border-bottom:1px solid var(--line); cursor:pointer; align-items:center;
   }
   .co-row:hover{ background:var(--bg); }
-  /* 미수금 금액 대신 업체 카드 맨 앞에 붙는 검정 패널. 금액은 노출하지 않고
-     미수금이 남아 있다는 상태만 한눈에 구분한다. */
-  .co-row.has-receivable{ position:relative; padding-left:54px; }
+  /* 미수금 금액/문구 대신 업체 카드 맨 앞에 작은 검정 네모 하나만 표시한다. */
+  .co-row.has-receivable{ position:relative; padding-left:24px; }
   .co-row.has-receivable::before{
-    content:'미수'; position:absolute; left:0; top:0; bottom:0; width:44px;
-    display:flex; align-items:center; justify-content:center;
-    color:#fff; background:#111827; font-size:10.5px; font-weight:800; letter-spacing:.04em;
+    content:''; position:absolute; left:8px; top:50%; width:8px; height:8px;
+    background:#111827; transform:translateY(-50%);
   }
   .col-name{ flex:1.1 1 140px; min-width:0; display:flex; flex-direction:column; gap:2px; font-weight:600; color:var(--text); font-size:13px; }
   /* §최근 실적 독립 컬럼 복원 라운드: 업체명 오른쪽에 최근 실적을 붙였던 걸 취소하고, 다시
