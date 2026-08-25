@@ -5329,11 +5329,16 @@ window.SHIN2_CRM_APP_INIT = function(){
   // (buildProgressStages의 currentIdx, 이미 §진행 기록 라운드에서 만든 계산)로 좁힌다.
   const FILTER_DEFS = [
     ['all','전체'], ['inProgress','진행중'], ['q','질문서'],
-    ['m1','1차미팅'], ['m2','2차미팅'], ['mou','MOU'], ['partner','협력업체']
+    ['m1','1차미팅'], ['m2','2차미팅'], ['mou','MOU'], ['partner','협력업체'],
+    ['receivable','미수 업체']
   ];
   function matchesFilter(co, progress, key){
     if(key === 'all') return true;
     if(key === 'partner') return co.partnerStatus === 'partner';
+    if(key === 'receivable'){
+      const receivable = D.getCompanyReceivable(co);
+      return !!(receivable && receivable.total > 0);
+    }
     if(key === 'inProgress') return progress.hasAny;
     if(!progress.hasAny) return false;
     return progress.stages[progress.currentIdx].key === key;
