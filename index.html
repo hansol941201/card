@@ -166,8 +166,8 @@
   .co-row:hover{ background:var(--bg); }
   /* 미수금 금액/문구/도형 대신 업체명 아래에만 검정 밑줄을 표시한다. */
   .co-row.has-receivable .co-name-text{
-    text-decoration-line:underline; text-decoration-color:#111827;
-    text-decoration-thickness:2px; text-underline-offset:3px;
+    display:inline-block; width:max-content; max-width:220px;
+    border-bottom:2px solid #111827; padding-bottom:2px;
   }
   .col-name{ flex:1.1 1 140px; min-width:0; display:flex; flex-direction:column; gap:2px; font-weight:600; color:var(--text); font-size:13px; }
   /* §최근 실적 독립 컬럼 복원 라운드: 업체명 오른쪽에 최근 실적을 붙였던 걸 취소하고, 다시
