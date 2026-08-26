@@ -1776,34 +1776,34 @@
     padding:12px;
   }
   .chart-panel{
-    width:calc(100vw - 24px);
-    max-width:1580px;
+    width:calc(100vw - 48px);
+    max-width:1220px;
     max-height:calc(100vh - 24px);
     border-radius:15px;
     border:1px solid rgba(220,228,238,.96);
     box-shadow:0 28px 70px rgba(15,23,42,.23);
   }
   .cdash-body{
-    padding:12px 14px 16px;
+    padding:10px 12px 12px;
     background:#F5F8FC;
   }
   .cdash-header{
-    min-height:88px;
-    padding:15px 48px 15px 18px;
-    margin-bottom:11px;
+    min-height:66px;
+    padding:10px 44px 10px 14px;
+    margin-bottom:8px;
     border-radius:11px;
     background:linear-gradient(100deg,#17305C 0%,#1D3A69 100%);
     box-shadow:0 5px 15px rgba(23,48,92,.12);
   }
   .cdash-header-title{
-    font-size:21px;
+    font-size:18px;
     font-weight:800;
     letter-spacing:-.45px;
   }
   .cdash-header-actions .co-text-action,
   .cdash-header-actions .chart-memo-btn{
-    min-height:29px;
-    padding:5px 11px;
+    min-height:27px;
+    padding:4px 9px;
     border-radius:6px;
     border-color:rgba(255,255,255,.34);
     background:rgba(255,255,255,.08);
@@ -1812,17 +1812,17 @@
     background:#fff;
     border:1px solid rgba(226,232,240,.85);
     border-radius:9px;
-    padding:8px 10px;
+    padding:6px 8px;
     box-shadow:0 2px 5px rgba(15,23,42,.035);
   }
   .cdash-header-field{
-    padding:2px 17px;
+    padding:1px 11px;
     border-color:#E3E8EF;
   }
   .cdash-header-field-label{ color:#7B899B; font-size:10px; }
   .cdash-header-field-value{ color:#17233A; font-size:12.5px; font-weight:700; }
 
-  .cdash-glance-row{ gap:11px; margin-bottom:11px; }
+  .cdash-glance-row{ gap:8px; margin-bottom:8px; }
   .cdash-bcol,.cdash-block,.cdash-glance-stats,.cdash-quad{
     background:#fff;
     border-color:#DDE5EF;
@@ -1836,7 +1836,7 @@
   }
   .cdash-summary-body{ padding:11px 13px 12px; }
   .cdash-glance-stats{ overflow:hidden; }
-  .cdash-glance-stat{ padding:12px 14px; }
+  .cdash-glance-stat{ padding:8px 10px; }
   .cdash-glance-stat-label{ color:#748297; font-size:10.5px; }
   .cdash-glance-stat-value{ color:#17233A; font-size:14px; }
   .cdash-glance-stat-sub{ color:#8390A2; }
@@ -1844,6 +1844,31 @@
   #cdashMeetingBlock{
     padding:11px 14px 12px;
     margin-bottom:11px;
+  }
+
+  /* Compact customer card: company name and section actions share one row. */
+  .cdash-header-left{ display:flex; align-items:center; gap:14px; flex:1; }
+  .cdash-header-actions{ margin-top:0; gap:5px; flex-wrap:nowrap; }
+  .cdash-bottom2{ grid-template-columns:minmax(250px,.7fr) minmax(0,1.8fr); gap:8px; margin-bottom:8px; }
+  .cdash-block{ padding:8px 10px; margin-bottom:8px; }
+  .cdash-pour-table th{ padding:3px 5px; }
+  .cdash-pour-table td{ padding:4px 5px; }
+  .cdash-quad{ grid-template-columns:1fr; margin-bottom:0; }
+  .cdash-header-popover{
+    display:none; position:relative; margin:-1px 0 8px; padding:10px 12px; background:#fff;
+    border:1px solid #DDE5EF; border-radius:8px; box-shadow:0 7px 20px rgba(15,23,42,.10);
+  }
+  .cdash-header-popover.is-open{ display:block; }
+  .cdash-header-popover-close{ position:absolute; top:7px; right:9px; border:0; background:none; color:var(--text-muted); font-size:18px; cursor:pointer; }
+  .cdash-header-popover-section{ display:none; padding-right:22px; }
+  .cdash-header-popover-section.is-open{ display:block; }
+  #cdashBasicInfoCol{ padding:8px 12px; }
+
+  @media(max-width:1100px){
+    .chart-panel{ width:calc(100vw - 24px); }
+    .cdash-header-left{ gap:8px; }
+    .cdash-header-actions .co-text-action,.cdash-header-actions .chart-memo-btn{ padding-left:7px; padding-right:7px; }
+    .cdash-header-field{ padding-left:7px; padding-right:7px; }
   }
   #cdashMeetingBlock .cdash-col-title-row,
   #cdashPourTrackBlock .cdash-col-title-row,
@@ -6263,6 +6288,12 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="chart-panel" role="dialog" aria-modal="true" aria-label="고객 차트">
           <div class="cdash-body" id="chartBody">
             <div id="chartHeader"></div>
+            <div class="cdash-header-popover" id="cdashHeaderPopover">
+              <button type="button" class="cdash-header-popover-close" id="cdashHeaderPopoverClose" aria-label="닫기">&times;</button>
+              <div class="cdash-header-popover-section" id="cdashInsightBlock"></div>
+              <div class="cdash-header-popover-section" id="cdashReactionsCol"></div>
+              <div class="cdash-header-popover-section" id="cdashDocStatusBlock"></div>
+            </div>
             <!-- §관리필요 업체 라운드 §9: 관리필요 업체의 카드를 열었을 때만 상단 요약영역에
                  작은 한 줄 안내를 추가한다(주황/빨강 계열, 대형 카드 아님) — 관리필요가
                  아닌 업체는 renderMgmtNeedBanner가 아무것도 그리지 않는다. -->
@@ -6280,8 +6311,6 @@ window.SHIN2_CRM_APP_INIT = function(){
                  "진행상황" 전체폭 가로 stepper로 단순화했다(renderMeetingRecordSection 내부만
                  재구성 — buildProgressStages/resolveNewMouForCompany 등 데이터 계산은 전혀
                  안 바꿈, 목록 화면의 buildStageStepperHtml을 그대로 재사용). -->
-            <div class="cdash-block" id="cdashMeetingBlock"></div>
-
             <!-- §고객카드 레이아웃 재배치 라운드 §6: 왼쪽 30~35%에 "최근 요청/고객 메모"
                  (cdashReqPreviewBlock, renderReqPreview — 이미 있던 함수, 제목만 바꿈),
                  오른쪽 65~70%에 "POUR 시공실적"(cdashPourTrackBlock) — 예전 §카드 순서
@@ -6305,8 +6334,6 @@ window.SHIN2_CRM_APP_INIT = function(){
                  아래에 빈 여백이 남지 않게 했다(§9). -->
             <div class="cdash-quad">
               <div class="cdash-col" id="cdashBasicInfoCol"></div>
-              <div class="cdash-col" id="cdashReactionsCol"></div>
-              <div class="cdash-col" id="cdashDocStatusBlock"></div>
             </div>
 
             <!-- §고객 성향 컬럼 라운드 §3/§4 — 기존 3분할(cdash-quad)과 완전히 별도의 신규
@@ -6315,7 +6342,6 @@ window.SHIN2_CRM_APP_INIT = function(){
                  접힘(§4)은 위 cdashReactionsCol("고객 정보")과 동일한 accordion 패턴
                  (cardState.accordionOpen/sectionEdit)을 그대로 재사용한다 — 새 UI 패턴을
                  만들지 않는다. -->
-            <div class="cdash-block" id="cdashInsightBlock"></div>
           </div>
         </div>
       </div>
@@ -6327,7 +6353,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     // renderInterestCol(co); — §중복정보 제거 라운드: "POUR 활용현황" 칸을 화면에서
     // 제거하면서 이 호출도 뺐다. 함수 자체(및 co.interestFields 데이터/D.addInterestField/
     // removeInterestField)는 전혀 지우지 않았다 — 그릴 DOM 슬롯이 없어졌을 뿐이다.
-    renderMeetingRecordSection(co);
+    // 진행상황은 고객 상세 화면에서 제거했다. 원본 데이터/렌더 함수는 보존한다.
     renderPourTrackSection(co);
     renderReqPreview(co);
     renderReactionsCol(co);
@@ -6346,6 +6372,9 @@ window.SHIN2_CRM_APP_INIT = function(){
     else { renderBasicInfoView(co); }
     renderDocCounts(co);
     renderDocsSection(co);
+
+    const popoverClose = document.getElementById('cdashHeaderPopoverClose');
+    if(popoverClose) popoverClose.addEventListener('click', closeHeaderSection);
 
     // §하단 탭 제거 라운드: cdash-tab-row(진행상황/POUR 시공실적/요청자료/서류함/업체정보)를
     // DOM에서 없앴으므로, 그 버튼들에 붙어있던 토글/스크롤/openMemoPanel 리스너 등록 코드도
@@ -6396,6 +6425,8 @@ window.SHIN2_CRM_APP_INIT = function(){
           <div class="cdash-header-title">${esc(co.name)}</div>
           <div class="cdash-header-actions">
             <button type="button" class="chart-memo-btn" id="chartInsightBtn">고객 인사이트${insightRegistered ? ' ✓' : ''}</button>
+            <button type="button" class="chart-memo-btn" id="chartInfoBtn">고객 정보</button>
+            <button type="button" class="chart-memo-btn" id="chartDocsBtn">서류 현황</button>
             <button type="button" class="co-text-action${editing ? ' primary' : ''}" id="chartEditBtn">${editing ? '수정 완료' : '수정'}</button>
           </div>
         </div>
@@ -6418,15 +6449,38 @@ window.SHIN2_CRM_APP_INIT = function(){
       cardState.accordionOpen.insight = true;
       cardState.sectionEdit.insight = true;
       refreshChart();
-      requestAnimationFrame(()=>{
-        const target = document.getElementById('cdashInsightBlock');
-        if(target) target.scrollIntoView({ behavior:'smooth', block:'start' });
-      });
+      requestAnimationFrame(()=> openHeaderSection('insight'));
+    });
+    document.getElementById('chartInfoBtn').addEventListener('click', ()=>{
+      cardState.accordionOpen.info = true;
+      renderReactionsCol(co);
+      openHeaderSection('info');
+    });
+    document.getElementById('chartDocsBtn').addEventListener('click', ()=>{
+      cardState.accordionOpen.docs = true;
+      renderDocCounts(co);
+      openHeaderSection('docs');
     });
     document.getElementById('chartEditBtn').addEventListener('click', ()=>{
       cardState.chartEditing = !cardState.chartEditing;
       refreshChart();
     });
+  }
+
+  function closeHeaderSection(){
+    const popover = document.getElementById('cdashHeaderPopover');
+    if(popover) popover.classList.remove('is-open');
+    document.querySelectorAll('.cdash-header-popover-section').forEach(el=> el.classList.remove('is-open'));
+  }
+
+  function openHeaderSection(section){
+    const ids = { insight:'cdashInsightBlock', info:'cdashReactionsCol', docs:'cdashDocStatusBlock' };
+    const popover = document.getElementById('cdashHeaderPopover');
+    const target = document.getElementById(ids[section]);
+    if(!popover || !target) return;
+    document.querySelectorAll('.cdash-header-popover-section').forEach(el=> el.classList.remove('is-open'));
+    target.classList.add('is-open');
+    popover.classList.add('is-open');
   }
 
   // ---- 2단 4분할의 공통 불릿 목록 렌더러(§9/§21) — POUR 협약 목적/현재 상황/관심 공종·제품이
