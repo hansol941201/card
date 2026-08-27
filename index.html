@@ -14227,6 +14227,9 @@ window.SHIN2_CRM_APP_INIT = function(){
       try{ mapCanvasState.destroy(); } catch(err){ /* 지도 정리 실패는 무시 — 다음 열기에서 새로 만들어짐 */ }
     }
     mapCanvasState = null;
+    updateMapMarkers = null;
+    focusMapRegion = null;
+    focusMapCompany = null;
   }
 
   function openMapDistributionModal(){
@@ -14383,7 +14386,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     return Array.from(set).sort((a,b)=> a.localeCompare(b, 'ko'));
   }
 
-  let mapCanvasState = null; // §지도분포3에서 채움(kakao map 인스턴스, 클러스터러 등)
+  let mapCanvasState = null; // 지도 인스턴스가 열려있는 동안만 존재(kakao map/clusterer/marker 인덱스)
+  // renderMapInfoPanel의 지역/업체 행 클릭이 이 세 변수를 typeof로 확인해서 부른다 —
+  // initMapCanvas가 성공했을 때만 실제 함수가 배정된다(§지도분포3).
+  let updateMapMarkers = null;
+  let focusMapRegion = null;
+  let focusMapCompany = null;
 
   function renderMapModalMain(kakao){
     const wrap = document.getElementById('mapModalBody');
@@ -14532,6 +14540,161 @@ window.SHIN2_CRM_APP_INIT = function(){
       mapFilterState.listView = 'inBounds';
       renderMapInfoPanel(allEntries);
     });
+  }
+
+  /* ==========================================================================
+     §지도분포3: 실제 지도 렌더링 + 지오코딩 + 클러스터/마커. 여기서 다루는 값은
+     latitude/longitude/geocodedAddress/geocodedAt/geocodeStatus 5개 선택 필드
+     뿐이다 — 단계/실적/매출/공종은 여기서 절대 다시 저장하지 않고, 항상
+     buildMapCompanyEntry(co)로 그 순간 다시 계산해서 보여준다(§3 데이터 원칙
+     "지도 전용 객체에 복사해 저장하지 마").
+     ========================================================================== */
+  // 마커 클릭/"고객카드 열기" 정보창에 쓰는 작은 HTML 조각 — .rev-popover 등과 같은
+  // 색 토큰(네이비/화이트/쿨그레이)만 인라인으로 재사용한다(카카오 InfoWindow는
+  // 자체 DOM이라 외부 스타일시트 클래스가 안 먹는 경우가 있어 인라인으로 최소만).
+  function buildMapInfoWindowHtml(entry){
+    const co = entry.co;
+    const stageText = entry.progress.hasAny ? entry.progress.stages[entry.progress.currentIdx].label : '미확인';
+    return `
+      <div style="padding:10px 12px;min-width:200px;max-width:240px;font-family:inherit;">
+        <div style="font-weight:700;font-size:13px;color:#13243E;margin-bottom:4px;">${esc(co.name)}</div>
+        <div style="font-size:11.5px;color:#66758D;margin-bottom:6px;">${esc(co.address || entry.region || '주소 미확인')}</div>
+        <div style="font-size:11.5px;color:#13243E;line-height:1.65;">
+          현재 단계: ${esc(stageText)}<br/>
+          총 실적: ${entry.pourCount ? entry.pourCount + '건' : '없음'}<br/>
+          총 매출: ${entry.totalRevenueText ? esc(entry.totalRevenueText) : '데이터 없음'}<br/>
+          주요 공종: ${entry.mainCategory ? esc(entry.mainCategory) : '—'}
+        </div>
+        <button type="button" id="mapInfoOpenCardBtn" data-open-company="${esc(co.id)}" style="margin-top:8px;height:28px;padding:0 10px;font-size:11.5px;font-weight:650;color:#fff;background:#082f67;border:0;border-radius:5px;cursor:pointer;font-family:inherit;">고객카드 열기</button>
+      </div>
+    `;
+  }
+
+  // §동기화 규칙: 주소가 새로 등록/변경된 업체만 지오코딩한다(co.geocodedAddress와
+  // co.address가 다를 때만) — 주소가 같으면 기존 latitude/longitude를 그대로
+  // 재사용하고, 팝업을 열 때마다 전부 다시 변환하지 않는다. 실패한 업체는
+  // geocodeStatus:'failed'로 남겨 다음에 주소가 바뀌거나 팝업을 다시 열면 재시도된다.
+  function syncGeocodeForEntries(entries, kakao){
+    const geocoder = new kakao.maps.services.Geocoder();
+    const missing = entries.filter(e=> !e.co.address && e.co.geocodeStatus !== 'missing');
+    missing.forEach(e=> D.updateCompany(e.co.id, { geocodeStatus:'missing', latitude:null, longitude:null, geocodedAddress:null }));
+    const pending = entries.filter(e=> e.co.address && e.co.geocodedAddress !== e.co.address);
+    if(!pending.length) return Promise.resolve(missing.length > 0);
+    let changed = true;
+    let i = 0;
+    return new Promise((resolve)=>{
+      function next(){
+        if(i >= pending.length){ resolve(changed); return; }
+        const e = pending[i++];
+        const address = e.co.address;
+        geocoder.addressSearch(address, (result, status)=>{
+          // §동기화 규칙: 검색 도중 사용자가 주소를 또 바꿨으면 이 결과는 이제 낡은
+          // 값이다 — 최신 co를 다시 읽어 주소가 그대로일 때만 저장한다.
+          const latest = D.findCompany(e.co.id);
+          if(latest && latest.address === address){
+            if(status === kakao.maps.services.Status.OK && result && result[0]){
+              D.updateCompany(e.co.id, {
+                latitude: parseFloat(result[0].y), longitude: parseFloat(result[0].x),
+                geocodedAddress: address, geocodedAt: new Date().toISOString(), geocodeStatus:'ok'
+              });
+            } else {
+              D.updateCompany(e.co.id, { geocodeStatus:'failed', geocodedAt: new Date().toISOString() });
+            }
+          }
+          // 카카오 Geocoder 호출 과부하를 피하려고 짧은 간격을 둔다(요청 폭주 방지).
+          setTimeout(next, 80);
+        });
+      }
+      next();
+    });
+  }
+
+  function initMapCanvas(kakao, allEntries){
+    const container = document.getElementById('mapModalCanvas');
+    if(!container) return;
+    const center = new kakao.maps.LatLng(36.2, 127.9); // 대한민국 대략 중앙
+    const map = new kakao.maps.Map(container, { center, level: 13 });
+    if(kakao.maps.ZoomControl){
+      map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
+    }
+    const clusterer = new kakao.maps.MarkerClusterer({ map, averageCenter:true, minLevel:6 });
+    const infoWindow = new kakao.maps.InfoWindow({ removable:true });
+    let markerByCompanyId = new Map();
+
+    function openInfoWindow(entry, marker){
+      infoWindow.setContent(buildMapInfoWindowHtml(entry));
+      infoWindow.open(map, marker);
+      // §2-4 "고객카드 열기": 지도 팝업을 닫고 기존 openCard()를 그대로 재사용한다 —
+      // 새 상세창이나 중복 데이터를 만들지 않는다. InfoWindow는 카카오가 자체적으로
+      // DOM에 붙이는 오버레이라, 콘텐츠가 실제로 붙은 다음 프레임에 버튼을 찾아 붙인다.
+      requestAnimationFrame(()=>{
+        const btn = document.getElementById('mapInfoOpenCardBtn');
+        if(btn) btn.addEventListener('click', ()=>{
+          const companyId = btn.getAttribute('data-open-company');
+          closeMapDistributionModal();
+          openCard(companyId);
+        });
+      });
+    }
+
+    function buildMarkersFor(entries){
+      clusterer.clear();
+      markerByCompanyId = new Map();
+      const markers = [];
+      entries.forEach(e=>{
+        if(!e.hasCoords) return;
+        const pos = new kakao.maps.LatLng(e.co.latitude, e.co.longitude);
+        const marker = new kakao.maps.Marker({ position: pos, title: e.co.name });
+        kakao.maps.event.addListener(marker, 'click', ()=> openInfoWindow(e, marker));
+        markers.push(marker);
+        markerByCompanyId.set(e.co.id, marker);
+      });
+      clusterer.addMarkers(markers);
+    }
+
+    function refreshVisibleList(){
+      if(!mapModalOpen) return;
+      renderMapInfoPanel(buildMapCompanies());
+    }
+    kakao.maps.event.addListener(map, 'idle', refreshVisibleList);
+
+    mapCanvasState = {
+      map, clusterer,
+      getVisibleEntries(){
+        const bounds = map.getBounds();
+        if(!bounds) return [];
+        return applyMapFilters(buildMapCompanies()).filter(e=> e.hasCoords && bounds.contain(new kakao.maps.LatLng(e.co.latitude, e.co.longitude)));
+      },
+      destroy(){
+        try{ clusterer.clear(); infoWindow.close(); } catch(err){ /* 무시 — 팝업 자체가 사라지므로 잔여 정리는 최선 노력만 */ }
+      }
+    };
+
+    updateMapMarkers = function(entries){ buildMarkersFor(applyMapFilters(entries)); };
+    focusMapRegion = function(regionName){
+      const targets = applyMapFilters(buildMapCompanies()).filter(e=> e.hasCoords && (e.region || '주소 미확인') === regionName);
+      if(!targets.length) return;
+      const bounds = new kakao.maps.LatLngBounds();
+      targets.forEach(e=> bounds.extend(new kakao.maps.LatLng(e.co.latitude, e.co.longitude)));
+      map.setBounds(bounds);
+    };
+    focusMapCompany = function(companyId){
+      const marker = markerByCompanyId.get(companyId);
+      if(!marker){ return; }
+      map.panTo(marker.getPosition());
+      const co = D.findCompany(companyId);
+      if(co) openInfoWindow(buildMapCompanyEntry(co), marker);
+    };
+
+    buildMarkersFor(applyMapFilters(allEntries));
+    // §동기화 규칙: 변경/신규 주소만 지오코딩 — 끝나면 마커·정보 패널을 최신 좌표로
+    // 다시 그린다(팝업이 그새 닫혔으면 아무것도 안 함).
+    syncGeocodeForEntries(allEntries, kakao).then((changed)=>{
+      if(!changed || !mapModalOpen) return;
+      const fresh = buildMapCompanies();
+      buildMarkersFor(applyMapFilters(fresh));
+      renderMapInfoPanel(fresh);
+    }).catch((err)=> console.warn('지오코딩 동기화 중 일부 실패:', err));
   }
 
   // ---------------- 진입 ----------------
