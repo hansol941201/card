@@ -2081,6 +2081,58 @@ html,body{background:radial-gradient(circle at 75% -10%,rgba(11,91,211,.055),tra
 .co-row .col-trend, .co-row .trend-cell{ font-size:12px!important; } /* 최근 흐름 배지: 11 -> 12 */
 .co-row .stage-step-label{ font-size:10px!important; } /* 단계 진행상황 라벨: 9 -> 10 */
 .co-row .grade-badge{ font-size:10.5px!important; } /* 등급 배지: 9.5 -> 10.5 */
+
+/* ==========================================================================
+   §지도 분포 라운드(신규) — "시공사 지역 분포" 팝업. 기존 .pi-overlay/.pi-panel과
+   같은 계열(중앙 dim 모달)이지만 요청된 크기(88%/최대 1400px/86vh)가 달라 별도
+   클래스로 정의한다. z-index는 .pi-overlay(300)보다 높고 .side-drawer(400)보다는
+   낮게 잡아 다른 모달과 겹쳐도 순서가 꼬이지 않게 했다. 색상은 기존 --navy/--line/
+   --text 토큰만 재사용 — 새 팔레트 없음, 그라데이션 없음.
+   ========================================================================== */
+.map-modal-overlay{ position:fixed; inset:0; z-index:350; background:rgba(20,24,34,.45); display:flex; align-items:center; justify-content:center; padding:20px; }
+.map-modal-panel{ background:#fff; border-radius:12px; width:88%; max-width:1400px; height:86vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(17,24,39,.22); }
+.map-modal-head{ flex:none; padding:16px 22px; border-bottom:1px solid var(--line); display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.map-modal-title{ font-size:18px; font-weight:700; color:var(--text); }
+.map-modal-subtitle{ font-size:12.5px; color:var(--text-muted); margin-top:2px; }
+.map-modal-close{ background:none; border:none; font-size:22px; line-height:1; cursor:pointer; color:var(--text-muted); padding:0 2px; font-family:inherit; }
+.map-modal-close:hover{ color:var(--text); }
+#mapModalBody{ flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+.map-modal-loading, .map-modal-error, .map-modal-empty{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:var(--text-muted); font-size:13px; padding:20px; text-align:center; }
+.map-modal-error-title{ font-size:14px; font-weight:700; color:var(--text); }
+.map-modal-retry-btn{ height:32px; padding:0 14px; font-size:12.5px; font-weight:650; color:var(--navy); background:#fff; border:1.5px solid var(--navy); border-radius:6px; cursor:pointer; font-family:inherit; }
+.map-modal-retry-btn:hover{ background:#EEF2F8; }
+.map-modal-filters{ flex:none; padding:10px 22px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.map-modal-search{ flex:1 1 200px; min-width:160px; height:32px; padding:0 10px; font-size:12.5px; border:1px solid var(--line); border-radius:6px; font-family:inherit; color:var(--text); }
+.map-modal-select{ height:32px; padding:0 8px; font-size:12px; border:1px solid var(--line); border-radius:6px; font-family:inherit; color:var(--text); background:#fff; }
+.map-modal-toggle-group{ display:flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+.map-modal-toggle-btn{ height:30px; padding:0 10px; font-size:12px; font-weight:600; color:var(--text-muted); background:#fff; border:none; cursor:pointer; font-family:inherit; }
+.map-modal-toggle-btn.is-active{ background:var(--navy); color:#fff; }
+.map-modal-body-main{ flex:1; min-height:0; display:flex; overflow:hidden; }
+.map-modal-mapcol{ flex:0 0 72%; min-width:0; position:relative; border-right:1px solid var(--line); background:#F4F7FB; }
+.map-modal-mapcol .map-modal-canvas{ position:absolute; inset:0; }
+.map-modal-infocol{ flex:0 0 28%; min-width:0; overflow-y:auto; padding:14px 16px; display:flex; flex-direction:column; gap:14px; }
+.map-info-block-title{ font-size:12.5px; font-weight:700; color:var(--text); margin-bottom:8px; }
+.map-info-stat-row{ display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted); padding:3px 0; }
+.map-info-stat-row b{ color:var(--text); font-weight:700; }
+.map-region-row{ display:flex; justify-content:space-between; align-items:center; padding:5px 0; font-size:12px; color:var(--text); cursor:pointer; border-bottom:1px solid var(--line); }
+.map-region-row:last-child{ border-bottom:none; }
+.map-region-row:hover{ color:var(--navy); }
+.map-region-count{ color:var(--text-muted); font-weight:600; }
+.map-company-row{ padding:6px 0; font-size:12px; color:var(--text); cursor:pointer; border-bottom:1px solid var(--line); }
+.map-company-row:last-child{ border-bottom:none; }
+.map-company-row:hover{ background:var(--bg); }
+.map-company-row-name{ font-weight:650; }
+.map-company-row-sub{ color:var(--text-muted); font-size:11px; margin-top:1px; }
+.map-unlocated-summary{ font-size:11.5px; color:var(--text-muted); border-top:1px solid var(--line); padding-top:10px; }
+.map-unlocated-btn{ margin-top:6px; height:28px; padding:0 10px; font-size:11.5px; font-weight:600; color:var(--navy); background:#fff; border:1px solid var(--line); border-radius:5px; cursor:pointer; font-family:inherit; }
+.map-unlocated-btn:hover{ background:var(--bg); }
+body.map-modal-lock{ overflow:hidden; }
+@media(max-width:900px){
+  .map-modal-panel{ width:96%; height:92vh; }
+  .map-modal-body-main{ flex-direction:column; overflow-y:auto; }
+  .map-modal-mapcol{ flex:0 0 auto; height:42vh; border-right:0; border-bottom:1px solid var(--line); }
+  .map-modal-infocol{ flex:1 1 auto; overflow-y:visible; }
+}
 </style>
 </head>
 <body>
@@ -2088,6 +2140,12 @@ html,body{background:radial-gradient(circle at 75% -10%,rgba(11,91,211,.055),tra
 <!-- Firebase 설정 로드(v2/index.html과 동일한 패턴) — 없거나 값이 비어있으면 아래 Storage
      초기화 스크립트가 조용히 건너뛰고 로컬 전용 모드로 남는다. -->
 <script src="firebaseConfig.js" onerror="console.warn('firebaseConfig.js 없음 — 서류함이 로컬 전용 모드로 동작합니다')"></script>
+<!-- §지도 분포 라운드(신규): 카카오맵 JavaScript 키 설정 — firebaseConfig.js와 완전히
+     같은 패턴(파일이 없어도 onerror로 조용히 넘어가고, 지도 분포 팝업만 "설정 필요"
+     안내로 대체된다 — 나머지 CRM 기능/Firebase 연동에는 전혀 영향 없음). 이 파일은
+     .gitignore에 등록되어 있어 저장소에 커밋되지 않는다 — kakaoMapConfig.example.js
+     참고해서 저장소 루트에 직접 만들어야 한다. -->
+<script src="kakaoMapConfig.js" onerror="console.warn('kakaoMapConfig.js 없음 — 지도 분포 팝업이 설정 안내만 표시합니다')"></script>
 
 <div class="gate-screen" id="gateScreen">
   <div class="gate-brand">한솔 고객관리</div>
@@ -2162,6 +2220,14 @@ html,body{background:radial-gradient(circle at 75% -10%,rgba(11,91,211,.055),tra
              테두리형 버튼(.list-phone-btn)+📞 아이콘으로 키웠다(§전화 요청 기록 버튼 확대
              라운드) — 다만 진한 네이비로 채운 주 CTA "+ 고객 등록"보다는 한 단계 낮은
              톤(흰 배경+네이비 테두리)이라 위계는 그대로 유지된다. -->
+        <!-- §지도 분포 라운드(신규): "전화 요청 기록"과 완전히 같은 보조 버튼 스타일
+             (.list-phone-btn 그대로 재사용 — 높이/테두리/글꼴/hover 전부 동일)로, 그
+             왼쪽에 배치한다. 이모지 대신 작은 SVG 핀 아이콘을 쓴다(§요청사항). -->
+        <button type="button" id="crmMapDistributionBtn" class="list-phone-btn">
+          <span class="list-phone-btn-icon" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.4-7-11.5A7 7 0 0 1 19 9.5C19 14.6 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg>
+          </span>지도 분포
+        </button>
         <button type="button" id="crmPhoneRequestBtn" class="list-phone-btn"><span class="list-phone-btn-icon" aria-hidden="true">📞</span>전화 요청 기록</button>
         <button type="button" id="crmAddBtn" class="list-add-btn">+ 고객 등록</button>
       </div>
@@ -2263,6 +2329,8 @@ html,body{background:radial-gradient(circle at 75% -10%,rgba(11,91,211,.055),tra
        전용 root — 다른 중앙 모달과 같은 .pi-overlay/.pi-panel 패턴, 폭만 작게(§요청사항
        "모달을 과도하게 크게 만들지 마"). -->
   <div id="phoneReqModalRoot"></div>
+  <!-- §지도 분포 라운드(신규): "지도 분포" 버튼이 여는 중앙 대형 모달 전용 root. -->
+  <div id="mapDistributionModalRoot"></div>
 </div>
 
 <script>
@@ -14096,7 +14164,126 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(dupBackBtn) dupBackBtn.addEventListener('click', ()=>{ s.duplicateCandidates = null; renderPhoneRequestModal(); });
   }
 
+  /* ==========================================================================
+     §지도 분포 라운드(신규) — "시공사 지도 분포" 팝업. 기존 CRM 데이터(companies)를
+     단일 원본으로 재사용하고, 지도 전용 사본을 따로 저장하지 않는다. 카카오맵 JS
+     SDK는 이 팝업을 처음 열 때만 동적으로 로드하고(§5), 로드 실패/키 없음이어도
+     나머지 CRM 기능에는 전혀 영향이 없도록 완전히 분리한다(§보안 원칙).
+     ========================================================================== */
+  let mapModalOpen = false;
+  let mapModalOutsideHandlers = null; // ESC/배경클릭 핸들러 — 열 때마다 재등록·정리
+  let kakaoSdkLoadPromise = null; // §7 SDK 중복 로드 방지 — 한 번 로드를 시작하면 그 Promise를 계속 재사용
+  // §6/§8: services(Geocoder)/clusterer 라이브러리만 로드, autoload=false로 받아
+  // kakao.maps.load()로 수동 초기화한다. REST API 키/어드민 키는 이 파일 어디에서도
+  // 쓰지 않는다 — JavaScript 키 하나만 kakaoMapConfig.js에서 읽는다.
+  function loadKakaoMapSdk(){
+    if(kakaoSdkLoadPromise) return kakaoSdkLoadPromise; // 이미 로드 중이거나 완료됨 — 새 <script> 추가 안 함
+    const cfg = window.SHIN2_KAKAO_MAP_CONFIG;
+    const key = cfg && cfg.javascriptKey;
+    if(!key || key === 'YOUR_KAKAO_JAVASCRIPT_KEY'){
+      kakaoSdkLoadPromise = Promise.reject(new Error('카카오맵 JavaScript 키가 설정되지 않았습니다.'));
+      return kakaoSdkLoadPromise;
+    }
+    if(window.kakao && window.kakao.maps && window.kakao.maps.services){
+      // 이미 다른 경로로 로드가 끝나 있으면(드문 경우) 그대로 재사용.
+      kakaoSdkLoadPromise = Promise.resolve(window.kakao);
+      return kakaoSdkLoadPromise;
+    }
+    kakaoSdkLoadPromise = new Promise((resolve, reject)=>{
+      const existing = document.getElementById('kakaoMapSdkScript');
+      if(existing){
+        // 이미 로딩 중인 <script> 태그가 있으면 그 완료를 기다린다(중복 <script> 추가 금지, §7).
+        existing.addEventListener('load', ()=>{
+          try{ window.kakao.maps.load(()=> resolve(window.kakao)); } catch(e){ reject(e); }
+        });
+        existing.addEventListener('error', ()=> reject(new Error('카카오맵 SDK 로드 실패')));
+        return;
+      }
+      const script = document.createElement('script');
+      script.id = 'kakaoMapSdkScript';
+      // §6: libraries=services,clusterer&autoload=false 그대로 적용. key는 절대
+      // console.log나 화면에 출력하지 않는다 — URL 문자열 조립에만 쓰고 즉시 버려진다.
+      script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(key)}&libraries=services,clusterer&autoload=false`;
+      script.onload = ()=>{
+        try{ window.kakao.maps.load(()=> resolve(window.kakao)); } catch(e){ reject(e); }
+      };
+      script.onerror = ()=> reject(new Error('카카오맵 SDK 로드 실패(네트워크 또는 도메인 제한을 확인하세요)'));
+      document.head.appendChild(script);
+    });
+    return kakaoSdkLoadPromise;
+  }
+
+  function closeMapDistributionModal(){
+    const root = document.getElementById('mapDistributionModalRoot');
+    if(root) root.innerHTML = '';
+    mapModalOpen = false;
+    document.body.classList.remove('map-modal-lock');
+    if(mapModalOutsideHandlers){ mapModalOutsideHandlers(); mapModalOutsideHandlers = null; }
+  }
+
+  function openMapDistributionModal(){
+    if(mapModalOpen) return; // 이미 열려있으면 다시 열지 않음(중복 방지)
+    mapModalOpen = true;
+    const root = document.getElementById('mapDistributionModalRoot');
+    if(!root) return;
+    document.body.classList.add('map-modal-lock'); // 기존 chart-lock과는 별도 클래스라 서로 안 건드림(§2-2 "충돌 없게")
+    root.innerHTML = `
+      <div class="map-modal-overlay" id="mapModalOverlay">
+        <div class="map-modal-panel" role="dialog" aria-modal="true" aria-label="시공사 지역 분포">
+          <div class="map-modal-head">
+            <div class="map-modal-title-wrap">
+              <div class="map-modal-title">시공사 지역 분포</div>
+              <div class="map-modal-subtitle">전국 등록 업체의 위치와 영업 현황</div>
+            </div>
+            <button type="button" class="map-modal-close" id="mapModalCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div id="mapModalBody"></div>
+        </div>
+      </div>
+    `;
+    document.getElementById('mapModalCloseBtn').addEventListener('click', closeMapDistributionModal);
+    document.getElementById('mapModalOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'mapModalOverlay') closeMapDistributionModal(); });
+    const onEsc = (e)=>{ if(e.key === 'Escape') closeMapDistributionModal(); };
+    document.addEventListener('keydown', onEsc);
+    mapModalOutsideHandlers = ()=> document.removeEventListener('keydown', onEsc);
+    renderMapModalBody();
+  }
+
+  // §4/§9: 키가 없거나 SDK 로드에 실패해도 나머지 CRM은 전혀 영향받지 않는다 — 이
+  // 팝업 내부에서만 안내와 재시도 버튼을 보여준다.
+  function renderMapModalSetupNotice(message){
+    const wrap = document.getElementById('mapModalBody');
+    if(!wrap) return;
+    wrap.innerHTML = `
+      <div class="map-modal-error">
+        <div class="map-modal-error-title">지도 설정이 필요합니다</div>
+        <div>${esc(message)}</div>
+        <div>저장소 루트에 kakaoMapConfig.js를 만들고 카카오맵 JavaScript 키를 넣어주세요(kakaoMapConfig.example.js 참고).</div>
+        <button type="button" class="map-modal-retry-btn" id="mapModalRetryBtn">다시 시도</button>
+      </div>
+    `;
+    const retryBtn = document.getElementById('mapModalRetryBtn');
+    if(retryBtn) retryBtn.addEventListener('click', ()=>{ kakaoSdkLoadPromise = null; renderMapModalBody(); });
+  }
+
+  // §지도분포2/3에서 본문(필터/지도/정보 패널)을 채운다. 여기서는 SDK 로드 상태만
+  // 관리한다 — 로드 성공 시 renderMapModalMain(kakao)를 호출한다(다음 라운드에서 정의).
+  function renderMapModalBody(){
+    const wrap = document.getElementById('mapModalBody');
+    if(!wrap) return;
+    wrap.innerHTML = `<div class="map-modal-loading">지도를 불러오는 중…</div>`;
+    loadKakaoMapSdk().then((kakao)=>{
+      if(!mapModalOpen) return; // 로딩 중 팝업이 닫혔으면 아무것도 안 함
+      if(typeof renderMapModalMain === 'function') renderMapModalMain(kakao);
+      else wrap.innerHTML = `<div class="map-modal-loading">지도 SDK 로드 완료 — 화면 구성은 다음 단계에서 이어집니다.</div>`;
+    }).catch((err)=>{
+      if(!mapModalOpen) return;
+      renderMapModalSetupNotice(err && err.message ? err.message : '지도를 불러오지 못했습니다.');
+    });
+  }
+
   // ---------------- 진입 ----------------
+  document.getElementById('crmMapDistributionBtn').addEventListener('click', openMapDistributionModal);
   document.getElementById('crmPhoneRequestBtn').addEventListener('click', openPhoneRequestModal);
   document.getElementById('crmAddBtn').addEventListener('click', openAddCompanyForm);
   // 기존 두 함수(openPartnerImportModal/openPourImportModal)는 그대로 두고, 드롭다운 메뉴
