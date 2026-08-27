@@ -613,15 +613,6 @@
   /* 행 전체를 빨갛게 칠하지 않고 왼쪽 3px 라인만 표시한다(§5/§9 "화면 전체 행을 진한
      빨간색으로 칠하지 마세요"). */
   .co-row.is-overdue{ border-left:3px solid #DC2626; }
-  /* §목록 행 하이라이트 라운드(신규): "실적 상승 업체"(TOP5 카드 위젯과 같은 판정)를
-     목록 전체에서 스크롤하며 훑어봐도 눈에 띄게 왼쪽 초록 라인 + 아주 옅은 배경 틴트로
-     표시한다("하이라이트 라인 탐지형태") — 기한초과(is-overdue, 빨강)와 색이 겹치지
-     않도록 기존 rising-up/화살표와 같은 초록 계열을 쓴다. is-overdue와 동시에 해당하면
-     기한초과가 더 급한 신호라 왼쪽 라인은 빨강이 우선한다(CSS 순서상 is-overdue가 이
-     블록보다 뒤에 있으면 안 겹치므로, 여기서는 배경 틴트만 추가하고 라인은 겹칠 때
-     보더 쪽에서 나중 규칙이 이기게 둔다 — 굳이 !important로 강제하지 않음). */
-  .co-row.is-rising{ background:#F3FBF6; border-left:3px solid #16A34A; }
-  .co-row.is-rising.is-overdue{ background:#FFF6F3; border-left:3px solid #DC2626; }
 
   /* 협력사 등급 배지(§4) — 별표 금지, 색상+텍스트 배지만 사용. */
   /* §등급 표시 재확인 라운드: 등급의 실제 우열 의미가 확인되지 않아, 색으로 "좋다/나쁘다"를
@@ -2021,7 +2012,7 @@ html,body{background:#F7F9FC;font-size:13px}
 .rising-grid{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:9px!important}
 .rising-card{min-width:0!important;background:#fff!important;border:1px solid #E9EDF3!important;border-radius:7px!important;padding:8px 9px 7px!important;box-shadow:0 1px 3px rgba(30,50,80,.04)!important}
 .rising-card:hover{border-color:#CBD7E6!important;box-shadow:0 2px 7px rgba(30,50,80,.07)!important}
-.rising-card-top{display:flex;align-items:center;gap:5px;min-width:0;margin-bottom:6px}.rising-rank{width:18px;height:18px;border-radius:4px;background:#17305C;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}.rising-name{font-size:11.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rising-row{font-size:9.5px;color:#8A97A8;display:grid!important;grid-template-columns:1fr 1fr 1fr;gap:3px}.rising-nums{font-size:12px;font-weight:700;color:#24324A;margin-top:2px;white-space:nowrap}.rising-up{color:#169B62;margin-left:5px}.rising-bar{height:3px!important;background:#EEF2F6!important;border-radius:99px;margin-top:6px!important}.rising-bar-fill{background:#19A66A!important;border-radius:99px}.rising-empty{padding:8px 10px!important;border:0!important;background:#F8FAFC!important;border-radius:6px!important;color:#7A8799!important;font-size:11px!important}
+.rising-card-top{display:flex;align-items:center;gap:5px;min-width:0;margin-bottom:6px}.rising-rank{width:18px;height:18px;border-radius:4px;background:#17305C;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}.rising-name{font-size:11.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rising-row{font-size:9.5px;color:#8A97A8;display:grid!important;grid-template-columns:1fr 1fr 1fr;gap:3px}.rising-nums{font-size:12px;font-weight:700;color:#24324A;margin-top:2px;white-space:nowrap}.rising-up{color:#169B62;margin-left:5px}.rising-bar{height:3px!important;background:#EEF2F6!important;border-radius:99px;margin-top:6px!important}.rising-bar-fill{background:#19A66A!important;border-radius:99px}.rising-empty{padding:8px 10px!important;border:0!important;background:#F8FAFC!important;border-radius:6px!important;color:#7A8799!important;font-size:11px!important}.rising-minichart{display:flex!important;align-items:flex-end!important;gap:6px!important;height:34px!important;margin-top:7px!important}.rising-minibar{flex:1!important;min-width:0!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:flex-end!important;height:100%!important}.rising-minibar-fill{width:100%!important;border-radius:3px 3px 0 0!important;min-height:2px!important}.rising-minibar-fill.y2024{background:#CBD5E1!important}.rising-minibar-fill.y2025{background:#19A66A!important}.rising-minibar-label{font-size:9px!important;color:#8A97A8!important;margin-top:2px!important;line-height:1!important}
 
 /* Search row */
 .list-filter-row{margin-bottom:8px;gap:5px}.list-filter-chip{height:27px;padding:0 10px;font-size:11px;border-radius:5px}
@@ -5944,10 +5935,6 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 쓰지 않는다는 새 원칙(§4)에 따라 제거했다 — 대신 실제 Partner Dashboard 등급
     // (co.partnerDashboard.grade)이 있는 업체만 등급 배지로 표시한다(getCompanyGrade).
     renderRisingSection(companies);
-    // §목록 행 하이라이트 라운드: TOP5 카드와 같은 판정을 재사용해(새 계산 없음) 목록
-    // 전체에서 "실적 상승 업체" 행을 한눈에 훑어볼 수 있게 한다 — 여기서 한 번만
-    // 계산해 아래 각 행에서는 Set 조회만 한다(다른 인덱스들과 같은 성능 패턴).
-    const risingCompanyIds = buildRisingCompanyIdSet(companies);
 
     const filterCounts = {};
     FILTER_DEFS.forEach(([key])=>{ filterCounts[key] = enriched.filter(r=> matchesFilter(r.co, r.progress, key)).length; });
@@ -6019,9 +6006,6 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 미수금 금액은 노출하지 않고, 합계가 0보다 큰 업체에만 카드 앞 검정 패널을 붙인다.
       const receivable = D.getCompanyReceivable(co);
       const receivablePenaltyClass = (receivable && receivable.total > 0) ? ' has-receivable' : '';
-      // §목록 행 하이라이트 라운드: 위에서 한 번만 계산해 둔 risingCompanyIds 조회만
-      // (새 계산 없음) — "실적 상승 업체" 행에 왼쪽 초록 강조선을 붙인다.
-      const risingRowClass = risingCompanyIds.has(co.id) ? ' is-rising' : '';
       // §최근 요청 라운드에서 "최근 시공"을 협력사 컬럼 안으로 옮겼다가, §최근 시공 위치
       // 변경 라운드에서 업체명 오른쪽(같은 줄)으로 바꿨는데, 업체명 길이에 따라 위치가
       // 흔들려 지저분하다는 피드백으로 §최근 실적 독립 컬럼 복원 라운드에서 다시 독립
@@ -6172,7 +6156,7 @@ window.SHIN2_CRM_APP_INIT = function(){
             ${relEntries.length > 1 ? `<span class="relation-badge">+${relEntries.length - 1}</span>` : ''}
           </div>` : '';
       return `
-      <div class="co-row${rowOverdueClass}${receivablePenaltyClass}${risingRowClass}" data-id="${esc(co.id)}">
+      <div class="co-row${rowOverdueClass}${receivablePenaltyClass}" data-id="${esc(co.id)}">
         <div class="col-name">
           <div class="col-name-top">
             <span class="co-name-badges">${partnerGlyphHtml(co)}<span class="co-name-text">${esc(co.name)}</span></span>
@@ -9559,14 +9543,6 @@ window.SHIN2_CRM_APP_INIT = function(){
     const combined = numeric.concat(newOnes);
     return { available: combined.length > 0, items: combined.slice(0, 5), totalComparable: rising.length, newCount: newOnes.length };
   }
-  // §목록 행 하이라이트 라운드: "실적 상승 업체"(TOP5 카드와 동일 판정, computeRisingCompanies
-  // 그대로 재사용) 전체 목록을 Set<companyId>로 반환 — TOP5로 자르지 않는다("탐지형태"라
-  // 목록을 스크롤하면서 훑어볼 때 상승 업체를 전부 눈에 띄게 하는 목적이라 5개로 제한할
-  // 이유가 없다). renderList()에서 한 번만 계산해 각 행에서 조회만 한다(§성능, 다른
-  // 인덱스들과 같은 패턴).
-  function buildRisingCompanyIdSet(companies){
-    return new Set(computeRisingCompanies(companies).map(r=> r.co.id));
-  }
   function renderRisingSection(companies){
     const root = document.getElementById('crmRisingSection');
     if(!root) return;
@@ -9584,13 +9560,24 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="rising-head">
         <div class="rising-title"><span class="rising-arrow">▲</span> 실적 상승 업체 <span class="rising-sub">(2025년 vs 2024년 POUR 실적 기준)</span></div>
       </div>
-      <div class="rising-grid">${data.items.map((it, i)=> `
+      <div class="rising-grid">${data.items.map((it, i)=> {
+        // §TOP5 카드 그래프 변경 라운드: 하단의 "증가율" 단일 막대 대신, 2024건/2025건
+        // 두 값을 나란히 비교하는 미니 막대 그래프로 바꿨다 — 카드 안 수치(y2024/y2025)는
+        // 그대로 재사용, 새 계산 없음. 카드마다 자기 자신의 최댓값 기준으로 막대 높이를
+        // 정해서(전체 카드 공통 스케일이 아님) 값이 작은 업체도 막대가 안 보이지 않게 한다.
+        const barMax = Math.max(it.y2024, it.y2025, 1);
+        const h2024 = Math.round((it.y2024 / barMax) * 100);
+        const h2025 = Math.round((it.y2025 / barMax) * 100);
+        return `
         <div class="rising-card" data-id="${esc(it.co.id)}">
           <div class="rising-card-top"><span class="rising-rank">${i+1}</span><span class="rising-name">${esc(it.co.name)}</span></div>
-          <div class="rising-row"><span>2024</span><span>2025</span><span>증감</span></div>
           <div class="rising-nums">${it.y2024}건 → ${it.y2025}건 <span class="rising-up">${it.isNew ? '신규 증가' : '▲ ' + it.pct + '%'}</span></div>
-          <div class="rising-bar"><div class="rising-bar-fill" style="width:${it.isNew ? 100 : Math.min(100, it.pct)}%"></div></div>
-        </div>`).join('')}</div>
+          <div class="rising-minichart">
+            <div class="rising-minibar"><div class="rising-minibar-fill y2024" style="height:${h2024}%"></div><div class="rising-minibar-label">24</div></div>
+            <div class="rising-minibar"><div class="rising-minibar-fill y2025" style="height:${h2025}%"></div><div class="rising-minibar-label">25</div></div>
+          </div>
+        </div>`;
+      }).join('')}</div>
     `;
     root.querySelectorAll('.rising-card').forEach(card=>{
       card.addEventListener('click', ()=> openCard(card.getAttribute('data-id')));
