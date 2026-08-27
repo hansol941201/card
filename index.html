@@ -2342,6 +2342,11 @@ body.map-modal-lock{ overflow:hidden; }
        없앴다(§요청사항). -->
   <div id="contribPopoverRoot"></div>
   <div id="trendPopoverRoot"></div>
+  <!-- §최근 요청 컬럼 미니 팝업 라운드(신규): "최근 요청" 날짜 클릭 시 뜨는 작은
+       popover 전용 root — totalRevenuePopoverRoot와 완전히 같은 패턴(overlay 없음,
+       position:fixed 작은 카드만, 바깥클릭/ESC로 닫힘). 큰 "요청자료" 중앙 모달
+       (openMemoPanel)은 이 팝업 안의 "전체 기록 보기" 버튼을 눌러야만 열린다. -->
+  <div id="requestPopoverRoot"></div>
   <!-- §전화 요청 기록 라운드(신규): 목록 상단 "+ 전화 요청 기록" 버튼이 여는 중앙 모달
        전용 root — 다른 중앙 모달과 같은 .pi-overlay/.pi-panel 패턴, 폭만 작게(§요청사항
        "모달을 과도하게 크게 만들지 마"). -->
@@ -5896,6 +5901,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(typeof closeInsightPopover === 'function') closeInsightPopover();
     if(typeof closeContribPopover === 'function') closeContribPopover();
     if(typeof closeTrendPopover === 'function') closeTrendPopover();
+    if(typeof closeRequestPopover === 'function') closeRequestPopover();
     const companies = D.loadCompanies();
     listTitle.textContent = '고객 ' + companies.length;
     // §미등록 업체 관리 라운드: 별도 저장소 없이 매번 다시 계산한다(§ "등록 후" 요구사항 —
@@ -6242,14 +6248,14 @@ window.SHIN2_CRM_APP_INIT = function(){
         if(co) openRequestDrawer(co);
       });
     });
-    // §최근 요청 컬럼 라운드 — "최근 요청" 셀 클릭 -> 고객카드의 "최근 요청 / 고객
-    // 메모"와 완전히 같은 패널(openMemoPanel/renderMemoPanel, 이미 전역 루트
-    // (#memoPanelRoot)에 렌더링돼 목록 화면에서도 그대로 열 수 있다).
+    // §최근 요청 컬럼 미니 팝업 라운드 — "최근 요청" 날짜 클릭 -> 큰 중앙 모달
+    // (openMemoPanel) 대신 클릭한 위치 옆에 작은 popover(openRequestPopover, 다른 네
+    // 미니 popover와 같은 패턴). 팝업 안의 "전체 기록 보기"를 눌러야만 기존 큰 모달이 열린다.
     listEl.querySelectorAll('[data-name-request-detail]').forEach(btn=>{
       btn.addEventListener('click', (e)=>{
         e.stopPropagation();
         const co = D.findCompany(btn.getAttribute('data-name-request-detail'));
-        if(co) openMemoPanel(co);
+        if(co) openRequestPopover(co, btn);
       });
     });
     // §최근 실적 독립 컬럼 복원 라운드 §7 → §시공실적 컬럼 재배치/Drawer 완전통일 라운드
@@ -10655,6 +10661,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(typeof closeTotalRevenuePopover === 'function') closeTotalRevenuePopover();
     if(typeof closeInsightPopover === 'function') closeInsightPopover();
     if(typeof closeTrendPopover === 'function') closeTrendPopover();
+    if(typeof closeRequestPopover === 'function') closeRequestPopover();
     const root = document.getElementById('contribPopoverRoot');
     if(!root) return;
     contribPopoverCompanyId = co.id;
@@ -10708,6 +10715,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(typeof closeTotalRevenuePopover === 'function') closeTotalRevenuePopover();
     if(typeof closeInsightPopover === 'function') closeInsightPopover();
     if(typeof closeContribPopover === 'function') closeContribPopover();
+    if(typeof closeRequestPopover === 'function') closeRequestPopover();
     const root = document.getElementById('trendPopoverRoot');
     if(!root) return;
     trendPopoverCompanyId = co.id;
@@ -10743,6 +10751,65 @@ window.SHIN2_CRM_APP_INIT = function(){
       document.addEventListener('keydown', onEsc);
     }, 0);
     closeTrendPopoverOutsideHandlers = ()=>{
+      document.removeEventListener('click', onOutside);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }
+
+  // §최근 요청 컬럼 미니 팝업 라운드(신규): "최근 요청" 날짜 클릭 시 큰 중앙 모달
+  // (openMemoPanel) 대신 클릭한 위치 옆에 작게 뜨는 popover — 다른 네 개(총 매출/
+  // 고객 성향/실적↔매출/최근 흐름)와 완전히 같은 패턴(overlay 없음, position:fixed,
+  // 바깥클릭/ESC로 닫힘, positionRevPopover로 위치 계산). 데이터는 buildRequestListItems
+  // (이미 renderList에서 계산해 둔 것과 동일한 함수)를 최신 상태로 다시 조회해 최근 몇 건만
+  // 보여주고, "전체 기록 보기"를 눌러야만 기존 큰 모달(openMemoPanel)이 열린다.
+  let requestPopoverCompanyId = null;
+  let closeRequestPopoverOutsideHandlers = null;
+  function closeRequestPopover(){
+    const root = document.getElementById('requestPopoverRoot');
+    if(root) root.innerHTML = '';
+    requestPopoverCompanyId = null;
+    if(closeRequestPopoverOutsideHandlers){ closeRequestPopoverOutsideHandlers(); closeRequestPopoverOutsideHandlers = null; }
+  }
+  function openRequestPopover(co, anchorEl){
+    if(requestPopoverCompanyId === co.id){ closeRequestPopover(); return; } // 같은 날짜 재클릭 시 닫기
+    closeRequestPopover();
+    if(typeof closeTotalRevenuePopover === 'function') closeTotalRevenuePopover();
+    if(typeof closeInsightPopover === 'function') closeInsightPopover();
+    if(typeof closeContribPopover === 'function') closeContribPopover();
+    if(typeof closeTrendPopover === 'function') closeTrendPopover();
+    const root = document.getElementById('requestPopoverRoot');
+    if(!root) return;
+    requestPopoverCompanyId = co.id;
+    const items = buildRequestListItems(co).slice(0, 3); // 최근 3건만 — 나머지는 "전체 기록 보기"로
+    const bodyHtml = items.length ? items.map(it=> `
+      <div class="cat-dist-row" style="align-items:flex-start;">
+        <span class="cat-dist-name" style="flex:0 0 auto;color:var(--text-faint);">${esc(fmtDate(it.createdAtIso))}</span>
+        <span class="cat-dist-count" style="text-align:right;font-weight:500;">${esc(it.text)}</span>
+      </div>
+    `).join('') : `<div class="rev-pop-note">최근 요청/메모 기록이 없습니다.</div>`;
+    root.innerHTML = `
+      <div class="rev-popover" id="requestPopover">
+        <div class="rev-pop-head">
+          <div class="rev-pop-title">최근 요청 — ${esc(co.name)}</div>
+          <button type="button" class="rev-pop-close" id="requestPopCloseBtn" aria-label="닫기">&times;</button>
+        </div>
+        <div class="rev-pop-body">
+          ${bodyHtml}
+          <button type="button" class="co-text-action" id="requestPopFullBtn" style="margin-top:8px;width:100%;">전체 기록 보기</button>
+        </div>
+      </div>
+    `;
+    const pop = document.getElementById('requestPopover');
+    positionRevPopover(pop, anchorEl);
+    document.getElementById('requestPopCloseBtn').addEventListener('click', closeRequestPopover);
+    document.getElementById('requestPopFullBtn').addEventListener('click', ()=>{ closeRequestPopover(); openMemoPanel(co); });
+    const onOutside = (e)=>{ if(!pop.contains(e.target)) closeRequestPopover(); };
+    const onEsc = (e)=>{ if(e.key === 'Escape') closeRequestPopover(); };
+    setTimeout(()=>{
+      document.addEventListener('click', onOutside);
+      document.addEventListener('keydown', onEsc);
+    }, 0);
+    closeRequestPopoverOutsideHandlers = ()=>{
       document.removeEventListener('click', onOutside);
       document.removeEventListener('keydown', onEsc);
     };
@@ -10836,6 +10903,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(typeof closeInsightPopover === 'function') closeInsightPopover();
     if(typeof closeContribPopover === 'function') closeContribPopover();
     if(typeof closeTrendPopover === 'function') closeTrendPopover();
+    if(typeof closeRequestPopover === 'function') closeRequestPopover();
     const root = document.getElementById('totalRevenuePopoverRoot');
     if(!root) return;
     const revAll = D.getCompanyTotalRevenueAllYears(co);
@@ -10938,6 +11006,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(typeof closeTotalRevenuePopover === 'function') closeTotalRevenuePopover();
     if(typeof closeContribPopover === 'function') closeContribPopover();
     if(typeof closeTrendPopover === 'function') closeTrendPopover();
+    if(typeof closeRequestPopover === 'function') closeRequestPopover();
     const root = document.getElementById('insightPopoverRoot');
     if(!root) return;
     insightPopoverCompanyId = co.id;
