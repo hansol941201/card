@@ -195,6 +195,13 @@
   .col-name-relation-name:hover{ text-decoration:underline; color:var(--blue); }
   .relation-badge{ flex:0 0 auto; display:inline-block; padding:1px 5px; font-size:9.5px; font-weight:700; border-radius:4px; background:#EEF2F7; color:#5B6B84; }
   .relation-badge.rel-parent{ background:#E8F0FE; color:#1D4ED8; }
+  /* §협력사 옆 최근 요청 날짜 표시 라운드 — 이미 계산돼 있던 requestHtml(옛 "최근 요청"
+     컬럼, §22 requestHistoryIndex)을 업체명 칸 안에 한 줄로 다시 붙인다. 행 높이가
+     늘어나지 않도록 col-name-relation과 같은 작고 옅은 한 줄 스타일을 재사용한다. */
+  .col-name-request{ display:flex; align-items:center; gap:4px; min-width:0; font-size:11px; color:var(--text-faint); background:none; border:none; padding:0; cursor:pointer; font-family:inherit; text-align:left; white-space:nowrap; overflow:hidden; }
+  .col-name-request:hover{ color:var(--navy); text-decoration:underline; }
+  .col-name-request-date{ flex:0 0 auto; }
+  .col-name-request-label{ overflow:hidden; text-overflow:ellipsis; }
   .relation-badge.rel-sub{ background:#FDF1E7; color:#B45309; }
   .relation-badge.rel-affiliate{ background:#F1EEFD; color:#6D28D9; }
   .col-recent{ flex:1.4 1 150px; min-width:0; color:var(--text-muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -6028,6 +6035,17 @@ window.SHIN2_CRM_APP_INIT = function(){
       } else {
         requestHtml = `<button type="button" class="request-cell" data-request-detail="${esc(co.id)}"><span class="data-none">—</span></button>`;
       }
+      // §협력사 옆 최근 요청 날짜 표시 라운드(신규): 위에서 이미 계산해 둔 latestRequest를
+      // 그대로 재사용해(새 계산 없음), 업체명(협력사) 칸 안에 아주 짧은 한 줄로만 보여준다
+      // — 날짜 + 요청 라벨 1개만("요청내용은 간단하게"). 클릭하면 기존 최근 요청
+      // Drawer(openRequestDrawer)가 그대로 열린다. 요청 이력이 없는 업체는 줄 자체를
+      // 안 보여준다(데이터 없음을 "—"로 지어내 채우지 않음).
+      const nameRequestLineHtml = latestRequest
+        ? `<button type="button" class="col-name-request" data-request-detail="${esc(co.id)}">
+            <span class="col-name-request-date">${esc(fmtRelativeActivityDate(latestRequest.createdAt))}</span>
+            <span class="col-name-request-label">${esc(latestRequest.labels[0] || '')} 요청</span>
+          </button>`
+        : '';
       // §고객 성향 컬럼 라운드 §2/§6: 목록에는 co.customerInsight(별도 신규 필드,
       // 기존 salesTendency/reactions와 무관 — §10 "기존 필드와 충돌하지 않는 별도 구조")의
       // 대표 태그 최대 3개만 짧게 보여준다. buildInsightRepTags는 아래 renderGlanceRow 근처
@@ -6136,6 +6154,7 @@ window.SHIN2_CRM_APP_INIT = function(){
             <span class="co-name-badges">${partnerGlyphHtml(co)}<span class="co-name-text">${esc(co.name)}</span></span>
           </div>
           ${relationRowHtml}
+          ${nameRequestLineHtml}
         </div>
         <div class="col-pour">${lastActHtml}</div>
         <div class="col-yr">${yrHtml}</div>
