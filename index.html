@@ -14181,12 +14181,20 @@ window.SHIN2_CRM_APP_INIT = function(){
   // §6/§8: services(Geocoder)/clusterer 라이브러리만 로드, autoload=false로 받아
   // kakao.maps.load()로 수동 초기화한다. REST API 키/어드민 키는 이 파일 어디에서도
   // 쓰지 않는다 — JavaScript 키 하나만 kakaoMapConfig.js에서 읽는다.
+  // §카카오 키 배포 진단 라운드: "설정 파일이 아예 없음/키가 안 채워짐"과 "설정은
+  // 됐는데 카카오 쪽에서 거부함(허용 도메인 미등록, 유효하지 않은 키 등)"은 사용자가
+  // 다음에 뭘 해야 할지가 다르다 — 원인을 err.kind에 남겨 렌더링 쪽에서 문구를
+  // 다르게 보여준다. 'missing' = kakaoMapConfig.js/키 자체가 없음(설정 파일 누락),
+  // 'authError' = 키는 있는데 SDK 스크립트 로드 자체가 실패(네트워크 또는 카카오
+  // 디벨로퍼스 허용 도메인 문제일 가능성이 높음), 'unknown' = 그 외(로드는 됐는데
+  // kakao.maps.load 콜백 단계에서 예외 등).
+  function mapSdkError(message, kind){ const e = new Error(message); e.kind = kind; return e; }
   function loadKakaoMapSdk(){
     if(kakaoSdkLoadPromise) return kakaoSdkLoadPromise; // 이미 로드 중이거나 완료됨 — 새 <script> 추가 안 함
     const cfg = window.SHIN2_KAKAO_MAP_CONFIG;
     const key = cfg && cfg.javascriptKey;
     if(!key || key === 'YOUR_KAKAO_JAVASCRIPT_KEY'){
-      kakaoSdkLoadPromise = Promise.reject(new Error('카카오맵 JavaScript 키가 설정되지 않았습니다.'));
+      kakaoSdkLoadPromise = Promise.reject(mapSdkError('카카오맵 JavaScript 키가 설정되지 않았습니다.', 'missing'));
       return kakaoSdkLoadPromise;
     }
     if(window.kakao && window.kakao.maps && window.kakao.maps.services){
@@ -14199,9 +14207,9 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(existing){
         // 이미 로딩 중인 <script> 태그가 있으면 그 완료를 기다린다(중복 <script> 추가 금지, §7).
         existing.addEventListener('load', ()=>{
-          try{ window.kakao.maps.load(()=> resolve(window.kakao)); } catch(e){ reject(e); }
+          try{ window.kakao.maps.load(()=> resolve(window.kakao)); } catch(e){ reject(mapSdkError(e && e.message ? e.message : String(e), 'unknown')); }
         });
-        existing.addEventListener('error', ()=> reject(new Error('카카오맵 SDK 로드 실패')));
+        existing.addEventListener('error', ()=> reject(mapSdkError('카카오맵 SDK 로드 실패', 'authError')));
         return;
       }
       const script = document.createElement('script');
@@ -14210,9 +14218,12 @@ window.SHIN2_CRM_APP_INIT = function(){
       // console.log나 화면에 출력하지 않는다 — URL 문자열 조립에만 쓰고 즉시 버려진다.
       script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(key)}&libraries=services,clusterer&autoload=false`;
       script.onload = ()=>{
-        try{ window.kakao.maps.load(()=> resolve(window.kakao)); } catch(e){ reject(e); }
+        try{ window.kakao.maps.load(()=> resolve(window.kakao)); } catch(e){ reject(mapSdkError(e && e.message ? e.message : String(e), 'unknown')); }
       };
-      script.onerror = ()=> reject(new Error('카카오맵 SDK 로드 실패(네트워크 또는 도메인 제한을 확인하세요)'));
+      // 키는 설정돼 있는데 SDK 스크립트 자체가 못 뜨는 경우 — 카카오 디벨로퍼스에
+      // 등록한 허용 도메인이 실제 접속 도메인과 다르거나, 키가 유효하지 않을 때
+      // 흔히 발생한다(단순 네트워크 문제일 수도 있음).
+      script.onerror = ()=> reject(mapSdkError('카카오맵 SDK를 불러오지 못했습니다.', 'authError'));
       document.head.appendChild(script);
     });
     return kakaoSdkLoadPromise;
@@ -14267,14 +14278,23 @@ window.SHIN2_CRM_APP_INIT = function(){
 
   // §4/§9: 키가 없거나 SDK 로드에 실패해도 나머지 CRM은 전혀 영향받지 않는다 — 이
   // 팝업 내부에서만 안내와 재시도 버튼을 보여준다.
-  function renderMapModalSetupNotice(message){
+  // §카카오 키 배포 진단 라운드: kind에 따라 제목/안내를 다르게 보여준다 —
+  // 'missing'(설정 파일/키 자체가 없음)과 'authError'/'unknown'(키는 있는데 카카오
+  // 쪽에서 거부/실패)은 사용자가 다음에 확인해야 할 곳이 다르다(전자는 배포 설정,
+  // 후자는 카카오 디벨로퍼스 콘솔의 허용 도메인/키 유효성).
+  function renderMapModalSetupNotice(message, kind){
     const wrap = document.getElementById('mapModalBody');
     if(!wrap) return;
+    const isMissing = kind !== 'authError' && kind !== 'unknown';
+    const title = isMissing ? '지도 설정이 필요합니다' : '카카오맵 연결에 실패했습니다';
+    const guidance = isMissing
+      ? '저장소 루트에 kakaoMapConfig.js를 만들고 카카오맵 JavaScript 키를 넣어주세요(kakaoMapConfig.example.js 참고). 실제 배포 사이트라면 GitHub Actions 저장소 시크릿 KAKAO_MAP_JS_KEY가 등록돼 있는지 확인해주세요.'
+      : '키 설정 파일 자체는 있지만 카카오 서버에서 연결을 거부했습니다. 카카오 디벨로퍼스 콘솔 → 내 애플리케이션 → 플랫폼 → Web에 이 사이트 도메인이 "허용 도메인"으로 정확히 등록돼 있는지, JavaScript 키가 맞는지 확인해주세요(REST API 키/어드민 키는 사용할 수 없습니다).';
     wrap.innerHTML = `
       <div class="map-modal-error">
-        <div class="map-modal-error-title">지도 설정이 필요합니다</div>
+        <div class="map-modal-error-title">${esc(title)}</div>
         <div>${esc(message)}</div>
-        <div>저장소 루트에 kakaoMapConfig.js를 만들고 카카오맵 JavaScript 키를 넣어주세요(kakaoMapConfig.example.js 참고).</div>
+        <div>${esc(guidance)}</div>
         <button type="button" class="map-modal-retry-btn" id="mapModalRetryBtn">다시 시도</button>
       </div>
     `;
@@ -14294,7 +14314,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       else wrap.innerHTML = `<div class="map-modal-loading">지도 SDK 로드 완료 — 화면 구성은 다음 단계에서 이어집니다.</div>`;
     }).catch((err)=>{
       if(!mapModalOpen) return;
-      renderMapModalSetupNotice(err && err.message ? err.message : '지도를 불러오지 못했습니다.');
+      renderMapModalSetupNotice(err && err.message ? err.message : '지도를 불러오지 못했습니다.', err && err.kind);
     });
   }
 
