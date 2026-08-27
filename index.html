@@ -4968,10 +4968,18 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   // normCompanyNameForRevenue: 기존 normCompanyName()은 절대 수정하지 않는다(§ 전 라운드부터
   // 이어지는 원칙) — 이번 매칭 기준에만 필요한 "(유)/유한회사" 무시를 얇은 래퍼로 추가했다.
   // normCompanyNameForPour와 같은 관례(기존 함수 재사용 + 이 기능 전용 규칙만 얹기).
+  // 사용자가 실제 동일 업체로 확인한 매출 원본명 ↔ CRM명 별칭만 명시적으로 연결한다.
+  // 유사도 추측은 하지 않으며, 이 표에 승인된 이름만 동일 업체로 취급한다.
+  const REVENUE_COMPANY_NAME_ALIASES = {
+    '주원디엔피': '주원디엔피',
+    '조광피앤텍': '조광피엔텍',
+    '진성이엔지': '진성이앤지'
+  };
   function normCompanyNameForRevenue(s){
     if(!s) return '';
     const t = String(s).replace(/유한회사|\(유\)/g, '');
-    return normCompanyName(t);
+    const normalized = normCompanyName(t);
+    return REVENUE_COMPANY_NAME_ALIASES[normalized] || normalized;
   }
   // buildRevenue2025Index: 스냅샷을 정규화 업체명으로 그룹핑하고 매출을 합산한다(§중복 업체
   // — 같은 정규화 업체가 여러 줄이면 합산, 원본 행은 rows[]로 추적 가능하게 유지).
