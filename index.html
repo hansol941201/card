@@ -136,13 +136,23 @@
   }
   .update-menu button:hover{ background:var(--bg); }
 
-  .list-filter-row{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+  .list-filter-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-bottom:12px; }
   .list-filter-chip{
+    display:inline-flex; align-items:center; gap:6px;
     height:30px; padding:0 12px; font-size:12.5px; font-weight:600; color:#475569; background:#fff;
     border:1px solid var(--line); border-radius:6px; cursor:pointer; white-space:nowrap;
   }
   .list-filter-chip:hover{ background:var(--bg); }
   .list-filter-chip.is-active{ background:var(--navy); color:#fff; border-color:var(--navy); }
+  /* §고객관리 탭 4개 재구성 라운드: 탭 우측 숫자만 옅은 회색 배지 안에 넣어 라벨과
+     시각적으로 구분한다(§요청 "우측에는 작은 숫자 배지"). is-active(남색 배경)일 때는
+     배지 배경을 옅은 흰색 반투명으로 바꿔 대비를 유지한다. */
+  .list-filter-chip .chip-count{
+    display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:16px;
+    padding:0 5px; border-radius:8px; background:#EEF2F7; color:#5B6B82; font-size:10.5px; font-weight:700;
+  }
+  .list-filter-chip.is-active .chip-count{ background:rgba(255,255,255,.22); color:#fff; }
+  .list-filter-chip svg{ flex:none; }
   /* §관리필요 업체 라운드 §1: 기존 필터 칩과 크기/폰트는 완전히 같고(list-filter-chip
      클래스 그대로 상속), 색만 연한 빨강/주황 포인트를 준다 — 필터가 아니라 클릭 시 모달을
      여는 버튼이라 FILTER_DEFS/data-filter에는 넣지 않았다(§2). */
@@ -5671,10 +5681,19 @@ window.SHIN2_CRM_APP_INIT = function(){
   // §2 필터 칩 정의 — "진행중"은 buildProgressStages(co).hasAny(=Partner Dashboard 진행
   // 데이터가 실제로 있음)를 그대로 쓴다. 질문서/1차미팅/2차미팅/MOU는 그 안에서 "현재 단계"
   // (buildProgressStages의 currentIdx, 이미 §진행 기록 라운드에서 만든 계산)로 좁힌다.
+  // §고객관리 탭 4개 재구성 라운드: 기존 8개 탭(전체/진행중/질문서/1차미팅/2차미팅/MOU/
+  // 협력업체/미수 업체)을 4개(전체/우리 협력사/협약 진행 중/미수금 있는 업체)로 줄였다.
+  // "우리 협력사"=co.partnerStatus==='partner'(기존 '협력업체' 필터와 완전히 같은 판정,
+  // 라벨만 바꿈), "미수금 있는 업체"=기존 'receivable' 필터 그대로. "협약 진행 중"만 새
+  // 키('agreementInProgress')를 추가했다 — 기존 'inProgress'(progress.hasAny) 키는
+  // 지우지 않고 그대로 뒀다(§ 지도분포 필터 MAP_FILTER_DEFS가 이 matchesFilter를 그대로
+  // 재사용 중이라 'inProgress' 의미를 바꾸면 그쪽까지 깨진다 — 아래 참고). 새 키는 기존
+  // hasAny에 "아직 우리 협력사로 등록되지 않음"(!== 'partner') 조건만 더해 "질문서→1차/2차
+  // 미팅→MOU 진행 ~ 최종 등록 전" 구간을 하나로 묶는다(§요청 "임의의 이름 문자열만 보고
+  // 나누지 말고 실제 협약 상태 필드로 분류" — hasAny/partnerStatus 둘 다 이미 있는 필드다).
   const FILTER_DEFS = [
-    ['all','전체'], ['inProgress','진행중'], ['q','질문서'],
-    ['m1','1차미팅'], ['m2','2차미팅'], ['mou','MOU'], ['partner','협력업체'],
-    ['receivable','미수 업체']
+    ['all','전체'], ['partner','우리 협력사'],
+    ['agreementInProgress','협약 진행 중'], ['receivable','미수금 있는 업체']
   ];
   function matchesFilter(co, progress, key){
     if(key === 'all') return true;
@@ -5683,7 +5702,11 @@ window.SHIN2_CRM_APP_INIT = function(){
       const receivable = D.getCompanyReceivable(co);
       return !!(receivable && receivable.total > 0);
     }
-    if(key === 'inProgress') return progress.hasAny;
+    // §고객관리 탭 4개 재구성 라운드: 최종 등록된 "우리 협력사"는 제외하고(§요청 "최종
+    // 협약이 완료된 우리 협력사는 여기서 제외"), 질문서/1차미팅/2차미팅/MOU 어느 단계든
+    // 진행 이력이 있는(hasAny) 업체만 묶는다.
+    if(key === 'agreementInProgress') return progress.hasAny && co.partnerStatus !== 'partner';
+    if(key === 'inProgress') return progress.hasAny; // §지도분포 필터(MAP_FILTER_DEFS) 등 다른 화면이 여전히 참조 — 의미 유지
     if(!progress.hasAny) return false;
     return progress.stages[progress.currentIdx].key === key;
   }
@@ -5818,15 +5841,23 @@ window.SHIN2_CRM_APP_INIT = function(){
       rows.sort((a,b)=> (b.pourCount - a.pourCount) || String(a.co.name||'').localeCompare(String(b.co.name||''), 'ko'));
     }
   }
+  // §고객관리 탭 4개 재구성 라운드: 탭 좌측에 붙이는 절제된 단색 아이콘(currentColor라
+  // is-active일 때 글자색과 함께 자동으로 흰색이 된다, §요청 "아이콘 색상도 최대한 절제").
+  // 새 판정 로직이 아니라 순수 장식이라 FILTER_ICONS는 matchesFilter와 무관하다.
+  const FILTER_ICON_SVG = {
+    all: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+    partner: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.3 2.3 2.3 4.7-4.7"/></svg>',
+    agreementInProgress: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>',
+    receivable: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.8v5"/><circle cx="12" cy="16" r="0.9" fill="currentColor" stroke="none"/></svg>'
+  };
   function renderFilterChips(counts){
     const wrap = document.getElementById('crmFilterRow');
     if(!wrap) return;
-    // §관리필요 업체 라운드 §1: 기존 7개 필터 칩은 전혀 안 바꿨다 — 가장 오른쪽에 "관리필요
-    // N" 버튼만 추가(margin-left:auto로 오른쪽 정렬, §mgmt-need-chip CSS). 이 버튼은
-    // FILTER_DEFS/data-filter 목록에 없으므로 목록을 필터링하지 않고 클릭 시 중앙 모달만
-    // 연다(§2).
+    // §고객관리 탭 4개 재구성 라운드: 탭 좌측 아이콘 + 우측 작은 숫자 배지(.chip-count)로
+    // 한 줄 컴팩트 탭 UI를 만든다(§요청 "카드형으로 과하게 크게 만들지 말 것" — 기존
+    // .list-filter-chip 높이/폰트는 그대로 재사용, 새 크기 체계를 만들지 않았다).
     wrap.innerHTML = FILTER_DEFS.map(([key,label])=>
-      `<button type="button" class="list-filter-chip${filterKey===key?' is-active':''}" data-filter="${esc(key)}">${esc(label)} ${counts[key]||0}</button>`
+      `<button type="button" class="list-filter-chip${filterKey===key?' is-active':''}" data-filter="${esc(key)}">${FILTER_ICON_SVG[key]||''}<span>${esc(label)}</span><span class="chip-count">${counts[key]||0}</span></button>`
     ).join('') + `<button type="button" class="list-filter-chip mgmt-need-chip" id="mgmtNeedBtn">관리필요 ${counts.manageNeeded||0}</button>`;
     wrap.querySelectorAll('[data-filter]').forEach(btn=> btn.addEventListener('click', ()=>{
       filterKey = btn.getAttribute('data-filter');
