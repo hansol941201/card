@@ -5153,6 +5153,15 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     if(!g) return null;
     return { total: g.total, byType: g.byType, rows: g.rows };
   }
+  // §미등록 업체 확인 제외 라운드: 사용자가 partner-dashboard(pourservice.github.io)에서
+  // 직접 이름으로 검색해 "협력업체 리스트에 없는 업체"라고 확정해 준 매출자료 표기들이다
+  // (2026-08-27 확인). 원래 오타로 다른 등록 업체와 헷갈릴 뻔한 후보였지만(§오타 후보 조사
+  // 라운드), 후보로 짐작했던 업체들조차 실제로는 partner-dashboard에 없었다 — 이름이 비슷할
+  // 뿐 서로 다른 업체이거나, 아예 등록된 적 없는 개별 자재 구매처일 수 있다는 뜻이다. 매출
+  // 원본 기록 자체(SHIN2_REVENUE_2026_SNAPSHOT)는 실제 거래 내역이라 절대 지우지 않고, "미등록
+  // 업체" 알림 화면에서만 제외한다 — 새 판정 로직을 만든 게 아니라, 기존 판정 기준(정규화
+  // 완전일치)은 그대로 두고 사람이 직접 확인한 예외만 뺐다.
+  const UNREGISTERED_2026_CONFIRMED_NAMES = ['성진산업', '(주)성익건설', '태원건설(주)', '다한건설'];
   // buildUnregisteredCompanies2026: 2025 매출 기반 buildUnregisteredCompanies와 같은
   // 규칙이되, 최근 매출일/최근 현장명(§11)을 추가로 계산한다 — rows[] 중 date가 있는
   // 것만 골라 문자열 비교(YYYY-MM-DD라 사전식 비교 = 날짜 비교와 동일)로 가장 최근
@@ -5160,10 +5169,12 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   function buildUnregisteredCompanies2026(){
     const companies = loadCompanies();
     const crmNormNames = new Set(companies.map(c=> normCompanyNameForRevenue(c.name)).filter(Boolean));
+    const confirmedNotPartnerNorms = new Set(UNREGISTERED_2026_CONFIRMED_NAMES.map(n=> normCompanyNameForRevenue(n)));
     const index = buildRevenue2026Index();
     const result = [];
     index.forEach((g, norm)=>{
       if(crmNormNames.has(norm)) return;
+      if(confirmedNotPartnerNorms.has(norm)) return;
       let latest = null;
       g.rows.forEach(r=>{ if(r.date && (!latest || r.date > latest.date)) latest = r; });
       result.push({
