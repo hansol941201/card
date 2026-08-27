@@ -14203,13 +14203,32 @@ window.SHIN2_CRM_APP_INIT = function(){
       return kakaoSdkLoadPromise;
     }
     kakaoSdkLoadPromise = new Promise((resolve, reject)=>{
+      let settled = false;
+      const settleResolve = (kakao)=>{ if(settled) return; settled = true; clearTimeout(timeoutId); resolve(kakao); };
+      const settleReject = (err)=>{
+        if(settled) return; settled = true; clearTimeout(timeoutId);
+        // 타임아웃/실패로 끝난 <script> 태그는 지워서, 다음 "다시 시도"가 완전히
+        // 새 <script>로 처음부터 다시 시도할 수 있게 한다(이미 이벤트가 소진된 태그에
+        // 리스너만 다시 붙이면 load 이벤트가 다시는 안 와서 재시도가 또 멈춘다).
+        const stuck = document.getElementById('kakaoMapSdkScript');
+        if(stuck) stuck.remove();
+        reject(err);
+      };
+      // §카카오 인증 오류 진단: 허용 도메인이 다르거나 키가 잘못되면 카카오 SDK가
+      // 예외를 던지지 않고 콜백을 아예 안 부르는 경우가 실제로 있다 — 그러면 팝업이
+      // "지도를 불러오는 중…"에 무한정 멈춰 보인다. 일정 시간 안에 안 끝나면
+      // 타임아웃으로 처리해 화면이 멈춘 채로 남지 않게 한다.
+      const timeoutId = setTimeout(()=>{
+        settleReject(mapSdkError('카카오맵 SDK 응답이 10초 넘게 없습니다.', 'authError'));
+      }, 10000);
+
       const existing = document.getElementById('kakaoMapSdkScript');
       if(existing){
         // 이미 로딩 중인 <script> 태그가 있으면 그 완료를 기다린다(중복 <script> 추가 금지, §7).
         existing.addEventListener('load', ()=>{
-          try{ window.kakao.maps.load(()=> resolve(window.kakao)); } catch(e){ reject(mapSdkError(e && e.message ? e.message : String(e), 'unknown')); }
+          try{ window.kakao.maps.load(()=> settleResolve(window.kakao)); } catch(e){ settleReject(mapSdkError(e && e.message ? e.message : String(e), 'unknown')); }
         });
-        existing.addEventListener('error', ()=> reject(mapSdkError('카카오맵 SDK 로드 실패', 'authError')));
+        existing.addEventListener('error', ()=> settleReject(mapSdkError('카카오맵 SDK 로드 실패', 'authError')));
         return;
       }
       const script = document.createElement('script');
@@ -14218,12 +14237,12 @@ window.SHIN2_CRM_APP_INIT = function(){
       // console.log나 화면에 출력하지 않는다 — URL 문자열 조립에만 쓰고 즉시 버려진다.
       script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(key)}&libraries=services,clusterer&autoload=false`;
       script.onload = ()=>{
-        try{ window.kakao.maps.load(()=> resolve(window.kakao)); } catch(e){ reject(mapSdkError(e && e.message ? e.message : String(e), 'unknown')); }
+        try{ window.kakao.maps.load(()=> settleResolve(window.kakao)); } catch(e){ settleReject(mapSdkError(e && e.message ? e.message : String(e), 'unknown')); }
       };
       // 키는 설정돼 있는데 SDK 스크립트 자체가 못 뜨는 경우 — 카카오 디벨로퍼스에
       // 등록한 허용 도메인이 실제 접속 도메인과 다르거나, 키가 유효하지 않을 때
       // 흔히 발생한다(단순 네트워크 문제일 수도 있음).
-      script.onerror = ()=> reject(mapSdkError('카카오맵 SDK를 불러오지 못했습니다.', 'authError'));
+      script.onerror = ()=> settleReject(mapSdkError('카카오맵 SDK를 불러오지 못했습니다.', 'authError'));
       document.head.appendChild(script);
     });
     return kakaoSdkLoadPromise;
