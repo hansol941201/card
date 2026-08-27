@@ -5683,29 +5683,43 @@ window.SHIN2_CRM_APP_INIT = function(){
   // (buildProgressStages의 currentIdx, 이미 §진행 기록 라운드에서 만든 계산)로 좁힌다.
   // §고객관리 탭 4개 재구성 라운드: 기존 8개 탭(전체/진행중/질문서/1차미팅/2차미팅/MOU/
   // 협력업체/미수 업체)을 4개(전체/우리 협력사/협약 진행 중/미수금 있는 업체)로 줄였다.
-  // "우리 협력사"=co.partnerStatus==='partner'(기존 '협력업체' 필터와 완전히 같은 판정,
-  // 라벨만 바꿈), "미수금 있는 업체"=기존 'receivable' 필터 그대로. "협약 진행 중"만 새
-  // 키('agreementInProgress')를 추가했다 — 기존 'inProgress'(progress.hasAny) 키는
-  // 지우지 않고 그대로 뒀다(§ 지도분포 필터 MAP_FILTER_DEFS가 이 matchesFilter를 그대로
-  // 재사용 중이라 'inProgress' 의미를 바꾸면 그쪽까지 깨진다 — 아래 참고). 새 키는 기존
-  // hasAny에 "아직 우리 협력사로 등록되지 않음"(!== 'partner') 조건만 더해 "질문서→1차/2차
-  // 미팅→MOU 진행 ~ 최종 등록 전" 구간을 하나로 묶는다(§요청 "임의의 이름 문자열만 보고
-  // 나누지 말고 실제 협약 상태 필드로 분류" — hasAny/partnerStatus 둘 다 이미 있는 필드다).
+  // "미수금 있는 업체"=기존 'receivable' 필터 그대로.
+  // §사용자 정정 라운드: 처음엔 "우리 협력사"를 co.partnerStatus==='partner'로 나눴는데,
+  // 사용자가 "우리 협력사는 MOU체결완료 = 협약진행중, 협약진행중은 질문서나 1차/2차
+  // 미팅중·체결 전 업체"로 정정 — 실제 기준은 partnerStatus 필드가 아니라 MOU 단계
+  // 완료 여부다. progress.stages의 mou 단계 state(buildProgressStages가 이미
+  // newMou.mouDone과 실제 협약체결일(resolvePartnerAgreementDate) 둘 다 반영해 계산해
+  // 둔 값, §업무관리 협약체결 판정 누락 라운드에서 만든 바로 그 소스)를 그대로 재사용한다
+  // — 새 판정 로직 없음. 'agreementInProgress'는 새 키로 추가했고, 기존 'inProgress'
+  // (progress.hasAny만 보는 원래 의미) 키는 그대로 남겨뒀다 — 지도분포 모달의
+  // MAP_FILTER_DEFS가 이 matchesFilter를 재사용 중이라 의미를 바꾸면 그쪽이 깨지기
+  // 때문(실제 확인 후 별도 키로 분리해뒀다).
   const FILTER_DEFS = [
     ['all','전체'], ['partner','우리 협력사'],
     ['agreementInProgress','협약 진행 중'], ['receivable','미수금 있는 업체']
   ];
+  function getMouStage(progress){
+    return progress.stages.find(s=> s.key === 'mou') || null;
+  }
   function matchesFilter(co, progress, key){
     if(key === 'all') return true;
-    if(key === 'partner') return co.partnerStatus === 'partner';
+    // §사용자 정정 라운드: "우리 협력사"=MOU 단계가 done(체결완료). partnerStatus 필드는
+    // 더 이상 이 판정에 쓰지 않는다(§요청 "우리 협력사는 MOU체결완료").
+    if(key === 'partner'){
+      const mou = getMouStage(progress);
+      return progress.hasAny && !!mou && mou.state === 'done';
+    }
     if(key === 'receivable'){
       const receivable = D.getCompanyReceivable(co);
       return !!(receivable && receivable.total > 0);
     }
-    // §고객관리 탭 4개 재구성 라운드: 최종 등록된 "우리 협력사"는 제외하고(§요청 "최종
-    // 협약이 완료된 우리 협력사는 여기서 제외"), 질문서/1차미팅/2차미팅/MOU 어느 단계든
-    // 진행 이력이 있는(hasAny) 업체만 묶는다.
-    if(key === 'agreementInProgress') return progress.hasAny && co.partnerStatus !== 'partner';
+    // §사용자 정정 라운드: "협약 진행 중"=진행 이력은 있지만(hasAny) MOU 단계가 아직
+    // done이 아닌 업체 — 질문서/1차미팅/2차미팅 중이거나 MOU 자체가 진행/대기 상태인
+    // 경우를 전부 포함, "체결 전" 구간 전체(§요청 그대로).
+    if(key === 'agreementInProgress'){
+      const mou = getMouStage(progress);
+      return progress.hasAny && !(mou && mou.state === 'done');
+    }
     if(key === 'inProgress') return progress.hasAny; // §지도분포 필터(MAP_FILTER_DEFS) 등 다른 화면이 여전히 참조 — 의미 유지
     if(!progress.hasAny) return false;
     return progress.stages[progress.currentIdx].key === key;
