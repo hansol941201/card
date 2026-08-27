@@ -22,6 +22,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # 시공사 지도 분포 팝업: 카카오맵 JavaScript 키는 저장소에 절대 커밋하지 않는다
+      # (kakaoMapConfig.js는 .gitignore 대상). 대신 이 빌드 단계에서만 GitHub Secrets의
+      # KAKAO_MAP_JS_KEY 값으로 kakaoMapConfig.js를 생성해 배포 아티팩트에만 포함시킨다.
+      # 시크릿이 등록돼 있지 않으면(값이 비어 있으면) 이 파일 없이 그대로 배포되고,
+      # 지도 분포 팝업은 "지도 설정이 필요합니다" 안내만 보여준다 — 나머지 CRM 기능은
+      # 영향받지 않는다. 로그에 키 값이 남지 않도록 echo로 직접 출력하지 않는다.
+      - name: Generate kakaoMapConfig.js from secret (배포 아티팩트 전용, 저장소에는 커밋 안 됨)
+        env:
+          KAKAO_MAP_JS_KEY: ${{ secrets.KAKAO_MAP_JS_KEY }}
+        run: |
+          if [ -n "$KAKAO_MAP_JS_KEY" ]; then
+            node -e "
+              const key = JSON.stringify(process.env.KAKAO_MAP_JS_KEY);
+              const fs = require('fs');
+              fs.writeFileSync('kakaoMapConfig.js',
+                'window.SHIN2_KAKAO_MAP_CONFIG = {\n  javascriptKey: ' + key + '\n};\n');
+            "
+            echo "kakaoMapConfig.js generated for this deploy (키 값은 로그에 출력하지 않음)"
+          else
+            echo "KAKAO_MAP_JS_KEY secret이 설정되어 있지 않습니다 — 지도 키 없이 배포합니다."
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

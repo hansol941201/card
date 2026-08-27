@@ -13,6 +13,12 @@
 // 3. index.html은 이 파일이 없어도 정상 동작한다 — 지도 분포 팝업만
 //    "지도 설정이 필요합니다" 안내를 보여주고, 나머지 고객관리 기능/Firebase
 //    연동/localStorage는 전혀 영향받지 않는다.
+//
+// 실제 GitHub Pages 배포에 키를 반영하는 방법(로컬 미리보기용 이 파일과는 별개):
+// 이 파일은 절대 커밋되지 않으므로, 실제 배포된 사이트는 이 파일을 갖고 있지 않다.
+// 대신 .github/workflows/pages.yml이 배포 빌드 시점에 GitHub Secrets의
+// KAKAO_MAP_JS_KEY 값으로 kakaoMapConfig.js를 자동 생성해 배포 아티팩트에만 넣는다
+// (저장소 코드에는 키가 절대 남지 않는다). 자세한 설정 절차는 KAKAO_MAP_SETUP.md 참고.
 window.SHIN2_KAKAO_MAP_CONFIG = {
   javascriptKey: 'YOUR_KAKAO_JAVASCRIPT_KEY'
 };
