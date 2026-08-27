@@ -195,11 +195,6 @@
   .col-name-relation-name:hover{ text-decoration:underline; color:var(--blue); }
   .relation-badge{ flex:0 0 auto; display:inline-block; padding:1px 5px; font-size:9.5px; font-weight:700; border-radius:4px; background:#EEF2F7; color:#5B6B84; }
   .relation-badge.rel-parent{ background:#E8F0FE; color:#1D4ED8; }
-  /* §협력사 옆 최근 요청 날짜 표시 라운드 — "업체명 옆에" 요청이라 별도 줄이 아니라
-     co-name-top 안, 업체명 바로 옆에 작은 배지로 붙인다(행 높이 안 늘어남). 요청 내용은
-     title 툴팁으로만("간단하게"), 배지 자체는 날짜만 짧게 보여준다. */
-  .col-name-request{ flex:0 0 auto; display:inline-flex; align-items:center; padding:1px 6px; font-size:10.5px; font-weight:600; color:var(--text-faint); background:#EEF2F7; border:none; border-radius:4px; cursor:pointer; font-family:inherit; white-space:nowrap; }
-  .col-name-request:hover{ color:#fff; background:var(--navy); }
   .relation-badge.rel-sub{ background:#FDF1E7; color:#B45309; }
   .relation-badge.rel-affiliate{ background:#F1EEFD; color:#6D28D9; }
   .col-recent{ flex:1.4 1 150px; min-width:0; color:var(--text-muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -2045,12 +2040,12 @@ html,body{background:#F7F9FC;font-size:13px}
 #cardView .section,#cardView .card-section,#cardView .detail-section{border-color:#E4EAF1!important;box-shadow:none!important}
 #cardView table{border-collapse:collapse}#cardView th{color:#66758D!important;font-size:10.5px!important;font-weight:650!important}#cardView td{font-size:11px!important}#cardView tr{border-color:#E9EEF4!important}
 
-@media(max-width:1100px){.app{padding-left:14px;padding-right:14px}.co-table-head,.co-row{grid-template-columns:140px 145px 50px 135px 74px 74px 90px 62px 150px!important}.rising-grid{grid-template-columns:repeat(5,minmax(160px,1fr))!important}.rising-section{overflow-x:auto}.co-table-head,.co-list{min-width:1060px}.co-list{overflow:visible}#listView{overflow-x:auto}}
-@media(max-width:760px){.app{padding:14px 10px 32px}.topbar{margin-bottom:12px}.rising-grid{grid-template-columns:repeat(5,165px)!important}.list-search-row{flex-direction:row!important;min-width:430px}.list-sort-select{width:auto!important}.co-table-head,.co-list{min-width:1060px}.co-row{grid-template-columns:140px 145px 50px 135px 74px 74px 90px 62px 150px!important}}
+@media(max-width:1100px){.app{padding-left:14px;padding-right:14px}.co-table-head,.co-row{grid-template-columns:140px 110px 145px 50px 135px 74px 74px 90px 62px 150px!important}.rising-grid{grid-template-columns:repeat(5,minmax(160px,1fr))!important}.rising-section{overflow-x:auto}.co-table-head,.co-list{min-width:1060px}.co-list{overflow:visible}#listView{overflow-x:auto}}
+@media(max-width:760px){.app{padding:14px 10px 32px}.topbar{margin-bottom:12px}.rising-grid{grid-template-columns:repeat(5,165px)!important}.list-search-row{flex-direction:row!important;min-width:430px}.list-sort-select{width:auto!important}.co-table-head,.co-list{min-width:1060px}.co-row{grid-template-columns:140px 110px 145px 50px 135px 74px 74px 90px 62px 150px!important}}
 
 /* HANSOL CRM corporate visual override */
 :root{--navy:#082f67;--blue:#0b5bd3;--bg:#f4f7fb;--line:#dfe7f1;--text:#13243e;--green:#079455}
-html,body{background:radial-gradient(circle at 75% -10%,rgba(11,91,211,.055),transparent 28%),var(--bg)!important;color:var(--text)!important}body{font-family:Pretendard,"Noto Sans KR","Malgun Gothic",Arial,sans-serif!important;letter-spacing:-.015em}.app{max-width:1580px!important;margin:0 auto!important;padding:24px 30px 48px!important}.brand{color:var(--navy)!important;font-size:25px!important;font-weight:800!important}.brand-wrap{display:flex!important;align-items:center!important;gap:10px!important}.brand-logo{display:block!important;height:30px!important;width:auto!important}.list-add-btn{background:linear-gradient(180deg,#0b3978,#082f67)!important;border:0!important;border-radius:7px!important;box-shadow:0 4px 12px rgba(8,47,103,.16)!important}.rising-section{background:#fff!important;border:1px solid var(--line)!important;border-radius:12px!important;padding:14px 16px 15px!important;box-shadow:0 3px 14px rgba(23,48,92,.055)!important}.rising-grid{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:12px!important}.rising-card{border:1px solid #e1e8f1!important;background:linear-gradient(180deg,#fff,#fbfdff)!important;border-radius:10px!important;padding:12px 13px 10px!important;box-shadow:0 2px 8px rgba(22,44,78,.045)!important}.rising-rank{background:var(--navy)!important;color:#fff!important;border-radius:5px!important}.rising-up{color:var(--green)!important;font-weight:800!important}.rising-bar{height:4px!important;background:#edf2f7!important}.rising-bar-fill{background:linear-gradient(90deg,#079455,#12b76a)!important}.list-filter-chip{border:1px solid #dce5ef!important;background:#fff!important;border-radius:7px!important;font-weight:650!important}.list-filter-chip.is-active{background:var(--navy)!important;color:#fff!important;border-color:var(--navy)!important}.list-search-row{background:#fff!important;border:1px solid var(--line)!important;border-radius:11px!important;padding:10px!important;box-shadow:0 2px 8px rgba(22,44,78,.035)!important}.search-box,.list-sort-select{height:39px!important;border:1px solid #dce5ef!important;border-radius:8px!important;background:#fff!important}.co-table-head,.co-row{display:grid!important;grid-template-columns:minmax(180px,1fr) 175px 68px 185px 92px 92px 140px 82px 200px!important;gap:12px!important;align-items:center!important}.co-table-head{margin-top:12px!important;padding:10px 14px!important;border:1px solid var(--line)!important;border-radius:10px 10px 0 0!important;background:#f9fbfd!important;color:#4b607c!important;font-weight:750!important}.co-list{background:#fff!important;border:1px solid var(--line)!important;border-top:0!important;border-radius:0 0 10px 10px!important;overflow:hidden!important}.co-row{min-height:50px!important;padding:6px 14px!important;border-bottom:1px solid #e8eef5!important;align-items:center!important}.co-row:hover{background:#f7fbff!important;box-shadow:inset 3px 0 0 var(--blue)!important}.col-name{font-weight:800!important;color:#142945!important}.col-yr{color:#0866df!important;font-weight:800!important;font-size:13px!important}.col-total,.col-revenue,.col-yr-revenue,.col-total-revenue{color:#172d4d!important;font-weight:750!important}.grade-badge{border-radius:5px!important;font-weight:800!important}.contrib-cell{border-radius:7px!important;padding:6px 9px!important}.contrib-cell.lv-high{background:#ecfdf3!important}.contrib-cell.lv-mid{background:#fff7ed!important}.contrib-cell.lv-low{background:#fff1f2!important}.contrib-cell.lv-insufficient{background:#f3f6f9!important}.list-pagination .active{background:var(--navy)!important;color:#fff!important}.coin-icon,.money-icon,[class*="coin-icon"],[class*="money-icon"]{display:none!important}#cardView .card-header,#cardView .detail-header{background:linear-gradient(135deg,#082f67,#123f7c)!important;border-radius:11px!important}@media(max-width:1180px){.app{padding:18px 16px 40px!important}.rising-section{overflow-x:auto!important}.rising-grid{grid-template-columns:repeat(5,190px)!important}.co-table-head,.co-list{min-width:1220px!important}#listView{overflow-x:auto!important}}
+html,body{background:radial-gradient(circle at 75% -10%,rgba(11,91,211,.055),transparent 28%),var(--bg)!important;color:var(--text)!important}body{font-family:Pretendard,"Noto Sans KR","Malgun Gothic",Arial,sans-serif!important;letter-spacing:-.015em}.app{max-width:1580px!important;margin:0 auto!important;padding:24px 30px 48px!important}.brand{color:var(--navy)!important;font-size:25px!important;font-weight:800!important}.brand-wrap{display:flex!important;align-items:center!important;gap:10px!important}.brand-logo{display:block!important;height:30px!important;width:auto!important}.list-add-btn{background:linear-gradient(180deg,#0b3978,#082f67)!important;border:0!important;border-radius:7px!important;box-shadow:0 4px 12px rgba(8,47,103,.16)!important}.rising-section{background:#fff!important;border:1px solid var(--line)!important;border-radius:12px!important;padding:14px 16px 15px!important;box-shadow:0 3px 14px rgba(23,48,92,.055)!important}.rising-grid{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:12px!important}.rising-card{border:1px solid #e1e8f1!important;background:linear-gradient(180deg,#fff,#fbfdff)!important;border-radius:10px!important;padding:12px 13px 10px!important;box-shadow:0 2px 8px rgba(22,44,78,.045)!important}.rising-rank{background:var(--navy)!important;color:#fff!important;border-radius:5px!important}.rising-up{color:var(--green)!important;font-weight:800!important}.rising-bar{height:4px!important;background:#edf2f7!important}.rising-bar-fill{background:linear-gradient(90deg,#079455,#12b76a)!important}.list-filter-chip{border:1px solid #dce5ef!important;background:#fff!important;border-radius:7px!important;font-weight:650!important}.list-filter-chip.is-active{background:var(--navy)!important;color:#fff!important;border-color:var(--navy)!important}.list-search-row{background:#fff!important;border:1px solid var(--line)!important;border-radius:11px!important;padding:10px!important;box-shadow:0 2px 8px rgba(22,44,78,.035)!important}.search-box,.list-sort-select{height:39px!important;border:1px solid #dce5ef!important;border-radius:8px!important;background:#fff!important}.co-table-head,.co-row{display:grid!important;grid-template-columns:minmax(180px,1fr) 150px 175px 68px 185px 92px 92px 140px 82px 200px!important;gap:12px!important;align-items:center!important}.co-table-head{margin-top:12px!important;padding:10px 14px!important;border:1px solid var(--line)!important;border-radius:10px 10px 0 0!important;background:#f9fbfd!important;color:#4b607c!important;font-weight:750!important}.co-list{background:#fff!important;border:1px solid var(--line)!important;border-top:0!important;border-radius:0 0 10px 10px!important;overflow:hidden!important}.co-row{min-height:50px!important;padding:6px 14px!important;border-bottom:1px solid #e8eef5!important;align-items:center!important}.co-row:hover{background:#f7fbff!important;box-shadow:inset 3px 0 0 var(--blue)!important}.col-name{font-weight:800!important;color:#142945!important}.col-yr{color:#0866df!important;font-weight:800!important;font-size:13px!important}.col-total,.col-revenue,.col-yr-revenue,.col-total-revenue{color:#172d4d!important;font-weight:750!important}.grade-badge{border-radius:5px!important;font-weight:800!important}.contrib-cell{border-radius:7px!important;padding:6px 9px!important}.contrib-cell.lv-high{background:#ecfdf3!important}.contrib-cell.lv-mid{background:#fff7ed!important}.contrib-cell.lv-low{background:#fff1f2!important}.contrib-cell.lv-insufficient{background:#f3f6f9!important}.list-pagination .active{background:var(--navy)!important;color:#fff!important}.coin-icon,.money-icon,[class*="coin-icon"],[class*="money-icon"]{display:none!important}#cardView .card-header,#cardView .detail-header{background:linear-gradient(135deg,#082f67,#123f7c)!important;border-radius:11px!important}@media(max-width:1180px){.app{padding:18px 16px 40px!important}.rising-section{overflow-x:auto!important}.rising-grid{grid-template-columns:repeat(5,190px)!important}.co-table-head,.co-list{min-width:1220px!important}#listView{overflow-x:auto!important}}
 
 /* ==========================================================================
    §목록 테이블 표시방식 조정 라운드(신규) — 고객 목록 테이블 폰트를 +1px.
@@ -2285,6 +2280,7 @@ body.map-modal-lock{ overflow:hidden; }
          실적/최근 요청/총 매출/2026 매출/실적↔매출/최근 흐름/단계 진행상황/다음 행동. -->
     <div class="co-table-head">
       <div class="col-name">협력사</div>
+      <div class="col-request">최근 요청</div>
       <div class="col-pour">최근 실적</div>
       <div class="col-yr">총 실적</div>
       <!-- §고객 성향 컬럼 라운드 — "최근 요청" 컬럼을 "고객 성향"으로 교체(§1). 최근 요청
@@ -6033,20 +6029,21 @@ window.SHIN2_CRM_APP_INIT = function(){
       } else {
         requestHtml = `<button type="button" class="request-cell" data-request-detail="${esc(co.id)}"><span class="data-none">—</span></button>`;
       }
-      // §협력사 옆 최근 요청 날짜 표시 라운드: "업체명 옆에" 요청이라 requestHistoryIndex
-      // (특정 자료 키워드가 매칭된 활동만 잡음, 너무 좁음) 대신 고객카드 "최근 요청 /
-      // 고객 메모" 박스와 완전히 같은 소스인 buildRequestListItems(co)를 그대로 재사용한다
-      // (메모까지 포함 — 새 계산 아님, 이미 있는 함수 호출만). 배지는 업체명 같은 줄
-      // 오른쪽에 날짜만 짧게 붙이고, 요청 내용은 title 툴팁으로만 보여준다("요청내용은
-      // 간단하게 적어도 된다"). 클릭하면 기존 최근 요청/메모 패널(openMemoPanel)이 그대로
-      // 열린다. 요청 이력이 없는 업체는 배지 자체를 안 보여준다(데이터 없음을 지어내지 않음).
+      // §협력사 옆 최근 요청 컬럼 라운드: requestHistoryIndex(특정 자료 키워드가 매칭된
+      // 활동만 잡음, 너무 좁음) 대신 고객카드 "최근 요청 / 고객 메모" 박스와 완전히 같은
+      // 소스인 buildRequestListItems(co)를 그대로 재사용한다(메모까지 포함 — 새 계산 아님,
+      // 이미 있는 함수 호출만). "업체명 옆" 인라인 배지 대신 독립된 "최근 요청" 컬럼(옛
+      // .request-cell 스타일 재사용)으로 날짜(fmtDate, 상대 표현 아닌 실제 날짜)+간단한
+      // 요청 내용 한 줄을 보여준다. 클릭하면 기존 최근 요청/메모 패널(openMemoPanel)이
+      // 그대로 열린다. 요청 이력이 없는 업체는 "—"만 보여준다(데이터 없음을 지어내지 않음).
       const recentRequestItems = buildRequestListItems(co);
       const latestRequestItem = recentRequestItems[0] || null;
-      const nameRequestBadgeHtml = latestRequestItem
-        ? `<button type="button" class="col-name-request" data-name-request-detail="${esc(co.id)}" title="${esc(latestRequestItem.text)}">
-            <span class="col-name-request-date">${esc(fmtRelativeActivityDate(latestRequestItem.createdAtIso))}</span>
+      const nameRequestCellHtml = latestRequestItem
+        ? `<button type="button" class="request-cell" data-name-request-detail="${esc(co.id)}" title="${esc(latestRequestItem.text)}">
+            <span class="request-date">${esc(fmtDate(latestRequestItem.createdAtIso))}</span>
+            <span class="request-labels">${esc(latestRequestItem.text)}</span>
           </button>`
-        : '';
+        : `<button type="button" class="request-cell" data-name-request-detail="${esc(co.id)}"><span class="data-none">—</span></button>`;
       // §고객 성향 컬럼 라운드 §2/§6: 목록에는 co.customerInsight(별도 신규 필드,
       // 기존 salesTendency/reactions와 무관 — §10 "기존 필드와 충돌하지 않는 별도 구조")의
       // 대표 태그 최대 3개만 짧게 보여준다. buildInsightRepTags는 아래 renderGlanceRow 근처
@@ -6153,10 +6150,10 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="col-name">
           <div class="col-name-top">
             <span class="co-name-badges">${partnerGlyphHtml(co)}<span class="co-name-text">${esc(co.name)}</span></span>
-            ${nameRequestBadgeHtml}
           </div>
           ${relationRowHtml}
         </div>
+        <div class="col-request">${nameRequestCellHtml}</div>
         <div class="col-pour">${lastActHtml}</div>
         <div class="col-yr">${yrHtml}</div>
         <div class="col-insight">${insightHtml}</div>
@@ -6241,9 +6238,9 @@ window.SHIN2_CRM_APP_INIT = function(){
         if(co) openRequestDrawer(co);
       });
     });
-    // §협력사 옆 최근 요청 날짜 표시 라운드 — 업체명 옆 날짜 배지 클릭 -> 고객카드의
-    // "최근 요청 / 고객 메모"와 완전히 같은 패널(openMemoPanel/renderMemoPanel, 이미
-    // 전역 루트(#memoPanelRoot)에 렌더링돼 목록 화면에서도 그대로 열 수 있다).
+    // §최근 요청 컬럼 라운드 — "최근 요청" 셀 클릭 -> 고객카드의 "최근 요청 / 고객
+    // 메모"와 완전히 같은 패널(openMemoPanel/renderMemoPanel, 이미 전역 루트
+    // (#memoPanelRoot)에 렌더링돼 목록 화면에서도 그대로 열 수 있다).
     listEl.querySelectorAll('[data-name-request-detail]').forEach(btn=>{
       btn.addEventListener('click', (e)=>{
         e.stopPropagation();
