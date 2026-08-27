@@ -6234,6 +6234,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     listEl.querySelectorAll('.co-row').forEach(row=>{
       row.addEventListener('click', ()=> openCard(row.getAttribute('data-id')));
     });
+    // §지도분포4 동기화 훅: renderList()는 업체 등록/수정/삭제/협력사 데이터
+    // 업데이트·동기화 등 companies가 바뀔 수 있는 거의 모든 경로에서 이미 호출되고
+    // 있는 단일 지점이다(§기존 코드 재사용 — 새 훅을 여러 곳에 흩어 넣는 대신 여기
+    // 한 곳에서만 지도 팝업이 열려 있는지 확인해 갱신한다).
+    if(typeof refreshMapIfOpen === 'function') refreshMapIfOpen();
   }
 
   function openCard(id){
@@ -14427,9 +14432,14 @@ window.SHIN2_CRM_APP_INIT = function(){
       mapFilterState.search = e.target.value;
       refreshMapInfoAndMarkers();
     });
+    // §지도분포4: 칩/토글 클릭은 활성 표시만 그 자리에서 바꾸고 refreshMapInfoAndMarkers()로
+    // 마커·정보 패널만 갱신한다 — 이전처럼 renderMapModalMain(kakao)를 다시 부르면
+    // initMapCanvas가 매번 지도 인스턴스를 새로 만들고 지오코딩까지 다시 돌아 클릭할 때마다
+    // 불필요한 재초기화/재지오코딩이 발생했다(§동기화 규칙 "변경된 주소만 지오코딩" 위반 소지).
     wrap.querySelectorAll('[data-map-filter]').forEach(btn=> btn.addEventListener('click', ()=>{
       mapFilterState.filterKey = btn.getAttribute('data-map-filter');
-      renderMapModalMain(kakao); // 칩 활성 표시 갱신을 위해 필터줄 전체를 다시 그린다
+      wrap.querySelectorAll('[data-map-filter]').forEach(b=> b.classList.toggle('is-active', b === btn));
+      refreshMapInfoAndMarkers();
     }));
     document.getElementById('mapFilterCategory').addEventListener('change', (e)=>{
       mapFilterState.category = e.target.value;
@@ -14441,7 +14451,8 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
     wrap.querySelectorAll('[data-map-viewmode]').forEach(btn=> btn.addEventListener('click', ()=>{
       mapFilterState.viewMode = btn.getAttribute('data-map-viewmode');
-      renderMapModalMain(kakao);
+      wrap.querySelectorAll('[data-map-viewmode]').forEach(b=> b.classList.toggle('is-active', b === btn));
+      refreshMapInfoAndMarkers();
     }));
     // §지도분포3에서 실제 지도/마커/클러스터를 초기화한다 — 여기서 실패해도(예: 좌표
     // 데이터가 전혀 없음) 아래 정보 패널은 별도로 렌더링되어 서로 영향을 주지 않는다
@@ -14464,6 +14475,15 @@ window.SHIN2_CRM_APP_INIT = function(){
       try{ updateMapMarkers(allEntries); } catch(err){ console.warn('지도 마커 갱신 실패:', err); }
     }
     renderMapInfoPanel(allEntries);
+  }
+
+  // §지도분포4 동기화 훅: 지도 팝업이 열려 있을 때만 다시 그린다(§동기화 규칙 "팝업이
+  // 열려 있으면 마커·클러스터·지역요약·업체목록을 다시 그린다"). 닫혀 있으면 아무것도
+  // 하지 않는다 — 다음에 열 때 buildMapCompanies()가 그 시점의 최신 companies를 읽는다
+  // (§동기화 규칙 "닫혀 있어도 다음 열 때 최신 데이터 사용", 별도 캐시 없음).
+  function refreshMapIfOpen(){
+    if(!mapModalOpen) return;
+    refreshMapInfoAndMarkers();
   }
 
   // §지도분포2: 오른쪽 정보 패널 — 지역 요약/업체 밀집 지역/현재 지도 내 업체/
@@ -14638,6 +14658,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     }
 
     function buildMarkersFor(entries){
+      clearHeatmap();
       clusterer.clear();
       markerByCompanyId = new Map();
       const markers = [];
@@ -14650,6 +14671,48 @@ window.SHIN2_CRM_APP_INIT = function(){
         markerByCompanyId.set(e.co.id, marker);
       });
       clusterer.addMarkers(markers);
+    }
+
+    // §히트맵 토글: 새 판정 기준을 만들지 않는다 — parseMapRegion()로 이미 나누는
+    // 시/도 단위 그대로, 지역별 위치확인 업체 수만 원(Circle) 크기/농도로 표현한다
+    // ("업체 밀집 지역" 패널과 동일한 집계를 지도 위에 겹쳐 보여주는 것 뿐).
+    let heatmapOverlays = [];
+    function clearHeatmap(){
+      heatmapOverlays.forEach(c=>{ try{ c.setMap(null); } catch(err){ /* 무시 */ } });
+      heatmapOverlays = [];
+    }
+    function buildHeatmapFor(entries){
+      clusterer.clear();
+      markerByCompanyId = new Map();
+      clearHeatmap();
+      const byRegion = new Map(); // region -> {sumLat,sumLng,count}
+      entries.forEach(e=>{
+        if(!e.hasCoords) return;
+        const key = e.region || '기타';
+        const acc = byRegion.get(key) || { sumLat:0, sumLng:0, count:0 };
+        acc.sumLat += e.co.latitude; acc.sumLng += e.co.longitude; acc.count += 1;
+        byRegion.set(key, acc);
+      });
+      if(!byRegion.size || !kakao.maps.Circle) return;
+      const maxCount = Math.max(...Array.from(byRegion.values()).map(v=> v.count));
+      byRegion.forEach((acc)=>{
+        const centerLat = acc.sumLat / acc.count, centerLng = acc.sumLng / acc.count;
+        const ratio = acc.count / maxCount; // 0~1
+        const circle = new kakao.maps.Circle({
+          center: new kakao.maps.LatLng(centerLat, centerLng),
+          radius: 6000 + ratio * 34000, // 6~40km, 밀집도에 비례
+          strokeWeight: 1, strokeColor: '#082f67', strokeOpacity: 0.35,
+          fillColor: '#082f67', fillOpacity: 0.12 + ratio * 0.33
+        });
+        circle.setMap(map);
+        heatmapOverlays.push(circle);
+      });
+    }
+    // 마커/히트맵 중 현재 뷰모드에 맞는 레이어만 그린다 — 지도 인스턴스 자체는
+    // 그대로 두고 오버레이만 바꿔치기한다(§4 "필터/토글 클릭마다 지도 재초기화하지 않기").
+    function renderMapLayer(entries){
+      if(mapFilterState.viewMode === 'heatmap') buildHeatmapFor(entries);
+      else buildMarkersFor(entries);
     }
 
     function refreshVisibleList(){
@@ -14666,11 +14729,11 @@ window.SHIN2_CRM_APP_INIT = function(){
         return applyMapFilters(buildMapCompanies()).filter(e=> e.hasCoords && bounds.contain(new kakao.maps.LatLng(e.co.latitude, e.co.longitude)));
       },
       destroy(){
-        try{ clusterer.clear(); infoWindow.close(); } catch(err){ /* 무시 — 팝업 자체가 사라지므로 잔여 정리는 최선 노력만 */ }
+        try{ clusterer.clear(); clearHeatmap(); infoWindow.close(); } catch(err){ /* 무시 — 팝업 자체가 사라지므로 잔여 정리는 최선 노력만 */ }
       }
     };
 
-    updateMapMarkers = function(entries){ buildMarkersFor(applyMapFilters(entries)); };
+    updateMapMarkers = function(entries){ renderMapLayer(applyMapFilters(entries)); };
     focusMapRegion = function(regionName){
       const targets = applyMapFilters(buildMapCompanies()).filter(e=> e.hasCoords && (e.region || '주소 미확인') === regionName);
       if(!targets.length) return;
@@ -14679,23 +14742,48 @@ window.SHIN2_CRM_APP_INIT = function(){
       map.setBounds(bounds);
     };
     focusMapCompany = function(companyId){
-      const marker = markerByCompanyId.get(companyId);
-      if(!marker){ return; }
-      map.panTo(marker.getPosition());
       const co = D.findCompany(companyId);
-      if(co) openInfoWindow(buildMapCompanyEntry(co), marker);
+      if(!co || typeof co.latitude !== 'number' || typeof co.longitude !== 'number') return;
+      const pos = new kakao.maps.LatLng(co.latitude, co.longitude);
+      map.panTo(pos);
+      const marker = markerByCompanyId.get(companyId);
+      // 히트맵 모드라 개별 마커가 없으면(§위 renderMapLayer) 좌표만으로 임시 마커 없이
+      // InfoWindow를 좌표 위치에 바로 띄운다 — 카카오 InfoWindow는 setPosition()+open(map)
+      // 오버로드로 marker 없이도 특정 좌표에 열 수 있다.
+      if(marker){ openInfoWindow(buildMapCompanyEntry(co), marker); }
+      else {
+        infoWindow.setContent(buildMapInfoWindowHtml(buildMapCompanyEntry(co)));
+        infoWindow.setPosition(pos);
+        infoWindow.open(map);
+        requestAnimationFrame(()=>{
+          const btn = document.getElementById('mapInfoOpenCardBtn');
+          if(btn) btn.addEventListener('click', ()=>{
+            const cid = btn.getAttribute('data-open-company');
+            closeMapDistributionModal();
+            openCard(cid);
+          });
+        });
+      }
     };
 
-    buildMarkersFor(applyMapFilters(allEntries));
+    renderMapLayer(applyMapFilters(allEntries));
     // §동기화 규칙: 변경/신규 주소만 지오코딩 — 끝나면 마커·정보 패널을 최신 좌표로
     // 다시 그린다(팝업이 그새 닫혔으면 아무것도 안 함).
     syncGeocodeForEntries(allEntries, kakao).then((changed)=>{
       if(!changed || !mapModalOpen) return;
       const fresh = buildMapCompanies();
-      buildMarkersFor(applyMapFilters(fresh));
+      renderMapLayer(applyMapFilters(fresh));
       renderMapInfoPanel(fresh);
     }).catch((err)=> console.warn('지오코딩 동기화 중 일부 실패:', err));
   }
+
+  // §지도분포4 동기화 훅: Firebase 실시간 구독(다른 <script> 블록)이 companies를
+  // 클라우드에서 새로 받으면 window에 이 커스텀 이벤트를 쏜다 — 지도 팝업이 열려
+  // 있으면 즉시 반영한다(§동기화 규칙 "Firebase 변경 이벤트가 지도에 반영돼야 함").
+  // 목록 화면 자체의 실시간 리렌더링은 이 라운드의 범위가 아니므로 손대지 않는다.
+  window.addEventListener('shin2-crm-cloud-update', (e)=>{
+    if(e && e.detail && e.detail.key === 'companies') refreshMapIfOpen();
+  });
 
   // ---------------- 진입 ----------------
   document.getElementById('crmMapDistributionBtn').addEventListener('click', openMapDistributionModal);
