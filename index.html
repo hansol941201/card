@@ -488,6 +488,11 @@
   .request-cell .request-date{ color:var(--text-faint); font-size:10.5px; }
   .request-cell .request-labels{ font-weight:600; color:var(--text); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .request-cell:hover .request-labels{ text-decoration:underline; }
+  /* §최근 요청 컬럼 날짜만 표시 라운드 — 셀에는 날짜만 남기고 자세한 내용은 title
+     툴팁(호버)으로만 보여준다. 날짜가 유일한 내용이라 옅은 보조색 대신 살짝 더
+     또렷하게 보이도록 조정. */
+  .request-cell-date-only .request-date{ color:var(--text); font-size:12px; font-weight:600; }
+  .request-cell-date-only:hover .request-date{ text-decoration:underline; color:var(--navy); }
   /* §고객 성향 컬럼 라운드 — "최근 요청" 컬럼 자리를 대체한다(.col-request/.request-cell은
      그대로 남겨둔다, 고객카드의 "최근 요청/고객 메모"는 이 클래스와 무관하게 계속 동작).
      행 높이를 넘지 않도록 grade-badge와 같은 작은 중립 회색 배지 스타일을 재사용한다(§11
@@ -6032,16 +6037,15 @@ window.SHIN2_CRM_APP_INIT = function(){
       // §협력사 옆 최근 요청 컬럼 라운드: requestHistoryIndex(특정 자료 키워드가 매칭된
       // 활동만 잡음, 너무 좁음) 대신 고객카드 "최근 요청 / 고객 메모" 박스와 완전히 같은
       // 소스인 buildRequestListItems(co)를 그대로 재사용한다(메모까지 포함 — 새 계산 아님,
-      // 이미 있는 함수 호출만). "업체명 옆" 인라인 배지 대신 독립된 "최근 요청" 컬럼(옛
-      // .request-cell 스타일 재사용)으로 날짜(fmtDate, 상대 표현 아닌 실제 날짜)+간단한
-      // 요청 내용 한 줄을 보여준다. 클릭하면 기존 최근 요청/메모 패널(openMemoPanel)이
-      // 그대로 열린다. 요청 이력이 없는 업체는 "—"만 보여준다(데이터 없음을 지어내지 않음).
+      // 이미 있는 함수 호출만). 셀에는 날짜(fmtDate, 절대 표기)만 보여주고, 자세한 요청
+      // 내용은 title 툴팁(마우스를 올리면 보임)으로만 노출한다. 클릭하면 기존 최근
+      // 요청/메모 패널(openMemoPanel)이 그대로 열린다. 요청 이력이 없는 업체는 "—"만
+      // 보여준다(데이터 없음을 지어내지 않음).
       const recentRequestItems = buildRequestListItems(co);
       const latestRequestItem = recentRequestItems[0] || null;
       const nameRequestCellHtml = latestRequestItem
-        ? `<button type="button" class="request-cell" data-name-request-detail="${esc(co.id)}" title="${esc(latestRequestItem.text)}">
+        ? `<button type="button" class="request-cell request-cell-date-only" data-name-request-detail="${esc(co.id)}" title="${esc(latestRequestItem.text)}">
             <span class="request-date">${esc(fmtDate(latestRequestItem.createdAtIso))}</span>
-            <span class="request-labels">${esc(latestRequestItem.text)}</span>
           </button>`
         : `<button type="button" class="request-cell" data-name-request-detail="${esc(co.id)}"><span class="data-none">—</span></button>`;
       // §고객 성향 컬럼 라운드 §2/§6: 목록에는 co.customerInsight(별도 신규 필드,
