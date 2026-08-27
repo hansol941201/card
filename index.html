@@ -2137,14 +2137,6 @@ html,body{background:radial-gradient(circle at 75% -10%,rgba(11,91,211,.055),tra
 .map-cluster-bubble span{ font-size:.82em; font-weight:600; opacity:.92; }
 .map-cluster-bubble b{ font-size:1em; }
 .map-cluster-bubble.is-selected{ outline:2px solid #16A34A; outline-offset:1px; }
-.map-heat-canvas{ position:absolute; inset:0; pointer-events:none; }
-.map-heat-legend{
-  position:absolute; left:12px; bottom:12px; z-index:6; background:rgba(255,255,255,.92);
-  border:1px solid var(--line); border-radius:6px; padding:6px 10px; font-size:11px;
-  color:var(--text-muted); display:flex; align-items:center; gap:8px; box-shadow:0 1px 4px rgba(0,0,0,.08);
-}
-.map-heat-legend-swatch{ width:70px; height:8px; border-radius:4px;
-  background:linear-gradient(90deg, rgba(8,47,103,0) 0%, #8EC9F0 50%, #082F67 100%); }
 body.map-modal-lock{ overflow:hidden; }
 @media(max-width:900px){
   .map-modal-panel{ width:96%; height:92vh; }
@@ -14718,7 +14710,6 @@ window.SHIN2_CRM_APP_INIT = function(){
     let markerByCompanyId = new Map();
     let currentEntries = allEntries; // 마지막으로 그린 필터 결과 — idle(팬/줌)마다 다시 쓴다
     let selectedClusterKey = null;   // 지역/시군구 패널에서 방금 선택한 그룹(강조 표시용)
-    let selectedHighlightLatLng = null; // 업체 하나를 선택했을 때 강조할 좌표(히트맵용)
 
     function openInfoWindow(entry, marker){
       infoWindow.setContent(buildMapInfoWindowHtml(entry));
@@ -14843,7 +14834,6 @@ window.SHIN2_CRM_APP_INIT = function(){
     }
     function focusClusterGroup(key, tier){
       selectedClusterKey = key;
-      selectedHighlightLatLng = null;
       const targets = currentEntries.filter(e=> e.hasCoords && groupKeyFor(e, tier) === key);
       if(!targets.length) return;
       const bounds = new kakao.maps.LatLngBounds();
@@ -14863,101 +14853,41 @@ window.SHIN2_CRM_APP_INIT = function(){
       }
     }
 
-    // §지도분포6: 히트맵 — 원 테두리가 겹쳐 보이던 이전 방식(Circle 여러 개) 대신,
-    // 지도 위에 캔버스를 한 장 겹쳐서 업체 위치마다 반경이 있는 옅은 점을 additive로
-    // 누적한 뒤, 누적된 농도(0~1)를 투명→연한 파랑(#8EC9F0)→진한 네이비(#082F67)
-    // 그라데이션으로 색칠한다. 새 판정 기준 없이 위치(위경도)만 쓴다.
-    let heatCanvasEl = null;
-    let heatLegendEl = null;
-    function ensureHeatCanvas(){
-      if(heatCanvasEl) return heatCanvasEl;
-      heatCanvasEl = document.createElement('canvas');
-      heatCanvasEl.className = 'map-heat-canvas';
-      if(container.parentElement) container.parentElement.appendChild(heatCanvasEl);
-      return heatCanvasEl;
+    // §히트맵 토글: 사용자 요청으로 캔버스 그라데이션 방식을 걷어내고 이전의
+    // Circle 기반 방식으로 되돌렸다 — parseMapRegion으로 이미 나누는 시/도 단위
+    // 그대로, 지역별 위치확인 업체 수만 원(Circle) 크기/농도로 표현한다("업체
+    // 밀집 지역" 패널과 동일 집계를 지도 위에 겹쳐 보여주는 것 뿐, 새 판정 기준 아님).
+    let heatmapOverlays = [];
+    function clearHeatmap(){
+      heatmapOverlays.forEach(c=>{ try{ c.setMap(null); } catch(err){ /* 무시 */ } });
+      heatmapOverlays = [];
     }
-    function ensureHeatLegend(){
-      if(heatLegendEl) return heatLegendEl;
-      heatLegendEl = document.createElement('div');
-      heatLegendEl.className = 'map-heat-legend';
-      heatLegendEl.style.display = 'none';
-      heatLegendEl.innerHTML = '<span>업체 밀도: 낮음</span><span class="map-heat-legend-swatch"></span><span>높음</span>';
-      if(container.parentElement) container.parentElement.appendChild(heatLegendEl);
-      return heatLegendEl;
-    }
-    function setHeatLegendVisible(visible){ ensureHeatLegend().style.display = visible ? 'flex' : 'none'; }
-    function clearHeatCanvas(){
-      if(!heatCanvasEl) return;
-      const ctx = heatCanvasEl.getContext && heatCanvasEl.getContext('2d');
-      if(ctx) ctx.clearRect(0, 0, heatCanvasEl.width, heatCanvasEl.height);
-    }
-    // 줌아웃(레벨 큼)일수록 화면에 점이 빽빽해지므로 반경을 줄이고, 확대(레벨 작음)
-    // 할수록 점 사이가 벌어지므로 반경을 키운다 — 행정구역/도시 이름이 안 가려지게.
-    function heatRadiusForLevel(lvl){ return Math.max(26, Math.min(90, 130 - lvl * 7)); }
-    function heatColorAt(t){
-      const lightBlue = [142,201,240], navy = [8,47,103];
-      if(t <= 0.5){
-        const k = t / 0.5;
-        return [Math.round(255 + (lightBlue[0]-255)*k), Math.round(255 + (lightBlue[1]-255)*k), Math.round(255 + (lightBlue[2]-255)*k)];
-      }
-      const k = (t - 0.5) / 0.5;
-      return [Math.round(lightBlue[0] + (navy[0]-lightBlue[0])*k), Math.round(lightBlue[1] + (navy[1]-lightBlue[1])*k), Math.round(lightBlue[2] + (navy[2]-lightBlue[2])*k)];
-    }
-    function drawHeatmap(entries){
-      const canvas = ensureHeatCanvas();
-      const w = container.clientWidth || 0, h = container.clientHeight || 0;
-      if(!w || !h) return;
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if(!ctx) return;
-      ctx.clearRect(0, 0, w, h);
-      const proj = (typeof map.getProjection === 'function') ? map.getProjection() : null;
-      if(!proj || typeof proj.pointFromCoords !== 'function') return; // 좌표 변환 불가하면 그냥 비움
-      const located = entries.filter(e=> e.hasCoords);
-      if(!located.length) return;
-      const lvl = (typeof map.getLevel === 'function') ? map.getLevel() : 8;
-      const radius = heatRadiusForLevel(lvl);
-      const off = document.createElement('canvas');
-      off.width = w; off.height = h;
-      const octx = off.getContext('2d');
-      octx.globalCompositeOperation = 'lighter';
-      located.forEach(e=>{
-        let px;
-        try{ px = proj.pointFromCoords(new kakao.maps.LatLng(e.co.latitude, e.co.longitude)); } catch(err){ px = null; }
-        if(!px || px.x < -radius || px.y < -radius || px.x > w+radius || px.y > h+radius) return;
-        const grad = octx.createRadialGradient(px.x, px.y, 0, px.x, px.y, radius);
-        grad.addColorStop(0, 'rgba(255,255,255,0.55)');
-        grad.addColorStop(1, 'rgba(255,255,255,0)');
-        octx.fillStyle = grad;
-        octx.beginPath();
-        octx.arc(px.x, px.y, radius, 0, Math.PI*2);
-        octx.fill();
+    function buildHeatmapFor(entries){
+      clusterer.clear();
+      markerByCompanyId = new Map();
+      clearHeatmap();
+      const byRegion = new Map(); // region -> {sumLat,sumLng,count}
+      entries.forEach(e=>{
+        if(!e.hasCoords) return;
+        const key = e.region || '기타';
+        const acc = byRegion.get(key) || { sumLat:0, sumLng:0, count:0 };
+        acc.sumLat += e.co.latitude; acc.sumLng += e.co.longitude; acc.count += 1;
+        byRegion.set(key, acc);
       });
-      const maskData = octx.getImageData(0, 0, w, h);
-      const outData = ctx.createImageData(w, h);
-      const MAX_OPACITY = 0.82; // 행정구역/도시명이 가려지지 않게 최대 불투명도 제한
-      for(let i=0;i<maskData.data.length;i+=4){
-        const a = maskData.data[i+3] / 255;
-        if(a <= 0.02) continue;
-        const t = Math.min(1, a);
-        const col = heatColorAt(t);
-        outData.data[i] = col[0]; outData.data[i+1] = col[1]; outData.data[i+2] = col[2];
-        outData.data[i+3] = Math.round(t * MAX_OPACITY * 255);
-      }
-      ctx.putImageData(outData, 0, 0);
-      // 선택된 업체는 별도 테두리(초록 원)로 강조 — 지역/시군구 선택 강조는 클러스터
-      // 버블 쪽(.is-selected)에서 담당하므로 여기서는 업체 단위 좌표만 그린다.
-      if(selectedHighlightLatLng){
-        let hpx;
-        try{ hpx = proj.pointFromCoords(selectedHighlightLatLng); } catch(err){ hpx = null; }
-        if(hpx){
-          ctx.beginPath();
-          ctx.arc(hpx.x, hpx.y, 10, 0, Math.PI*2);
-          ctx.lineWidth = 2.5;
-          ctx.strokeStyle = '#16A34A';
-          ctx.stroke();
-        }
-      }
+      if(!byRegion.size || !kakao.maps.Circle) return;
+      const maxCount = Math.max(...Array.from(byRegion.values()).map(v=> v.count));
+      byRegion.forEach((acc)=>{
+        const centerLat = acc.sumLat / acc.count, centerLng = acc.sumLng / acc.count;
+        const ratio = acc.count / maxCount; // 0~1
+        const circle = new kakao.maps.Circle({
+          center: new kakao.maps.LatLng(centerLat, centerLng),
+          radius: 6000 + ratio * 34000, // 6~40km, 밀집도에 비례
+          strokeWeight: 1, strokeColor: '#082f67', strokeOpacity: 0.35,
+          fillColor: '#082f67', fillOpacity: 0.12 + ratio * 0.33
+        });
+        circle.setMap(map);
+        heatmapOverlays.push(circle);
+      });
     }
 
     // 클러스터/히트맵 중 현재 뷰모드에 맞는 레이어만 그린다 — 지도 인스턴스 자체는
@@ -14966,24 +14896,19 @@ window.SHIN2_CRM_APP_INIT = function(){
       currentEntries = entries;
       if(mapFilterState.viewMode === 'heatmap'){
         clearClusterOverlays();
-        clusterer.clear();
-        markerByCompanyId = new Map();
-        setHeatLegendVisible(true);
-        drawHeatmap(entries);
+        buildHeatmapFor(entries);
       } else {
-        setHeatLegendVisible(false);
-        clearHeatCanvas();
+        clearHeatmap();
         renderClusterLayer(entries);
       }
     }
 
     // 지도가 움직이거나(팬/줌) 확대 단계가 바뀔 때마다: 클러스터 모드면 현재 줌
-    // 단계에 맞는 레이어를 다시 그리고, 히트맵 모드면 화면 좌표가 바뀐 만큼 다시
-    // 그린다(캔버스는 뷰포트 기준 좌표라 매번 새로 계산해야 한다). 우측 "현재 지도
-    // 내 업체" 패널도 같이 갱신한다(§지도분포2 기존 동작 유지).
+    // 단계에 맞는 레이어를 다시 그리고, 히트맵 모드면 지역 집계를 다시 계산한다.
+    // 우측 "현재 지도 내 업체" 패널도 같이 갱신한다(§지도분포2 기존 동작 유지).
     function refreshVisibleList(){
       if(!mapModalOpen) return;
-      if(mapFilterState.viewMode === 'heatmap') drawHeatmap(currentEntries);
+      if(mapFilterState.viewMode === 'heatmap') buildHeatmapFor(currentEntries);
       else renderClusterLayer(currentEntries);
       renderMapInfoPanel(buildMapCompanies());
     }
@@ -14997,18 +14922,13 @@ window.SHIN2_CRM_APP_INIT = function(){
         return applyMapFilters(buildMapCompanies()).filter(e=> e.hasCoords && bounds.contain(new kakao.maps.LatLng(e.co.latitude, e.co.longitude)));
       },
       destroy(){
-        try{
-          clusterer.clear(); clearClusterOverlays(); infoWindow.close();
-          if(heatCanvasEl){ heatCanvasEl.remove(); heatCanvasEl = null; }
-          if(heatLegendEl){ heatLegendEl.remove(); heatLegendEl = null; }
-        } catch(err){ /* 무시 — 팝업 자체가 사라지므로 잔여 정리는 최선 노력만 */ }
+        try{ clusterer.clear(); clearClusterOverlays(); clearHeatmap(); infoWindow.close(); } catch(err){ /* 무시 — 팝업 자체가 사라지므로 잔여 정리는 최선 노력만 */ }
       }
     };
 
     updateMapMarkers = function(entries){ renderMapLayer(applyMapFilters(entries)); };
     focusMapRegion = function(regionName){
       selectedClusterKey = regionName;
-      selectedHighlightLatLng = null;
       const targets = applyMapFilters(buildMapCompanies()).filter(e=> e.hasCoords && (e.region || '주소 미확인') === regionName);
       if(!targets.length) return;
       const bounds = new kakao.maps.LatLngBounds();
@@ -15019,7 +14939,6 @@ window.SHIN2_CRM_APP_INIT = function(){
       const co = D.findCompany(companyId);
       if(!co || typeof co.latitude !== 'number' || typeof co.longitude !== 'number') return;
       const pos = new kakao.maps.LatLng(co.latitude, co.longitude);
-      selectedHighlightLatLng = pos;
       selectedClusterKey = null;
       const openNow = ()=>{
         const marker = markerByCompanyId.get(companyId);
