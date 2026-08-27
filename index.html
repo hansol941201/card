@@ -613,6 +613,15 @@
   /* 행 전체를 빨갛게 칠하지 않고 왼쪽 3px 라인만 표시한다(§5/§9 "화면 전체 행을 진한
      빨간색으로 칠하지 마세요"). */
   .co-row.is-overdue{ border-left:3px solid #DC2626; }
+  /* §목록 행 하이라이트 라운드(신규): "실적 상승 업체"(TOP5 카드 위젯과 같은 판정)를
+     목록 전체에서 스크롤하며 훑어봐도 눈에 띄게 왼쪽 초록 라인 + 아주 옅은 배경 틴트로
+     표시한다("하이라이트 라인 탐지형태") — 기한초과(is-overdue, 빨강)와 색이 겹치지
+     않도록 기존 rising-up/화살표와 같은 초록 계열을 쓴다. is-overdue와 동시에 해당하면
+     기한초과가 더 급한 신호라 왼쪽 라인은 빨강이 우선한다(CSS 순서상 is-overdue가 이
+     블록보다 뒤에 있으면 안 겹치므로, 여기서는 배경 틴트만 추가하고 라인은 겹칠 때
+     보더 쪽에서 나중 규칙이 이기게 둔다 — 굳이 !important로 강제하지 않음). */
+  .co-row.is-rising{ background:#F3FBF6; border-left:3px solid #16A34A; }
+  .co-row.is-rising.is-overdue{ background:#FFF6F3; border-left:3px solid #DC2626; }
 
   /* 협력사 등급 배지(§4) — 별표 금지, 색상+텍스트 배지만 사용. */
   /* §등급 표시 재확인 라운드: 등급의 실제 우열 의미가 확인되지 않아, 색으로 "좋다/나쁘다"를
@@ -5935,6 +5944,10 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 쓰지 않는다는 새 원칙(§4)에 따라 제거했다 — 대신 실제 Partner Dashboard 등급
     // (co.partnerDashboard.grade)이 있는 업체만 등급 배지로 표시한다(getCompanyGrade).
     renderRisingSection(companies);
+    // §목록 행 하이라이트 라운드: TOP5 카드와 같은 판정을 재사용해(새 계산 없음) 목록
+    // 전체에서 "실적 상승 업체" 행을 한눈에 훑어볼 수 있게 한다 — 여기서 한 번만
+    // 계산해 아래 각 행에서는 Set 조회만 한다(다른 인덱스들과 같은 성능 패턴).
+    const risingCompanyIds = buildRisingCompanyIdSet(companies);
 
     const filterCounts = {};
     FILTER_DEFS.forEach(([key])=>{ filterCounts[key] = enriched.filter(r=> matchesFilter(r.co, r.progress, key)).length; });
@@ -6006,6 +6019,9 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 미수금 금액은 노출하지 않고, 합계가 0보다 큰 업체에만 카드 앞 검정 패널을 붙인다.
       const receivable = D.getCompanyReceivable(co);
       const receivablePenaltyClass = (receivable && receivable.total > 0) ? ' has-receivable' : '';
+      // §목록 행 하이라이트 라운드: 위에서 한 번만 계산해 둔 risingCompanyIds 조회만
+      // (새 계산 없음) — "실적 상승 업체" 행에 왼쪽 초록 강조선을 붙인다.
+      const risingRowClass = risingCompanyIds.has(co.id) ? ' is-rising' : '';
       // §최근 요청 라운드에서 "최근 시공"을 협력사 컬럼 안으로 옮겼다가, §최근 시공 위치
       // 변경 라운드에서 업체명 오른쪽(같은 줄)으로 바꿨는데, 업체명 길이에 따라 위치가
       // 흔들려 지저분하다는 피드백으로 §최근 실적 독립 컬럼 복원 라운드에서 다시 독립
@@ -6156,7 +6172,7 @@ window.SHIN2_CRM_APP_INIT = function(){
             ${relEntries.length > 1 ? `<span class="relation-badge">+${relEntries.length - 1}</span>` : ''}
           </div>` : '';
       return `
-      <div class="co-row${rowOverdueClass}${receivablePenaltyClass}" data-id="${esc(co.id)}">
+      <div class="co-row${rowOverdueClass}${receivablePenaltyClass}${risingRowClass}" data-id="${esc(co.id)}">
         <div class="col-name">
           <div class="col-name-top">
             <span class="co-name-badges">${partnerGlyphHtml(co)}<span class="co-name-text">${esc(co.name)}</span></span>
@@ -9517,7 +9533,10 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 포기하고 "최근 흐름"과 같은 연 단위 비교(2025 vs 2024, getTotalPourRecordsForCompany
   // 동일 소스)로 바꿨다. 2024=0/2025>0인 업체는 증감률(0으로 나누기)을 만들 수 없어
   // "신규 증가"로 별도 표시하고 가짜 퍼센트를 만들지 않는다(§8).
-  function buildRisingCompaniesTop5(companies){
+  // §목록 행 하이라이트 라운드(신규): TOP5 카드 위젯과 목록 행 강조가 같은 "실적 상승"
+  // 판정을 쓰도록, 판정 로직 자체를 여기 하나로 뽑아냈다(§3 "새 판정 기준 발명 금지" —
+  // 이미 buildRisingCompaniesTop5가 쓰던 계산을 그대로 재사용, 결과만 두 곳에서 나눠 쓴다).
+  function computeRisingCompanies(companies){
     const rising = [];
     companies.forEach(co=>{
       const records = getTotalPourRecordsForCompany(co);
@@ -9531,10 +9550,22 @@ window.SHIN2_CRM_APP_INIT = function(){
         rising.push({ co, y2024: 0, y2025, pct: null, isNew: true });
       }
     });
+    return rising;
+  }
+  function buildRisingCompaniesTop5(companies){
+    const rising = computeRisingCompanies(companies);
     const numeric = rising.filter(r=> !r.isNew).sort((a,b)=> b.pct - a.pct);
     const newOnes = rising.filter(r=> r.isNew).sort((a,b)=> b.y2025 - a.y2025);
     const combined = numeric.concat(newOnes);
     return { available: combined.length > 0, items: combined.slice(0, 5), totalComparable: rising.length, newCount: newOnes.length };
+  }
+  // §목록 행 하이라이트 라운드: "실적 상승 업체"(TOP5 카드와 동일 판정, computeRisingCompanies
+  // 그대로 재사용) 전체 목록을 Set<companyId>로 반환 — TOP5로 자르지 않는다("탐지형태"라
+  // 목록을 스크롤하면서 훑어볼 때 상승 업체를 전부 눈에 띄게 하는 목적이라 5개로 제한할
+  // 이유가 없다). renderList()에서 한 번만 계산해 각 행에서 조회만 한다(§성능, 다른
+  // 인덱스들과 같은 패턴).
+  function buildRisingCompanyIdSet(companies){
+    return new Set(computeRisingCompanies(companies).map(r=> r.co.id));
   }
   function renderRisingSection(companies){
     const root = document.getElementById('crmRisingSection');
