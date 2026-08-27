@@ -1017,6 +1017,10 @@
   .pi-sample-table th{ background:#F5F7FA; color:var(--navy); font-weight:700; }
   .pi-note{ font-size:11.5px; color:var(--text-muted); margin-bottom:10px; }
   .pi-result-box{ background:#F5F7FA; border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
+  /* §partner-dashboard 실시간 동기화 라운드 — 기존 .pi-note/co-text-action을 그대로
+     재사용하고 작은 박스 하나만 추가했다(새 색 팔레트 없음). */
+  .pi-sync-box{ background:#F5F7FA; border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-top:2px; }
+  .pi-sync-status{ font-size:11px; color:var(--text-muted); margin-top:6px; line-height:1.5; }
 
   /* §전화 요청 기록 라운드(신규) — .pi-overlay/.pi-panel/.pi-head/.pi-title/.pi-body를
      그대로 재사용하고(새 모달 디자인 시스템 안 만듦) 폭만 좁힌다(§요청사항 "모달을 과도
@@ -13913,6 +13917,142 @@ window.SHIN2_CRM_APP_INIT = function(){
      실제로 저장). 검토 필요 항목은 이 화면에서 자동 처리하지 않는다(§4 원칙) — 명단만
      보여주고, 실제 처리는 직원이 각 업체를 열어 수동으로 판단한다.
      ========================================================================== */
+  // §partner-dashboard 실시간 동기화 라운드: window.SHIN2_PARTNER_SNAPSHOT은 원래
+  // 2026-07-23 시점에 pourservice/partner-dashboard 저장소를 한 번 읽어 embed해 둔
+  // 정적 값이었다(§Partner Dashboard 이관 라운드) — 그 뒤로 그 사이트에서 새로 등록/체결된
+  // 업체가 CRM에 전혀 반영되지 않는 문제가 실제로 확인됐다(사용자 확인: "우리 협력사"
+  // 카운트가 partner-dashboard 화면의 실제 숫자보다 작음). [🔄 최신 데이터 동기화] 버튼을
+  // 누르면 그 사이트를 지금 이 순간 실제로 fetch해서 같은 병합 규칙(내부 리스트+등급+
+  // 신규MOU+외부리스트 폴백, 업체명 정규화 완전일치만, §normCompanyNameForPartnerMatch와
+  // 동일 규칙 재사용)으로 window.SHIN2_PARTNER_SNAPSHOT을 그 자리에서 새로 만든다 — 이후
+  // 아래 [분석 시작]/[적용] 흐름(D.previewPartnerImport/applyPartnerImport)은 전혀 안
+  // 바꾸고 그대로 재사용한다(§ "새 저장/판정 로직을 만들지 않는다").
+  //
+  // ⚠ 알려진 한계(사용자에게도 안내함): 이 버튼은 partner-dashboard의 "정적 페이지에
+  // 박혀 있는 원본 데이터"만 가져올 수 있다. partner-dashboard 자체가 방문자 브라우저의
+  // localStorage에 저장하는 수정/추가분(그 사이트 코드의 overrides/adds, §8030-8056)은
+  // 브라우저마다 격리돼 있어 어떤 사이트도 다른 사이트의 localStorage를 읽을 수 없다(웹
+  // 표준 동일-출처 정책 — CORS를 아무리 허용해도 우회 불가) — 그래서 그 사이트에서 직접
+  // 등록한 최신 업체가 이 버튼만으로는 여전히 안 잡힐 수 있다. 완전히 맞추려면
+  // partner-dashboard 쪽에서 최신 데이터를 실제로 내보내서 그 저장소에 커밋해야 한다.
+  const PARTNER_DASHBOARD_LIVE_URL = 'https://pourservice.github.io/partner-dashboard/';
+  function normCompanyNameForLiveSync(s){
+    // §normCompanyNameForPartnerMatch(§7031-7036)와 완전히 같은 규칙 — 로컬 재구현이
+    // 아니라 이 파일 다른 모듈에도 이미 있는 "표기 차이만 흡수, 완전일치만 허용" 원칙을
+    // 그대로 복제했다(§ "모듈별 로컬 상수 복제" 관례, 새 매칭 기준을 만들지 않음).
+    if(!s) return '';
+    let t = String(s).replace(/\(주\)|㈜|주식회사/g, '');
+    t = t.replace(/[\s()\[\]㈱·\-_,.]/g, '');
+    return t.trim().toLowerCase();
+  }
+  function pickTruthy(obj, keys){
+    const out = {};
+    keys.forEach(k=>{ if(obj[k]) out[k] = obj[k]; });
+    return out;
+  }
+  function shrinkLiveNewMou(rec){
+    // 기존 정적 스냅샷의 newMou 축약 형태(Label류/site/note는 있을 때만, mouDone/hurdle/
+    // stage는 항상 유지)를 그대로 재현 — 실제 기존 값과 역추적 비교해서 확인한 규칙이다.
+    const out = {};
+    Object.assign(out, pickTruthy(rec, ['qSentLabel','qReplyLabel','m1Label','m2Label','mouLabel','site','note']));
+    out.mouDone = !!rec.mouDone;
+    out.hurdle = !!rec.hurdle;
+    if(rec.stage) out.stage = rec.stage;
+    return out;
+  }
+  // partner-dashboard 페이지 원문(HTML 텍스트)에서 `const DATA = {...};` 리터럴을 뽑아
+  // 파싱하고, 기존 정적 스냅샷과 동일한 규칙(내부→등급전용→신규MOU전용→외부전용 순서,
+  // 업체명 정규화 완전일치 기준 중복제거)으로 병합한 배열을 만든다.
+  function buildMergedPartnerSnapshotFromLiveHtml(html){
+    const m = html.match(/const DATA = (\{[\s\S]*?\});\s*\n/);
+    if(!m) throw new Error('원본 페이지에서 DATA를 찾지 못했습니다(사이트 구조가 바뀌었을 수 있습니다)');
+    const DATA = JSON.parse(m[1]);
+    if(!DATA.partnerList || !DATA.grades || !DATA.newMou) throw new Error('원본 데이터 구조가 예상과 다릅니다(partnerList/grades/newMou 필요)');
+
+    const gradeIndex = new Map();
+    Object.entries(DATA.grades).forEach(([letter, list])=>{
+      (list||[]).forEach(rec=>{
+        const key = normCompanyNameForLiveSync(rec.name);
+        if(!key || gradeIndex.has(key)) return;
+        const gradeHistory = {};
+        ['y25','y24','y23','y22'].forEach(y=>{ if(rec[y]) gradeHistory[y] = rec[y]; });
+        gradeIndex.set(key, { grade: letter, gradeSales: rec.sales, gradeHistory });
+      });
+    });
+    const newMouIndex = new Map();
+    (DATA.newMou||[]).forEach(rec=>{
+      const key = normCompanyNameForLiveSync(rec.company);
+      if(!key || newMouIndex.has(key)) return;
+      newMouIndex.set(key, rec);
+    });
+
+    const seen = new Set();
+    const out = [];
+    (DATA.partnerList.internal||[]).forEach(c=>{
+      const key = normCompanyNameForLiveSync(c.company);
+      if(!key || seen.has(key)) return;
+      seen.add(key);
+      const entry = { name: c.company };
+      Object.assign(entry, pickTruthy(c, ['region','ceo','bizno','address','phone','fax','email']));
+      if(c.mou) entry.mouDate = c.mou;
+      Object.assign(entry, pickTruthy(c, ['code']));
+      const g = gradeIndex.get(key);
+      if(g){ entry.grade = g.grade; entry.gradeSales = g.gradeSales; entry.gradeHistory = g.gradeHistory; }
+      Object.assign(entry, pickTruthy(c, ['capital','note']));
+      const nm = newMouIndex.get(key);
+      if(nm) entry.newMou = shrinkLiveNewMou(nm);
+      out.push(entry);
+    });
+    Object.entries(DATA.grades).forEach(([letter, list])=>{
+      (list||[]).forEach(rec=>{
+        const key = normCompanyNameForLiveSync(rec.name);
+        if(!key || seen.has(key)) return;
+        seen.add(key);
+        const gradeHistory = {};
+        ['y25','y24','y23','y22'].forEach(y=>{ if(rec[y]) gradeHistory[y] = rec[y]; });
+        const entry = { name: rec.name, grade: letter, gradeSales: rec.sales, gradeHistory };
+        const nm = newMouIndex.get(key);
+        if(nm) entry.newMou = shrinkLiveNewMou(nm);
+        out.push(entry);
+      });
+    });
+    (DATA.newMou||[]).forEach(rec=>{
+      const key = normCompanyNameForLiveSync(rec.company);
+      if(!key || seen.has(key)) return;
+      seen.add(key);
+      out.push({ name: rec.company, newMou: shrinkLiveNewMou(rec) });
+    });
+    (DATA.partnerList.external||[]).forEach(c=>{
+      const key = normCompanyNameForLiveSync(c.company);
+      if(!key || seen.has(key)) return;
+      seen.add(key);
+      const entry = { name: c.company };
+      Object.assign(entry, pickTruthy(c, ['region','ceo','address','phone']));
+      out.push(entry);
+    });
+    return out;
+  }
+  // 동기화 결과 표시 상태만 담는다(별도 저장소 아님, 페이지 새로고침하면 초기화 —
+  // window.SHIN2_PARTNER_SNAPSHOT 교체 자체도 메모리상에서만 일어난다, §7 patterns와 동일).
+  let piSyncState = { status:'idle', count:null, error:null };
+  async function syncPartnerSnapshotFromLive(){
+    piSyncState = { status:'loading', count:null, error:null };
+    renderPartnerImportModal();
+    try{
+      const res = await fetch(PARTNER_DASHBOARD_LIVE_URL, { cache:'no-store' });
+      if(!res.ok) throw new Error('페이지를 불러오지 못했습니다(HTTP ' + res.status + ')');
+      const html = await res.text();
+      const merged = buildMergedPartnerSnapshotFromLiveHtml(html);
+      window.SHIN2_PARTNER_SNAPSHOT = merged;
+      piSyncState = { status:'success', count: merged.length, error:null };
+    }catch(err){
+      // 네트워크/CORS 차단은 TypeError로 온다 — 원인을 구분해서 안내한다.
+      const msg = (err && err.message) || String(err);
+      piSyncState = { status:'error', count:null, error: msg };
+    }
+    piState = { preview: null, applied: null }; // 새 스냅샷 기준으로 미리보기를 다시 하게 초기화
+    renderPartnerImportModal();
+  }
   let piState = { preview: null, applied: null };
   function openPartnerImportModal(){
     piState = { preview: null, applied: null };
@@ -13940,6 +14080,16 @@ window.SHIN2_CRM_APP_INIT = function(){
                 원본: pourservice/partner-dashboard (2026-07-23 스냅샷, 총 ${snapshotCount}개 업체 — 내부 협력업체 리스트 + 등급 + 신규 MOU 진행현황을 업체명 기준으로 병합).<br/>
                 [분석 시작]은 아무것도 저장하지 않습니다 — 현재 CRM 업체와 비교한 결과만 미리 보여줍니다. 실제 저장은 결과를 확인한 뒤 [적용]을 눌러야만 일어납니다.
               </div>
+              <div class="pi-sync-box">
+                <button type="button" class="co-text-action" id="piSyncBtn" ${piSyncState.status==='loading' ? 'disabled' : ''}>
+                  ${piSyncState.status==='loading' ? '동기화 중…' : '🔄 partner-dashboard 최신 데이터 동기화'}
+                </button>
+                <div class="pi-sync-status">
+                  ${piSyncState.status==='success' ? `방금 ${esc(String(piSyncState.count))}개 업체로 새로 동기화했습니다(아래 숫자에 반영됨). 지금부터 [분석 시작]을 누르면 이 최신 데이터로 비교합니다.` : ''}
+                  ${piSyncState.status==='error' ? `동기화 실패: ${esc(piSyncState.error)} — 기존 2026-07-23 스냅샷을 그대로 사용합니다.` : ''}
+                  ${piSyncState.status==='idle' || piSyncState.status==='loading' ? `partner-dashboard 사이트를 지금 이 순간 다시 읽어와 위 스냅샷을 최신화합니다. 단, 그 사이트 브라우저에만 저장된 수정/추가 내역(localStorage)은 어떤 방법으로도 가져올 수 없습니다 — 완전히 맞추려면 그쪽에서 최신 데이터를 내보내 저장소에 반영해야 합니다.` : ''}
+                </div>
+              </div>
             </div>
             <div class="pi-actions">
               <button type="button" class="co-text-action" id="piCancelBtn">닫기</button>
@@ -13954,6 +14104,8 @@ window.SHIN2_CRM_APP_INIT = function(){
         piState.preview = D.previewPartnerImport();
         renderPartnerImportModal();
       });
+      const syncBtn = document.getElementById('piSyncBtn');
+      if(syncBtn) syncBtn.addEventListener('click', ()=>{ syncPartnerSnapshotFromLive(); });
       return;
     }
 
