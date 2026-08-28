@@ -5023,7 +5023,12 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
       const contactChanged = pdContactChanged(m.co, contact);
       const oldNm = (m.co.partnerDashboard && m.co.partnerDashboard.newMou) || null;
       const mouSignalPatch = pdResolveContactMouPatch(oldNm, contact);
-      if(contactChanged || mouSignalPatch){
+      // §협력업체 리스트 등재 기준 재정정 라운드 — partnerStatus가 아직 'partner'가 아닌
+      // 업체는 연락처/협약체결일이 그대로여도 "등재 반영"이라는 실제 변경이 필요하다
+      // (applyPartnerListSync가 이 값도 함께 세운다). 안 그러면 최초 동기화 이후 재실행 시
+      // 이미 매칭됐지만 partnerStatus만 빠진 업체가 "변경 없음"으로 조용히 넘어가버린다.
+      const needsPartnerFlag = m.co.partnerStatus !== 'partner';
+      if(contactChanged || mouSignalPatch || needsPartnerFlag){
         updates.push({ co: m.co, contact, contactChanged, mouSignalPatch });
       } else {
         noChangeCount++;
@@ -5055,9 +5060,14 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     const companies = loadCompanies();
     const byId = new Map(companies.map(c=> [c.id, c]));
     const now = nowIso();
-    let updatedCount = 0, newCount = 0, contactChangedCount = 0, mouChangedCount = 0;
+    let updatedCount = 0, newCount = 0, contactChangedCount = 0, mouChangedCount = 0, markedPartnerCount = 0;
     const contactFieldChanges = [];
 
+    // §협력업체 리스트 등재 기준 재정정 라운드 — "날짜가 없어도 체결리스트에 있으면
+    // 협력사"(사용자 정정). 이 동기화가 다루는 업체는 전부 partner-dashboard의 내부/시공사/
+    // 외부 리스트(pdBuildContactIndex, 협약체결일 필드 유무와 무관하게 그 리스트에 실제로
+    // 등재된 업체)에서 온 것이므로, 매칭·신규생성 둘 다 co.partnerStatus='partner'를
+    // 세운다 — matchesFilter의 isConfirmedPartner가 이 값을 읽어 "우리 협력사" 탭에 반영한다.
     preview.updates.forEach(u=>{
       const co = byId.get(u.co.id);
       if(!co) return;
@@ -5082,6 +5092,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
         co.partnerDashboard = Object.assign({}, co.partnerDashboard, { newMou: pdMergeNewMou(oldNm, u.mouSignalPatch) });
         mouChangedCount++; changed = true;
       }
+      if(co.partnerStatus !== 'partner'){ co.partnerStatus = 'partner'; markedPartnerCount++; changed = true; }
       if(changed) updatedCount++;
     });
 
@@ -5095,17 +5106,19 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
         email: contact.email || '',
         address: contact.address || '',
         bizRegNo: contact.bizno || '',
+        partnerStatus: 'partner',
         partnerDashboard: contact.mou ? { newMou: { mouDone: true, mouLabel: contact.mou } } : undefined
       });
       companies.push(rec);
       byId.set(rec.id, rec);
       newCount++;
+      markedPartnerCount++;
     });
 
     saveCompanies(companies);
     try{ localStorage.setItem('shin2-partner-list-sync-last-run', now); }catch(e){}
     return {
-      updatedCount, newCount, contactChangedCount, mouChangedCount, contactFieldChanges,
+      updatedCount, newCount, contactChangedCount, mouChangedCount, markedPartnerCount, contactFieldChanges,
       reviewCount: preview.review.length,
       originalCompany: preview.counts.originalCompany, matched: preview.counts.matched,
       noChange: preview.counts.noChange, errorKey: preview.counts.errorKey,
@@ -5882,31 +5895,40 @@ window.SHIN2_CRM_APP_INIT = function(){
     const nm = resolveNewMouForCompany(co);
     return !!(nm && nm.hurdle);
   }
+  // §협력업체 리스트 등재 기준 재정정 라운드 — 사용자 재정정: "날짜가 없어도 체결리스트에
+  // 있으면 협력사". 실제 사례로 확인됨: partner-dashboard 내부용 리스트(전체 289개)에는
+  // 등재돼 있지만 협약체결일(mou) 필드가 비어있는 업체가 다수 있고(예전 라운드 조사로도
+  // 확인된 실제 데이터 공백 — 지어낸 값이 아님), 이런 업체도 "우리 협력사"로 봐야 한다는
+  // 뜻이다. co.partnerStatus==='partner'는 이제 §협력업체 동기화 단순화 라운드의
+  // applyPartnerListSync에서만 세팅한다(매칭·신규생성 둘 다) — partner-dashboard의
+  // 내부/시공사/외부 리스트에 실제로 등재된 업체만 이 값을 갖는다(예전에 이 필드를 버렸던
+  // "MOU 진행중인데 등재로 오인" 문제는 그 원인이던 낡은 전체 스냅샷 임포트 경로였고, 지금은
+  // 협력업체 리스트 전용 동기화만 이 필드를 쓴다 — 재발 원인 제거 확인).
+  // MOU 단계 done(§ 지난 라운드에서 만든 신호)도 여전히 "협력사"의 충분조건으로 같이 본다
+  // — 리스트에 아직 없어도(등재 반영 전) 실제 체결일이 잡혔으면 이미 협력사이기 때문.
+  function isConfirmedPartner(co, progress){
+    if(co && co.partnerStatus === 'partner') return true;
+    const mou = getMouStage(progress);
+    return !!(progress.hasAny && mou && mou.state === 'done');
+  }
   function matchesFilter(co, progress, key){
     if(key === 'all') return true;
-    // §사용자 정정 라운드: "우리 협력사"=MOU 단계가 done(체결완료). partnerStatus 필드는
-    // 더 이상 이 판정에 쓰지 않는다(§요청 "우리 협력사는 MOU체결완료").
-    if(key === 'partner'){
-      const mou = getMouStage(progress);
-      return progress.hasAny && !!mou && mou.state === 'done';
-    }
+    if(key === 'partner') return isConfirmedPartner(co, progress);
     if(key === 'receivable'){
       const receivable = D.getCompanyReceivable(co);
       return !!(receivable && receivable.total > 0);
     }
-    // §사용자 정정 라운드: "협약 진행 중"=진행 이력은 있지만(hasAny) MOU 단계가 아직
-    // done이 아닌 업체 — 질문서/1차미팅/2차미팅 중이거나 MOU 자체가 진행/대기 상태인
-    // 경우를 전부 포함, "체결 전" 구간 전체(§요청 그대로).
+    // §협력업체 리스트 등재 기준 재정정 라운드: 위 isConfirmedPartner(리스트 등재 OR MOU
+    // 체결완료)에 해당하면 여기서 전부 빠진다 — 질문서/1차미팅/2차미팅/MOU 체결 전 진행
+    // 이력만 여기 남는다.
     if(key === 'agreementInProgress'){
-      const mou = getMouStage(progress);
-      return progress.hasAny && !(mou && mou.state === 'done') && !isHurdleCompany(co);
+      return progress.hasAny && !isConfirmedPartner(co, progress) && !isHurdleCompany(co);
     }
     if(key === 'hurdle') return progress.hasAny && isHurdleCompany(co);
-    // 매출은 발생했지만 MOU 체결완료가 아닌 시공사. 매출 0원/자료 없음은 제외한다.
+    // 매출은 발생했지만 아직 확정 협력사가 아닌 시공사. 매출 0원/자료 없음은 제외한다.
     if(key === 'nonPartnerRevenue'){
-      const mou = getMouStage(progress);
       const revenue = D.getCompanyTotalRevenueAllYears(co);
-      return !!revenue && !revenue.ambiguous && typeof revenue.total === 'number' && revenue.total > 0 && !(mou && mou.state === 'done');
+      return !!revenue && !revenue.ambiguous && typeof revenue.total === 'number' && revenue.total > 0 && !isConfirmedPartner(co, progress);
     }
     if(key === 'inProgress') return progress.hasAny; // §지도분포 필터(MAP_FILTER_DEFS) 등 다른 화면이 여전히 참조 — 의미 유지
     if(!progress.hasAny) return false;
