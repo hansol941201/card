@@ -413,6 +413,9 @@
   .workq-table tr:hover td{ background:#F7FBFF; }
   .workq-co-link{ background:none; border:none; padding:0; font:inherit; font-weight:700; color:var(--navy); cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px; }
   .workq-co-link:hover{ text-decoration-style:solid; }
+  /* §단계 진행상황 이전 라운드 — 고객관리 목록에서 옮겨온 4단계 stepper 칸. 너무 넓게
+     늘어나지 않도록 폭만 제한(.stage-stepper 자체 스타일은 그대로 재사용). */
+  .workq-stage-progress{ width:150px; min-width:130px; }
   .workq-reason{ color:var(--text-muted); font-size:12px; }
   .workq-days{ white-space:nowrap; font-variant-numeric:tabular-nums; }
   .workq-delay-badge{ display:inline-block; font-size:10px; font-weight:700; color:#B45309; background:#FFF3E0; border-radius:4px; padding:1px 5px; margin-left:5px; }
@@ -2165,12 +2168,12 @@ html,body{background:#F7F9FC;font-size:13px}
 #cardView .section,#cardView .card-section,#cardView .detail-section{border-color:#E4EAF1!important;box-shadow:none!important}
 #cardView table{border-collapse:collapse}#cardView th{color:#66758D!important;font-size:10.5px!important;font-weight:650!important}#cardView td{font-size:11px!important}#cardView tr{border-color:#E9EEF4!important}
 
-@media(max-width:1100px){.app{padding-left:14px;padding-right:14px}.co-table-head,.co-row{grid-template-columns:140px 110px 145px 50px 135px 74px 74px 90px 62px 150px!important}.rising-grid{grid-template-columns:repeat(5,minmax(160px,1fr))!important}.rising-section{overflow-x:auto}.co-table-head,.co-list{min-width:1060px}.co-list{overflow:visible}#listView{overflow-x:auto}}
-@media(max-width:760px){.app{padding:14px 10px 32px}.topbar{margin-bottom:12px}.rising-grid{grid-template-columns:repeat(5,165px)!important}.list-search-row{flex-direction:row!important;min-width:430px}.list-sort-select{width:auto!important}.co-table-head,.co-list{min-width:1060px}.co-row{grid-template-columns:140px 110px 145px 50px 135px 74px 74px 90px 62px 150px!important}}
+@media(max-width:1100px){.app{padding-left:14px;padding-right:14px}.co-table-head,.co-row{grid-template-columns:140px 110px 145px 50px 135px 74px 74px 90px 62px!important}.rising-grid{grid-template-columns:repeat(5,minmax(160px,1fr))!important}.rising-section{overflow-x:auto}.co-table-head,.co-list{min-width:1060px}.co-list{overflow:visible}#listView{overflow-x:auto}}
+@media(max-width:760px){.app{padding:14px 10px 32px}.topbar{margin-bottom:12px}.rising-grid{grid-template-columns:repeat(5,165px)!important}.list-search-row{flex-direction:row!important;min-width:430px}.list-sort-select{width:auto!important}.co-table-head,.co-list{min-width:1060px}.co-row{grid-template-columns:140px 110px 145px 50px 135px 74px 74px 90px 62px!important}}
 
 /* HANSOL CRM corporate visual override */
 :root{--navy:#082f67;--blue:#0b5bd3;--bg:#f4f7fb;--line:#dfe7f1;--text:#13243e;--green:#079455}
-html,body{background:radial-gradient(circle at 75% -10%,rgba(11,91,211,.055),transparent 28%),var(--bg)!important;color:var(--text)!important}body{font-family:Pretendard,"Noto Sans KR","Malgun Gothic",Arial,sans-serif!important;letter-spacing:-.015em}.app{max-width:1580px!important;margin:0 auto!important;padding:24px 30px 48px!important}.brand{color:var(--navy)!important;font-size:25px!important;font-weight:800!important}.brand-wrap{display:flex!important;align-items:center!important;gap:10px!important}.brand-logo{display:block!important;height:30px!important;width:auto!important}.list-add-btn{background:linear-gradient(180deg,#0b3978,#082f67)!important;border:0!important;border-radius:7px!important;box-shadow:0 4px 12px rgba(8,47,103,.16)!important}.rising-section{background:#fff!important;border:1px solid var(--line)!important;border-radius:12px!important;padding:14px 16px 15px!important;box-shadow:0 3px 14px rgba(23,48,92,.055)!important}.rising-grid{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:12px!important}.rising-card{border:1px solid #e1e8f1!important;background:linear-gradient(180deg,#fff,#fbfdff)!important;border-radius:10px!important;padding:12px 13px 10px!important;box-shadow:0 2px 8px rgba(22,44,78,.045)!important}.rising-rank{background:var(--navy)!important;color:#fff!important;border-radius:5px!important}.rising-up{color:var(--green)!important;font-weight:800!important}.rising-bar{height:4px!important;background:#edf2f7!important}.rising-bar-fill{background:linear-gradient(90deg,#079455,#12b76a)!important}.list-filter-chip{border:1px solid #dce5ef!important;background:#fff!important;border-radius:7px!important;font-weight:650!important}.list-filter-chip.is-active{background:var(--navy)!important;color:#fff!important;border-color:var(--navy)!important}.list-search-row{background:#fff!important;border:1px solid var(--line)!important;border-radius:11px!important;padding:10px!important;box-shadow:0 2px 8px rgba(22,44,78,.035)!important}.search-box,.list-sort-select{height:39px!important;border:1px solid #dce5ef!important;border-radius:8px!important;background:#fff!important}.co-table-head,.co-row{display:grid!important;grid-template-columns:minmax(180px,1fr) 150px 175px 68px 185px 92px 92px 140px 82px 200px!important;gap:12px!important;align-items:center!important}.co-table-head{margin-top:12px!important;padding:10px 14px!important;border:1px solid var(--line)!important;border-radius:10px 10px 0 0!important;background:#f9fbfd!important;color:#4b607c!important;font-weight:750!important}.co-list{background:#fff!important;border:1px solid var(--line)!important;border-top:0!important;border-radius:0 0 10px 10px!important;overflow:hidden!important}.co-row{min-height:50px!important;padding:6px 14px!important;border-bottom:1px solid #e8eef5!important;align-items:center!important}.co-row:hover{background:#f7fbff!important;box-shadow:inset 3px 0 0 var(--blue)!important}.col-name{font-weight:800!important;color:#142945!important}.col-yr{color:#0866df!important;font-weight:800!important;font-size:13px!important}.col-total,.col-revenue,.col-yr-revenue,.col-total-revenue{color:#172d4d!important;font-weight:750!important}.grade-badge{border-radius:5px!important;font-weight:800!important}.contrib-cell{border-radius:7px!important;padding:6px 9px!important;background:transparent!important;border-color:transparent!important}.list-pagination .active{background:var(--navy)!important;color:#fff!important}.coin-icon,.money-icon,[class*="coin-icon"],[class*="money-icon"]{display:none!important}#cardView .card-header,#cardView .detail-header{background:linear-gradient(135deg,#082f67,#123f7c)!important;border-radius:11px!important}@media(max-width:1180px){.app{padding:18px 16px 40px!important}.rising-section{overflow-x:auto!important}.rising-grid{grid-template-columns:repeat(5,190px)!important}.co-table-head,.co-list{min-width:1220px!important}#listView{overflow-x:auto!important}}
+html,body{background:radial-gradient(circle at 75% -10%,rgba(11,91,211,.055),transparent 28%),var(--bg)!important;color:var(--text)!important}body{font-family:Pretendard,"Noto Sans KR","Malgun Gothic",Arial,sans-serif!important;letter-spacing:-.015em}.app{max-width:1580px!important;margin:0 auto!important;padding:24px 30px 48px!important}.brand{color:var(--navy)!important;font-size:25px!important;font-weight:800!important}.brand-wrap{display:flex!important;align-items:center!important;gap:10px!important}.brand-logo{display:block!important;height:30px!important;width:auto!important}.list-add-btn{background:linear-gradient(180deg,#0b3978,#082f67)!important;border:0!important;border-radius:7px!important;box-shadow:0 4px 12px rgba(8,47,103,.16)!important}.rising-section{background:#fff!important;border:1px solid var(--line)!important;border-radius:12px!important;padding:14px 16px 15px!important;box-shadow:0 3px 14px rgba(23,48,92,.055)!important}.rising-grid{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:12px!important}.rising-card{border:1px solid #e1e8f1!important;background:linear-gradient(180deg,#fff,#fbfdff)!important;border-radius:10px!important;padding:12px 13px 10px!important;box-shadow:0 2px 8px rgba(22,44,78,.045)!important}.rising-rank{background:var(--navy)!important;color:#fff!important;border-radius:5px!important}.rising-up{color:var(--green)!important;font-weight:800!important}.rising-bar{height:4px!important;background:#edf2f7!important}.rising-bar-fill{background:linear-gradient(90deg,#079455,#12b76a)!important}.list-filter-chip{border:1px solid #dce5ef!important;background:#fff!important;border-radius:7px!important;font-weight:650!important}.list-filter-chip.is-active{background:var(--navy)!important;color:#fff!important;border-color:var(--navy)!important}.list-search-row{background:#fff!important;border:1px solid var(--line)!important;border-radius:11px!important;padding:10px!important;box-shadow:0 2px 8px rgba(22,44,78,.035)!important}.search-box,.list-sort-select{height:39px!important;border:1px solid #dce5ef!important;border-radius:8px!important;background:#fff!important}.co-table-head,.co-row{display:grid!important;grid-template-columns:minmax(180px,1fr) 150px 175px 68px 185px 92px 92px 140px 82px!important;gap:12px!important;align-items:center!important}.co-table-head{margin-top:12px!important;padding:10px 14px!important;border:1px solid var(--line)!important;border-radius:10px 10px 0 0!important;background:#f9fbfd!important;color:#4b607c!important;font-weight:750!important}.co-list{background:#fff!important;border:1px solid var(--line)!important;border-top:0!important;border-radius:0 0 10px 10px!important;overflow:hidden!important}.co-row{min-height:50px!important;padding:6px 14px!important;border-bottom:1px solid #e8eef5!important;align-items:center!important}.co-row:hover{background:#f7fbff!important;box-shadow:inset 3px 0 0 var(--blue)!important}.col-name{font-weight:800!important;color:#142945!important}.col-yr{color:#0866df!important;font-weight:800!important;font-size:13px!important}.col-total,.col-revenue,.col-yr-revenue,.col-total-revenue{color:#172d4d!important;font-weight:750!important}.grade-badge{border-radius:5px!important;font-weight:800!important}.contrib-cell{border-radius:7px!important;padding:6px 9px!important;background:transparent!important;border-color:transparent!important}.list-pagination .active{background:var(--navy)!important;color:#fff!important}.coin-icon,.money-icon,[class*="coin-icon"],[class*="money-icon"]{display:none!important}#cardView .card-header,#cardView .detail-header{background:linear-gradient(135deg,#082f67,#123f7c)!important;border-radius:11px!important}@media(max-width:1180px){.app{padding:18px 16px 40px!important}.rising-section{overflow-x:auto!important}.rising-grid{grid-template-columns:repeat(5,190px)!important}.co-table-head,.co-list{min-width:1220px!important}#listView{overflow-x:auto!important}}
 
 /* ==========================================================================
    §목록 테이블 표시방식 조정 라운드(신규) — 고객 목록 테이블 폰트를 +1px.
@@ -2418,7 +2421,10 @@ body.map-modal-lock{ overflow:hidden; }
       <div class="col-yr-revenue">2026 매출</div>
       <div class="col-contrib" title="실적 1건당 평균 매출을 전체 업체와 비교한 상대 순위(하위 30%=낮음·중간 40%=보통·상위 30%=높음). 클릭하면 근거를 볼 수 있습니다.">실적↔매출</div>
       <div class="col-trend" title="POUR 시공실적 건수의 전년 대비 증감(작년 vs 재작년, ±10% 기준). 클릭하면 근거를 볼 수 있습니다.">최근 흐름</div>
-      <div class="col-stage-progress">단계 진행상황</div>
+      <!-- §단계 진행상황 이전 라운드: "단계 진행상황"(4단계 stepper) 컬럼을 목록 화면에서
+           뺐다(요청 "정보를 지우는 게 아니라 창에서 안 보이게, 업무관리 창으로 이전"—
+           buildStageStepperHtml 함수/r.progress 데이터/§업무관리 화면 쪽 렌더링은 그대로
+           보존, 아래 renderWorkQueueView 표에 새로 추가했다). -->
     </div>
     <div class="co-list" id="crmList"></div>
     <div class="list-pagination" id="crmPagination"></div>
@@ -6538,7 +6544,9 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="col-yr-revenue">${yrRevenueHtml}</div>
         <div class="col-contrib">${contribHtml}</div>
         <div class="col-trend">${trendHtml}</div>
-        <div class="col-stage-progress">${stageStepperHtml}</div>
+        <!-- §단계 진행상황 이전 라운드: 이 컬럼은 목록에서 뺐다(업무관리 화면으로 이전,
+             stageStepperHtml 변수/buildStageStepperHtml 함수는 그대로 계산돼 있다 —
+             §"데이터 제거가 아니라 숨김" 관례 그대로). -->
       </div>`;
     }).join('');
     // §실적↔매출 실제 구현 라운드: "실적↔매출" 클릭 -> 실적·매출 분석 Drawer(다른 컬럼과
@@ -8978,17 +8986,23 @@ window.SHIN2_CRM_APP_INIT = function(){
       </div>
       ${filtered.length ? `
         <table class="workq-table">
-          <thead><tr><th>업체명</th><th>현재 상태</th><th>관리 이유</th><th>경과</th><th>해야 할 일</th></tr></thead>
+          <!-- §단계 진행상황 이전 라운드 — 고객관리 목록 컬럼("단계 진행상황", 질문서→1차→
+               2차→MOU 4단계 stepper)을 여기로 옮겼다(요청 "정보를 지우는 게 아니라 이 창을
+               업무관리 창으로 이전"). buildStageStepperHtml/buildProgressStages 둘 다
+               이미 있던 함수 그대로 재사용 — 새 판정 로직 없음. -->
+          <thead><tr><th>업체명</th><th>현재 상태</th><th>단계 진행상황</th><th>관리 이유</th><th>경과</th><th>해야 할 일</th></tr></thead>
           <tbody>
             ${filtered.map(it=> {
               const isOpen = workQueueExpanded && workQueueExpanded.companyId === it.co.id && workQueueExpanded.type === it.type;
+              const stageStepperHtml = buildStageStepperHtml(buildProgressStages(it.co));
               return `<tr>
                 <td><button type="button" class="workq-co-link" data-workq-open-co="${esc(it.co.id)}">${esc(it.co.name)}</button></td>
                 <td>${esc(it.currentStateLabel)}</td>
+                <td class="workq-stage-progress">${stageStepperHtml}</td>
                 <td class="workq-reason">${esc(it.reasonText)}</td>
                 <td class="workq-days">${it.days === null ? '—' : esc(it.days) + '일'}${it.isDelayed ? '<span class="workq-delay-badge">지연</span>' : ''}</td>
                 <td><button type="button" class="workq-action-btn${isOpen ? ' is-open' : ''}" data-workq-toggle="${esc(it.co.id)}" data-workq-toggle-type="${esc(it.type)}">${esc(it.actionLabel)}</button></td>
-              </tr>${isOpen ? `<tr class="workq-expand-row"><td colspan="5"><div class="workq-expand">${renderWorkqExpandBody(it)}</div></td></tr>` : ''}`;
+              </tr>${isOpen ? `<tr class="workq-expand-row"><td colspan="6"><div class="workq-expand">${renderWorkqExpandBody(it)}</div></td></tr>` : ''}`;
             }).join('')}
           </tbody>
         </table>
