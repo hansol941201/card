@@ -8590,13 +8590,18 @@ window.SHIN2_CRM_APP_INIT = function(){
     // §고객 단계 전환관리 라운드 §12 — 기존 category(l2l3) 집계는 그대로 두고, 새 필터/
     // 히어로가 L1→L2와 L2→L3를 따로 세도록 type(firstActivity/l2Stall) 기준 집계만
     // 추가한다. 새 판정 로직이 아니라 이미 계산된 it.type을 다른 키로도 세는 것뿐이다.
-    const counts = { all: list.length, meeting: 0, mou: 0, l2l3: 0, reuse: 0, firstActivity: 0, l2Stall: 0 };
+    const counts = { all: list.length, meeting: 0, mou: 0, l2l3: 0, reuse: 0, firstActivity: 0, l2Stall: 0, m1: 0, m2: 0 };
     list.forEach(it=>{
       counts[it.category] = (counts[it.category] || 0) + 1;
       // firstActivity/l2Stall만 별도 키로 추가 집계(§고객 단계 전환관리 라운드 §12) —
       // 이 둘은 category('l2l3')와 이름이 겹치지 않아 이중 집계가 안 된다. mou/reuse는
       // category와 type이 같은 문자열이라 위 category 집계로 이미 반영돼 있다.
       if(it.type === 'firstActivity' || it.type === 'l2Stall') counts[it.type] = (counts[it.type] || 0) + 1;
+      // §업무관리 1·2차미팅 탭 분리 라운드 — "미팅"(category='meeting')이 m1/m1Scheduled/
+      // m2/m2Scheduled를 전부 묶어서 세던 걸 1차/2차로 따로 센다. 새 판정이 아니라 이미
+      // 있는 it.type을 다른 키로 한 번 더 세는 것뿐(§ firstActivity/l2Stall과 같은 패턴).
+      if(it.type === 'm1' || it.type === 'm1Scheduled') counts.m1++;
+      if(it.type === 'm2' || it.type === 'm2Scheduled') counts.m2++;
     });
     return { list, counts };
   }
@@ -8880,8 +8885,13 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 필터 값은 새로 만들지 않고 classifyManagementNeed가 이미 반환하는 type 값
   // (firstActivity/l2Stall)을 그대로 키로 쓴다 — filtered 계산의
   // `it.type === workQueueFilter` 조건이 이미 이 값을 처리하므로 로직 추가 없음.
+  // §업무관리 1·2차미팅 탭 분리 라운드 — 사용자 요청 "1차미팅/2차미팅/MOU 파트 나눠서
+  // 탭 만들어줘": 기존 "미팅"(1차+2차를 하나로 묶던 칩)을 "1차미팅"/"2차미팅" 두 개로
+  // 나눴다. "MOU"는 이미 별도 칩이었어서 그대로 뒀다 — 아래 filtered 계산에서 m1/m2 키를
+  // "type이 m1 또는 m1Scheduled(예정된 미팅 포함)"로 매칭하도록만 확장했다(§ 새 판정
+  // 로직 아님, 이미 있는 it.type 값을 다른 키로 묶어서 보는 것뿐).
   const WORKQ_FILTER_DEFS = [
-    ['all','전체'], ['meeting','미팅'], ['mou','MOU'], ['firstActivity','L1→L2'], ['l2Stall','L2→L3'], ['reuse','재사용'], ['newPartner','신규 협력업체']
+    ['all','전체'], ['m1','1차미팅'], ['m2','2차미팅'], ['mou','MOU'], ['firstActivity','L1→L2'], ['l2Stall','L2→L3'], ['reuse','재사용'], ['newPartner','신규 협력업체']
   ];
   let workQueueFilter = 'all';
   // §업무관리 검색창 라운드 — 고객관리 목록 검색(matchesSearch, §searchQuery)과 완전히
@@ -8917,7 +8927,14 @@ window.SHIN2_CRM_APP_INIT = function(){
     // matchesSearch(co, acts, q)를 재사용해 필터 뒤에 한 번 더 좁힌다 — 요약 패널/필터 칩
     // 숫자(위 counts, list 기준)는 검색과 무관하게 그대로 둔다(고객관리 filterCounts 선례와
     // 동일한 원칙).
-    const filtered = (workQueueFilter === 'all' ? list : list.filter(it=> it.category === workQueueFilter || it.type === workQueueFilter))
+    // §업무관리 1·2차미팅 탭 분리 라운드 — 'm1'/'m2' 필터는 예정된 미팅(m1Scheduled/
+    // m2Scheduled)도 같은 탭에 포함해야 한다(§7 "일정 잡아둔 업체가 어디에도 안 보이는
+    // 문제" 방지 원칙과 동일 이유 — 새 판정 아니라 이미 있는 두 type을 한 탭으로 묶어 보는 것).
+    const filtered = (workQueueFilter === 'all' ? list : list.filter(it=>{
+      if(workQueueFilter === 'm1') return it.type === 'm1' || it.type === 'm1Scheduled';
+      if(workQueueFilter === 'm2') return it.type === 'm2' || it.type === 'm2Scheduled';
+      return it.category === workQueueFilter || it.type === workQueueFilter;
+    }))
       .filter(it=> matchesSearch(it.co, D.activitiesForCompany(it.co.id), workQueueSearch));
     const m1Count = list.filter(it=> it.type==='m1').length;
     const m2Count = list.filter(it=> it.type==='m2').length;
