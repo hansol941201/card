@@ -8890,8 +8890,14 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 나눴다. "MOU"는 이미 별도 칩이었어서 그대로 뒀다 — 아래 filtered 계산에서 m1/m2 키를
   // "type이 m1 또는 m1Scheduled(예정된 미팅 포함)"로 매칭하도록만 확장했다(§ 새 판정
   // 로직 아님, 이미 있는 it.type 값을 다른 키로 묶어서 보는 것뿐).
+  // §업무관리 필터 탭 정리 라운드 — 사용자 요청 "재사용, 신규 협력업체는 없어도 될 것
+  // 같아": 필터 칩 목록에서만 뺐다(§ "데이터를 지우는 게 아니라 화면에서만" 관례 그대로
+  // — computeWorkQueue의 counts.reuse/counts.newPartner 집계, buildWorkQueueItem의
+  // reuse/newPartner 판정 로직, "다음 단계로 전환" 섹션의 "다시 연락하기" 카드는 전혀
+  // 안 건드렸다. 저 카드를 눌러 workQueueFilter='reuse'가 되는 경로는 여전히 있으니,
+  // filtered 계산 자체도 그대로 둔다 — 이 칩 행에만 안 보일 뿐이다).
   const WORKQ_FILTER_DEFS = [
-    ['all','전체'], ['m1','1차미팅'], ['m2','2차미팅'], ['mou','MOU'], ['firstActivity','L1→L2'], ['l2Stall','L2→L3'], ['reuse','재사용'], ['newPartner','신규 협력업체']
+    ['all','전체'], ['m1','1차미팅'], ['m2','2차미팅'], ['mou','MOU'], ['firstActivity','L1→L2'], ['l2Stall','L2→L3']
   ];
   let workQueueFilter = 'all';
   // §업무관리 검색창 라운드 — 고객관리 목록 검색(matchesSearch, §searchQuery)과 완전히
