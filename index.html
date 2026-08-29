@@ -6007,10 +6007,13 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 분기)은 삭제하지 않고 그대로 남긴다 — 지도분포 MAP_FILTER_DEFS 등 다른 화면이 여전히
   // matchesFilter를 재사용 중이라 의미를 지우면 그쪽이 깨진다(§ 위 §고객관리 탭 4개 재구성
   // 라운드 때 이미 확인된 원칙, 이번에도 동일하게 적용).
-  // 'MOU체결'은 §고객관리 탭 3개 재구성 라운드 확인(AskUserQuestion): "순수하게 MOU 단계
-  // 체결완료만(다른 기준)" — 기존 isConfirmedPartner(리스트 등재 OR MOU 완료)와는 다른,
-  // 더 좁은 기준이다. partnerStatus는 전혀 보지 않고 getMouStage(progress).state==='done'
-  // 만 본다(새 판정 로직 없음 — 이미 있는 getMouStage를 그대로 재사용).
+  // 'MOU체결'은 처음엔 §고객관리 탭 3개 재구성 라운드 확인(AskUserQuestion) "순수하게 MOU
+  // 단계 체결완료만(다른 기준)"으로 partnerStatus(리스트 등재)를 아예 안 보게 만들었는데,
+  // 배포 후 실제 화면(전체 368/MOU체결 235)이 partner-dashboard 협력업체(289)보다 훨씬
+  // 적은 걸 사용자가 보고 §MOU체결 기준 재정정 라운드에서 다시 정정: "체결일이 비어있거나,
+  // 리스트 동기화가 안되도 협력사로 들어온건 다 mou체결로 해줘" — 결국 isConfirmedPartner
+  // (리스트 등재 co.partnerStatus==='partner' OR MOU 단계 done) 그대로다. 새 판정 로직
+  // 없음 — 이미 있는 isConfirmedPartner를 그대로 재사용한다.
   const FILTER_DEFS = [
     ['all','전체'], ['mouDone','MOU체결'], ['trendUp','최근흐름 상승세']
   ];
@@ -6057,12 +6060,16 @@ window.SHIN2_CRM_APP_INIT = function(){
       return !!revenue && !revenue.ambiguous && typeof revenue.total === 'number' && revenue.total > 0 && !isConfirmedPartner(co, progress);
     }
     if(key === 'inProgress') return progress.hasAny; // §지도분포 필터(MAP_FILTER_DEFS) 등 다른 화면이 여전히 참조 — 의미 유지
-    // §고객관리 탭 3개 재구성 라운드: 'MOU체결' 탭 전용 — isConfirmedPartner와 달리
-    // partnerStatus(리스트 등재)는 전혀 보지 않고 순수하게 MOU 단계 done 여부만 본다.
-    if(key === 'mouDone'){
-      const mou = getMouStage(progress);
-      return !!(mou && mou.state === 'done');
-    }
+    // §고객관리 탭 3개 재구성 라운드 → §MOU체결 기준 재정정 라운드: 처음엔 "순수하게 MOU
+    // 단계 체결완료만"(partnerStatus 리스트 등재는 안 봄)으로 만들었는데, 사용자가 실제
+    // 화면(전체 368/MOU체결 235 vs partner-dashboard 협력업체 289)을 보고 재정정: "체결일이
+    // 비어있거나, 리스트 동기화가 안 되도 협력사로 들어온건 다 mou체결로 해줘" — 즉
+    // partner-dashboard 협력업체 리스트에 실제 등재된 업체(co.partnerStatus==='partner',
+    // §협력업체 동기화 단순화 라운드부터 협력업체 리스트 동기화 전용으로만 세팅되는 값)는
+    // 협약체결일 필드가 비어 있어도 "MOU체결"로 봐야 한다는 뜻이다. 결국 이전 라운드에서
+    // 만든 isConfirmedPartner(리스트 등재 OR MOU 단계 done)와 동일한 기준으로 되돌아간다 —
+    // 새 판정 로직을 만들지 않고 이미 있는 함수를 그대로 재사용한다.
+    if(key === 'mouDone') return isConfirmedPartner(co, progress);
     // '최근흐름 상승세' 탭 — buildRecentTrend(co)가 이미 계산해 둔 값을 그대로 재사용
     // (목록 셀/드로어와 같은 함수, 새 판정 로직 아님). state==='up'인 업체만.
     if(key === 'trendUp') return buildRecentTrend(co).state === 'up';
