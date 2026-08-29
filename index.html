@@ -2274,11 +2274,29 @@ html,body{background:radial-gradient(circle at 75% -10%,rgba(11,91,211,.055),tra
 .map-cluster-bubble b{ font-size:1em; }
 .map-cluster-bubble.is-selected{ outline:2px solid #16A34A; outline-offset:1px; }
 body.map-modal-lock{ overflow:hidden; }
+/* §POUR 시공 아파트 지도 라운드: 지도 상단 탭(시공사/시공 아파트). 기존 .map-modal-toggle-*
+   (클러스터/히트맵)와 같은 톤·크기로 만들어 새 색상 체계를 추가하지 않는다. */
+.map-modal-tabs{ flex:none; padding:0 22px; display:flex; gap:4px; border-bottom:1px solid var(--line); }
+.map-modal-tab-btn{ height:38px; padding:0 14px; font-size:13px; font-weight:650; color:var(--text-muted); background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; font-family:inherit; }
+.map-modal-tab-btn.is-active{ color:var(--navy); border-bottom-color:var(--navy); }
+.map-modal-tab-btn:hover{ color:var(--navy); }
+/* 시공 아파트 탭 요약 줄(§6) — 필터 바로 아래, 지도 위 한 줄 요약. */
+.map-apt-summary{ flex:none; padding:8px 22px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:var(--text-muted); }
+.map-apt-summary b{ color:var(--navy); font-weight:700; }
+.map-apt-summary .is-warn{ color:#B45309; }
+/* 지도 옆 아파트 목록(§11) — 기존 .map-company-row와 같은 톤으로 행 구성만 다르게. */
+.map-apt-row{ padding:7px 0; font-size:12px; color:var(--text); cursor:pointer; border-bottom:1px solid var(--line); }
+.map-apt-row:last-child{ border-bottom:none; }
+.map-apt-row:hover{ background:var(--bg); }
+.map-apt-row-name{ font-weight:650; display:flex; align-items:center; gap:6px; }
+.map-apt-row-hh{ font-size:11px; color:var(--navy); font-weight:700; }
+.map-apt-row-sub{ color:var(--text-muted); font-size:11px; margin-top:1px; }
 @media(max-width:900px){
   .map-modal-panel{ width:96%; height:92vh; }
   .map-modal-body-main{ flex-direction:column; overflow-y:auto; }
   .map-modal-mapcol{ flex:0 0 auto; height:42vh; border-right:0; border-bottom:1px solid var(--line); }
   .map-modal-infocol{ flex:1 1 auto; overflow-y:visible; }
+  .map-apt-summary{ gap:10px; }
 }
 </style>
 </head>
@@ -2491,6 +2509,9 @@ body.map-modal-lock{ overflow:hidden; }
   <div id="phoneReqModalRoot"></div>
   <!-- §지도 분포 라운드(신규): "지도 분포" 버튼이 여는 중앙 대형 모달 전용 root. -->
   <div id="mapDistributionModalRoot"></div>
+  <!-- §POUR 시공 아파트 지도 라운드(신규): 아파트 마커 "실적 상세보기" 클릭 시 여는 중앙
+       모달 전용 root — 다른 중앙 모달과 같은 .pi-overlay/.pi-panel 패턴 재사용. -->
+  <div id="aptHistoryModalRoot"></div>
 </div>
 
 <script>
@@ -15281,6 +15302,8 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 항상 "전체" 상태로 새로 시작하고, 닫혀있던 동안 바뀐 최신 companies로 다시
     // 그려진다(§동기화 규칙 "닫혀 있어도 다음에 열 때 최신 데이터 사용").
     mapFilterState = { search:'', filterKey:'all', category:'all', pourRange:'all', viewMode:'cluster', listView:'inBounds' };
+    aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all' };
+    mapActiveTab = 'company'; // §요청 "기본 선택은 시공사" — 매번 열 때 항상 기본 탭으로 시작
     if(mapCanvasState && typeof mapCanvasState.destroy === 'function'){
       try{ mapCanvasState.destroy(); } catch(err){ /* 지도 정리 실패는 무시 — 다음 열기에서 새로 만들어짐 */ }
     }
@@ -15288,6 +15311,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     updateMapMarkers = null;
     focusMapRegion = null;
     focusMapCompany = null;
+    if(aptCanvasState && typeof aptCanvasState.destroy === 'function'){
+      try{ aptCanvasState.destroy(); } catch(err){ /* 무시 */ }
+    }
+    aptCanvasState = null;
+    updateAptMarkers = null;
+    focusAptItem = null;
   }
 
   function openMapDistributionModal(){
@@ -15296,15 +15325,22 @@ window.SHIN2_CRM_APP_INIT = function(){
     const root = document.getElementById('mapDistributionModalRoot');
     if(!root) return;
     document.body.classList.add('map-modal-lock'); // 기존 chart-lock과는 별도 클래스라 서로 안 건드림(§2-2 "충돌 없게")
+    // §POUR 시공 아파트 지도 라운드: 사용자 요청 "지도 기능을 새로 하나 더 복사해서 만들지
+    // 말고, 기존 지도 컴포넌트 안에서 탭으로 전환되도록" — 탭 자체는 모달 head 바로 아래
+    // 고정 영역에 한 번만 그린다(#mapModalBody 재렌더와 무관하게 유지). 기본 탭은 '시공사'.
     root.innerHTML = `
       <div class="map-modal-overlay" id="mapModalOverlay">
         <div class="map-modal-panel" role="dialog" aria-modal="true" aria-label="시공사 지역 분포">
           <div class="map-modal-head">
             <div class="map-modal-title-wrap">
-              <div class="map-modal-title">시공사 지역 분포</div>
-              <div class="map-modal-subtitle">전국 등록 업체의 위치와 영업 현황</div>
+              <div class="map-modal-title" id="mapModalTitle">시공사 지역 분포</div>
+              <div class="map-modal-subtitle" id="mapModalSubtitle">전국 등록 업체의 위치와 영업 현황</div>
             </div>
             <button type="button" class="map-modal-close" id="mapModalCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="map-modal-tabs" id="mapModalTabs">
+            <button type="button" class="map-modal-tab-btn is-active" data-map-tab="company">시공사</button>
+            <button type="button" class="map-modal-tab-btn" data-map-tab="apartment">시공 아파트</button>
           </div>
           <div id="mapModalBody"></div>
         </div>
@@ -15315,6 +15351,26 @@ window.SHIN2_CRM_APP_INIT = function(){
     const onEsc = (e)=>{ if(e.key === 'Escape') closeMapDistributionModal(); };
     document.addEventListener('keydown', onEsc);
     mapModalOutsideHandlers = ()=> document.removeEventListener('keydown', onEsc);
+    root.querySelectorAll('[data-map-tab]').forEach(btn=> btn.addEventListener('click', ()=>{
+      const tab = btn.getAttribute('data-map-tab');
+      if(tab === mapActiveTab) return;
+      mapActiveTab = tab;
+      root.querySelectorAll('[data-map-tab]').forEach(b=> b.classList.toggle('is-active', b === btn));
+      const titleEl = document.getElementById('mapModalTitle');
+      const subEl = document.getElementById('mapModalSubtitle');
+      if(titleEl) titleEl.textContent = tab === 'apartment' ? 'POUR 시공 아파트 분포' : '시공사 지역 분포';
+      if(subEl) subEl.textContent = tab === 'apartment' ? '고객관리카드에 등록된 업체의 실제 POUR 시공실적 기준' : '전국 등록 업체의 위치와 영업 현황';
+      // §1 "탭을 전환할 때 기존 마커를 정리한 뒤 선택한 종류의 마커만 표시... 중복으로
+      // 쌓이지 않게" — 두 탭의 지도 인스턴스는 완전히 분리돼 있어(mapCanvasState/
+      // aptCanvasState) 전환 시 이전 탭의 인스턴스를 명시적으로 destroy한 뒤 renderMapModalBody()가
+      // #mapModalBody를 통째로 새로 그려 새 Kakao Map을 새로 만든다 — 이전 마커/클러스터가
+      // 이어질 여지가 구조적으로 없다.
+      if(mapCanvasState && typeof mapCanvasState.destroy === 'function'){ try{ mapCanvasState.destroy(); }catch(err){ /* 무시 */ } }
+      mapCanvasState = null; updateMapMarkers = null; focusMapRegion = null; focusMapCompany = null;
+      if(aptCanvasState && typeof aptCanvasState.destroy === 'function'){ try{ aptCanvasState.destroy(); }catch(err){ /* 무시 */ } }
+      aptCanvasState = null; updateAptMarkers = null; focusAptItem = null;
+      renderMapModalBody();
+    }));
     renderMapModalBody();
   }
 
@@ -15431,6 +15487,9 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 상태다 — 서로 전혀 안 건드림). §지도분포6: 기본 보기를 '클러스터'로 바꿨다
   // (이전 이름 'marker' → 'cluster', 지역/시군구 단위로 묶어서 보여주는 게 기본).
   let mapFilterState = { search:'', filterKey:'all', category:'all', pourRange:'all', viewMode:'cluster' };
+  // §POUR 시공 아파트 지도 라운드(신규) — 지도 상단 탭 상태. 'company'(기본)|'apartment'.
+  // 팝업을 닫으면 항상 'company'로 되돌아간다(§1 "기본 선택은 '시공사'").
+  let mapActiveTab = 'company';
   const MAP_FILTER_DEFS = [
     ['all','전체'], ['partner','협력업체'], ['inProgress','진행중'],
     ['managementNeeded','관리필요'], ['receivable','미수 업체']
@@ -15471,15 +15530,173 @@ window.SHIN2_CRM_APP_INIT = function(){
     return Array.from(set).sort((a,b)=> a.localeCompare(b, 'ko'));
   }
 
+  /* ==========================================================================
+     §POUR 시공 아파트 지도 라운드(신규) — 데이터 계층. 사용자 요청: "고객관리카드에
+     등록된 업체의 POUR 시공실적에서 실제 시공한 아파트를 지도에 표시". 새 판정 기준을
+     만들지 않는다 — "POUR 실적으로 판정되는 기존 기준"은 이미 목록/고객카드가 쓰는
+     getTotalPourRecordsForCompany(co)(§실적 카운트 정정 라운드 이후 표준 소스, 중복
+     제거까지 끝난 배열) 그대로 재사용한다. 이 함수가 반환하는 레코드 전부가 곧 "POUR
+     실적"이다 — 원본 스냅샷(SHIN2_POUR_TRACK_RECORD_SNAPSHOT)에 method/isPour 같은 별도
+     판정 필드가 없고, 시공사 컬럼이 있는 2024~2026년 시트만 애초에 이 스냅샷에 포함된
+     것이 곧 "POUR 시공실적" 포함 기준이었다(§POUR 시공실적 스냅샷 라운드 주석 확인).
+     ========================================================================== */
+  // 실제 사용한 시공실적 필드: client(아파트/현장명), region/city(지역), year(시공연도),
+  // category(공종), households(세대수), patentNo(특허번호/공법), sourceSheet+sourceRow
+  // (원본 추적 ID), 그리고 D.getAllPourRecordsForCompany 매칭 단계에서 붙는 companyId/
+  // companyName(시공사 연결) — 전부 §2에서 요청한 필드 그대로, 새로 가정한 필드 없음.
+  //
+  // 아파트명 정규화(§7 중복 판별): 괄호 안 단지 설명/‘아파트’·APT 표기/공백 차이만
+  // 제거한다 — 지역명·숫자 등 실제 식별 정보는 건드리지 않는다.
+  function normAptName(s){
+    if(!s) return '';
+    return String(s)
+      .replace(/\(.*?\)/g, '')            // 괄호 안 단지 설명 제거
+      .replace(/아파트|APT|apt|Apt/g, '')  // 표기 차이 제거
+      .replace(/\s+/g, '')                 // 공백(중복 포함) 전부 제거
+      .trim()
+      .toLowerCase();
+  }
+  // §7 우선순위 1(정규화 도로명주소)은 POUR 실적 레코드에 주소 필드 자체가 없어(§2 조사
+  // 결과 — region/city/client만 있음, 상세 도로명주소 없음) 항상 스킵되고, 실제로는
+  // 우선순위 2(아파트명+시·군·구)로 그룹을 나눈다. region+city를 합친 문자열이 이
+  // 레코드에서 얻을 수 있는 가장 좁은 지역 단위다.
+  function normSigunguForApt(region, city){
+    return [region, city].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  }
+  // 업체별 POUR 실적(getTotalPourRecordsForCompany, 기존 판정·중복제거 기준 그대로)을
+  // 훑어서 "아파트 그룹"으로 다시 묶는다 — 같은 아파트가 여러 업체/여러 실적에 걸쳐
+  // 나오면 하나의 그룹(history 배열)에 합쳐진다(§7 "동일 아파트에 서로 다른 연도·공종의
+  // 시공실적이 여러 개 있으면 정보카드 안에 묶어서" — 제거가 아니라 병합).
+  function buildPourApartmentGroups(){
+    const companies = D.loadCompanies();
+    const groups = new Map();
+    companies.forEach(co=>{
+      let records;
+      try{ records = getTotalPourRecordsForCompany(co); }
+      catch(err){ console.warn('POUR 실적 조회 실패(업체 1건, 지도 렌더링은 계속):', co && co.id, err); records = []; } // §12 "데이터 하나가 잘못돼도 전체 지도가 멈추지 않게"
+      records.forEach(r=>{
+        if(!r || !r.client) return; // 현장명(아파트명)이 없으면 "아파트"로 묶을 근거가 없어 제외 — 지어내지 않음
+        const nameKey = normAptName(r.client);
+        if(!nameKey) return;
+        const sigunguKey = normSigunguForApt(r.region, r.city);
+        const key = nameKey + '|' + sigunguKey; // §7 우선순위 2
+        let g = groups.get(key);
+        if(!g){ g = { key, name: r.client, region: r.region || null, city: r.city || null, history: [], companies: new Map() }; groups.set(key, g); }
+        g.history.push(Object.assign({}, r, { companyId: co.id, companyName: co.name }));
+        if(!g.companies.has(co.id)) g.companies.set(co.id, co.name);
+      });
+    });
+    return Array.from(groups.values());
+  }
+  // 세대수: 동일 아파트에 여러 값이 있어도 합산하지 않고(§7) 가장 최근 연도의 유효값
+  // 하나만 채택한다 — 임의 생성 금지, 값이 전혀 없으면 null(호출부가 "세대수 미등록"으로 표시).
+  function resolveGroupApartmentHouseholds(history){
+    const withHh = history.filter(h=> typeof h.households === 'number' && h.households > 0);
+    if(!withHh.length) return null;
+    withHh.sort((a,b)=> (b.year||0) - (a.year||0));
+    return withHh[0].households;
+  }
+  // §5 세대수 표기: 쉼표 + '세대' 1회만, 원본에 이미 '세대'가 섞여 있어도(원본 client
+  // 문자열이 아니라 숫자 households 필드만 쓰므로 애초에 중복될 수 없음) 항상 정규화된
+  // 형태만 나온다. 숫자가 없으면 지어내지 않고 "세대수 미등록".
+  function fmtAptHouseholds(n){
+    return (typeof n === 'number' && n > 0) ? n.toLocaleString('ko-KR') + '세대' : '세대수 미등록';
+  }
+  // §8 좌표 캐시 — Firebase 스키마/보안 규칙을 새로 확인·변경하지 않기 위해(§요청 "Firebase에
+  // 새 필드를 저장하기 전 기존 스키마와 보안 규칙을 확인해야 한다") 이 브라우저의
+  // localStorage에만 저장한다. 업체 데이터(co.latitude 등, 기존 §지도분포3 방식)는 전혀
+  // 건드리지 않는다 — 아파트는 회사 레코드가 아니라 여러 실적을 합친 가상의 그룹이라
+  // 애초에 저장할 co가 없다.
+  const APT_GEOCODE_CACHE_KEY = 'shin2-apt-geocode-cache-v1';
+  function loadAptGeocodeCache(){
+    try{ return JSON.parse(localStorage.getItem(APT_GEOCODE_CACHE_KEY) || '{}') || {}; }
+    catch(err){ return {}; }
+  }
+  function saveAptGeocodeCache(cache){
+    try{ localStorage.setItem(APT_GEOCODE_CACHE_KEY, JSON.stringify(cache)); }
+    catch(err){ /* 저장 실패(용량 초과 등)는 무시 — 다음에 다시 검색될 뿐 기능은 안 깨짐 */ }
+  }
+  function buildAptEntry(g, cache){
+    const years = Array.from(new Set(g.history.map(h=> h.year).filter(y=> typeof y === 'number'))).sort((a,b)=> b-a);
+    const categories = Array.from(new Set(g.history.flatMap(h=> String(h.category || '').split(/\n+/).map(s=> s.trim()).filter(Boolean))));
+    const households = resolveGroupApartmentHouseholds(g.history);
+    const companies = Array.from(g.companies.entries()).map(([id,name])=> ({ id, name }));
+    const cacheEntry = cache[g.key] || null;
+    const hasCoords = !!(cacheEntry && cacheEntry.status === 'ok');
+    return {
+      key: g.key, name: g.name, region: g.region, city: g.city,
+      years, categories, households, companies, history: g.history,
+      lat: hasCoords ? cacheEntry.lat : null, lng: hasCoords ? cacheEntry.lng : null,
+      hasCoords, geocodeStatus: cacheEntry ? cacheEntry.status : 'pending'
+    };
+  }
+  function buildPourApartmentEntries(){
+    const cache = loadAptGeocodeCache();
+    return buildPourApartmentGroups().map(g=> buildAptEntry(g, cache));
+  }
+
+  // §10 검색/필터 상태 — 지도 팝업이 열려있는 동안에만 유지(§지도분포2와 같은 원칙),
+  // 닫으면 초기화(closeMapDistributionModal에서 리셋).
+  let aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all' };
+  function aptEntryMatchesSearch(e, q){
+    if(!q) return true;
+    const norm = q.trim().toLowerCase();
+    if(!norm) return true;
+    const name = String(e.name || '').toLowerCase();
+    const region = [e.region, e.city].filter(Boolean).join(' ').toLowerCase();
+    const companyNames = e.companies.map(c=> c.name).join(' ').toLowerCase();
+    return name.includes(norm) || region.includes(norm) || companyNames.includes(norm);
+  }
+  function aptEntryMatchesFilter(e, state){
+    if(state.year !== 'all' && !e.years.includes(parseInt(state.year, 10))) return false;
+    if(state.category !== 'all' && !e.categories.includes(state.category)) return false;
+    if(state.region !== 'all' && e.region !== state.region) return false;
+    if(state.households !== 'all'){
+      const h = e.households;
+      if(state.households === 'none') return h == null;
+      if(h == null) return false;
+      if(state.households === 'lt500') return h < 500;
+      if(state.households === '500to999') return h >= 500 && h < 1000;
+      if(state.households === '1000to1999') return h >= 1000 && h < 2000;
+      if(state.households === 'ge2000') return h >= 2000;
+    }
+    return true;
+  }
+  function applyAptFilters(entries){
+    return entries.filter(e=> aptEntryMatchesSearch(e, aptFilterState.search) && aptEntryMatchesFilter(e, aptFilterState));
+  }
+  function buildAptFilterOptions(entries){
+    const years = Array.from(new Set(entries.flatMap(e=> e.years))).sort((a,b)=> b-a);
+    const categories = Array.from(new Set(entries.flatMap(e=> e.categories))).sort((a,b)=> a.localeCompare(b, 'ko'));
+    const regions = Array.from(new Set(entries.map(e=> e.region).filter(Boolean))).sort((a,b)=> a.localeCompare(b, 'ko'));
+    return { years, categories, regions };
+  }
+  // §6 지도 위 요약 — 하드코딩 없이 현재 필터가 적용된 entries에서 매번 다시 계산한다.
+  function computeAptSummary(entries){
+    const totalHouseholds = entries.reduce((s,e)=> s + (typeof e.households === 'number' ? e.households : 0), 0);
+    const missingHouseholdsCount = entries.filter(e=> e.households == null).length;
+    const sigunguSet = new Set(entries.map(e=> [e.region, e.city].filter(Boolean).join(' ')).filter(Boolean));
+    return { count: entries.length, totalHouseholds, missingHouseholdsCount, regionCount: sigunguSet.size };
+  }
+
   let mapCanvasState = null; // 지도 인스턴스가 열려있는 동안만 존재(kakao map/clusterer/marker 인덱스)
   // renderMapInfoPanel의 지역/업체 행 클릭이 이 세 변수를 typeof로 확인해서 부른다 —
   // initMapCanvas가 성공했을 때만 실제 함수가 배정된다(§지도분포3).
   let updateMapMarkers = null;
   let focusMapRegion = null;
   let focusMapCompany = null;
+  // 시공 아파트 탭 전용 지도 인스턴스 — 시공사 탭(mapCanvasState)과 완전히 분리된다(§1
+  // "탭을 전환할 때 기존 마커를 정리한 뒤 선택한 종류의 마커만... 중복으로 쌓이지 않게").
+  let aptCanvasState = null;
+  let updateAptMarkers = null;
+  let focusAptItem = null;
 
   function renderMapModalMain(kakao){
     const wrap = document.getElementById('mapModalBody');
+    if(mapActiveTab === 'apartment'){
+      if(wrap) renderMapModalMainApartment(kakao, wrap);
+      return;
+    }
     if(!wrap) return;
     const allEntries = buildMapCompanies();
     const categoryOptions = buildMapCategoryOptions(allEntries);
@@ -15563,7 +15780,11 @@ window.SHIN2_CRM_APP_INIT = function(){
   // (§동기화 규칙 "닫혀 있어도 다음 열 때 최신 데이터 사용", 별도 캐시 없음).
   function refreshMapIfOpen(){
     if(!mapModalOpen) return;
-    refreshMapInfoAndMarkers();
+    // §POUR 시공 아파트 지도 라운드: companies가 바뀌면 아파트 그룹도 바뀔 수 있어(등록
+    // 업체가 늘거나 줄면 그 업체의 POUR 실적도 아파트 집합에서 빠지거나 들어온다) 활성
+    // 탭에 맞는 쪽만 갱신한다 — 비활성 탭의 지도 인스턴스는 애초에 존재하지 않는다.
+    if(mapActiveTab === 'apartment') refreshAptInfoAndMarkers();
+    else refreshMapInfoAndMarkers();
   }
 
   // §지도분포2: 오른쪽 정보 패널 — 지역 요약/업체 밀집 지역/현재 지도 내 업체/
@@ -15987,6 +16208,363 @@ window.SHIN2_CRM_APP_INIT = function(){
       renderMapLayer(applyMapFilters(fresh));
       renderMapInfoPanel(fresh);
     }).catch((err)=> console.warn('지오코딩 동기화 중 일부 실패:', err));
+  }
+
+  /* ==========================================================================
+     §POUR 시공 아파트 지도 라운드(신규) — 렌더링 계층. 시공사 탭(initMapCanvas 등)은
+     전혀 손대지 않고 완전히 별도의 지도 인스턴스/마커/클러스터러로 구현한다(§13 "기존
+     시공사 지도... 절대 깨뜨리지 말 것"). 좌표가 없는 회사 필드(co.latitude 등)와
+     달리, 아파트는 여러 실적을 합친 가상의 그룹이라 저장할 co가 없다 — 좌표 캐시는
+     §8 주석대로 localStorage(APT_GEOCODE_CACHE_KEY)에만 둔다.
+     ========================================================================== */
+  // §4 "실적 상세보기" — 그룹의 모든 시공 이력(연도/공종/세대수/시공사/특허·공법)을
+  // 표로 보여준다. 기존 openSiteHistoryModal과 같은 .pi-overlay/.pi-panel 패턴 재사용
+  // (새 모달 스타일을 만들지 않음).
+  function closeAptHistoryModal(){
+    const root = document.getElementById('aptHistoryModalRoot');
+    if(root) root.innerHTML = '';
+  }
+  function openAptHistoryModal(entry){
+    const root = document.getElementById('aptHistoryModalRoot');
+    if(!root) return;
+    const rows = entry.history.slice().sort((a,b)=> (b.year||0) - (a.year||0));
+    root.innerHTML = `
+      <div class="pi-overlay" id="aptHistOverlay">
+        <div class="pi-panel" style="max-width:640px;">
+          <div class="pi-head">
+            <div class="pi-title">시공 이력 — ${esc(entry.name)}</div>
+            <button type="button" class="chart-close-btn" id="aptHistCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body">
+            <div class="pi-note">${esc([entry.region, entry.city].filter(Boolean).join(' ') || '지역 미확인')} · 세대수 ${esc(fmtAptHouseholds(entry.households))} · 총 ${esc(rows.length)}건</div>
+            <div style="overflow-x:auto;margin-top:10px;">
+              <table class="pi-sample-table">
+                <thead><tr><th>연도</th><th>공종</th><th>세대수</th><th>시공사</th><th>특허·공법</th></tr></thead>
+                <tbody>
+                  ${rows.map(r=> `<tr>
+                    <td>${r.year != null ? esc(r.year) : '—'}</td>
+                    <td>${esc(fmtCategoryDisplay(r.category))}</td>
+                    <td>${typeof r.households === 'number' && r.households > 0 ? esc(r.households.toLocaleString('ko-KR')) + '세대' : '세대수 미등록'}</td>
+                    <td>${esc(r.companyName || '시공사 미연결')}</td>
+                    <td>${esc(fmtPatentDisplay(r.patentNo))}</td>
+                  </tr>`).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.getElementById('aptHistCloseBtn').addEventListener('click', closeAptHistoryModal);
+    document.getElementById('aptHistOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'aptHistOverlay') closeAptHistoryModal(); });
+  }
+
+  // §3 아파트 마커 — 시공사 마커(카카오 기본 이미지, 손대지 않음)보다 작고 파란색 계열의
+  // 심플한 건물 아이콘(핀 모양 + 창문 4칸). 과한 장식/색상 없음(§요청 "기업 대시보드
+  // 스타일 유지").
+  function buildAptMarkerImage(kakao){
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="26" viewBox="0 0 22 26">'
+      + '<path d="M11 25S2 15.6 2 9.8A9 9 0 1 1 20 9.8C20 15.6 11 25 11 25z" fill="#2563EB" stroke="#fff" stroke-width="1.4"/>'
+      + '<rect x="6.6" y="5.4" width="8.8" height="8" rx="1" fill="#fff"/>'
+      + '<rect x="7.8" y="6.7" width="2.1" height="2.1" fill="#2563EB"/>'
+      + '<rect x="11.1" y="6.7" width="2.1" height="2.1" fill="#2563EB"/>'
+      + '<rect x="7.8" y="9.4" width="2.1" height="2.1" fill="#2563EB"/>'
+      + '<rect x="11.1" y="9.4" width="2.1" height="2.1" fill="#2563EB"/>'
+      + '</svg>';
+    const url = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+    return new kakao.maps.MarkerImage(url, new kakao.maps.Size(22, 26), { offset: new kakao.maps.Point(11, 26) });
+  }
+
+  // §4 아파트 마커 클릭 정보카드 — 회사 InfoWindow(buildMapInfoWindowHtml)와 같은 인라인
+  // 스타일 패턴만 재사용, 내용은 요청한 필드로 새로 구성.
+  function buildAptInfoWindowHtml(entry){
+    const hhText = fmtAptHouseholds(entry.households);
+    const yearsText = entry.years.length ? entry.years.map(y=> y + '년').join(', ') : '연도 미상';
+    const catText = entry.categories.length ? esc(entry.categories.join('·')) : '—';
+    const regionText = [entry.region, entry.city].filter(Boolean).join(' ') || '지역 미확인';
+    const companyText = entry.companies.length === 1 ? esc(entry.companies[0].name)
+      : (entry.companies.length > 1 ? esc(entry.companies.map(c=> c.name).join(', ')) : '시공사 미연결');
+    const historyBadge = entry.history.length > 1 ? `<div style="font-size:11px;color:#2563EB;font-weight:700;margin-top:1px;">시공 이력 ${entry.history.length}건</div>` : '';
+    const detailBtn = `<button type="button" id="aptInfoDetailBtn" data-apt-key="${esc(entry.key)}" style="margin-top:8px;height:26px;padding:0 9px;font-size:11px;font-weight:650;color:#082f67;background:#fff;border:1px solid #CFE0FB;border-radius:5px;cursor:pointer;font-family:inherit;">실적 상세보기</button>`;
+    // §4 "기존 데이터상 시공사를 연결할 수 없으면 버튼을 숨기거나 비활성화" — 시공사가
+    // 정확히 1곳일 때만 버튼을 그린다(0곳=미연결, 2곳 이상=어느 카드를 열지 모호) — 에러
+    // 없이 그냥 안 그리는 쪽을 택했다.
+    const cardBtn = entry.companies.length === 1
+      ? `<button type="button" id="aptInfoCardBtn" data-open-company="${esc(entry.companies[0].id)}" style="margin-top:8px;margin-left:6px;height:26px;padding:0 9px;font-size:11px;font-weight:650;color:#fff;background:#082f67;border:0;border-radius:5px;cursor:pointer;font-family:inherit;">시공사 고객카드 보기</button>`
+      : '';
+    return `
+      <div style="padding:10px 12px;min-width:210px;max-width:250px;font-family:inherit;">
+        <div style="font-weight:700;font-size:13px;color:#13243E;margin-bottom:2px;">${esc(entry.name)}</div>
+        ${historyBadge}
+        <div style="font-size:11.5px;color:#66758D;margin:4px 0 6px;">${esc(regionText)}</div>
+        <div style="font-size:11.5px;color:#13243E;line-height:1.65;">
+          시공 정보: ${esc(yearsText)} · ${catText}<br/>
+          세대수: <b>${esc(hhText)}</b><br/>
+          시공사: ${companyText}
+        </div>
+        <div>${detailBtn}${cardBtn}</div>
+      </div>
+    `;
+  }
+
+  // §8 위치 좌표 처리 — POUR 실적에는 위/경도도 정확한 도로명주소도 없어(§2 조사 결과)
+  // 항상 "지역+아파트명"(요청 fallback 순서의 2·3번째 단계에 해당)으로 카카오
+  // Places 키워드 검색을 쓴다(주소가 아니라 장소명 검색이라 Geocoder.addressSearch가
+  // 아닌 services.Places.keywordSearch를 쓴다 — 아파트명 같은 장소명 검색에 더 맞는
+  // 기존 카카오 SDK 기능, 새 API 아님). 검색 결과가 없으면(시·군·구 단위 근사조차)
+  // 절대 임의 위치로 표시하지 않고 'failed'로만 남긴다(§8 "불확실하면 표시하지 말 것").
+  // 캐시(§8 "같은 주소 반복 검색 금지"): localStorage에 이미 있는 키(성공/실패 불문)는
+  // 재검색하지 않는다 — 팝업을 다시 열어도 새 아파트(신규 POUR 실적)만 검색된다.
+  function geocodeAptEntries(entries, kakao){
+    if(!kakao.maps.services || typeof kakao.maps.services.Places !== 'function') return Promise.resolve(false);
+    const places = new kakao.maps.services.Places();
+    const cache = loadAptGeocodeCache();
+    const pending = entries.filter(e=> !cache[e.key]);
+    if(!pending.length) return Promise.resolve(false);
+    let changed = false;
+    let i = 0;
+    return new Promise((resolve)=>{
+      function next(){
+        if(i >= pending.length){ if(changed) saveAptGeocodeCache(cache); resolve(changed); return; }
+        const e = pending[i++];
+        const query = [e.region, e.city, e.name].filter(Boolean).join(' ').trim();
+        if(!query){
+          cache[e.key] = { status:'failed', cachedAt: new Date().toISOString() };
+          changed = true; setTimeout(next, 0); return;
+        }
+        try{
+          places.keywordSearch(query, (result, status)=>{
+            if(status === kakao.maps.services.Status.OK && result && result[0]){
+              cache[e.key] = { status:'ok', lat: parseFloat(result[0].y), lng: parseFloat(result[0].x), matchedName: result[0].place_name || null, cachedAt: new Date().toISOString() };
+            } else {
+              cache[e.key] = { status:'failed', cachedAt: new Date().toISOString() };
+            }
+            changed = true;
+            setTimeout(next, 80); // 기존 회사 지오코딩과 동일한 스로틀(§8 요청 폭주 방지)
+          });
+        } catch(err){
+          cache[e.key] = { status:'failed', cachedAt: new Date().toISOString() };
+          changed = true; setTimeout(next, 80);
+        }
+      }
+      next();
+    });
+  }
+
+  // §9 마커 밀집 처리 — 시공사 탭과 같은 네이티브 kakao.maps.MarkerClusterer를 그대로
+  // 재사용(§요청 "기존 지도 라이브러리에서 제공하는 클러스터 기능을 우선 사용"), 색만
+  // 파란색 계열 단일 스타일로. 시공사 탭의 지역/시군구 커스텀 버블 단계는 이 탭에는
+  // 만들지 않았다 — 요청 범위(§9)가 요구하는 "숫자 클러스터/확대 시 분리/클릭 시 확대"는
+  // MarkerClusterer 기본 동작만으로 이미 충족된다(과한 중복 구현 금지).
+  function initAptMapCanvas(kakao, allEntries){
+    const container = document.getElementById('mapModalCanvas');
+    if(!container) return;
+    const center = new kakao.maps.LatLng(36.2, 127.9);
+    const map = new kakao.maps.Map(container, { center, level: 13 });
+    if(kakao.maps.ZoomControl){ map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT); }
+    const clusterer = new kakao.maps.MarkerClusterer({
+      map, averageCenter:true, minLevel:6,
+      styles: [{
+        width:'34px', height:'34px', background:'rgba(37,99,235,.88)', color:'#fff',
+        borderRadius:'17px', textAlign:'center', lineHeight:'34px', fontSize:'12px', fontWeight:'700',
+        border:'2px solid #fff'
+      }]
+    });
+    const infoWindow = new kakao.maps.InfoWindow({ removable:true });
+    const markerImage = buildAptMarkerImage(kakao);
+    let markerByKey = new Map();
+    let currentEntries = allEntries;
+
+    function openInfoWindow(entry, marker){
+      infoWindow.setContent(buildAptInfoWindowHtml(entry));
+      infoWindow.open(map, marker);
+      requestAnimationFrame(()=>{
+        const detailBtn = document.getElementById('aptInfoDetailBtn');
+        if(detailBtn) detailBtn.addEventListener('click', ()=> openAptHistoryModal(entry));
+        const cardBtn = document.getElementById('aptInfoCardBtn');
+        if(cardBtn) cardBtn.addEventListener('click', ()=>{
+          const companyId = cardBtn.getAttribute('data-open-company');
+          closeMapDistributionModal();
+          openCard(companyId);
+        });
+      });
+    }
+
+    function buildMarkersFor(entries){
+      clusterer.clear();
+      markerByKey = new Map();
+      const markers = [];
+      entries.forEach(e=>{
+        if(!e.hasCoords) return;
+        const pos = new kakao.maps.LatLng(e.lat, e.lng);
+        const marker = new kakao.maps.Marker({ position: pos, title: e.name, image: markerImage });
+        kakao.maps.event.addListener(marker, 'click', ()=> openInfoWindow(e, marker));
+        markers.push(marker);
+        markerByKey.set(e.key, marker);
+      });
+      clusterer.addMarkers(markers);
+    }
+
+    function renderLayer(entries){
+      currentEntries = entries;
+      buildMarkersFor(entries);
+    }
+
+    aptCanvasState = {
+      map, clusterer,
+      destroy(){ try{ clusterer.clear(); infoWindow.close(); }catch(err){ /* 무시 — 팝업 자체가 사라지므로 잔여 정리는 최선 노력만 */ } }
+    };
+
+    updateAptMarkers = function(entries){ renderLayer(applyAptFilters(entries)); };
+    focusAptItem = function(key){
+      const entry = currentEntries.find(e=> e.key === key);
+      if(!entry || !entry.hasCoords) return;
+      const pos = new kakao.maps.LatLng(entry.lat, entry.lng);
+      const openNow = ()=>{
+        const marker = markerByKey.get(key);
+        if(marker){ openInfoWindow(entry, marker); return; }
+        infoWindow.setContent(buildAptInfoWindowHtml(entry));
+        infoWindow.setPosition(pos);
+        infoWindow.open(map);
+        requestAnimationFrame(()=>{
+          const detailBtn = document.getElementById('aptInfoDetailBtn');
+          if(detailBtn) detailBtn.addEventListener('click', ()=> openAptHistoryModal(entry));
+          const cardBtn = document.getElementById('aptInfoCardBtn');
+          if(cardBtn) cardBtn.addEventListener('click', ()=>{
+            const companyId = cardBtn.getAttribute('data-open-company');
+            closeMapDistributionModal();
+            openCard(companyId);
+          });
+        });
+      };
+      if(typeof map.getLevel === 'function' && map.getLevel() > 6 && typeof map.setLevel === 'function') map.setLevel(5);
+      map.panTo(pos);
+      setTimeout(openNow, 260);
+    };
+
+    renderLayer(applyAptFilters(allEntries));
+    // §8 "화면을 열 때마다 전체 아파트 주소를 다시 검색하지 말 것" — geocodeAptEntries가
+    // 캐시에 없는 것만 검색하므로, 재오픈 시 새 POUR 실적(신규 아파트)만 실제로 검색된다.
+    geocodeAptEntries(allEntries, kakao).then((changed)=>{
+      if(!changed || !mapModalOpen || mapActiveTab !== 'apartment') return;
+      const fresh = buildPourApartmentEntries();
+      renderLayer(applyAptFilters(fresh));
+      renderAptInfoPanel(fresh);
+    }).catch((err)=> console.warn('아파트 지오코딩 동기화 중 일부 실패:', err));
+  }
+
+  // §6/§11 요약 + 지도 옆 목록. summaryRow는 필터 적용된 entries로 매번 다시 계산한다
+  // (§6 "숫자는 실제 데이터로 계산하고 하드코딩하지 말 것").
+  function renderAptInfoPanel(allEntries){
+    const summaryRow = document.getElementById('aptSummaryRow');
+    const infoCol = document.getElementById('mapModalInfoCol');
+    const filtered = applyAptFilters(allEntries);
+    const emptyMsg = allEntries.length === 0 ? '등록된 POUR 시공 아파트가 없습니다.' : '조건에 맞는 시공 아파트가 없습니다.'; // §12
+    if(summaryRow){
+      const summary = computeAptSummary(filtered);
+      summaryRow.innerHTML = filtered.length ? `
+        <span>시공 아파트 <b>${esc(summary.count.toLocaleString('ko-KR'))}곳</b></span>
+        <span>총 <b>${esc(summary.totalHouseholds.toLocaleString('ko-KR'))}세대</b></span>
+        <span>전국 <b>${esc(summary.regionCount.toLocaleString('ko-KR'))}개 지역</b></span>
+        ${summary.missingHouseholdsCount ? `<span class="is-warn">세대수 미등록 ${esc(summary.missingHouseholdsCount)}곳(세대수 집계 제외)</span>` : ''}
+      ` : `<span>${esc(emptyMsg)}</span>`;
+    }
+    if(!infoCol) return;
+    const unlocated = filtered.filter(e=> !e.hasCoords && e.geocodeStatus === 'failed');
+    const pending = filtered.filter(e=> e.geocodeStatus === 'pending');
+    infoCol.innerHTML = `
+      <div>
+        <div class="map-info-block-title">시공 아파트 목록${filtered.length > 300 ? '(상위 300곳 — 검색·필터로 좁혀보세요)' : ''}</div>
+        ${filtered.length ? filtered.slice(0, 300).map(e=> `
+          <div class="map-apt-row" data-apt-key="${esc(e.key)}">
+            <div class="map-apt-row-name"><span>${esc(e.name)}</span><span class="map-apt-row-hh">${esc(fmtAptHouseholds(e.households))}</span></div>
+            <div class="map-apt-row-sub">${esc([e.region, e.city].filter(Boolean).join(' ') || '지역 미확인')} · ${esc(e.years.length ? e.years[0] + '년' : '연도 미상')} · ${esc(e.categories[0] || '—')} · ${esc(e.companies.length === 1 ? e.companies[0].name : (e.companies.length ? e.companies.length + '개 시공사' : '시공사 미연결'))}</div>
+          </div>
+        `).join('') : `<div class="map-modal-empty" style="padding:8px 0;">${esc(emptyMsg)}</div>`}
+      </div>
+      ${unlocated.length ? `<div class="map-unlocated-summary">위치 확인 필요 ${esc(unlocated.length)}곳(주소 검색 실패 또는 정보 부족)</div>` : ''}
+      ${pending.length ? `<div class="map-unlocated-summary">위치 확인 중 ${esc(pending.length)}곳…</div>` : ''}
+    `;
+    infoCol.querySelectorAll('[data-apt-key]').forEach(row=> row.addEventListener('click', ()=>{
+      const key = row.getAttribute('data-apt-key');
+      if(typeof focusAptItem === 'function') focusAptItem(key);
+    }));
+  }
+
+  // 필터/검색이 바뀌었을 때 아파트 마커와 정보 패널만 다시 그린다(지도 인스턴스는 그대로
+  // — §지도분포4와 동일 원칙, 검색창 포커스가 끊기지 않게).
+  function refreshAptInfoAndMarkers(){
+    let allEntries;
+    try{ allEntries = buildPourApartmentEntries(); }
+    catch(err){ console.warn('시공 아파트 데이터 계산 실패:', err); allEntries = []; } // §12
+    if(typeof updateAptMarkers === 'function'){
+      try{ updateAptMarkers(allEntries); } catch(err){ console.warn('아파트 마커 갱신 실패:', err); }
+    }
+    renderAptInfoPanel(allEntries);
+  }
+
+  // §1 시공 아파트 탭 본문 — 시공사 탭(renderMapModalMain 위쪽 절반)과 같은 구조(필터 바 +
+  // 지도 + 옆 목록)를 그대로 따르되, 데이터 소스와 필터 종류만 다르다. #mapModalBody
+  // 안에서만 바뀌고 위쪽 탭 자체(#mapModalTabs)는 openMapDistributionModal에서 이미 그려진
+  // 채로 유지된다.
+  function renderMapModalMainApartment(kakao, wrap){
+    let allEntries;
+    try{ allEntries = buildPourApartmentEntries(); }
+    catch(err){ console.warn('시공 아파트 데이터 계산 실패:', err); allEntries = []; } // §12
+    const opts = buildAptFilterOptions(allEntries);
+    wrap.innerHTML = `
+      <div class="map-modal-filters">
+        <input type="text" class="map-modal-search" id="aptFilterSearch" placeholder="아파트명 · 지역 · 시공사 검색" value="${esc(aptFilterState.search)}" />
+        <select class="map-modal-select" id="aptFilterYear">
+          <option value="all">연도 전체</option>
+          ${opts.years.map(y=> `<option value="${esc(y)}"${String(aptFilterState.year)===String(y)?' selected':''}>${esc(y)}년</option>`).join('')}
+        </select>
+        <select class="map-modal-select" id="aptFilterCategory">
+          <option value="all">공종 전체</option>
+          ${opts.categories.map(c=> `<option value="${esc(c)}"${aptFilterState.category===c?' selected':''}>${esc(c)}</option>`).join('')}
+        </select>
+        <select class="map-modal-select" id="aptFilterRegion">
+          <option value="all">지역 전체</option>
+          ${opts.regions.map(r=> `<option value="${esc(r)}"${aptFilterState.region===r?' selected':''}>${esc(r)}</option>`).join('')}
+        </select>
+        <select class="map-modal-select" id="aptFilterHouseholds">
+          <option value="all"${aptFilterState.households==='all'?' selected':''}>세대수 전체</option>
+          <option value="lt500"${aptFilterState.households==='lt500'?' selected':''}>500세대 미만</option>
+          <option value="500to999"${aptFilterState.households==='500to999'?' selected':''}>500~999세대</option>
+          <option value="1000to1999"${aptFilterState.households==='1000to1999'?' selected':''}>1,000~1,999세대</option>
+          <option value="ge2000"${aptFilterState.households==='ge2000'?' selected':''}>2,000세대 이상</option>
+          <option value="none"${aptFilterState.households==='none'?' selected':''}>세대수 미등록</option>
+        </select>
+        <button type="button" class="map-modal-retry-btn" id="aptFilterResetBtn">필터 초기화</button>
+      </div>
+      <div class="map-apt-summary" id="aptSummaryRow"></div>
+      <div class="map-modal-body-main">
+        <div class="map-modal-mapcol" id="mapModalMapCol"><div class="map-modal-canvas" id="mapModalCanvas"></div></div>
+        <div class="map-modal-infocol" id="mapModalInfoCol"></div>
+      </div>
+    `;
+    document.getElementById('aptFilterSearch').addEventListener('input', (e)=>{ aptFilterState.search = e.target.value; refreshAptInfoAndMarkers(); });
+    document.getElementById('aptFilterYear').addEventListener('change', (e)=>{ aptFilterState.year = e.target.value; refreshAptInfoAndMarkers(); });
+    document.getElementById('aptFilterCategory').addEventListener('change', (e)=>{ aptFilterState.category = e.target.value; refreshAptInfoAndMarkers(); });
+    document.getElementById('aptFilterRegion').addEventListener('change', (e)=>{ aptFilterState.region = e.target.value; refreshAptInfoAndMarkers(); });
+    document.getElementById('aptFilterHouseholds').addEventListener('change', (e)=>{ aptFilterState.households = e.target.value; refreshAptInfoAndMarkers(); });
+    document.getElementById('aptFilterResetBtn').addEventListener('click', ()=>{
+      aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all' };
+      document.getElementById('aptFilterSearch').value = '';
+      document.getElementById('aptFilterYear').value = 'all';
+      document.getElementById('aptFilterCategory').value = 'all';
+      document.getElementById('aptFilterRegion').value = 'all';
+      document.getElementById('aptFilterHouseholds').value = 'all';
+      refreshAptInfoAndMarkers();
+    });
+    try{
+      if(typeof initAptMapCanvas === 'function') initAptMapCanvas(kakao, allEntries);
+    } catch(err){
+      console.warn('아파트 지도 캔버스 초기화 실패:', err);
+      const canvas = document.getElementById('mapModalCanvas');
+      if(canvas) canvas.innerHTML = '<div class="map-modal-error">지도를 표시하지 못했습니다.</div>';
+    }
+    renderAptInfoPanel(allEntries);
   }
 
   // §지도분포4 동기화 훅: Firebase 실시간 구독(다른 <script> 블록)이 companies를
