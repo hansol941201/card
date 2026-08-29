@@ -1858,9 +1858,9 @@
      들어가야 해서(§요청) 기존 108px보다 높였다 — buildRevenueSvgChart의 viewBox H(170)와
      반드시 같은 값이어야 한다(SVG width/height:100%가 이 wrap 박스 크기에 맞춰 늘어나므로,
      둘이 다르면 좌표 스케일이 어긋난다). */
-  .cdash2-chart-wrap{ position:relative; height:170px; }
+  .cdash2-chart-wrap{ position:relative; height:176px; }
   .cdash2-chart-tooltip{ position:absolute; pointer-events:none; background:var(--navy); color:#fff; font-size:11px; font-weight:600; padding:4px 8px; border-radius:5px; transform:translate(-50%,-100%); white-space:nowrap; opacity:0; transition:opacity .1s; z-index:5; }
-  .cdash2-chart-empty{ height:170px; display:flex; align-items:center; justify-content:center; color:var(--text-faint); font-size:12px; }
+  .cdash2-chart-empty{ height:176px; display:flex; align-items:center; justify-content:center; color:var(--text-faint); font-size:12px; }
 
   .cdash2-body-grid{ display:grid; grid-template-columns:minmax(220px,34%) 1fr; gap:10px; margin-bottom:10px; align-items:start; }
   .cdash2-col-stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
@@ -7157,7 +7157,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 함" — 좌표 자체는 절대 옮기지 않음), 첫/마지막만 text-anchor를 start/end로 바꿔서
   // 잘리지 않게 한다(앵커만 바뀔 뿐 좌표는 그대로라 정렬이 어긋나지 않는다).
   function buildRevenueSvgChart(points){
-    const W = 560, H = 170, padX = 28, padTop = 44, padBottom = 32;
+    const W = 560, H = 176, padX = 28, padTop = 50, padBottom = 32;
     const axisY = H - padBottom;
     const plotH = axisY - padTop;
     const values = points.map(p=> p.total);
@@ -7175,16 +7175,21 @@ window.SHIN2_CRM_APP_INIT = function(){
       return `<line x1="${padX}" y1="${y}" x2="${W-padX}" y2="${y}" stroke="#EEF2F7" stroke-width="1"/>`;
     }).join('');
 
-    // §요청 "좁은 화면에서는 주요 지점의 금액만 표시하고 나머지는 마우스 오버로 확인,
-    // 데스크톱에서는 모든 월의 금액을 기본 표시" — 카드가 열리는 시점의 창 너비로 판정
-    // (이 팝업의 다른 반응형 분기와 동일한 760px 기준, §8 반응형). 주요 지점 = 처음/마지막/
-    // 최고 매출 지점(중복 제거).
+    // §매출 그래프 상시 라벨 재요청 라운드 — 사용자가 "포인트에 마우스를 올려야 금액이
+    // 보인다"며 재확인 요청. 위 valueLabels는 이미 항상 그려지는 data label이라 hover가
+    // 전혀 필요 없다(hitDot·tooltip은 그대로 "상세 확인용"으로 남겨둠, §요청 "기존 마우스
+    // 오버 툴팁은 유지해도 됨"). 좁은 화면 우선순위를 이번 요청 문구대로 "최고점·최저점·
+    // 최근 월"로 맞춘다(이전엔 처음/마지막/최고였음 — 최저점·최근월 기준으로 정정).
     const isNarrow = (typeof window !== 'undefined') && window.innerWidth <= 760;
-    const keyIdx = new Set([0, n-1]);
-    if(maxIdx >= 0) keyIdx.add(maxIdx);
+    const minRaw = Math.min.apply(null, values);
+    const minIdx = values.indexOf(minRaw);
+    const keyIdx = new Set([n-1, minIdx]); // 최근 월(마지막) + 최저점
+    if(maxIdx >= 0) keyIdx.add(maxIdx); // + 최고점
 
-    const NEAR = 10, FAR = 24, boxH = 16; // NEAR=§요청 "위쪽으로 8~12px" 범위
-    const estWidth = s=>{ let w = 12; for(const ch of String(s)){ w += ch.charCodeAt(0) > 127 ? 12.5 : 6.6; } return w; };
+    // §요청 라벨 디자인 재정정: "포인트 위 10~14px, 상하 3px/좌우 6px 여백, 모서리 4px".
+    const NEAR = 12, FAR = 26, padTB = 3, padLR = 6;
+    const boxH = 11.5 * 1.2 + padTB*2; // font-size 기준 줄높이 + 상하 3px씩
+    const estWidth = s=>{ let w = padLR*2; for(const ch of String(s)){ w += ch.charCodeAt(0) > 127 ? 12.5 : 6.6; } return w; };
 
     const dots = coords.map((c,i)=>{
       const isMax = i === maxIdx;
@@ -7195,15 +7200,15 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(isNarrow && !keyIdx.has(i)) return ''; // 좁은 화면: 주요 지점 외엔 라벨 생략(hitDot으로 hover는 계속 가능)
       const label = fmtKrwCompact(points[i].total); // §요청 금액 표기 형식(억/만원 변환)을 그대로 재사용
       const isMax = i === maxIdx;
-      const tier = i % 2 === 0 ? NEAR : FAR; // §요청 "위아래 위치를 번갈아 조정"
+      const tier = i % 2 === 0 ? NEAR : FAR; // §요청 "가까우면 위쪽 높이를 번갈아 조정"
       const w = estWidth(label);
       let boxX = c[0] - w/2;
       if(boxX < 2) boxX = 2;
       if(boxX + w > W - 2) boxX = W - 2 - w; // §요청 "카드 밖으로 넘어가지 않게"
       const boxY = c[1] - tier - boxH;
       const textX = boxX + w/2;
-      const textY = boxY + boxH - 5;
-      return `<rect x="${boxX.toFixed(1)}" y="${boxY.toFixed(1)}" width="${w.toFixed(1)}" height="${boxH}" rx="5" fill="#FFFFFF" stroke="#CFE0FB" stroke-width="1"/>`
+      const textY = boxY + boxH - padTB - 2.5;
+      return `<rect x="${boxX.toFixed(1)}" y="${boxY.toFixed(1)}" width="${w.toFixed(1)}" height="${boxH.toFixed(1)}" rx="4" fill="#FFFFFF" stroke="#CFE0FB" stroke-width="1"/>`
         + `<text x="${textX.toFixed(1)}" y="${textY.toFixed(1)}" font-size="11.5" font-weight="600" fill="${isMax?'#1D4ED8':'#17305C'}" text-anchor="middle">${esc(label)}</text>`;
     }).join('');
 
