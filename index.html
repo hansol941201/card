@@ -16328,7 +16328,13 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 절대 임의 위치로 표시하지 않고 'failed'로만 남긴다(§8 "불확실하면 표시하지 말 것").
   // 캐시(§8 "같은 주소 반복 검색 금지"): localStorage에 이미 있는 키(성공/실패 불문)는
   // 재검색하지 않는다 — 팝업을 다시 열어도 새 아파트(신규 POUR 실적)만 검색된다.
-  function geocodeAptEntries(entries, kakao){
+  // §버그 수정(사용자 재현): 아파트가 1,000곳이 넘으면 80ms 스로틀 기준 전부 끝날 때까지
+  // 1분 넘게 걸리는데, 예전엔 그 전체가 끝나야만(Promise.then) 지도에 마커를 한 번
+  // 그렸다 — 그 사이엔 지도가 텅 비어 보였다(요약 줄·목록은 buildPourApartmentEntries가
+  // 캐시만 읽어서 즉시 나오니 정상인데, 지도만 계속 비어 "안 뜬다"고 보인 진짜 원인).
+  // onBatch 콜백을 추가해 일정 개수(15건)마다 지금까지 확인된 좌표로 중간중간 다시
+  // 그리게 한다 — 새 지오코딩 로직이 아니라 같은 로직에 진행 중 갱신 지점만 추가했다.
+  function geocodeAptEntries(entries, kakao, onBatch){
     if(!kakao.maps.services || typeof kakao.maps.services.Places !== 'function') return Promise.resolve(false);
     const places = new kakao.maps.services.Places();
     const cache = loadAptGeocodeCache();
@@ -16336,14 +16342,25 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(!pending.length) return Promise.resolve(false);
     let changed = false;
     let i = 0;
+    let sinceFlush = 0;
     return new Promise((resolve)=>{
+      function flush(){
+        if(!changed) return;
+        saveAptGeocodeCache(cache);
+        if(typeof onBatch === 'function'){ try{ onBatch(); }catch(err){ console.warn('아파트 지도 중간 갱신 실패:', err); } }
+      }
+      function afterOne(){
+        sinceFlush++;
+        if(sinceFlush >= 15){ sinceFlush = 0; flush(); }
+        setTimeout(next, 80); // 기존 회사 지오코딩과 동일한 스로틀(§8 요청 폭주 방지)
+      }
       function next(){
-        if(i >= pending.length){ if(changed) saveAptGeocodeCache(cache); resolve(changed); return; }
+        if(i >= pending.length){ flush(); resolve(changed); return; }
         const e = pending[i++];
         const query = [e.region, e.city, e.name].filter(Boolean).join(' ').trim();
         if(!query){
           cache[e.key] = { status:'failed', cachedAt: new Date().toISOString() };
-          changed = true; setTimeout(next, 0); return;
+          changed = true; afterOne(); return;
         }
         try{
           places.keywordSearch(query, (result, status)=>{
@@ -16353,11 +16370,11 @@ window.SHIN2_CRM_APP_INIT = function(){
               cache[e.key] = { status:'failed', cachedAt: new Date().toISOString() };
             }
             changed = true;
-            setTimeout(next, 80); // 기존 회사 지오코딩과 동일한 스로틀(§8 요청 폭주 방지)
+            afterOne();
           });
         } catch(err){
           cache[e.key] = { status:'failed', cachedAt: new Date().toISOString() };
-          changed = true; setTimeout(next, 80);
+          changed = true; afterOne();
         }
       }
       next();
@@ -16582,11 +16599,17 @@ window.SHIN2_CRM_APP_INIT = function(){
     renderLayer(applyAptFilters(allEntries));
     // §8 "화면을 열 때마다 전체 아파트 주소를 다시 검색하지 말 것" — geocodeAptEntries가
     // 캐시에 없는 것만 검색하므로, 재오픈 시 새 POUR 실적(신규 아파트)만 실제로 검색된다.
-    geocodeAptEntries(allEntries, kakao).then((changed)=>{
-      if(!changed || !mapModalOpen || mapActiveTab !== 'apartment') return;
+    // §버그 수정: onBatch로 15건마다 지금까지 확인된 좌표를 지도에 반영 — 전체(최대
+    // 1,000건 이상)가 끝날 때까지 지도가 텅 비어 보이던 문제 해결(위 geocodeAptEntries
+    // 주석 참고).
+    const refreshFromCache = ()=>{
+      if(!mapModalOpen || mapActiveTab !== 'apartment') return;
       const fresh = buildPourApartmentEntries();
       renderLayer(applyAptFilters(fresh));
       renderAptInfoPanel(fresh);
+    };
+    geocodeAptEntries(allEntries, kakao, refreshFromCache).then((changed)=>{
+      if(changed) refreshFromCache();
     }).catch((err)=> console.warn('아파트 지오코딩 동기화 중 일부 실패:', err));
   }
 
