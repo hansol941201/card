@@ -16139,8 +16139,15 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 지도가 움직이거나(팬/줌) 확대 단계가 바뀔 때마다: 클러스터 모드면 현재 줌
     // 단계에 맞는 레이어를 다시 그리고, 히트맵 모드면 지역 집계를 다시 계산한다.
     // 우측 "현재 지도 내 업체" 패널도 같이 갱신한다(§지도분포2 기존 동작 유지).
+    // §POUR 시공 아파트 지도 라운드에서 발견된 버그 수정: 아파트 탭으로 전환한 뒤에도
+    // 이 시공사 지도 인스턴스가 완전히 GC되지 않으면(예: 탭 전환 직후 뒤늦게 tile
+    // 로딩이 끝나 idle이 한 번 더 발생하는 경우) 이 리스너가 그대로 남아 있어
+    // renderMapInfoPanel(회사용 "지역 요약"/"업체 밀집 지역")이 지금은 아파트 탭
+    // 것으로 바뀐 #mapModalInfoCol(같은 id를 재사용)에 잘못 그려지는 실제 사례가
+    // 있었다(사용자 스크린샷으로 재현 확인) — mapActiveTab이 'company'일 때만
+    // 실행되게 막는다(mapModalOpen만 보던 기존 가드로는 부족했다).
     function refreshVisibleList(){
-      if(!mapModalOpen) return;
+      if(!mapModalOpen || mapActiveTab !== 'company') return;
       if(mapFilterState.viewMode === 'heatmap') buildHeatmapFor(currentEntries);
       else renderClusterLayer(currentEntries);
       renderMapInfoPanel(buildMapCompanies());
@@ -16155,6 +16162,9 @@ window.SHIN2_CRM_APP_INIT = function(){
         return applyMapFilters(buildMapCompanies()).filter(e=> e.hasCoords && bounds.contain(new kakao.maps.LatLng(e.co.latitude, e.co.longitude)));
       },
       destroy(){
+        // 위 버그의 근본 조치 — 인스턴스를 버릴 때 idle 리스너 자체도 명시적으로 뗀다
+        // (mapActiveTab 가드는 방어선 하나 더, 이건 애초에 안 불리게 막는 조치).
+        try{ kakao.maps.event.removeListener(map, 'idle', refreshVisibleList); } catch(err){ /* 무시 */ }
         try{ clusterer.clear(); clearClusterOverlays(); clearHeatmap(); infoWindow.close(); } catch(err){ /* 무시 — 팝업 자체가 사라지므로 잔여 정리는 최선 노력만 */ }
       }
     };
@@ -16203,7 +16213,10 @@ window.SHIN2_CRM_APP_INIT = function(){
     // §동기화 규칙: 변경/신규 주소만 지오코딩 — 끝나면 마커·정보 패널을 최신 좌표로
     // 다시 그린다(팝업이 그새 닫혔으면 아무것도 안 함).
     syncGeocodeForEntries(allEntries, kakao).then((changed)=>{
-      if(!changed || !mapModalOpen) return;
+      // §POUR 시공 아파트 지도 라운드에서 발견된 버그와 같은 종류 — 지오코딩이 진행되는
+      // 동안 사용자가 아파트 탭으로 넘어갔으면 이 콜백이 늦게 도착해서 지금은 아파트
+      // 탭 것인 #mapModalInfoCol에 회사용 패널을 덮어쓸 수 있었다. mapActiveTab도 함께 확인.
+      if(!changed || !mapModalOpen || mapActiveTab !== 'company') return;
       const fresh = buildMapCompanies();
       renderMapLayer(applyMapFilters(fresh));
       renderMapInfoPanel(fresh);
@@ -16529,7 +16542,13 @@ window.SHIN2_CRM_APP_INIT = function(){
 
     aptCanvasState = {
       map, clusterer,
-      destroy(){ try{ clusterer.clear(); clearClusterOverlays(); infoWindow.close(); }catch(err){ /* 무시 — 팝업 자체가 사라지므로 잔여 정리는 최선 노력만 */ } }
+      // §시공사 탭에서 발견된 버그(초기 idle 리스너가 인스턴스 destroy 이후에도 남아있던
+      // 문제, 위 initMapCanvas 주석 참고)와 같은 조치를 여기도 대칭으로 적용 — 안전장치
+      // 이중화, 새 문제 발견은 아님.
+      destroy(){
+        try{ kakao.maps.event.removeListener(map, 'idle', refreshVisible); } catch(err){ /* 무시 */ }
+        try{ clusterer.clear(); clearClusterOverlays(); infoWindow.close(); }catch(err){ /* 무시 — 팝업 자체가 사라지므로 잔여 정리는 최선 노력만 */ }
+      }
     };
 
     updateAptMarkers = function(entries){ renderLayer(applyAptFilters(entries)); };
