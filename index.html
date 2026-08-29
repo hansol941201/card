@@ -2280,6 +2280,10 @@ body.map-modal-lock{ overflow:hidden; }
 .map-modal-tab-btn{ height:38px; padding:0 14px; font-size:13px; font-weight:650; color:var(--text-muted); background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; font-family:inherit; }
 .map-modal-tab-btn.is-active{ color:var(--navy); border-bottom-color:var(--navy); }
 .map-modal-tab-btn:hover{ color:var(--navy); }
+/* §근처 아파트 검색 재요청("따로 검색창 만들어줘") — 이름/지역/시공사 검색 필터 바와
+   시각적으로 구분되는 옅은 파란 바탕의 전용 줄. 새 색상 체계 없음(기존 --flat 계열). */
+.map-apt-near-row{ background:var(--flat-bg,#EFF6FF); border-bottom-color:var(--line); }
+.map-apt-near-label{ font-size:12px; font-weight:700; color:var(--flat,#2563EB); white-space:nowrap; }
 /* 시공 아파트 탭 요약 줄(§6) — 필터 바로 아래, 지도 위 한 줄 요약. */
 .map-apt-summary{ flex:none; padding:8px 22px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:var(--text-muted); }
 .map-apt-summary b{ color:var(--navy); font-weight:700; }
@@ -15307,7 +15311,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 항상 "전체" 상태로 새로 시작하고, 닫혀있던 동안 바뀐 최신 companies로 다시
     // 그려진다(§동기화 규칙 "닫혀 있어도 다음에 열 때 최신 데이터 사용").
     mapFilterState = { search:'', filterKey:'all', category:'all', pourRange:'all', viewMode:'cluster', listView:'inBounds' };
-    aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all', nearCenter:null, nearRadiusKm:5 };
+    aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all', nearCenter:null, nearRadiusKm:5, nearQuery:'' };
     mapActiveTab = 'company'; // §요청 "기본 선택은 시공사" — 매번 열 때 항상 기본 탭으로 시작
     if(mapCanvasState && typeof mapCanvasState.destroy === 'function'){
       try{ mapCanvasState.destroy(); } catch(err){ /* 지도 정리 실패는 무시 — 다음 열기에서 새로 만들어짐 */ }
@@ -15647,7 +15651,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 아파트도 뜨는 기능". nearCenter가 세팅되면 검색창의 일반 이름 검색(substring)
   // 대신 좌표 반경 검색으로 바뀐다(둘 다 같은 칸을 쓰지만 의미가 다르다 — "이름 검색"과
   // "주소 근처 검색"을 동시에 만족시킬 수 없어 nearCenter 유무로 분기).
-  let aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all', nearCenter:null, nearRadiusKm:5 };
+  let aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all', nearCenter:null, nearRadiusKm:5, nearQuery:'' };
   function aptEntryMatchesSearch(e, q){
     if(!q) return true;
     const norm = q.trim().toLowerCase();
@@ -16732,14 +16736,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     const opts = buildAptFilterOptions(allEntries);
     wrap.innerHTML = `
       <div class="map-modal-filters">
-        <input type="text" class="map-modal-search" id="aptFilterSearch" placeholder="아파트명 · 지역 · 시공사 검색, 또는 주소 입력 후 Enter" value="${esc(aptFilterState.search)}" />
-        <select class="map-modal-select" id="aptNearRadius" title="근처 검색 반경">
-          <option value="1"${aptFilterState.nearRadiusKm===1?' selected':''}>1km 이내</option>
-          <option value="3"${aptFilterState.nearRadiusKm===3?' selected':''}>3km 이내</option>
-          <option value="5"${aptFilterState.nearRadiusKm===5?' selected':''}>5km 이내</option>
-          <option value="10"${aptFilterState.nearRadiusKm===10?' selected':''}>10km 이내</option>
-        </select>
-        <button type="button" class="map-modal-retry-btn" id="aptNearSearchBtn" title="검색창에 입력한 주소 근처 시공 아파트 찾기">주소로 찾기</button>
+        <input type="text" class="map-modal-search" id="aptFilterSearch" placeholder="아파트명 · 지역 · 시공사 검색" value="${esc(aptFilterState.search)}" />
         <select class="map-modal-select" id="aptFilterYear">
           <option value="all">연도 전체</option>
           ${opts.years.map(y=> `<option value="${esc(y)}"${String(aptFilterState.year)===String(y)?' selected':''}>${esc(y)}년</option>`).join('')}
@@ -16762,25 +16759,38 @@ window.SHIN2_CRM_APP_INIT = function(){
         </select>
         <button type="button" class="map-modal-retry-btn" id="aptFilterResetBtn">필터 초기화</button>
       </div>
+      <div class="map-modal-filters map-apt-near-row">
+        <span class="map-apt-near-label">📍 근처 검색</span>
+        <input type="text" class="map-modal-search" id="aptNearSearchInput" placeholder="주소 입력 후 Enter — 그 근처 시공 아파트를 찾습니다" value="${esc(aptFilterState.nearQuery || '')}" />
+        <select class="map-modal-select" id="aptNearRadius" title="근처 검색 반경">
+          <option value="1"${aptFilterState.nearRadiusKm===1?' selected':''}>1km 이내</option>
+          <option value="3"${aptFilterState.nearRadiusKm===3?' selected':''}>3km 이내</option>
+          <option value="5"${aptFilterState.nearRadiusKm===5?' selected':''}>5km 이내</option>
+          <option value="10"${aptFilterState.nearRadiusKm===10?' selected':''}>10km 이내</option>
+        </select>
+        <button type="button" class="map-modal-retry-btn" id="aptNearSearchBtn">주소로 찾기</button>
+        ${aptFilterState.nearCenter ? `<button type="button" class="map-modal-retry-btn" id="aptNearClearBtn">근처 검색 해제</button>` : ''}
+      </div>
       <div class="map-apt-summary" id="aptSummaryRow"></div>
       <div class="map-modal-body-main">
         <div class="map-modal-mapcol" id="mapModalMapCol"><div class="map-modal-canvas" id="mapModalCanvas"></div></div>
         <div class="map-modal-infocol" id="mapModalInfoCol"></div>
       </div>
     `;
-    // §근처 아파트 검색 라운드: 검색창은 매 타이핑마다 즉시 반영되는 "이름 검색"과, 입력을
-    // 마치고 Enter(또는 [주소로 찾기])를 눌러야 실행되는 "주소 근처 검색" 두 가지 역할을
-    // 겸한다 — 지오코딩은 API 호출이라 매 키 입력마다 부르면 안 되므로(§8 요청 폭주 방지
-    // 원칙과 동일) 명시적 트리거가 필요하다. 검색창을 비우면 근처 검색도 함께 해제한다.
+    // §근처 아파트 검색 라운드 → 재요청("따로 검색창 만들어줘"): 이름/지역/시공사를 즉시
+    // 필터링하는 기존 검색창과, "주소로 찾기" 전용 검색창을 완전히 분리했다 — 서로 다른
+    // 의미(문자열 검색 vs 좌표 반경 검색)를 한 칸에서 Enter로 구분하던 첫 시도가 헷갈릴 수
+    // 있어 아예 입력칸 자체를 나눴다. 지오코딩은 API 호출이라 매 키 입력마다 부를 수
+    // 없어(§8 요청 폭주 방지 원칙과 동일) 이 칸도 Enter/버튼으로만 실행된다.
     document.getElementById('aptFilterSearch').addEventListener('input', (e)=>{
       aptFilterState.search = e.target.value;
-      if(!e.target.value.trim() && aptFilterState.nearCenter){ aptFilterState.nearCenter = null; setAptNearStatus(''); }
       refreshAptInfoAndMarkers();
     });
-    document.getElementById('aptFilterSearch').addEventListener('keydown', (e)=>{
+    document.getElementById('aptNearSearchInput').addEventListener('keydown', (e)=>{
       if(e.key === 'Enter'){ e.preventDefault(); runAptNearSearch(kakao); }
     });
     document.getElementById('aptNearSearchBtn').addEventListener('click', ()=> runAptNearSearch(kakao));
+    syncAptNearClearBtnVisibility();
     document.getElementById('aptNearRadius').addEventListener('change', (e)=>{
       aptFilterState.nearRadiusKm = parseInt(e.target.value, 10) || 5;
       if(aptFilterState.nearCenter) refreshAptInfoAndMarkers(); // 이미 근처 검색 중이면 반경만 바꿔서 즉시 재적용
@@ -16790,14 +16800,16 @@ window.SHIN2_CRM_APP_INIT = function(){
     document.getElementById('aptFilterRegion').addEventListener('change', (e)=>{ aptFilterState.region = e.target.value; refreshAptInfoAndMarkers(); });
     document.getElementById('aptFilterHouseholds').addEventListener('change', (e)=>{ aptFilterState.households = e.target.value; refreshAptInfoAndMarkers(); });
     document.getElementById('aptFilterResetBtn').addEventListener('click', ()=>{
-      aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all', nearCenter:null, nearRadiusKm:5 };
+      aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all', nearCenter:null, nearRadiusKm:5, nearQuery:'' };
       document.getElementById('aptFilterSearch').value = '';
+      document.getElementById('aptNearSearchInput').value = '';
       document.getElementById('aptFilterYear').value = 'all';
       document.getElementById('aptFilterCategory').value = 'all';
       document.getElementById('aptFilterRegion').value = 'all';
       document.getElementById('aptFilterHouseholds').value = 'all';
       document.getElementById('aptNearRadius').value = '5';
       setAptNearStatus('');
+      syncAptNearClearBtnVisibility();
       refreshAptInfoAndMarkers();
     });
     try{
@@ -16838,9 +16850,35 @@ window.SHIN2_CRM_APP_INIT = function(){
       } catch(err){ finishWithPlaces(); }
     });
   }
+  // 근처 검색 전용 입력칸("따로 검색창") 아래에 [근처 검색 해제] 버튼을 붙였다 뗐다
+  // 한다 — nearCenter가 있을 때만 나타난다. onclick으로 붙여서(addEventListener 누적
+  // 방지) 버튼이 이미 있어도 다시 부르면 그냥 최신 핸들러로 덮어써 중복이 안 쌓인다.
+  function syncAptNearClearBtnVisibility(){
+    const row = document.querySelector('.map-apt-near-row');
+    if(!row) return;
+    let btn = document.getElementById('aptNearClearBtn');
+    if(aptFilterState.nearCenter){
+      if(!btn){
+        btn = document.createElement('button');
+        btn.type = 'button'; btn.id = 'aptNearClearBtn'; btn.className = 'map-modal-retry-btn';
+        btn.textContent = '근처 검색 해제';
+        row.appendChild(btn);
+      }
+      btn.onclick = ()=>{
+        aptFilterState.nearCenter = null; aptFilterState.nearQuery = ''; setAptNearStatus('');
+        const input = document.getElementById('aptNearSearchInput'); if(input) input.value = '';
+        syncAptNearClearBtnVisibility();
+        refreshAptInfoAndMarkers();
+      };
+    } else if(btn){
+      btn.remove();
+    }
+  }
   async function runAptNearSearch(kakao){
-    const q = (aptFilterState.search || '').trim();
-    if(!q){ aptFilterState.nearCenter = null; setAptNearStatus(''); refreshAptInfoAndMarkers(); return; }
+    const input = document.getElementById('aptNearSearchInput');
+    const q = (input ? input.value : aptFilterState.nearQuery || '').trim();
+    aptFilterState.nearQuery = q;
+    if(!q){ aptFilterState.nearCenter = null; setAptNearStatus(''); syncAptNearClearBtnVisibility(); refreshAptInfoAndMarkers(); return; }
     setAptNearStatus('주소 확인 중…');
     renderAptInfoPanel(buildPourApartmentEntries());
     let coords = null;
@@ -16850,6 +16888,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(!coords){ setAptNearStatus(`"${q}" 위치를 찾을 수 없습니다.`); refreshAptInfoAndMarkers(); return; }
     aptFilterState.nearCenter = coords;
     setAptNearStatus(`"${coords.label}" 근처 ${aptFilterState.nearRadiusKm}km 이내`);
+    syncAptNearClearBtnVisibility();
     refreshAptInfoAndMarkers();
     if(typeof focusAptNearCenter === 'function') focusAptNearCenter(coords);
   }
