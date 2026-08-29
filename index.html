@@ -16351,17 +16351,22 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
   }
 
-  // §9 마커 밀집 처리 — 시공사 탭과 같은 네이티브 kakao.maps.MarkerClusterer를 그대로
-  // 재사용(§요청 "기존 지도 라이브러리에서 제공하는 클러스터 기능을 우선 사용"), 색만
-  // 파란색 계열 단일 스타일로. 시공사 탭의 지역/시군구 커스텀 버블 단계는 이 탭에는
-  // 만들지 않았다 — 요청 범위(§9)가 요구하는 "숫자 클러스터/확대 시 분리/클릭 시 확대"는
-  // MarkerClusterer 기본 동작만으로 이미 충족된다(과한 중복 구현 금지).
+  // §9 마커 밀집 처리 — 사용자가 실제 시공사 탭 스크린샷("경기 78"/"부산 36"처럼 지역명+
+  // 개수 원)을 보여주며 "시공 아파트도 저렇게 뜨게 해줘" 라고 요청 — 처음엔 네이티브
+  // MarkerClusterer 숫자 원만으로 충분하다고 판단했었는데, 실제로는 시공사 탭과 "같은
+  // 모양"을 원한 것이었다. 그래서 시공사 탭의 지역/시군구 커스텀 버블 클러스터링
+  // (initMapCanvas의 currentClusterTier/groupKeyFor/buildClusterOverlaysFor 등, §지도분포6)과
+  // 완전히 같은 로직·색상·반발 배치 알고리즘을 그대로 옮겨왔다 — co.latitude/longitude
+  // 대신 아파트 그룹의 e.lat/e.lng, co.address 파싱 대신 이미 갖고 있는 e.region/e.city를
+  // 쓰는 점만 다르고 새 클러스터링 알고리즘을 만들지 않았다(§요청 "기존 지도 라이브러리
+  // 기능 우선 사용" 원칙과 같은 선상 — 이미 이 파일 안에 있는 검증된 구현을 재사용).
   function initAptMapCanvas(kakao, allEntries){
     const container = document.getElementById('mapModalCanvas');
     if(!container) return;
     const center = new kakao.maps.LatLng(36.2, 127.9);
     const map = new kakao.maps.Map(container, { center, level: 13 });
     if(kakao.maps.ZoomControl){ map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT); }
+    // 확대(개별 마커) 단계에서만 쓰는 네이티브 클러스터러 — 시공사 탭과 동일 패턴.
     const clusterer = new kakao.maps.MarkerClusterer({
       map, averageCenter:true, minLevel:6,
       styles: [{
@@ -16374,6 +16379,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     const markerImage = buildAptMarkerImage(kakao);
     let markerByKey = new Map();
     let currentEntries = allEntries;
+    let selectedClusterKey = null;
 
     function openInfoWindow(entry, marker){
       infoWindow.setContent(buildAptInfoWindowHtml(entry));
@@ -16388,6 +16394,20 @@ window.SHIN2_CRM_APP_INIT = function(){
           openCard(companyId);
         });
       });
+    }
+
+    // §지도분포6과 동일: 전국(시도) → 중간(시군구) → 확대(개별 마커) 3단계.
+    function currentClusterTier(){
+      const lvl = (typeof map.getLevel === 'function') ? map.getLevel() : 13;
+      if(lvl >= 11) return 'sido';
+      if(lvl >= 7) return 'sigungu';
+      return 'individual';
+    }
+    // 회사는 co.address를 파싱해 region/sigungu를 만들었지만, 아파트 그룹은 POUR
+    // 실적의 region/city 필드를 이미 그대로 갖고 있어 파싱이 필요 없다(§7 재사용 원칙).
+    function groupKeyFor(e, tier){
+      if(tier === 'sido') return e.region || '기타';
+      return [e.region, e.city].filter(Boolean).join(' ') || e.region || '기타';
     }
 
     function buildMarkersFor(entries){
@@ -16405,14 +16425,111 @@ window.SHIN2_CRM_APP_INIT = function(){
       clusterer.addMarkers(markers);
     }
 
+    // 아래 지역/시군구 원 클러스터 — initMapCanvas의 buildClusterOverlaysFor와 완전히
+    // 같은 코드(색상 공식·반발 배치 포함), 좌표 소스만 e.co.latitude/longitude → e.lat/e.lng.
+    let clusterOverlays = [];
+    function clearClusterOverlays(){
+      clusterOverlays.forEach(o=>{ try{ o.setMap(null); } catch(err){ /* 무시 */ } });
+      clusterOverlays = [];
+    }
+    function clusterLightness(ratio){ return 78 - Math.max(0, Math.min(1, ratio)) * 50; }
+    function clusterColor(ratio){ return `hsl(215,65%,${Math.round(clusterLightness(ratio))}%)`; }
+    function clusterTextColor(ratio){ return clusterLightness(ratio) >= 55 ? '#0B1F3A' : '#fff'; }
+    function buildClusterOverlaysFor(entries, tier){
+      clearClusterOverlays();
+      const groups = new Map();
+      entries.forEach(e=>{
+        if(!e.hasCoords) return;
+        const key = groupKeyFor(e, tier);
+        const acc = groups.get(key) || { key, sumLat:0, sumLng:0, count:0 };
+        acc.sumLat += e.lat; acc.sumLng += e.lng; acc.count += 1;
+        groups.set(key, acc);
+      });
+      if(!groups.size) return;
+      const list = Array.from(groups.values());
+      const maxCount = Math.max(...list.map(g=> g.count));
+      const proj = (typeof map.getProjection === 'function') ? map.getProjection() : null;
+      const items = list.map(g=>{
+        const ratio = g.count / maxCount;
+        const size = 32 + Math.sqrt(ratio) * (64 - 32);
+        const latlng = new kakao.maps.LatLng(g.sumLat / g.count, g.sumLng / g.count);
+        let px = null;
+        if(proj && typeof proj.pointFromCoords === 'function'){
+          try{ px = proj.pointFromCoords(latlng); } catch(err){ px = null; }
+        }
+        return { key: g.key, count: g.count, ratio, size, latlng, px };
+      });
+      if(items.every(it=> it.px)){
+        for(let pass=0; pass<6; pass++){
+          let moved = false;
+          for(let i=0;i<items.length;i++){
+            for(let j=i+1;j<items.length;j++){
+              const a=items[i], b=items[j];
+              const dx=b.px.x-a.px.x, dy=b.px.y-a.px.y;
+              let dist=Math.sqrt(dx*dx+dy*dy);
+              const minDist=(a.size+b.size)/2 + 4;
+              if(dist < minDist){
+                if(dist < 0.01) dist = 0.01;
+                const push=(minDist-dist)/2, ux=dx/dist, uy=dy/dist;
+                a.px.x -= ux*push; a.px.y -= uy*push;
+                b.px.x += ux*push; b.px.y += uy*push;
+                moved = true;
+              }
+            }
+          }
+          if(!moved) break;
+        }
+      }
+      items.forEach(it=>{
+        let latlng = it.latlng;
+        if(it.px && proj && typeof proj.coordsFromPoint === 'function'){
+          try{ latlng = proj.coordsFromPoint(it.px); } catch(err){ /* 원래 좌표 유지 */ }
+        }
+        const el = document.createElement('div');
+        el.className = 'map-cluster-bubble' + (it.key === selectedClusterKey ? ' is-selected' : '');
+        el.style.width = it.size + 'px'; el.style.height = it.size + 'px';
+        el.style.background = clusterColor(it.ratio);
+        el.style.color = clusterTextColor(it.ratio);
+        el.style.fontSize = Math.max(10, Math.min(13, it.size * 0.24)) + 'px';
+        el.innerHTML = `<span>${esc(it.key)}</span><b>${it.count}</b>`;
+        el.addEventListener('click', ()=> focusClusterGroup(it.key, tier));
+        const overlay = new kakao.maps.CustomOverlay({ position: latlng, content: el, xAnchor:0.5, yAnchor:0.5, zIndex:10 });
+        overlay.setMap(map);
+        clusterOverlays.push(overlay);
+      });
+    }
+    function focusClusterGroup(key, tier){
+      selectedClusterKey = key;
+      const targets = currentEntries.filter(e=> e.hasCoords && groupKeyFor(e, tier) === key);
+      if(!targets.length) return;
+      const bounds = new kakao.maps.LatLngBounds();
+      targets.forEach(e=> bounds.extend(new kakao.maps.LatLng(e.lat, e.lng)));
+      map.setBounds(bounds);
+    }
+    function renderClusterLayer(entries){
+      const tier = currentClusterTier();
+      if(tier === 'individual'){
+        clearClusterOverlays();
+        buildMarkersFor(entries);
+      } else {
+        clusterer.clear();
+        markerByKey = new Map();
+        buildClusterOverlaysFor(entries, tier);
+      }
+    }
     function renderLayer(entries){
       currentEntries = entries;
-      buildMarkersFor(entries);
+      renderClusterLayer(entries);
     }
+    function refreshVisible(){
+      if(!mapModalOpen || mapActiveTab !== 'apartment') return;
+      renderClusterLayer(currentEntries);
+    }
+    kakao.maps.event.addListener(map, 'idle', refreshVisible);
 
     aptCanvasState = {
       map, clusterer,
-      destroy(){ try{ clusterer.clear(); infoWindow.close(); }catch(err){ /* 무시 — 팝업 자체가 사라지므로 잔여 정리는 최선 노력만 */ } }
+      destroy(){ try{ clusterer.clear(); clearClusterOverlays(); infoWindow.close(); }catch(err){ /* 무시 — 팝업 자체가 사라지므로 잔여 정리는 최선 노력만 */ } }
     };
 
     updateAptMarkers = function(entries){ renderLayer(applyAptFilters(entries)); };
@@ -16420,6 +16537,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       const entry = currentEntries.find(e=> e.key === key);
       if(!entry || !entry.hasCoords) return;
       const pos = new kakao.maps.LatLng(entry.lat, entry.lng);
+      selectedClusterKey = null;
       const openNow = ()=>{
         const marker = markerByKey.get(key);
         if(marker){ openInfoWindow(entry, marker); return; }
@@ -16437,7 +16555,7 @@ window.SHIN2_CRM_APP_INIT = function(){
           });
         });
       };
-      if(typeof map.getLevel === 'function' && map.getLevel() > 6 && typeof map.setLevel === 'function') map.setLevel(5);
+      if(currentClusterTier() !== 'individual' && typeof map.setLevel === 'function') map.setLevel(5);
       map.panTo(pos);
       setTimeout(openNow, 260);
     };
