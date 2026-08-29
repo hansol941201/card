@@ -1798,14 +1798,121 @@
     backdrop-filter:blur(1.5px);
     padding:12px;
   }
+  /* §고객카드 전면 개선 라운드(§8 반응형/크기) — 데스크톱 팝업 폭을 화면의 88~92%로
+     (요청 그대로 90vw), 최대 1400px 상한을 둬서 초대형 모니터에서 과도하게 넓어지지
+     않게 한다. 아래 @media(max-width:1180px)/(max-width:760px) 오버라이드(각각
+     calc(100vw-24px)/100vw)는 그대로 둬서 태블릿/모바일에서는 기존처럼 화면 꽉 채움을
+     유지한다(§6 "작은 화면에서 세로 사이드바를 다시 표시하지 말 것"과 같은 결의 요청 —
+     모바일에서 별도 폭 제한을 두지 않는다). */
   .chart-panel{
-    width:calc(100vw - 48px);
-    max-width:1220px;
+    width:90vw;
+    max-width:1400px;
     max-height:calc(100vh - 24px);
     border-radius:15px;
     border:1px solid rgba(220,228,238,.96);
     box-shadow:0 28px 70px rgba(15,23,42,.23);
   }
+
+  /* ==========================================================================
+     §고객카드 전면 개선 라운드 — 새 팝업 레이아웃 전용 클래스(cdash2-* 네임스페이스,
+     기존 cdash-*와 충돌 없음 — renderInsightBlock/renderReactionsCol/renderDocStatusBlock/
+     renderBasicInfoCol 등 기존 함수와 그 CSS는 전혀 안 건드렸다, 여전히
+     #cdashHeaderPopover 안에서 그대로 재사용된다). 색은 진한 남색(var(--navy))/파란색
+     위주, 모서리 8~10px, 얇은 연회색 선(var(--line))만 — 요청 [디자인] 그대로.
+     ========================================================================== */
+  .cdash2-header{ background:var(--navy); border-radius:10px; padding:14px 16px; display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:10px; }
+  .cdash2-header-left{ display:flex; align-items:center; gap:9px; min-width:0; flex-wrap:wrap; }
+  .cdash2-title{ font-size:18px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:340px; }
+  .cdash2-tag{ display:inline-flex; align-items:center; height:22px; padding:0 9px; border-radius:5px; font-size:11.5px; font-weight:700; white-space:nowrap; background:rgba(255,255,255,.14); color:#DCE7FF; }
+  .cdash2-tag.is-done{ background:#E8F8EF; color:#0F7A42; }
+  .cdash2-tag.is-core{ background:#EAF1FF; color:#1D4ED8; }
+  .cdash2-header-close{ flex:none; width:26px; height:26px; border-radius:6px; border:none; background:transparent; color:#C9D6EE; font-size:18px; line-height:1; cursor:pointer; }
+  .cdash2-header-close:hover{ background:rgba(255,255,255,.12); color:#fff; }
+
+  .cdash2-info-strip{ display:flex; align-items:center; gap:0; border:1px solid var(--line); border-radius:8px; background:#fff; padding:10px 14px; margin-bottom:10px; }
+  .cdash2-info-item{ display:flex; align-items:center; gap:7px; padding:0 16px; min-width:0; }
+  .cdash2-info-item:first-child{ padding-left:0; }
+  .cdash2-info-item + .cdash2-info-item{ border-left:1px solid var(--line); }
+  .cdash2-info-item.is-address{ flex:1; min-width:0; }
+  .cdash2-info-label{ flex:none; font-size:11.5px; color:var(--text-muted); font-weight:600; }
+  .cdash2-info-value{ font-size:12.5px; color:var(--text); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cdash2-info-strip-spacer{ flex:1; min-width:12px; }
+
+  .cdash2-summary-row{ display:grid; grid-template-columns:minmax(160px,220px) 1fr; gap:10px; margin-bottom:10px; align-items:stretch; }
+  .cdash2-card{ background:#fff; border:1px solid var(--line); border-radius:9px; padding:13px 15px; min-width:0; }
+  .cdash2-card-title{ font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:8px; }
+  .cdash2-pour-num{ font-size:25px; font-weight:800; color:var(--navy); line-height:1.1; }
+  .cdash2-pour-sub{ font-size:11.5px; color:var(--text-muted); margin-top:5px; }
+
+  .cdash2-revenue-head{ display:flex; align-items:baseline; gap:22px; flex-wrap:wrap; margin-bottom:8px; }
+  .cdash2-revenue-stat-label{ font-size:11.5px; color:var(--text-muted); font-weight:600; margin-bottom:2px; }
+  .cdash2-revenue-stat-value{ font-size:19px; font-weight:800; color:var(--navy); }
+  .cdash2-chart-wrap{ position:relative; height:108px; }
+  .cdash2-chart-tooltip{ position:absolute; pointer-events:none; background:var(--navy); color:#fff; font-size:11px; font-weight:600; padding:4px 8px; border-radius:5px; transform:translate(-50%,-100%); white-space:nowrap; opacity:0; transition:opacity .1s; z-index:5; }
+  .cdash2-chart-empty{ height:108px; display:flex; align-items:center; justify-content:center; color:var(--text-faint); font-size:12px; }
+
+  .cdash2-body-grid{ display:grid; grid-template-columns:minmax(220px,34%) 1fr; gap:10px; margin-bottom:10px; align-items:start; }
+  .cdash2-col-stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+
+  .cdash2-timeline{ display:flex; flex-direction:column; gap:0; }
+  .cdash2-timeline-item{ position:relative; padding:0 0 12px 15px; border-left:1.5px solid var(--line); }
+  .cdash2-timeline-item:last-child{ padding-bottom:0; border-left-color:transparent; }
+  .cdash2-timeline-dot{ position:absolute; left:-4.5px; top:2px; width:8px; height:8px; border-radius:50%; background:var(--navy); border:2px solid #fff; box-shadow:0 0 0 1px var(--line); }
+  .cdash2-timeline-row{ display:flex; align-items:baseline; gap:9px; }
+  .cdash2-timeline-date{ flex:none; font-size:11.5px; font-weight:700; color:var(--text-muted); }
+  .cdash2-timeline-text{ font-size:12.5px; color:var(--text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .cdash2-insight-tags{ display:flex; flex-wrap:wrap; gap:6px; }
+  .cdash2-insight-tag{ display:inline-flex; align-items:center; height:24px; padding:0 10px; border-radius:6px; background:#EEF3FC; color:#1D3E7C; font-size:11.5px; font-weight:600; border:1px solid #DCE6F7; }
+  .cdash2-card.is-clickable{ cursor:pointer; }
+  .cdash2-card.is-clickable:hover{ border-color:#B7C6E5; }
+
+  .cdash2-pour-card-head{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:8px; }
+  .cdash2-pour-card-counts{ font-size:11.5px; color:var(--text-muted); font-weight:600; }
+  .cdash2-table-scroll{ overflow-x:auto; }
+  /* table-layout:fixed로 열 폭을 고정해야 "지역·현장" 열의 긴 텍스트가 세대수 열을
+     화면 밖으로 밀어내지 않는다(§요청 "표가 좁아질 때 전체 팝업이 깨지지 않게 표
+     영역만 가로 스크롤" — 고정폭+ellipsis 조합으로 카드 안에서 항상 정렬 유지). */
+  .cdash2-table-scroll table.cdash-pour-table{ width:100%; min-width:460px; table-layout:fixed; }
+  .cdash2-table-scroll th, .cdash2-table-scroll td{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cdash2-table-scroll th:nth-child(1), .cdash2-table-scroll td:nth-child(1){ width:52px; }
+  .cdash2-table-scroll th:nth-child(2), .cdash2-table-scroll td:nth-child(2){ width:92px; }
+  .cdash2-table-scroll th:nth-child(3), .cdash2-table-scroll td:nth-child(3){ width:auto; }
+  .cdash2-table-scroll th:nth-child(4), .cdash2-table-scroll td:nth-child(4){ width:66px; }
+  .cdash2-view-all-btn{ margin-top:9px; }
+
+  .cdash2-footer{ display:flex; align-items:center; justify-content:space-between; gap:12px; border-top:1px solid var(--line); padding-top:10px; margin-top:2px; flex-wrap:wrap; }
+  .cdash2-footer-left{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  .cdash2-doc-title{ font-size:11.5px; color:var(--text-muted); font-weight:700; margin-right:2px; }
+  .cdash2-doc-item{ display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--text); }
+  .cdash2-doc-item .dot{ width:6px; height:6px; border-radius:50%; flex:none; }
+  .cdash2-doc-item.is-done .dot{ background:var(--up); }
+  .cdash2-doc-item.is-pending .dot{ background:var(--text-faint); }
+  .cdash2-doc-item.is-done{ color:var(--up); font-weight:600; }
+  .cdash2-footer-right{ display:flex; gap:8px; flex:none; }
+
+  @media(max-width:1200px){
+    .cdash2-summary-row{ grid-template-columns:1fr; }
+  }
+  @media(max-width:900px){
+    .cdash2-body-grid{ grid-template-columns:1fr; }
+  }
+  @media(max-width:760px){
+    .cdash2-info-strip{ flex-wrap:wrap; row-gap:8px; }
+    .cdash2-info-item{ padding:0 12px; }
+    .cdash2-info-item:first-child{ padding-left:0; }
+    .cdash2-info-item.is-address{ order:5; width:100%; padding-left:0; border-left:none; }
+    .cdash2-info-strip-spacer{ display:none; }
+    /* §8 반응형 — 모바일에서 [고객 정보 수정] 버튼이 order 없는 기본값(0)이라 주소 줄
+       (order:5)보다 먼저 배치돼 중간에 끼어 보이던 문제를 고쳤다 — 항상 맨 끝, 한 줄
+       전체 너비로 내려온다. */
+    .cdash2-info-strip > button{ order:6; width:100%; margin-top:2px; }
+    .cdash2-title{ max-width:190px; font-size:16px; }
+    .cdash2-pour-card-head{ flex-direction:column; align-items:flex-start; gap:2px; }
+    .cdash2-footer{ flex-direction:column; align-items:stretch; }
+    .cdash2-footer-right{ justify-content:flex-end; }
+  }
+
   .cdash-body{
     padding:10px 12px 12px;
     background:#F5F8FC;
@@ -6740,6 +6847,17 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(moreBtn) moreBtn.addEventListener('click', ()=> openMemoPanel(co));
   }
 
+  // §고객카드 전면 개선 라운드 — 시안 그대로 8개 구획(헤더/기본정보 줄/핵심요약(POUR·매출
+  // 그래프)/최근 접촉 기록/고객 인사이트/최근 POUR 시공실적/하단 고정 바)으로 다시 짰다.
+  // "현재 단계" 별도 카드·"협약 완료" 중복 표시·NEXT/다음 행동·비어있던 "업체 특징" 큰
+  // 영역·연도 필터 버튼(옛 renderPourTrackSection의 연도 탭)은 화면에서 뺐다(§9 요청 —
+  // 함수 자체(renderBasicInfoCol/renderPourTrackSection/renderReqPreview/
+  // renderNextActionsCol)와 데이터는 전혀 지우지 않았다, 이 라운드 이전 라운드들이 이미
+  // 세워둔 "화면에서만 빼고 함수는 보존" 관례를 그대로 따랐다 — 그릴 DOM 슬롯만 없앴다).
+  // "고객 인사이트"/"고객 정보"/"서류 현황"의 실제 조회·수정 UI(renderInsightBlock/
+  // renderReactionsCol/renderDocStatusBlock/renderDocsSection, #cdashHeaderPopover)는
+  // 함수·마크업 전부 그대로 재사용한다 — 진입 버튼 위치만 헤더에서 각 카드/하단 바로
+  // 옮겼을 뿐이다(§ "디자인만 바꾸고 기능은 유지").
   function renderChart(co){
     // 전화기록 원문에서 명확한 자료 요청만 추출해 requestedMaterials에 병합(§14, 멱등이라
     // 카드를 열 때마다 실행해도 중복 생성되지 않는다) — originalText 자체는 절대 건드리지 않음.
@@ -6757,63 +6875,30 @@ window.SHIN2_CRM_APP_INIT = function(){
     // v2의 "내 할 일" 저장소에는 이제부터 CRM이 아무것도 새로 쓰지 않는다.
     cardView.innerHTML = `
       <div class="chart-overlay" id="chartOverlay">
-        <div class="chart-panel" role="dialog" aria-modal="true" aria-label="고객 차트">
+        <div class="chart-panel" role="dialog" aria-modal="true" aria-label="고객 상세">
           <div class="cdash-body" id="chartBody">
             <div id="chartHeader"></div>
+            <!-- §고객 정보/고객 인사이트/서류 현황의 실제 편집 UI는 여기 그대로(#cdashHeaderPopover)
+                 재사용한다 — renderInsightBlock/renderReactionsCol/renderDocStatusBlock은
+                 한 글자도 안 바꿨다. 새 카드(인사이트 태그 카드/하단 서류 바)를 클릭하면 이
+                 팝오버가 해당 section만 열린 채로 뜬다(§ openHeaderSection 그대로 재사용). -->
             <div class="cdash-header-popover" id="cdashHeaderPopover">
               <button type="button" class="cdash-header-popover-close" id="cdashHeaderPopoverClose" aria-label="닫기">&times;</button>
               <div class="cdash-header-popover-section" id="cdashInsightBlock"></div>
               <div class="cdash-header-popover-section" id="cdashReactionsCol"></div>
               <div class="cdash-header-popover-section" id="cdashDocStatusBlock"></div>
             </div>
-            <!-- §관리필요 업체 라운드 §9: 관리필요 업체의 카드를 열었을 때만 상단 요약영역에
-                 작은 한 줄 안내를 추가한다(주황/빨강 계열, 대형 카드 아님) — 관리필요가
-                 아닌 업체는 renderMgmtNeedBanner가 아무것도 그리지 않는다. -->
             <div id="cdashMgmtNeedBanner"></div>
-
-            <!-- §고객카드 레이아웃 재배치 라운드 §2/§3: 상단 네이비 헤더는 그대로(chartHeader),
-                 바로 아래 "핵심 현황"을 한 줄(현재단계|주요시공|총실적|총매출|2026매출|미수금
-                 6칸)로 배치한다. 옛 왼쪽 "핵심 한 줄 요약"(cdashSummaryCol)은 최종 구조(§10)에
-                 없어 이 라운드에서 뺐다 — renderSummaryCol 함수와 데이터는 그대로 둔다. -->
-            <div class="cdash-glance-row">
-              <div class="cdash-glance-stats" id="cdashGlanceStats"></div>
+            <div id="cdashInfoStrip"></div>
+            <div id="cdashSummaryRow"></div>
+            <div class="cdash2-body-grid">
+              <div class="cdash2-col-stack">
+                <div id="cdashTimelineCard"></div>
+                <div id="cdashInsightTagsCard"></div>
+              </div>
+              <div id="cdashPourResultsCard"></div>
             </div>
-
-            <!-- §고객카드 레이아웃 재배치 라운드 §4: 옛 "진행 기록" 큰 박스(날짜별 상세 목록)를
-                 "진행상황" 전체폭 가로 stepper로 단순화했다(renderMeetingRecordSection 내부만
-                 재구성 — buildProgressStages/resolveNewMouForCompany 등 데이터 계산은 전혀
-                 안 바꿈, 목록 화면의 buildStageStepperHtml을 그대로 재사용). -->
-            <!-- §고객카드 레이아웃 재배치 라운드 §6: 왼쪽 30~35%에 "최근 요청/고객 메모"
-                 (cdashReqPreviewBlock, renderReqPreview — 이미 있던 함수, 제목만 바꿈),
-                 오른쪽 65~70%에 "POUR 시공실적"(cdashPourTrackBlock) — 예전 §카드 순서
-                 재배치 라운드에서 정했던 좌우를 요청에 맞춰 다시 바꿨다(비율은
-                 .cdash-bottom2 CSS, §6). -->
-            <div class="cdash-bottom2">
-              <div id="cdashReqPreviewBlock"></div>
-              <div id="cdashPourTrackBlock"></div>
-            </div>
-
-            <!-- §고객카드 레이아웃 재배치 라운드 §9: 하단 3분할 — 업체 특징 | 고객 정보 | 서류
-                 현황. "다음 행동"(cdashNextActionsCol)은 이번 개편에서 고객카드 화면에서만
-                 뺐다(renderNextActionsCol 함수/co.nextActions 원본 데이터는 그대로, 목록
-                 화면 기능에도 영향 없음, §5/§12). 예전에 전체 폭을 쓰던 "서류 현황"
-                 (cdashDocStatusBlock)을 이 3분할 안으로 옮겼다 — renderDocStatusBlock은
-                 여전히 같은 id를 그대로 그린다(함수 변경 없음). -->
-            <!-- §고객카드 아코디언 라운드: "업체 특징"(cdashBasicInfoCol)은 항상 펼침 그대로
-                 유지(§1), "고객 정보"/"서류 현황"만 renderReactionsCol/renderDocStatusBlock
-                 내부에서 기본 접힘 accordion으로 그려진다 — 이 바깥 템플릿 구조 자체는 바꾸지
-                 않았다(칸 3개 그대로). .cdash-quad에 align-items:start를 추가해 짧아진 두 칸
-                 아래에 빈 여백이 남지 않게 했다(§9). -->
-            <div class="cdash-quad">
-              <div class="cdash-col" id="cdashBasicInfoCol"></div>
-            </div>
-
-            <!-- §고객 성향 컬럼 라운드 §3/§4 — 기존 3분할(cdash-quad)과 완전히 별도의 신규
-                 전체폭 블록. "새로운 큰 카드 추가 금지"(§11) 요구에 맞춰 cdashMeetingBlock과
-                 같은 .cdash-block(이미 있는 얇은 블록 스타일)을 그대로 재사용하고, 기본
-                 접힘(§4)은 위 cdashReactionsCol("고객 정보")과 동일한 accordion 패턴
-                 (cardState.accordionOpen/sectionEdit)을 그대로 재사용한다 — 새 UI 패턴을
-                 만들지 않는다. -->
+            <div id="cdashFooterBar"></div>
           </div>
         </div>
       </div>
@@ -6821,25 +6906,18 @@ window.SHIN2_CRM_APP_INIT = function(){
     document.body.classList.add('chart-lock');
     renderChartHeader(co);
     renderMgmtNeedBanner(co);
-    renderBasicInfoCol(co);
-    // renderInterestCol(co); — §중복정보 제거 라운드: "POUR 활용현황" 칸을 화면에서
-    // 제거하면서 이 호출도 뺐다. 함수 자체(및 co.interestFields 데이터/D.addInterestField/
-    // removeInterestField)는 전혀 지우지 않았다 — 그릴 DOM 슬롯이 없어졌을 뿐이다.
-    // 진행상황은 고객 상세 화면에서 제거했다. 원본 데이터/렌더 함수는 보존한다.
-    renderPourTrackSection(co);
-    renderReqPreview(co);
-    renderReactionsCol(co);
-    renderInsightBlock(co); // §고객 성향 컬럼 라운드 §3
-    // renderNextActionsCol(co); — §고객카드 레이아웃 재배치 라운드 §5: "다음 행동" 카드를
-    // 화면에서 뺐다(§10 최종 구조에 없음). 함수 자체와 co.nextActions 원본 데이터는 전혀
-    // 지우지 않았다 — 그릴 DOM 슬롯(cdashNextActionsCol)이 없어졌을 뿐이다.
-    // renderSummaryCol(co); — 같은 라운드 §3: "핵심 한 줄 요약" 칸도 화면에서 뺐다(함수/
-    // co.memoSummary 데이터 그대로).
-    // §9: cdashDocStatusBlock(서류 현황)은 이제 하단 3분할 안에 있지만, 렌더 함수는 그대로
-    // renderDocCounts(co) 안에서 renderDocStatusBlock(co, list)를 호출해 채운다(아래에서
-    // 이미 호출됨, 여기서 중복 호출하지 않는다).
-    renderGlanceRow(co);
+    renderInfoStrip(co);
+    renderSummaryRow2(co);
+    renderContactTimelineCard(co);
+    renderInsightTagsCard(co);
+    renderPourResultsCard(co);
+    renderFooterBar(co);
 
+    // 팝오버 안 실제 콘텐츠(고객 정보/고객 인사이트/서류 현황)는 그대로 채워 둔다 — 열려있지
+    // 않으면 화면엔 안 보이지만(.cdash-header-popover-section에 is-open 없으면 display:none),
+    // 새 카드를 클릭했을 때 openHeaderSection이 바로 보여줄 수 있게 항상 최신 상태로 렌더.
+    renderReactionsCol(co);
+    renderInsightBlock(co);
     if(cardState.chartEditing){ renderBasicInfoForm(co); }
     else { renderBasicInfoView(co); }
     renderDocCounts(co);
@@ -6847,11 +6925,6 @@ window.SHIN2_CRM_APP_INIT = function(){
 
     const popoverClose = document.getElementById('cdashHeaderPopoverClose');
     if(popoverClose) popoverClose.addEventListener('click', closeHeaderSection);
-
-    // §하단 탭 제거 라운드: cdash-tab-row(진행상황/POUR 시공실적/요청자료/서류함/업체정보)를
-    // DOM에서 없앴으므로, 그 버튼들에 붙어있던 토글/스크롤/openMemoPanel 리스너 등록 코드도
-    // 함께 제거했다(§ 존재하지 않는 요소에 리스너를 붙이지 않는다). openMemoPanel(co) 자체는
-    // renderReqPreview의 [전체 기록 보기] 버튼에서 여전히 호출된다(§2, 기능 보존).
   }
 
   // §관리필요 업체 라운드 §9: 카드 상단 요약영역의 작은 안내 한 줄. managementNeedCache(목록
@@ -6873,69 +6946,364 @@ window.SHIN2_CRM_APP_INIT = function(){
     wrap.innerHTML = `<div class="cdash-mgmt-need-banner">관리 필요 · ${esc(mgmtNeedBannerText(result))}</div>`;
   }
 
-  // ---- 상단 헤더(§1~5) — 업체명만 크게, "고객관리카드" 문구/개별 복사버튼 삭제. X는 카드
-  // 맨 오른쪽 상단. 액션은 [고객 메모 정리][수정] 두 개만. 연락처 박스는 대표자/전화번호/
-  // 주소/사업자번호 4칸을 한 줄로 — 고객상태/영업단계/등록일/담당자 위젯은 화면에서 제거
-  // 했지만 데이터(customerStatusNote/dealStage)는 그대로 있고 영업단계는 "업체 기본 정보"
-  // 칸에서 계속 확인/수정할 수 있다(§17 데이터 보존, 아래 renderBasicInfoCol 참고). ----
+  // ---- §고객카드 전면 개선 라운드 [1] 상단 헤더 — 남색 헤더 안에 업체명 + 상태 태그
+  // 2개(협약 상태/핵심 고객) + 닫기 버튼만. 두 태그 다 실제 데이터에서만 계산한다:
+  // 1) 협약 상태 = buildGlanceStats(co).stageText — 목록/기존 "한눈에 보기"가 이미 쓰던
+  //    바로 그 문자열("협약 완료"/"질문서 대기" 등, buildProgressStages 기반, §업무관리
+  //    협약체결 판정 누락 라운드 로직 그대로) — 새 판정을 만들지 않았다.
+  // 2) 핵심 고객 = getCompanyGrade(co).raw가 'S' 또는 'A'일 때만 표시(등급 정의(gradeDefs)
+  //    자체가 "상호간의 매출 동반상승"을 뜻해 "핵심 고객" 의미와 실제로 맞는다, §요청
+  //    "샘플 숫자를 하드코딩하지 말고 선택한 업체의 데이터를 사용" — 등급 없는/낮은 업체는
+  //    이 태그 자체를 아예 안 그린다, 가짜 배지 금지). ----
   function renderChartHeader(co){
     const wrap = document.getElementById('chartHeader');
-    const editing = cardState.chartEditing;
-    const contactFields = [
-      ['repName','대표자'], ['phone','전화번호'], ['address','주소'], ['bizRegNo','사업자번호']
-    ];
-    // §상단 고객 인사이트 버튼 라운드 §1/§2 — 업체명 바로 아래 [고객 메모 정리] 버튼을
-    // 빼고(§1, 버튼만 — openMemoParseModal 함수/메모 데이터/customerActivities는 그대로
-    // 전부 남아있다, 아래 하단 어딘가에서 계속 열 수 있음) 같은 자리·같은 CSS 클래스
-    // (chart-memo-btn, 기존 높이/여백 그대로)로 [고객 인사이트] 버튼을 넣는다. 등록
-    // 여부만 아주 단순하게 ✓로 구분한다(§4, buildInsightRepTagsFull은 이미 하단 인사이트
-    // 아코디언 요약에도 쓰는 같은 함수 — 새 판정 로직을 안 만든다).
-    const insightRegistered = buildInsightRepTagsFull(co).shown.length > 0;
+    const stageText = buildGlanceStats(co).stageText; // '협약 완료' | '질문서 대기' 등 | '미확인'
+    const isDone = stageText === '협약 완료';
+    const grade = getCompanyGrade(co);
+    const isCore = !!(grade && (grade.raw === 'S' || grade.raw === 'A'));
     wrap.innerHTML = `
-      <div class="cdash-header">
-        <div class="cdash-header-left">
-          <div class="cdash-header-title">${esc(co.name)}</div>
-          <div class="cdash-header-actions">
-            <button type="button" class="chart-memo-btn" id="chartInsightBtn">고객 인사이트${insightRegistered ? ' ✓' : ''}</button>
-            <button type="button" class="chart-memo-btn" id="chartInfoBtn">고객 정보</button>
-            <button type="button" class="chart-memo-btn" id="chartDocsBtn">서류 현황</button>
-            <button type="button" class="co-text-action${editing ? ' primary' : ''}" id="chartEditBtn">${editing ? '수정 완료' : '수정'}</button>
-          </div>
+      <div class="cdash2-header">
+        <div class="cdash2-header-left">
+          <div class="cdash2-title" title="${esc(co.name)}">${esc(co.name)}</div>
+          <span class="cdash2-tag${isDone ? ' is-done' : ''}">${esc(stageText)}</span>
+          ${isCore ? `<span class="cdash2-tag is-core">핵심 고객</span>` : ''}
         </div>
-        <div class="cdash-header-box">
-          ${contactFields.map(([k,label])=> `
-            <div class="cdash-header-field">
-              <div class="cdash-header-field-label">${esc(label)}</div>
-              <div class="cdash-header-field-value${co[k] ? '' : ' is-muted'}">${esc(co[k] || '미확인')}</div>
-            </div>
-          `).join('')}
-        </div>
-        <button type="button" class="chart-close-btn" id="chartCloseBtn" title="닫기" aria-label="닫기">&times;</button>
+        <button type="button" class="cdash2-header-close" id="chartCloseBtn" title="닫기" aria-label="닫기">&times;</button>
       </div>
     `;
     document.getElementById('chartCloseBtn').addEventListener('click', closeChart);
-    // §3 — 새 인사이트 UI를 만들지 않는다. 기존 하단 고객 인사이트 아코디언(renderInsightBlock,
-    // 저장 로직/데이터 구조 전부 그대로)을 펼침+수정 모드로 전환해 스크롤만 이동시킨다
-    // (§5 "같은 데이터/같은 편집 UI" — 별도 저장소나 별도 편집 폼을 새로 만들면 안 됨).
-    document.getElementById('chartInsightBtn').addEventListener('click', ()=>{
+  }
+
+  // ---- §고객카드 전면 개선 라운드 [2] 기본정보 줄 — 대표자/전화번호/주소 + [고객 정보
+  // 수정] 버튼. 주소는 말줄임 + title(전체 주소 호버) 처리(§요청). 수정 버튼은 새 편집
+  // 폼을 만들지 않고 기존 "고객 정보" 팝오버(renderReactionsCol 안의 #crmBasicInfo,
+  // renderBasicInfoForm/D.updateCompany — 이미 있던 저장 로직)를 편집 모드로 바로 연다. ----
+  function renderInfoStrip(co){
+    const wrap = document.getElementById('cdashInfoStrip');
+    if(!wrap) return;
+    const addr = co.address || '';
+    wrap.innerHTML = `
+      <div class="cdash2-info-strip">
+        <div class="cdash2-info-item">
+          <span class="cdash2-info-label">대표</span>
+          <span class="cdash2-info-value">${esc(co.repName || '미확인')}</span>
+        </div>
+        <div class="cdash2-info-item">
+          <span class="cdash2-info-label">전화번호</span>
+          <span class="cdash2-info-value">${esc(co.phone || '미확인')}</span>
+        </div>
+        <div class="cdash2-info-item is-address" ${addr ? `title="${esc(addr)}"` : ''}>
+          <span class="cdash2-info-label">주소</span>
+          <span class="cdash2-info-value">${esc(addr || '미확인')}</span>
+        </div>
+        <div class="cdash2-info-strip-spacer"></div>
+        <button type="button" class="co-text-action" id="cdashInfoEditBtn">✎ 고객 정보 수정</button>
+      </div>
+    `;
+    document.getElementById('cdashInfoEditBtn').addEventListener('click', ()=>{
+      cardState.accordionOpen.info = true;
+      cardState.chartEditing = true;
+      renderReactionsCol(co);
+      renderBasicInfoForm(co);
+      openHeaderSection('info');
+    });
+  }
+
+  // ---- §고객카드 전면 개선 라운드 [3] 핵심 요약 — 왼쪽 POUR 실적 카드(D.getAllPourRecordsForCompany
+  // 그대로, "몇 건/최근 몇 년"만 조회), 오른쪽 매출 카드(총매출=D.getCompanyTotalRevenueAllYears,
+  // 올해 매출=그 함수가 이미 만들어 둔 byYear 배열에서 현재 연도만 찾아 조회 — 연도별로
+  // 따로 이름 붙은 getCompany2024/2025/2026Revenue를 새로 부르지 않고, 이미 합산해 둔
+  // byYear를 재사용해 연도가 바뀌어도 코드 수정 없이 자동으로 맞는 연도를 찾는다). ----
+  function renderSummaryRow2(co){
+    const wrap = document.getElementById('cdashSummaryRow');
+    if(!wrap) return;
+    const allPour = D.getAllPourRecordsForCompany(co);
+    const pourCount = allPour.length;
+    const latestYear = pourCount ? Math.max(...allPour.map(r=> r.year)) : null;
+
+    const revAll = D.getCompanyTotalRevenueAllYears(co);
+    const currentYear = new Date().getFullYear();
+    let totalRevenueText = '데이터 없음';
+    let yearRevenueText = '데이터 없음';
+    if(revAll && revAll.ambiguous){
+      totalRevenueText = '중복 후보(확인 필요)';
+      yearRevenueText = '중복 후보(확인 필요)';
+    } else if(revAll && typeof revAll.total === 'number'){
+      totalRevenueText = fmtKrwCompact(revAll.total);
+      const yEntry = Array.isArray(revAll.byYear) ? revAll.byYear.find(y=> y.year === currentYear) : null;
+      yearRevenueText = fmtKrwCompact(yEntry ? yEntry.total : 0); // §요청 "매출이 없으면 0원으로" — 실제 집계가 있는 업체는 0도 값이다(데이터 없음과 구분)
+    }
+
+    const monthly = buildMonthlyRevenueForCurrentYear(co);
+    let chartHtml;
+    if(!monthly){
+      chartHtml = `<div class="cdash2-chart-empty">월별 매출 데이터 없음</div>`;
+    } else if(monthly.points.length < 2){
+      chartHtml = `<div class="cdash2-chart-empty">월별 매출 데이터 없음</div>`;
+    } else {
+      chartHtml = buildRevenueSvgChart(monthly.points);
+    }
+
+    wrap.innerHTML = `
+      <div class="cdash2-summary-row">
+        <div class="cdash2-card">
+          <div class="cdash2-card-title">POUR 실적</div>
+          <div class="cdash2-pour-num">${pourCount ? esc(pourCount) + '건' : '실적 없음'}</div>
+          <div class="cdash2-pour-sub">${latestYear ? '최근 ' + esc(latestYear) + '년' : ''}</div>
+        </div>
+        <div class="cdash2-card">
+          <div class="cdash2-card-title">매출 현황</div>
+          <div class="cdash2-revenue-head">
+            <div><div class="cdash2-revenue-stat-label">총 매출</div><div class="cdash2-revenue-stat-value">${esc(totalRevenueText)}</div></div>
+            <div><div class="cdash2-revenue-stat-label">${esc(currentYear)}년 매출</div><div class="cdash2-revenue-stat-value">${esc(yearRevenueText)}</div></div>
+          </div>
+          <div class="cdash2-chart-wrap" id="cdashRevenueChartWrap">${chartHtml}</div>
+        </div>
+      </div>
+    `;
+    if(monthly && monthly.points.length >= 2) wireRevenueChartHover(monthly.points);
+  }
+
+  // §고객카드 전면 개선 라운드 — 연도별 매출 데이터 소스 함수 이름표. 함수를 새로 만들지
+  // 않고 이미 있는 D.getCompany2024/2025/2026Revenue 중 "지금 연도"에 해당하는 것만
+  // 골라 부른다 — 데이터가 아직 없는 미래 연도는 이 표에 없으므로 자동으로 null 처리된다
+  // (아래 buildMonthlyRevenueForCurrentYear가 그 경우 그래프 대신 "데이터 없음"을 보여준다,
+  // §요청 "가짜 그래프 금지").
+  const REVENUE_YEAR_FN_NAMES = { 2024:'getCompany2024Revenue', 2025:'getCompany2025Revenue', 2026:'getCompany2026Revenue' };
+  // rows[].date(YYYY-MM-DD, 실제 거래 원본 필드)를 월 단위로 합산한다 — 아직 지나지 않은
+  // 달은 아예 배열에 넣지 않고(§요청), 지난 달인데 거래가 없으면 0으로 채운다(§요청 "매출
+  // 없는 달은 0원"). date 필드가 없는 행은 월을 알 수 없어 집계에서 제외한다(§ "날짜 기준
+  // 계산" — 있는 값만 쓰고 지어내지 않는다).
+  function buildMonthlyRevenueForCurrentYear(co){
+    const year = new Date().getFullYear();
+    const fnName = REVENUE_YEAR_FN_NAMES[year];
+    if(!fnName || typeof D[fnName] !== 'function') return null;
+    const rev = D[fnName](co);
+    if(!rev) return null; // 이 연도 데이터 자체가 없는 업체 — "계산 불가"
+    const nowMonth = new Date().getMonth() + 1;
+    const sums = new Array(nowMonth).fill(0);
+    (rev.rows || []).forEach(r=>{
+      if(!r || !r.date) return;
+      const m = parseInt(String(r.date).slice(5,7), 10);
+      if(m >= 1 && m <= nowMonth) sums[m-1] += (typeof r.amount === 'number' ? r.amount : 0);
+    });
+    return { year, points: sums.map((total,i)=> ({ month:i+1, total })) };
+  }
+  // 얇은 파란 꺾은선 + 아주 연한 파란 영역 + 옅은 가로 안내선만 있는 최소 SVG 차트(§요청
+  // "무거운 축 테두리/세로 격자선 금지"). Chart.js는 이 프로젝트에 설치돼 있지 않다(정적
+  // 단일 HTML 파일, 라이브러리 로드 없음) — 요청사항 "없으면 가장 가벼운 방식으로"에 따라
+  // 새 라이브러리를 추가하지 않고 인라인 SVG로 직접 그렸다. 매번 innerHTML로 완전히 새로
+  // 그려지므로(다른 라이브러리처럼 별도 인스턴스를 보관하지 않음) 카드를 여러 번 열어도
+  // 중복 인스턴스가 쌓이지 않는다(§10 검증 항목).
+  function buildRevenueSvgChart(points){
+    const W = 560, H = 108, padX = 6, padTop = 12, padBottom = 20;
+    const values = points.map(p=> p.total);
+    const maxV = Math.max.apply(null, values.concat([1]));
+    const n = points.length;
+    const xAt = i=> padX + (n <= 1 ? 0 : (i/(n-1)) * (W - padX*2));
+    const yAt = v=> padTop + (1 - (v/maxV)) * (H - padTop - padBottom);
+    const coords = points.map((p,i)=> [xAt(i), yAt(p.total)]);
+    const linePath = coords.map((c,i)=> (i===0?'M':'L') + c[0].toFixed(1) + ',' + c[1].toFixed(1)).join(' ');
+    const baseY = (H - padBottom).toFixed(1);
+    const areaPath = linePath + ` L${coords[n-1][0].toFixed(1)},${baseY} L${coords[0][0].toFixed(1)},${baseY} Z`;
+    // 주요 변곡점(방향이 바뀌는 지점) + 처음/끝만 원형 포인트로 표시(§요청).
+    const markIdx = new Set([0, n-1]);
+    for(let i=1;i<n-1;i++){
+      const prev = values[i-1], cur = values[i], next = values[i+1];
+      if((cur - prev > 0 && next - cur < 0) || (cur - prev < 0 && next - cur > 0)) markIdx.add(i);
+    }
+    const guideLines = [0.25,0.5,0.75].map(f=>{
+      const y = (padTop + f*(H-padTop-padBottom)).toFixed(1);
+      return `<line x1="${padX}" y1="${y}" x2="${W-padX}" y2="${y}" stroke="#EEF2F7" stroke-width="1"/>`;
+    }).join('');
+    const dots = Array.from(markIdx).sort((a,b)=>a-b).map(i=>
+      `<circle cx="${coords[i][0].toFixed(1)}" cy="${coords[i][1].toFixed(1)}" r="3" fill="#2563EB" stroke="#fff" stroke-width="1.5"/>`
+    ).join('');
+    const hitDots = coords.map((c,i)=>
+      `<circle class="cdash2-chart-hitdot" data-idx="${i}" cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="10" fill="transparent"/>`
+    ).join('');
+    const lastLabel = fmtKrwCompact(values[n-1]);
+    const lastX = coords[n-1][0].toFixed(1);
+    const lastY = Math.max(11, coords[n-1][1]-8).toFixed(1);
+    return `
+      <svg viewBox="0 0 ${W} ${H}" width="100%" height="100%" preserveAspectRatio="none" style="overflow:visible;display:block;">
+        ${guideLines}
+        <path d="${areaPath}" fill="#EAF2FE" stroke="none"/>
+        <path d="${linePath}" fill="none" stroke="#2563EB" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        ${dots}
+        <text x="${lastX}" y="${lastY}" font-size="10" font-weight="700" fill="#1D4ED8" text-anchor="end">${esc(lastLabel)}</text>
+        ${hitDots}
+      </svg>
+      <div class="cdash2-chart-tooltip" id="cdashChartTooltip"></div>
+    `;
+  }
+  function wireRevenueChartHover(points){
+    const wrap = document.getElementById('cdashRevenueChartWrap');
+    const tooltip = document.getElementById('cdashChartTooltip');
+    if(!wrap || !tooltip) return;
+    wrap.querySelectorAll('.cdash2-chart-hitdot').forEach(dot=>{
+      dot.addEventListener('mouseenter', ()=>{
+        const idx = parseInt(dot.getAttribute('data-idx'), 10);
+        const p = points[idx];
+        if(!p) return;
+        tooltip.textContent = p.month + '월 · ' + fmtKrwCompact(p.total);
+        const cx = parseFloat(dot.getAttribute('cx'));
+        const cy = parseFloat(dot.getAttribute('cy'));
+        const scaleX = wrap.clientWidth / 560;
+        tooltip.style.left = (cx * scaleX) + 'px';
+        tooltip.style.top = cy + 'px';
+        tooltip.style.opacity = '1';
+      });
+      dot.addEventListener('mouseleave', ()=>{ tooltip.style.opacity = '0'; });
+    });
+  }
+
+  // ---- §고객카드 전면 개선 라운드 [4] 최근 접촉 기록 — D.activitiesForCompany +
+  // D.memosFor를 합쳐 최신순 3건만 보여준다(§요청, NEXT/다음 행동/후속 일정 등록은 만들지
+  // 않는다). "다음 할 일" 관련 UI는 이 카드에 전혀 없다. ----
+  function fmtMonthDayShort(x){
+    const d = new Date(x); if(isNaN(d)) return '';
+    const p = n=> String(n).padStart(2,'0');
+    return p(d.getMonth()+1) + '.' + p(d.getDate());
+  }
+  function renderContactTimelineCard(co){
+    const wrap = document.getElementById('cdashTimelineCard');
+    if(!wrap) return;
+    const acts = D.activitiesForCompany(co.id).map(a=> ({ text: (a.activityText || a.originalText || '').trim(), raw: a.createdAt }));
+    const memos = D.memosFor(co.id).map(m=> ({ text: (m.text || '').trim(), raw: m.updatedAt || m.createdAt }));
+    const items = acts.concat(memos)
+      .filter(x=> x.text && x.raw != null && !isNaN(new Date(x.raw).getTime()))
+      .sort((a,b)=> new Date(b.raw).getTime() - new Date(a.raw).getTime())
+      .slice(0, 3);
+    wrap.innerHTML = `
+      <div class="cdash2-card">
+        <div class="cdash2-card-title">최근 접촉 기록</div>
+        ${items.length ? `
+          <div class="cdash2-timeline">
+            ${items.map(it=> `
+              <div class="cdash2-timeline-item">
+                <span class="cdash2-timeline-dot"></span>
+                <div class="cdash2-timeline-row">
+                  <span class="cdash2-timeline-date">${esc(fmtMonthDayShort(it.raw))}</span>
+                  <span class="cdash2-timeline-text" title="${esc(it.text)}">${esc(it.text)}</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        ` : `<div class="chart-empty">최근 접촉 기록 없음</div>`}
+      </div>
+    `;
+  }
+
+  // ---- §고객카드 전면 개선 라운드 [5] 고객 인사이트 — buildInsightRepTagsFull(co)(이미
+  // 있던 함수, 상단 헤더 ✓ 표시/하단 아코디언 요약에도 쓰던 바로 그 함수)의 대표 태그를
+  // 그대로 짧은 칩으로만 보여준다. 카드를 클릭하면 기존 "고객 인사이트" 편집 화면
+  // (renderInsightBlock, #cdashHeaderPopover)이 그대로 열린다 — 새 편집 UI를 안 만든다. ----
+  function renderInsightTagsCard(co){
+    const wrap = document.getElementById('cdashInsightTagsCard');
+    if(!wrap) return;
+    const rep = buildInsightRepTagsFull(co);
+    wrap.innerHTML = `
+      <div class="cdash2-card is-clickable" id="cdashInsightTagsCardBtn" role="button" tabindex="0">
+        <div class="cdash2-card-title">고객 인사이트</div>
+        ${rep.shown.length ? `<div class="cdash2-insight-tags">${rep.shown.map(t=> `<span class="cdash2-insight-tag">${esc(t)}</span>`).join('')}</div>` : `<div class="chart-empty">등록된 인사이트 없음</div>`}
+      </div>
+    `;
+    const openInsight = ()=>{
       cardState.accordionOpen.insight = true;
       cardState.sectionEdit.insight = true;
       refreshChart();
       requestAnimationFrame(()=> openHeaderSection('insight'));
-    });
-    document.getElementById('chartInfoBtn').addEventListener('click', ()=>{
-      cardState.accordionOpen.info = true;
-      renderReactionsCol(co);
-      openHeaderSection('info');
-    });
-    document.getElementById('chartDocsBtn').addEventListener('click', ()=>{
+    };
+    const btn = document.getElementById('cdashInsightTagsCardBtn');
+    btn.addEventListener('click', openInsight);
+    btn.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' ') openInsight(); });
+  }
+
+  // ---- §고객카드 전면 개선 라운드 [6] 최근 POUR 시공실적 — getTotalPourRecordsForCompany
+  // (이미 있는 로컬 함수, 연도 desc/sourceRow desc 정렬까지 끝난 배열)를 그대로 조회만
+  // 해서 최신 4건만 표에 보여준다. "전체 N건 보기"는 새 화면을 만들지 않고 기존
+  // openConstructionModal(co, null)(목록 화면에서 쓰던 그 모달, .pi-overlay 패턴이라
+  // 이미 열려 있는 고객카드 위에 그대로 쌓인다)을 그대로 연다. ----
+  function renderPourResultsCard(co){
+    const wrap = document.getElementById('cdashPourResultsCard');
+    if(!wrap) return;
+    const all = getTotalPourRecordsForCompany(co); // 이미 연도desc/sourceRow desc 정렬됨
+    const total = all.length;
+    const thisYear = new Date().getFullYear();
+    const thisYearCount = all.filter(r=> r.year === thisYear).length;
+    const recent4 = all.slice(0, 4);
+    wrap.innerHTML = `
+      <div class="cdash2-card">
+        <div class="cdash2-pour-card-head">
+          <div class="cdash2-card-title" style="margin-bottom:0;">최근 POUR 시공실적</div>
+          <div class="cdash2-pour-card-counts">전체 ${esc(total)}건 · ${esc(thisYear)}년 ${esc(thisYearCount)}건</div>
+        </div>
+        ${total ? `
+          <div class="cdash2-table-scroll">
+            <table class="cdash-pour-table">
+              <thead><tr><th>연도</th><th>공종</th><th>지역·현장</th><th>세대수</th></tr></thead>
+              <tbody>
+                ${recent4.map(r=>{
+                  const loc = fmtLocation(r.region, r.city, r.client);
+                  return `<tr>
+                    <td>${esc(r.year)}</td>
+                    <td>${esc(fmtCategoryDisplay(r.category))}</td>
+                    <td title="${esc(loc)}">${esc(loc)}</td>
+                    <td>${esc(fmtHouseholds(r.households))}</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+          <button type="button" class="co-text-action cdash2-view-all-btn" id="cdashPourViewAllBtn">전체 실적 ${esc(total)}건 보기 &gt;</button>
+        ` : `<div class="chart-empty">등록된 시공실적이 없습니다</div>`}
+      </div>
+    `;
+    const viewAllBtn = document.getElementById('cdashPourViewAllBtn');
+    if(viewAllBtn) viewAllBtn.addEventListener('click', ()=> openConstructionModal(co, null));
+  }
+
+  // ---- §고객카드 전면 개선 라운드 [7] 하단 고정 영역 — 서류 현황(협약서=mouAgreement,
+  // 질문서=questionnaire 완료 여부, buildDocStatusList(co) 그대로 재사용) + [메모 추가]
+  // (openMemoPanel을 "새 메모 작성" 상태로 바로 열기 — 기존 memoPanelState.drafting
+  // 필드를 그대로 씀, 새 저장 로직 없음) + [자료 발송](openPhoneRequestModal(co.name) —
+  // 기존 전화 요청 기록 모달을 업체명 프리필로 재사용, §요청 "기능이 없으면 오류 없이
+  // UI만"에 따라 새 발송 기능을 만들지 않고 가장 가까운 기존 기능에 연결). ----
+  function renderFooterBar(co){
+    const wrap = document.getElementById('cdashFooterBar');
+    if(!wrap) return;
+    const docList = buildDocStatusList(co);
+    const mou = docList.find(d=> d.type === 'mouAgreement');
+    const q = docList.find(d=> d.type === 'questionnaire');
+    const docChip = (label, item)=>{
+      const done = !!(item && item.count > 0);
+      return `<span class="cdash2-doc-item${done ? ' is-done' : ' is-pending'}"><span class="dot"></span>${esc(label)} ${done ? '완료' : '미완료'}</span>`;
+    };
+    wrap.innerHTML = `
+      <div class="cdash2-footer">
+        <button type="button" class="cdash2-footer-left" id="cdashFooterDocsBtn" style="background:none;border:none;padding:0;cursor:pointer;">
+          <span class="cdash2-doc-title">서류 현황</span>
+          ${docChip('협약서', mou)}
+          ${docChip('질문서', q)}
+        </button>
+        <div class="cdash2-footer-right">
+          <button type="button" class="co-text-action" id="cdashFooterMemoBtn">메모 추가</button>
+          <button type="button" class="co-text-action primary" id="cdashFooterSendBtn">자료 발송</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('cdashFooterDocsBtn').addEventListener('click', ()=>{
       cardState.accordionOpen.docs = true;
       renderDocCounts(co);
       openHeaderSection('docs');
     });
-    document.getElementById('chartEditBtn').addEventListener('click', ()=>{
-      cardState.chartEditing = !cardState.chartEditing;
-      refreshChart();
+    document.getElementById('cdashFooterMemoBtn').addEventListener('click', ()=>{
+      memoPanelState = { editingId: null, drafting: true, deleteConfirmId: null };
+      renderMemoPanel(co);
+    });
+    document.getElementById('cdashFooterSendBtn').addEventListener('click', ()=>{
+      openPhoneRequestModal(co.name);
     });
   }
 
@@ -14546,9 +14914,14 @@ window.SHIN2_CRM_APP_INIT = function(){
      ========================================================================== */
   const PHONE_REQ_TYPES = ['자료 요청','견적 문의','기술 문의','미팅 요청','기타'];
   let phoneReqState = null;
-  function openPhoneRequestModal(){
+  // §고객카드 전면 개선 라운드 — prefillName(선택 인자) 추가. openAddCompanyForm(prefillName)과
+  // 같은 패턴(§ 이 파일에 이미 있는 관례) — 기존 호출부(전부 인자 없이 호출)는 동작 그대로,
+  // 고객카드 하단 [자료 발송] 버튼만 지금 열려있는 업체명을 미리 채워서 연다(§7 "기존 기능이
+  // 있다면 그대로 연결" — 새 발송 기능을 만들지 않고 이미 있는 전화 요청 기록 흐름을 그대로
+  // 재사용, 타이핑만 줄여준다).
+  function openPhoneRequestModal(prefillName){
     phoneReqState = {
-      companyName: '', requestType: PHONE_REQ_TYPES[0], requestContent: '', callMemo: '', error: '',
+      companyName: prefillName || '', requestType: PHONE_REQ_TYPES[0], requestContent: '', callMemo: '', error: '',
       duplicateCandidates: null // §업체명 정규화 매칭 라운드(신규): 정규화 이름이 같은 업체가 2개 이상이면 여기 채워지고, 하나 고를 때까지 저장을 미룬다.
     };
     renderPhoneRequestModal();
