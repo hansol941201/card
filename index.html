@@ -2284,6 +2284,11 @@ body.map-modal-lock{ overflow:hidden; }
 .map-apt-summary{ flex:none; padding:8px 22px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:var(--text-muted); }
 .map-apt-summary b{ color:var(--navy); font-weight:700; }
 .map-apt-summary .is-warn{ color:#B45309; }
+/* §버그 수정(사용자 재현): "실적 상세보기" 클릭 시 뜨는 .pi-overlay(기본 z-index:300)가
+   지도 분포 모달(.map-modal-overlay, z-index:350)보다 낮아 지도 뒤에 깔려 보였다 —
+   다른 .pi-overlay 사용처(고객카드 등, z-index:300으로 이미 정상 동작)에는 영향 없게
+   이 모달 전용 root 안에서만 더 높은 값으로 덮어쓴다. */
+#aptHistoryModalRoot .pi-overlay{ z-index:400; }
 /* 지도 옆 아파트 목록(§11) — 기존 .map-company-row와 같은 톤으로 행 구성만 다르게. */
 .map-apt-row{ padding:7px 0; font-size:12px; color:var(--text); cursor:pointer; border-bottom:1px solid var(--line); }
 .map-apt-row:last-child{ border-bottom:none; }
@@ -15302,7 +15307,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 항상 "전체" 상태로 새로 시작하고, 닫혀있던 동안 바뀐 최신 companies로 다시
     // 그려진다(§동기화 규칙 "닫혀 있어도 다음에 열 때 최신 데이터 사용").
     mapFilterState = { search:'', filterKey:'all', category:'all', pourRange:'all', viewMode:'cluster', listView:'inBounds' };
-    aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all' };
+    aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all', nearCenter:null, nearRadiusKm:5 };
     mapActiveTab = 'company'; // §요청 "기본 선택은 시공사" — 매번 열 때 항상 기본 탭으로 시작
     if(mapCanvasState && typeof mapCanvasState.destroy === 'function'){
       try{ mapCanvasState.destroy(); } catch(err){ /* 지도 정리 실패는 무시 — 다음 열기에서 새로 만들어짐 */ }
@@ -15317,6 +15322,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     aptCanvasState = null;
     updateAptMarkers = null;
     focusAptItem = null;
+    focusAptNearCenter = null;
   }
 
   function openMapDistributionModal(){
@@ -15368,7 +15374,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(mapCanvasState && typeof mapCanvasState.destroy === 'function'){ try{ mapCanvasState.destroy(); }catch(err){ /* 무시 */ } }
       mapCanvasState = null; updateMapMarkers = null; focusMapRegion = null; focusMapCompany = null;
       if(aptCanvasState && typeof aptCanvasState.destroy === 'function'){ try{ aptCanvasState.destroy(); }catch(err){ /* 무시 */ } }
-      aptCanvasState = null; updateAptMarkers = null; focusAptItem = null;
+      aptCanvasState = null; updateAptMarkers = null; focusAptItem = null; focusAptNearCenter = null;
       renderMapModalBody();
     }));
     renderMapModalBody();
@@ -15637,7 +15643,11 @@ window.SHIN2_CRM_APP_INIT = function(){
 
   // §10 검색/필터 상태 — 지도 팝업이 열려있는 동안에만 유지(§지도분포2와 같은 원칙),
   // 닫으면 초기화(closeMapDistributionModal에서 리셋).
-  let aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all' };
+  // §근처 아파트 검색 라운드(신규) — 사용자 요청: "검색창에 주소치면 그 근처 시공한
+  // 아파트도 뜨는 기능". nearCenter가 세팅되면 검색창의 일반 이름 검색(substring)
+  // 대신 좌표 반경 검색으로 바뀐다(둘 다 같은 칸을 쓰지만 의미가 다르다 — "이름 검색"과
+  // "주소 근처 검색"을 동시에 만족시킬 수 없어 nearCenter 유무로 분기).
+  let aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all', nearCenter:null, nearRadiusKm:5 };
   function aptEntryMatchesSearch(e, q){
     if(!q) return true;
     const norm = q.trim().toLowerCase();
@@ -15662,8 +15672,25 @@ window.SHIN2_CRM_APP_INIT = function(){
     }
     return true;
   }
+  // 두 좌표 사이의 실제 거리(km, 하버사인 공식) — 근처 검색 정렬/반경 판정에만 쓴다.
+  function haversineKm(lat1, lng1, lat2, lng2){
+    const R = 6371;
+    const dLat = (lat2-lat1) * Math.PI/180;
+    const dLng = (lng2-lng1) * Math.PI/180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
   function applyAptFilters(entries){
-    return entries.filter(e=> aptEntryMatchesSearch(e, aptFilterState.search) && aptEntryMatchesFilter(e, aptFilterState));
+    const base = entries.filter(e=> aptEntryMatchesFilter(e, aptFilterState));
+    if(aptFilterState.nearCenter){
+      const c = aptFilterState.nearCenter;
+      return base
+        .filter(e=> e.hasCoords)
+        .map(e=> Object.assign({}, e, { distanceKm: haversineKm(c.lat, c.lng, e.lat, e.lng) }))
+        .filter(e=> e.distanceKm <= aptFilterState.nearRadiusKm)
+        .sort((a,b)=> a.distanceKm - b.distanceKm); // 가까운 순
+    }
+    return base.filter(e=> aptEntryMatchesSearch(e, aptFilterState.search));
   }
   function buildAptFilterOptions(entries){
     const years = Array.from(new Set(entries.flatMap(e=> e.years))).sort((a,b)=> b-a);
@@ -15690,6 +15717,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   let aptCanvasState = null;
   let updateAptMarkers = null;
   let focusAptItem = null;
+  let focusAptNearCenter = null; // §근처 아파트 검색 라운드: 주소 검색 성공 시 그 지점으로 지도를 이동+반경 표시
 
   function renderMapModalMain(kakao){
     const wrap = document.getElementById('mapModalBody');
@@ -16557,6 +16585,28 @@ window.SHIN2_CRM_APP_INIT = function(){
     }
     kakao.maps.event.addListener(map, 'idle', refreshVisible);
 
+    // §근처 아파트 검색 라운드 — 검색 지점을 반경 원(옅은 파란 점선)으로 지도에 표시하고
+    // 그 지점으로 이동/확대한다. 새 판정 로직 없음 — applyAptFilters가 이미 계산한
+    // aptFilterState.nearRadiusKm을 그대로 반지름으로 쓴다.
+    let nearCenterOverlay = null;
+    function clearNearCenterOverlay(){
+      if(nearCenterOverlay){ try{ nearCenterOverlay.setMap(null); }catch(err){ /* 무시 */ } nearCenterOverlay = null; }
+    }
+    function showNearCenter(center){
+      clearNearCenterOverlay();
+      const latlng = new kakao.maps.LatLng(center.lat, center.lng);
+      if(kakao.maps.Circle){
+        nearCenterOverlay = new kakao.maps.Circle({
+          center: latlng, radius: aptFilterState.nearRadiusKm * 1000,
+          strokeWeight: 1.5, strokeColor: '#2563EB', strokeOpacity: 0.55, strokeStyle: 'shortdash',
+          fillColor: '#2563EB', fillOpacity: 0.06
+        });
+        nearCenterOverlay.setMap(map);
+      }
+      map.setCenter(latlng);
+      if(typeof map.setLevel === 'function') map.setLevel(7);
+    }
+
     aptCanvasState = {
       map, clusterer,
       // §시공사 탭에서 발견된 버그(초기 idle 리스너가 인스턴스 destroy 이후에도 남아있던
@@ -16564,11 +16614,12 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 이중화, 새 문제 발견은 아님.
       destroy(){
         try{ kakao.maps.event.removeListener(map, 'idle', refreshVisible); } catch(err){ /* 무시 */ }
-        try{ clusterer.clear(); clearClusterOverlays(); infoWindow.close(); }catch(err){ /* 무시 — 팝업 자체가 사라지므로 잔여 정리는 최선 노력만 */ }
+        try{ clusterer.clear(); clearClusterOverlays(); clearNearCenterOverlay(); infoWindow.close(); }catch(err){ /* 무시 — 팝업 자체가 사라지므로 잔여 정리는 최선 노력만 */ }
       }
     };
 
     updateAptMarkers = function(entries){ renderLayer(applyAptFilters(entries)); };
+    focusAptNearCenter = showNearCenter;
     focusAptItem = function(key){
       const entry = currentEntries.find(e=> e.key === key);
       if(!entry || !entry.hasCoords) return;
@@ -16622,23 +16673,30 @@ window.SHIN2_CRM_APP_INIT = function(){
     const emptyMsg = allEntries.length === 0 ? '등록된 POUR 시공 아파트가 없습니다.' : '조건에 맞는 시공 아파트가 없습니다.'; // §12
     if(summaryRow){
       const summary = computeAptSummary(filtered);
-      summaryRow.innerHTML = filtered.length ? `
+      const nearNote = aptFilterState.nearStatusText ? `<span class="is-warn">${esc(aptFilterState.nearStatusText)}</span>` : '';
+      summaryRow.innerHTML = (filtered.length ? `
         <span>시공 아파트 <b>${esc(summary.count.toLocaleString('ko-KR'))}곳</b></span>
         <span>총 <b>${esc(summary.totalHouseholds.toLocaleString('ko-KR'))}세대</b></span>
         <span>전국 <b>${esc(summary.regionCount.toLocaleString('ko-KR'))}개 지역</b></span>
         ${summary.missingHouseholdsCount ? `<span class="is-warn">세대수 미등록 ${esc(summary.missingHouseholdsCount)}곳(세대수 집계 제외)</span>` : ''}
-      ` : `<span>${esc(emptyMsg)}</span>`;
+      ` : `<span>${esc(emptyMsg)}</span>`) + nearNote;
     }
     if(!infoCol) return;
     const unlocated = filtered.filter(e=> !e.hasCoords && e.geocodeStatus === 'failed');
     const pending = filtered.filter(e=> e.geocodeStatus === 'pending');
+    // §근처 아파트 검색 라운드: nearCenter가 활성화돼 있으면 목록 제목과 각 행에
+    // 가까운 순서·거리(km)를 함께 보여준다(applyAptFilters가 이미 가까운 순으로
+    // 정렬해 둔 상태라 목록도 자동으로 그 순서를 따른다).
+    const listTitle = aptFilterState.nearCenter
+      ? `근처 시공 아파트${filtered.length > 300 ? '(상위 300곳)' : ''}`
+      : `시공 아파트 목록${filtered.length > 300 ? '(상위 300곳 — 검색·필터로 좁혀보세요)' : ''}`;
     infoCol.innerHTML = `
       <div>
-        <div class="map-info-block-title">시공 아파트 목록${filtered.length > 300 ? '(상위 300곳 — 검색·필터로 좁혀보세요)' : ''}</div>
+        <div class="map-info-block-title">${esc(listTitle)}</div>
         ${filtered.length ? filtered.slice(0, 300).map(e=> `
           <div class="map-apt-row" data-apt-key="${esc(e.key)}">
-            <div class="map-apt-row-name"><span>${esc(e.name)}</span><span class="map-apt-row-hh">${esc(fmtAptHouseholds(e.households))}</span></div>
-            <div class="map-apt-row-sub">${esc([e.region, e.city].filter(Boolean).join(' ') || '지역 미확인')} · ${esc(e.years.length ? e.years[0] + '년' : '연도 미상')} · ${esc(e.categories[0] || '—')} · ${esc(e.companies.length === 1 ? e.companies[0].name : (e.companies.length ? e.companies.length + '개 시공사' : '시공사 미연결'))}</div>
+            <div class="map-apt-row-name"><span>${esc(e.name)}</span><span class="map-apt-row-hh">${typeof e.distanceKm === 'number' ? esc(e.distanceKm.toFixed(1)) + 'km' : esc(fmtAptHouseholds(e.households))}</span></div>
+            <div class="map-apt-row-sub">${esc([e.region, e.city].filter(Boolean).join(' ') || '지역 미확인')} · ${esc(e.years.length ? e.years[0] + '년' : '연도 미상')} · ${esc(e.categories[0] || '—')} · ${esc(e.companies.length === 1 ? e.companies[0].name : (e.companies.length ? e.companies.length + '개 시공사' : '시공사 미연결'))}${typeof e.distanceKm === 'number' ? ' · ' + esc(fmtAptHouseholds(e.households)) : ''}</div>
           </div>
         `).join('') : `<div class="map-modal-empty" style="padding:8px 0;">${esc(emptyMsg)}</div>`}
       </div>
@@ -16674,7 +16732,14 @@ window.SHIN2_CRM_APP_INIT = function(){
     const opts = buildAptFilterOptions(allEntries);
     wrap.innerHTML = `
       <div class="map-modal-filters">
-        <input type="text" class="map-modal-search" id="aptFilterSearch" placeholder="아파트명 · 지역 · 시공사 검색" value="${esc(aptFilterState.search)}" />
+        <input type="text" class="map-modal-search" id="aptFilterSearch" placeholder="아파트명 · 지역 · 시공사 검색, 또는 주소 입력 후 Enter" value="${esc(aptFilterState.search)}" />
+        <select class="map-modal-select" id="aptNearRadius" title="근처 검색 반경">
+          <option value="1"${aptFilterState.nearRadiusKm===1?' selected':''}>1km 이내</option>
+          <option value="3"${aptFilterState.nearRadiusKm===3?' selected':''}>3km 이내</option>
+          <option value="5"${aptFilterState.nearRadiusKm===5?' selected':''}>5km 이내</option>
+          <option value="10"${aptFilterState.nearRadiusKm===10?' selected':''}>10km 이내</option>
+        </select>
+        <button type="button" class="map-modal-retry-btn" id="aptNearSearchBtn" title="검색창에 입력한 주소 근처 시공 아파트 찾기">주소로 찾기</button>
         <select class="map-modal-select" id="aptFilterYear">
           <option value="all">연도 전체</option>
           ${opts.years.map(y=> `<option value="${esc(y)}"${String(aptFilterState.year)===String(y)?' selected':''}>${esc(y)}년</option>`).join('')}
@@ -16703,18 +16768,36 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="map-modal-infocol" id="mapModalInfoCol"></div>
       </div>
     `;
-    document.getElementById('aptFilterSearch').addEventListener('input', (e)=>{ aptFilterState.search = e.target.value; refreshAptInfoAndMarkers(); });
+    // §근처 아파트 검색 라운드: 검색창은 매 타이핑마다 즉시 반영되는 "이름 검색"과, 입력을
+    // 마치고 Enter(또는 [주소로 찾기])를 눌러야 실행되는 "주소 근처 검색" 두 가지 역할을
+    // 겸한다 — 지오코딩은 API 호출이라 매 키 입력마다 부르면 안 되므로(§8 요청 폭주 방지
+    // 원칙과 동일) 명시적 트리거가 필요하다. 검색창을 비우면 근처 검색도 함께 해제한다.
+    document.getElementById('aptFilterSearch').addEventListener('input', (e)=>{
+      aptFilterState.search = e.target.value;
+      if(!e.target.value.trim() && aptFilterState.nearCenter){ aptFilterState.nearCenter = null; setAptNearStatus(''); }
+      refreshAptInfoAndMarkers();
+    });
+    document.getElementById('aptFilterSearch').addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter'){ e.preventDefault(); runAptNearSearch(kakao); }
+    });
+    document.getElementById('aptNearSearchBtn').addEventListener('click', ()=> runAptNearSearch(kakao));
+    document.getElementById('aptNearRadius').addEventListener('change', (e)=>{
+      aptFilterState.nearRadiusKm = parseInt(e.target.value, 10) || 5;
+      if(aptFilterState.nearCenter) refreshAptInfoAndMarkers(); // 이미 근처 검색 중이면 반경만 바꿔서 즉시 재적용
+    });
     document.getElementById('aptFilterYear').addEventListener('change', (e)=>{ aptFilterState.year = e.target.value; refreshAptInfoAndMarkers(); });
     document.getElementById('aptFilterCategory').addEventListener('change', (e)=>{ aptFilterState.category = e.target.value; refreshAptInfoAndMarkers(); });
     document.getElementById('aptFilterRegion').addEventListener('change', (e)=>{ aptFilterState.region = e.target.value; refreshAptInfoAndMarkers(); });
     document.getElementById('aptFilterHouseholds').addEventListener('change', (e)=>{ aptFilterState.households = e.target.value; refreshAptInfoAndMarkers(); });
     document.getElementById('aptFilterResetBtn').addEventListener('click', ()=>{
-      aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all' };
+      aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all', nearCenter:null, nearRadiusKm:5 };
       document.getElementById('aptFilterSearch').value = '';
       document.getElementById('aptFilterYear').value = 'all';
       document.getElementById('aptFilterCategory').value = 'all';
       document.getElementById('aptFilterRegion').value = 'all';
       document.getElementById('aptFilterHouseholds').value = 'all';
+      document.getElementById('aptNearRadius').value = '5';
+      setAptNearStatus('');
       refreshAptInfoAndMarkers();
     });
     try{
@@ -16725,6 +16808,50 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(canvas) canvas.innerHTML = '<div class="map-modal-error">지도를 표시하지 못했습니다.</div>';
     }
     renderAptInfoPanel(allEntries);
+  }
+  // 검색창 아래 요약 줄 왼쪽에 근처 검색 상태 문구를 붙였다 뗐다 한다(별도 DOM 없이
+  // aptSummaryRow의 첫 줄로 합쳐 보여준다 — renderAptInfoPanel이 다시 그릴 때마다
+  // aptFilterState.nearStatusText를 함께 반영).
+  function setAptNearStatus(text){ aptFilterState.nearStatusText = text || ''; }
+  // 주소/장소명 → 좌표. Geocoder(도로명·지번 주소)를 먼저 시도하고 실패하면
+  // Places.keywordSearch(장소명)로 한 번 더 시도한다 — §8과 동일한 기존 SDK 기능만 사용.
+  function geocodeAddressOrPlace(query, kakao){
+    return new Promise((resolve)=>{
+      if(!kakao.maps.services){ resolve(null); return; }
+      const finishWithPlaces = ()=>{
+        if(typeof kakao.maps.services.Places !== 'function'){ resolve(null); return; }
+        try{
+          new kakao.maps.services.Places().keywordSearch(query, (result, status)=>{
+            if(status === kakao.maps.services.Status.OK && result && result[0]){
+              resolve({ lat: parseFloat(result[0].y), lng: parseFloat(result[0].x), label: result[0].place_name || query });
+            } else resolve(null);
+          });
+        } catch(err){ resolve(null); }
+      };
+      if(typeof kakao.maps.services.Geocoder !== 'function'){ finishWithPlaces(); return; }
+      try{
+        new kakao.maps.services.Geocoder().addressSearch(query, (result, status)=>{
+          if(status === kakao.maps.services.Status.OK && result && result[0]){
+            resolve({ lat: parseFloat(result[0].y), lng: parseFloat(result[0].x), label: result[0].address_name || query });
+          } else finishWithPlaces();
+        });
+      } catch(err){ finishWithPlaces(); }
+    });
+  }
+  async function runAptNearSearch(kakao){
+    const q = (aptFilterState.search || '').trim();
+    if(!q){ aptFilterState.nearCenter = null; setAptNearStatus(''); refreshAptInfoAndMarkers(); return; }
+    setAptNearStatus('주소 확인 중…');
+    renderAptInfoPanel(buildPourApartmentEntries());
+    let coords = null;
+    try{ coords = await geocodeAddressOrPlace(q, kakao); }
+    catch(err){ console.warn('근처 아파트 검색 실패:', err); }
+    if(!mapModalOpen || mapActiveTab !== 'apartment') return; // 검색 도중 팝업이 닫히거나 탭이 바뀌었으면 결과 무시
+    if(!coords){ setAptNearStatus(`"${q}" 위치를 찾을 수 없습니다.`); refreshAptInfoAndMarkers(); return; }
+    aptFilterState.nearCenter = coords;
+    setAptNearStatus(`"${coords.label}" 근처 ${aptFilterState.nearRadiusKm}km 이내`);
+    refreshAptInfoAndMarkers();
+    if(typeof focusAptNearCenter === 'function') focusAptNearCenter(coords);
   }
 
   // §지도분포4 동기화 훅: Firebase 실시간 구독(다른 <script> 블록)이 companies를
