@@ -1854,9 +1854,13 @@
   .cdash2-revenue-head{ display:flex; align-items:baseline; gap:22px; flex-wrap:wrap; margin-bottom:8px; }
   .cdash2-revenue-stat-label{ font-size:11.5px; color:var(--text-muted); font-weight:600; margin-bottom:2px; }
   .cdash2-revenue-stat-value{ font-size:19px; font-weight:800; color:var(--navy); }
-  .cdash2-chart-wrap{ position:relative; height:108px; }
+  /* §매출 현황 그래프 라벨 개선 라운드: 모든 월별 포인트 위에 금액 라벨 + 아래에 월 표시가
+     들어가야 해서(§요청) 기존 108px보다 높였다 — buildRevenueSvgChart의 viewBox H(170)와
+     반드시 같은 값이어야 한다(SVG width/height:100%가 이 wrap 박스 크기에 맞춰 늘어나므로,
+     둘이 다르면 좌표 스케일이 어긋난다). */
+  .cdash2-chart-wrap{ position:relative; height:170px; }
   .cdash2-chart-tooltip{ position:absolute; pointer-events:none; background:var(--navy); color:#fff; font-size:11px; font-weight:600; padding:4px 8px; border-radius:5px; transform:translate(-50%,-100%); white-space:nowrap; opacity:0; transition:opacity .1s; z-index:5; }
-  .cdash2-chart-empty{ height:108px; display:flex; align-items:center; justify-content:center; color:var(--text-faint); font-size:12px; }
+  .cdash2-chart-empty{ height:170px; display:flex; align-items:center; justify-content:center; color:var(--text-faint); font-size:12px; }
 
   .cdash2-body-grid{ display:grid; grid-template-columns:minmax(220px,34%) 1fr; gap:10px; margin-bottom:10px; align-items:start; }
   .cdash2-col-stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
@@ -7136,49 +7140,91 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
     return { year, points: sums.map((total,i)=> ({ month:i+1, total })) };
   }
-  // 얇은 파란 꺾은선 + 아주 연한 파란 영역 + 옅은 가로 안내선만 있는 최소 SVG 차트(§요청
-  // "무거운 축 테두리/세로 격자선 금지"). Chart.js는 이 프로젝트에 설치돼 있지 않다(정적
-  // 단일 HTML 파일, 라이브러리 로드 없음) — 요청사항 "없으면 가장 가벼운 방식으로"에 따라
-  // 새 라이브러리를 추가하지 않고 인라인 SVG로 직접 그렸다. 매번 innerHTML로 완전히 새로
-  // 그려지므로(다른 라이브러리처럼 별도 인스턴스를 보관하지 않음) 카드를 여러 번 열어도
-  // 중복 인스턴스가 쌓이지 않는다(§10 검증 항목).
+  // §매출 현황 그래프 라벨 개선 라운드 — 사용자 요청: "그래프의 모든 월별 데이터 포인트
+  // 위에 해당 월의 매출금액을 항상 표시해줘"(기존엔 마지막 지점 라벨만 있었음). 얇은 파란
+  // 꺾은선 + 아주 연한 파란 영역 + 옅은 가로 안내선(§요청 "무거운 축 테두리/세로 격자선
+  // 금지") 뼈대는 그대로 두고, 포인트마다 금액 라벨 + 아래 월 라벨을 추가했다. Chart.js는
+  // 이 프로젝트에 설치돼 있지 않다(정적 단일 HTML, 라이브러리 로드 없음, package.json 없음
+  // — 실제로 확인함) — §요청 "없으면 가장 가벼운 방식으로"에 따라 새 CDN을 추가하지 않고
+  // 기존과 동일하게 인라인 SVG로 직접 그린다. 매번 innerHTML로 완전히 새로 그려지므로(별도
+  // 인스턴스를 보관하지 않음) 카드를 여러 번 열어도 중복 인스턴스가 쌓이지 않는다(§10 검증).
+  //
+  // 라벨 겹침 방지(§요청 "가까운 지점의 라벨은 위아래 위치를 번갈아 조정"): 포인트마다
+  // 위쪽으로 가까운 거리(NEAR, 8~12px 범위)/먼 거리(FAR)를 인덱스 짝/홀로 번갈아 적용해
+  // 인접한 라벨이 같은 높이에서 겹치지 않게 한다. 라벨 상자는 글자 수 기반 추정 너비로
+  // 카드 좌우 끝을 벗어나지 않게 클램프한다(§요청 "카드 밖으로 넘어가지 않게"). 월 라벨은
+  // 데이터 포인트와 x좌표가 정확히 같고(§요청 "월과 데이터 포인트의 위치가 정확히 맞아야
+  // 함" — 좌표 자체는 절대 옮기지 않음), 첫/마지막만 text-anchor를 start/end로 바꿔서
+  // 잘리지 않게 한다(앵커만 바뀔 뿐 좌표는 그대로라 정렬이 어긋나지 않는다).
   function buildRevenueSvgChart(points){
-    const W = 560, H = 108, padX = 6, padTop = 12, padBottom = 20;
+    const W = 560, H = 170, padX = 28, padTop = 44, padBottom = 32;
+    const axisY = H - padBottom;
+    const plotH = axisY - padTop;
     const values = points.map(p=> p.total);
     const maxV = Math.max.apply(null, values.concat([1]));
+    const maxRaw = Math.max.apply(null, values);
+    const maxIdx = maxRaw > 0 ? values.indexOf(maxRaw) : -1; // 전부 0원이면 강조할 "최고"가 의미 없어 강조 안 함
     const n = points.length;
     const xAt = i=> padX + (n <= 1 ? 0 : (i/(n-1)) * (W - padX*2));
-    const yAt = v=> padTop + (1 - (v/maxV)) * (H - padTop - padBottom);
+    const yAt = v=> axisY - (v/maxV) * plotH;
     const coords = points.map((p,i)=> [xAt(i), yAt(p.total)]);
     const linePath = coords.map((c,i)=> (i===0?'M':'L') + c[0].toFixed(1) + ',' + c[1].toFixed(1)).join(' ');
-    const baseY = (H - padBottom).toFixed(1);
-    const areaPath = linePath + ` L${coords[n-1][0].toFixed(1)},${baseY} L${coords[0][0].toFixed(1)},${baseY} Z`;
-    // 주요 변곡점(방향이 바뀌는 지점) + 처음/끝만 원형 포인트로 표시(§요청).
-    const markIdx = new Set([0, n-1]);
-    for(let i=1;i<n-1;i++){
-      const prev = values[i-1], cur = values[i], next = values[i+1];
-      if((cur - prev > 0 && next - cur < 0) || (cur - prev < 0 && next - cur > 0)) markIdx.add(i);
-    }
+    const areaPath = linePath + ` L${coords[n-1][0].toFixed(1)},${axisY.toFixed(1)} L${coords[0][0].toFixed(1)},${axisY.toFixed(1)} Z`;
     const guideLines = [0.25,0.5,0.75].map(f=>{
-      const y = (padTop + f*(H-padTop-padBottom)).toFixed(1);
+      const y = (padTop + f*plotH).toFixed(1);
       return `<line x1="${padX}" y1="${y}" x2="${W-padX}" y2="${y}" stroke="#EEF2F7" stroke-width="1"/>`;
     }).join('');
-    const dots = Array.from(markIdx).sort((a,b)=>a-b).map(i=>
-      `<circle cx="${coords[i][0].toFixed(1)}" cy="${coords[i][1].toFixed(1)}" r="3" fill="#2563EB" stroke="#fff" stroke-width="1.5"/>`
-    ).join('');
+
+    // §요청 "좁은 화면에서는 주요 지점의 금액만 표시하고 나머지는 마우스 오버로 확인,
+    // 데스크톱에서는 모든 월의 금액을 기본 표시" — 카드가 열리는 시점의 창 너비로 판정
+    // (이 팝업의 다른 반응형 분기와 동일한 760px 기준, §8 반응형). 주요 지점 = 처음/마지막/
+    // 최고 매출 지점(중복 제거).
+    const isNarrow = (typeof window !== 'undefined') && window.innerWidth <= 760;
+    const keyIdx = new Set([0, n-1]);
+    if(maxIdx >= 0) keyIdx.add(maxIdx);
+
+    const NEAR = 10, FAR = 24, boxH = 16; // NEAR=§요청 "위쪽으로 8~12px" 범위
+    const estWidth = s=>{ let w = 12; for(const ch of String(s)){ w += ch.charCodeAt(0) > 127 ? 12.5 : 6.6; } return w; };
+
+    const dots = coords.map((c,i)=>{
+      const isMax = i === maxIdx;
+      return `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="${isMax?3.5:3}" fill="#2563EB" stroke="#fff" stroke-width="1.5"/>`;
+    }).join('');
+
+    const valueLabels = coords.map((c,i)=>{
+      if(isNarrow && !keyIdx.has(i)) return ''; // 좁은 화면: 주요 지점 외엔 라벨 생략(hitDot으로 hover는 계속 가능)
+      const label = fmtKrwCompact(points[i].total); // §요청 금액 표기 형식(억/만원 변환)을 그대로 재사용
+      const isMax = i === maxIdx;
+      const tier = i % 2 === 0 ? NEAR : FAR; // §요청 "위아래 위치를 번갈아 조정"
+      const w = estWidth(label);
+      let boxX = c[0] - w/2;
+      if(boxX < 2) boxX = 2;
+      if(boxX + w > W - 2) boxX = W - 2 - w; // §요청 "카드 밖으로 넘어가지 않게"
+      const boxY = c[1] - tier - boxH;
+      const textX = boxX + w/2;
+      const textY = boxY + boxH - 5;
+      return `<rect x="${boxX.toFixed(1)}" y="${boxY.toFixed(1)}" width="${w.toFixed(1)}" height="${boxH}" rx="5" fill="#FFFFFF" stroke="#CFE0FB" stroke-width="1"/>`
+        + `<text x="${textX.toFixed(1)}" y="${textY.toFixed(1)}" font-size="11.5" font-weight="600" fill="${isMax?'#1D4ED8':'#17305C'}" text-anchor="middle">${esc(label)}</text>`;
+    }).join('');
+
+    const monthLabels = coords.map((c,i)=>{
+      const anchor = i === 0 ? 'start' : (i === n-1 ? 'end' : 'middle'); // 좌표는 그대로, 앵커만 바꿔 잘림 방지
+      return `<text x="${c[0].toFixed(1)}" y="${(H-10).toFixed(1)}" font-size="10.5" font-weight="600" fill="#475569" text-anchor="${anchor}">${esc(points[i].month)}월</text>`;
+    }).join('');
+
     const hitDots = coords.map((c,i)=>
-      `<circle class="cdash2-chart-hitdot" data-idx="${i}" cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="10" fill="transparent"/>`
+      `<circle class="cdash2-chart-hitdot" data-idx="${i}" cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="12" fill="transparent"/>`
     ).join('');
-    const lastLabel = fmtKrwCompact(values[n-1]);
-    const lastX = coords[n-1][0].toFixed(1);
-    const lastY = Math.max(11, coords[n-1][1]-8).toFixed(1);
+
     return `
       <svg viewBox="0 0 ${W} ${H}" width="100%" height="100%" preserveAspectRatio="none" style="overflow:visible;display:block;">
         ${guideLines}
+        <line x1="${padX}" y1="${axisY.toFixed(1)}" x2="${W-padX}" y2="${axisY.toFixed(1)}" stroke="#E2E8F0" stroke-width="1"/>
         <path d="${areaPath}" fill="#EAF2FE" stroke="none"/>
         <path d="${linePath}" fill="none" stroke="#2563EB" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
         ${dots}
-        <text x="${lastX}" y="${lastY}" font-size="10" font-weight="700" fill="#1D4ED8" text-anchor="end">${esc(lastLabel)}</text>
+        ${valueLabels}
+        ${monthLabels}
         ${hitDots}
       </svg>
       <div class="cdash2-chart-tooltip" id="cdashChartTooltip"></div>
@@ -7193,6 +7239,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         const idx = parseInt(dot.getAttribute('data-idx'), 10);
         const p = points[idx];
         if(!p) return;
+        // §요청 "마우스 오버: 정확한 월과 전체 매출금액"
         tooltip.textContent = p.month + '월 · ' + fmtKrwCompact(p.total);
         const cx = parseFloat(dot.getAttribute('cx'));
         const cy = parseFloat(dot.getAttribute('cy'));
