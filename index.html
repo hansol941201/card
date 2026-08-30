@@ -1864,6 +1864,17 @@
   /* §막대그래프 전환 라운드: 말풍선/배경박스 없이 순수 텍스트 라벨만 쓰는 만큼 기존
      176px보다 낮춰도 충분하다(§2 "카드 높이는 지금과 비슷하거나 조금 더 낮게"). */
   .cdash2-chart-wrap{ position:relative; height:150px; }
+  /* §그래프 가로 폭 축소 라운드(신규) — 사용자 요청: "카드 전체 너비는 그대로, 그래프
+     영역만 약 75%로 줄이고 가운데 정렬" — SVG(viewBox 560 고정, width/height:100%,
+     preserveAspectRatio:none)를 감싸는 이 바깥 래퍼의 CSS 너비만 줄이면, SVG 좌표계는
+     그대로 560이라 안내선·막대·간격이 전부 비례해서 함께 좁아진다(§ "막대 사이 간격이
+     자연스럽게 가까워지도록" — 새 Chart.js 옵션이나 막대 폭 재계산 없이 CSS만으로 요청
+     그대로 구현됨). 툴팁 위치 계산(wireRevenueChartHover)은 이미 매번
+     wrap.clientWidth를 실시간으로 읽어 스케일을 구하므로 이 래퍼 크기 변경에 별도 코드
+     수정 없이 그대로 맞는다. */
+  .cdash2-chart-outer{ width:75%; margin-left:auto; margin-right:auto; }
+  @media(max-width:1200px){ .cdash2-chart-outer{ width:88%; } }
+  @media(max-width:760px){ .cdash2-chart-outer{ width:100%; } }
   .cdash2-chart-tooltip{ position:absolute; pointer-events:none; background:var(--navy); color:#fff; font-size:11px; font-weight:600; padding:4px 8px; border-radius:5px; transform:translate(-50%,-100%); white-space:nowrap; opacity:0; transition:opacity .1s; z-index:5; }
   .cdash2-chart-empty{ height:150px; display:flex; align-items:center; justify-content:center; color:var(--text-faint); font-size:12px; }
 
@@ -7160,7 +7171,7 @@ window.SHIN2_CRM_APP_INIT = function(){
             <div><div class="cdash2-revenue-stat-label">총 매출</div><div class="cdash2-revenue-stat-value">${esc(totalRevenueText)}</div></div>
             <div><div class="cdash2-revenue-stat-label">${esc(currentYear)}년 매출</div><div class="cdash2-revenue-stat-value">${esc(yearRevenueText)}<span class="cdash2-revenue-yearly-tag">올해 누적</span></div></div>
           </div>
-          <div class="cdash2-chart-wrap" id="cdashRevenueChartWrap">${chartHtml}</div>
+          <div class="cdash2-chart-outer"><div class="cdash2-chart-wrap" id="cdashRevenueChartWrap">${chartHtml}</div></div>
         </div>
       </div>
     `;
