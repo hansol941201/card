@@ -2323,6 +2323,64 @@ body.map-modal-lock{ overflow:hidden; }
   .map-modal-infocol{ flex:1 1 auto; overflow-y:visible; }
   .map-apt-summary{ gap:10px; }
 }
+
+/* ==========================================================================
+   §고객카드 팝업 전체 크기 축소 라운드(신규) — 사용자 요청: "팝업이 화면을 거의 다
+   덮는다, 그래프가 아니라 팝업 전체 컨테이너 크기를 데스크톱에서 화면의 약 75%로
+   줄이고 화면 정중앙에 배치". .chart-panel/.chart-overlay는 이 파일 안에서 이미 여러
+   라운드에 걸쳐 규칙이 쌓여 있고(§853/1407/1799 및 그 media 오버라이드들, 마지막
+   선언이 이긴다는 이 파일의 기존 캐스케이드 원칙) 그 전부보다 이 블록이 파일 안에서
+   더 뒤에 있어 최종적으로 이 값들이 적용된다 — 클래스명은 새로 안 만들고 기존
+   .chart-overlay/.chart-panel 그대로 재사용했다(§요청 "실제 클래스명은 프로젝트 확인
+   후 기존 컨테이너에 적용").
+   ========================================================================== */
+/* 화면 세로 중앙 배치 — 기존엔 align-items:flex-start(위쪽 패딩으로만 자리 잡음)라
+   세로 중앙이 아니었다. */
+.chart-overlay{ align-items:center; }
+/* 큰 데스크톱(기본값, §8 "너비 75vw / 최대 1440px / 최대 높이 88vh"). scale() 대신
+   실제 width/max-height만 바꾼다(§요청 "콘텐츠를 통째로 scale() 하지 말 것") — 내부
+   글자·Canvas·SVG는 그대로 원본 해상도로 그려지고, 컨테이너 크기만 바뀐다. */
+.chart-panel{
+  width:min(75vw, 1440px);
+  min-width:640px; /* §요청 "최소한의 사용 가능한 너비도 설정" */
+  max-height:88vh;
+}
+/* 노트북/중간 화면(약 1200~1500px) — 82~88vw, 좌우 최소 32px 여백 확보. */
+@media(max-width:1500px){
+  .chart-panel{ width:88vw; min-width:0; }
+}
+@media(max-width:1300px){
+  .chart-panel{ width:84vw; }
+}
+/* 태블릿(§요청 "약 94vw") — 기존 1100px 미디어(§2024)가 calc(100vw-24px)로 이미
+   거의 같은 폭을 주고 있었는데, 명시적으로 요청값(94vw)에 맞춘다. */
+@media(max-width:1100px){
+  .chart-panel{ width:94vw; }
+}
+/* 모바일(§요청 "calc(100vw-24px)/calc(100vh-24px), 상하좌우 12px 여백") — 기존
+   760px/900px 미디어가 100vw+100vh(화면 꽉 채움, 모서리 각짐)로 덮어쓰던 것을
+   되돌린다. 더는 화면에 완전히 붙지 않고 사방에 12px 여백이 있는 독립된 창처럼
+   보이므로 모서리도 다시 둥글게(§요청 "독립된 창처럼 보여야 한다"). */
+@media(max-width:760px){
+  .chart-panel{
+    width:calc(100vw - 24px);
+    max-height:calc(100vh - 24px);
+    min-width:0;
+    border-radius:15px;
+  }
+}
+/* §요청 "헤더는 상단 고정 / 하단 버튼은 하단 고정 / 가운데 본문만 스크롤" — #chartHeader와
+   #cdashFooterBar를 .cdash-body(기존 flex:1;overflow-y:auto 스크롤 영역, 그대로 유지)
+   밖으로 옮겨 .chart-panel의 형제 요소로 배치했다(아래 렌더 함수의 마크업 변경과 짝).
+   .chart-panel은 이미 display:flex;flex-direction:column이라 기본 flex-shrink만으로
+   두 요소가 자연히 "고정"된다 — 새 sticky 계산이나 JS 스크롤 로직 없음. */
+#chartHeader{ flex:none; padding:12px 12px 0; }
+#cdashFooterBar{ flex:none; padding:0 12px 12px; }
+/* §요청 "카드 사이 간격 10~12px(기존 .cdash2-summary-row/.cdash2-body-grid의 gap:10px
+   이미 범위 안이라 그대로 둠), 카드 안쪽 여백 14~18px, 팝업 안쪽 여백 12~16px" —
+   팝업 폭이 좁아진 만큼 본문 카드 안쪽 여백만 살짝 정돈한다. */
+.cdash-body{ padding:12px; }
+.cdash2-card{ padding:14px 15px; }
 </style>
 </head>
 <body>
@@ -6746,9 +6804,17 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(typeof refreshMapIfOpen === 'function') refreshMapIfOpen();
   }
 
+  // §팝업 전체 크기 축소 라운드 §9(접근성): Esc로 닫기 + 닫을 때 이전 포커스 위치 복구.
+  // openCard가 매번(같은 업체 재렌더링 포함) 불리는 게 아니라 "카드가 실제로 닫혀있다가
+  // 새로 열릴 때"만 이전 포커스를 캡처/리스너를 등록해야 한다 — refreshChart()가
+  // 편집 저장 등으로 renderChart만 다시 부를 때 이전 포커스가 편집 중이던 input으로
+  // 잘못 덮어써지지 않게(§ "팝업을 닫으면 이전 포커스 위치 복구").
+  let chartPrevFocusedEl = null;
+  function chartEscHandler(e){ if(e.key === 'Escape') closeChart(); }
   function openCard(id){
     const co = D.findCompany(id);
     if(!co){ return; }
+    const wasClosed = cardView.style.display !== 'block';
     currentCompanyId = id;
     cardState.evidenceOpen = {}; // 업체를 새로 열 때만 근거 펼침 상태 초기화 — 같은 업체 재렌더링(수정 등) 중에는 유지
     cardState.questionLinkOpenId = null;
@@ -6760,9 +6826,18 @@ window.SHIN2_CRM_APP_INIT = function(){
     cardState.insightSummaryExpanded = false; // §인사이트 요약 표시 라운드 §1/§8: 업체를 새로 열 때는 항상 "핵심 요약"부터 시작(전체보기는 매번 다시 눌러야 함)
     cardState.insightQuickStep = 'note'; cardState.insightAdvancedOpen = false; cardState.insightParsedPreview = null; // §1차미팅 메모 자동정리 라운드: 업체를 새로 열 때는 항상 메모 입력 화면부터 시작
     cardState.insightSubOpen = null; // §고객 인사이트 수정화면 정리 라운드: 접이식 소그룹 열림 상태도 업체마다 새로 계산(이 업체 데이터 기준으로 자동 펼침)
+    if(wasClosed) chartPrevFocusedEl = document.activeElement;
     cardView.style.display = 'block';
     history.replaceState(null, '', '?company=' + encodeURIComponent(id));
     renderChart(co);
+    if(wasClosed){
+      document.addEventListener('keydown', chartEscHandler);
+      // §9 "팝업이 열리면 포커스를 팝업 내부로" — 콘텐츠가 innerHTML로 막 채워진 다음
+      // 프레임에 닫기 버튼으로 옮긴다(포커스 트랩 자체는 이 팝업이 화면 전체를 덮는
+      // 유일한 모달이라 Tab이 배경 리스트로 넘어갈 일이 실제로는 없다 — 별도 트랩 로직
+      // 없이 시작 위치만 안전하게 맞춘다).
+      requestAnimationFrame(()=>{ const btn = document.getElementById('chartCloseBtn'); if(btn) btn.focus(); });
+    }
   }
   function openList(){
     currentCompanyId = null;
@@ -6770,8 +6845,13 @@ window.SHIN2_CRM_APP_INIT = function(){
     cardView.style.display = 'none';
     listView.style.display = 'block';
     document.body.classList.remove('chart-lock');
+    document.removeEventListener('keydown', chartEscHandler);
     history.replaceState(null, '', location.pathname);
     renderList();
+    if(chartPrevFocusedEl && typeof chartPrevFocusedEl.focus === 'function'){
+      try{ chartPrevFocusedEl.focus(); }catch(err){ /* 무시 — 포커스 복구 실패는 치명적이지 않음 */ }
+    }
+    chartPrevFocusedEl = null;
   }
   function closeChart(){ openList(); }
   function refreshChart(){
@@ -6965,9 +7045,13 @@ window.SHIN2_CRM_APP_INIT = function(){
     // v2의 "내 할 일" 저장소에는 이제부터 CRM이 아무것도 새로 쓰지 않는다.
     cardView.innerHTML = `
       <div class="chart-overlay" id="chartOverlay">
-        <div class="chart-panel" role="dialog" aria-modal="true" aria-label="고객 상세">
+        <div class="chart-panel" role="dialog" aria-modal="true" aria-label="고객 상세" aria-labelledby="chartCoNameTitle">
+          <!-- §팝업 전체 크기 축소 라운드 §6: 헤더/하단 버튼을 스크롤 영역(.cdash-body,
+               flex:1;overflow-y:auto는 그대로) 밖으로 꺼내 .chart-panel의 형제로 뒀다 —
+               .chart-panel이 이미 display:flex;flex-direction:column이라 이 둘은 기본
+               flex-shrink만으로 상단/하단에 고정되고, 가운데 .cdash-body만 스크롤된다. -->
+          <div id="chartHeader"></div>
           <div class="cdash-body" id="chartBody">
-            <div id="chartHeader"></div>
             <!-- §고객 정보/고객 인사이트/서류 현황의 실제 편집 UI는 여기 그대로(#cdashHeaderPopover)
                  재사용한다 — renderInsightBlock/renderReactionsCol/renderDocStatusBlock은
                  한 글자도 안 바꿨다. 새 카드(인사이트 태그 카드/하단 서류 바)를 클릭하면 이
@@ -6988,8 +7072,8 @@ window.SHIN2_CRM_APP_INIT = function(){
               </div>
               <div id="cdashPourResultsCard"></div>
             </div>
-            <div id="cdashFooterBar"></div>
           </div>
+          <div id="cdashFooterBar"></div>
         </div>
       </div>
     `;
@@ -7060,7 +7144,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     wrap.innerHTML = `
       <div class="cdash2-header">
         <div class="cdash2-header-left">
-          <div class="cdash2-title" title="${esc(co.name)}">${esc(co.name)}</div>
+          <div class="cdash2-title" id="chartCoNameTitle" title="${esc(co.name)}">${esc(co.name)}</div>
           <span class="cdash2-tag${isDone ? ' is-done' : ''}">${esc(stageText)}</span>
           ${isCore ? `<span class="cdash2-tag is-core">핵심 고객</span>` : ''}
           ${isHurdle ? `<span class="cdash2-tag is-hurdle" title="진행 중인 신규 협약(MOU) 건이 허들·보류 상태입니다">허들·보류</span>` : ''}
