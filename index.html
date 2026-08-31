@@ -2398,6 +2398,13 @@ body.map-modal-lock{ overflow:hidden; }
   color:#EAF1FF; font-size:12px; font-weight:700; white-space:nowrap; cursor:pointer;
 }
 .cdash2-map-back-btn:hover{ background:rgba(255,255,255,.18); }
+/* §협력업체 리스트 추가폼 이관 라운드: 사업자등록증/명함 이미지 첨부란 — 사용자 요청
+   "작게 만들어주고" 그대로, 파일 입력 + 작은 썸네일 + 인식 상태 텍스트만 있는 컴팩트한
+   박스 하나로 구성한다(기존 서류함의 큰 드래그앤드롭 타일과는 다른 축소판). */
+.ca-ocr-box{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.ca-ocr-box input[type="file"]{ font-size:12px; max-width:220px; }
+.ca-ocr-thumb{ width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid var(--line); flex:none; }
+.ca-ocr-status{ font-size:11px; color:var(--text-muted); flex-basis:100%; line-height:1.4; }
 </style>
 </head>
 <body>
@@ -14934,9 +14941,51 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 넘어온다 — 업체명 입력칸만 미리 채워둘 뿐, 매출금액은 절대 넣지 않고(§요구사항 "매출금액을
   // 고객 기본정보에 임의 저장하지 마세요") 자동 저장/자동 등록도 하지 않는다(§"자동으로
   // 고객등록 완료하지 마세요") — 사용자가 [등록] 버튼을 직접 눌러야만 저장된다.
+  // §협력업체 리스트 추가폼 이관 라운드: partner-dashboard의 "협력업체 리스트에 업체
+  // 추가" 화면(지역·상호·업체코드·대표자·사업자번호·주소·연락처·FAX·Email·협약체결일·
+  // 자본금·비고 + 사업자등록증/명함 이미지 자동인식)을 card 앱 자체 데이터 구조 위에
+  // 그대로 옮겨왔다. partner-dashboard 저장소/그쪽 Firebase 데이터는 이 라운드에서
+  // 전혀 읽지도 쓰지도 않는다 — 여기서 만든 업체는 어디까지나 card 앱의 companies
+  // 컬렉션에만 저장된다(§사용자 확인: "시공사용 외부발송용 합쳐도돼" — 두 발송 목록을
+  // 하나로 합친 체크박스 1개만 두고, 그 값도 partner-dashboard로 보내지 않고 이 업체
+  // 레코드 자체에 태그(distributionLists)로만 남긴다).
+  const COMPANY_REGIONS = ['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
+  // 업체코드 자동 생성 — partner-dashboard 스냅샷의 실제 표기 규칙(예: "19001"=19년도
+  // 1번째)을 그대로 따른다: 올해 2자리 + 그 해 안에서의 다음 순번(3자리). 이미 있는
+  // code 값과 절대 겹치지 않도록 실제 저장된 값 중 같은 연도 접두어의 최댓값+1만 쓴다.
+  function genCompanyCode(){
+    const yy = String(new Date().getFullYear()).slice(2);
+    const used = D.loadCompanies()
+      .map(c=> c.code)
+      .filter(code=> typeof code === 'string' && code.startsWith(yy) && /^\d{5}$/.test(code))
+      .map(code=> parseInt(code.slice(2), 10));
+    const next = (used.length ? Math.max(...used) : 0) + 1;
+    return yy + String(next).padStart(3, '0');
+  }
+  // Tesseract.js(브라우저 내에서만 도는 무료 OCR)를 이미지 첨부란에 파일을 올렸을 때만
+  // 지연 로드한다(§ "명함/사업자등록증 이미지 → 전화번호·이메일 자동 기입" 요청, 사용자
+  // 확인: 이미지가 외부 서버로 전송되지 않는 브라우저 내 OCR 방식으로 진행). 카카오맵
+  // SDK 로더(loadKakaoMapSdk)와 동일한 "Promise 캐시로 중복 <script> 방지" 패턴.
+  let tesseractLoadPromise = null;
+  function loadTesseractSdk(){
+    if(tesseractLoadPromise) return tesseractLoadPromise;
+    if(window.Tesseract){ tesseractLoadPromise = Promise.resolve(window.Tesseract); return tesseractLoadPromise; }
+    tesseractLoadPromise = new Promise((resolve, reject)=>{
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+      s.onload = ()=>{ if(window.Tesseract) resolve(window.Tesseract); else reject(new Error('Tesseract 로드 실패')); };
+      s.onerror = ()=>{ tesseractLoadPromise = null; reject(new Error('Tesseract 스크립트를 불러오지 못했습니다(네트워크 확인 필요)')); };
+      document.head.appendChild(s);
+    });
+    return tesseractLoadPromise;
+  }
   function openAddCompanyForm(prefillName){
     addingNewCompany = true;
-    const co = { id:null, name:'', repName:'', contactName:'', position:'', phone:'', mobile:'', fax:'', email:'', bizRegNo:'', address:'', website:'', memo:'' };
+    const regionSelected = new Set();
+    // ocrState: 첨부 이미지 1장 + OCR 진행상태만 이 폼이 열려있는 동안만 들고 있는다
+    // (저장 전까지는 D.addDocument를 호출하지 않음 — §8 "저장이 성공한 뒤에만 부가
+    // 처리" 원칙과 동일하게, 여기서도 [등록] 버튼을 눌러야만 실제로 저장된다).
+    const ocrState = { file:null, docType:null, extracted:null, status:'idle' };
     cardView.innerHTML = `
       <button type="button" class="back-link" id="crmBackBtn2">&larr; 고객 목록</button>
       <div class="card-title" style="margin-bottom:14px;">신규 고객 등록</div>
@@ -14946,16 +14995,111 @@ window.SHIN2_CRM_APP_INIT = function(){
     cardView.style.display = 'block';
     document.getElementById('crmBackBtn2').addEventListener('click', ()=>{ addingNewCompany = false; openList(); });
     const wrap = document.getElementById('crmAddFormWrap');
-    wrap.innerHTML = CO_FIELD_LABELS.map(([k,l])=> `<div class="co-form-field"><label>${l}</label><input type="text" id="crmNewF_${k}" /></div>`).join('') +
-      `<div id="crmNewFErr" style="display:none;color:#B91C1C;font-size:12px;margin-bottom:8px;">업체명을 입력하세요.</div>
-       <button type="button" class="co-text-action primary" id="crmNewFSave">등록</button>`;
+    const NEW_FIELD_LABELS = [
+      ['name','상호 *'], ['repName','대표자'], ['bizRegNo','사업자번호'], ['address','주소'],
+      ['phone','연락처'], ['fax','FAX'], ['email','Email'], ['capital','자본금']
+    ];
+    wrap.innerHTML = `
+      <div class="co-form-field">
+        <label>지역(복수 선택 가능)</label>
+        <div class="list-filter-row" id="crmNewFRegions">
+          ${COMPANY_REGIONS.map(r=> `<button type="button" class="list-filter-chip" data-region="${esc(r)}">${esc(r)}</button>`).join('')}
+        </div>
+      </div>
+      <div class="co-form-field"><label>상호 *</label><input type="text" id="crmNewF_name" /></div>
+      <div class="co-form-field"><label>업체코드(자동 생성 — 필요시 수정 가능)</label><input type="text" id="crmNewF_code" /></div>
+      ${NEW_FIELD_LABELS.slice(1).map(([k,l])=> `<div class="co-form-field"><label>${esc(l)}</label><input type="text" id="crmNewF_${k}" /></div>`).join('')}
+      <div class="co-form-field"><label>협약체결일</label><input type="date" id="crmNewF_mouDate" /></div>
+      <div class="co-form-field"><label>비고</label><textarea id="crmNewF_note"></textarea></div>
+      <div class="co-form-field">
+        <label>사업자등록증 · 명함 이미지 첨부(선택)</label>
+        <div class="ca-ocr-box">
+          <input type="file" accept="image/*" id="crmNewFImage" />
+          <img id="crmNewFImagePreview" class="ca-ocr-thumb" style="display:none;" alt="첨부 이미지 미리보기" />
+          <div class="ca-ocr-status" id="crmNewFOcrStatus"></div>
+        </div>
+      </div>
+      <div class="co-form-field">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);">
+          <input type="checkbox" id="crmNewFDualList" style="width:auto;" />
+          시공사발송용 · 외부발송용 목록에도 함께 표시
+        </label>
+      </div>
+      <div id="crmNewFErr" style="display:none;color:#B91C1C;font-size:12px;margin-bottom:8px;">업체명을 입력하세요.</div>
+      <button type="button" class="co-text-action primary" id="crmNewFSave">등록</button>
+    `;
+    document.getElementById('crmNewF_code').value = genCompanyCode();
     if(prefillName) document.getElementById('crmNewF_name').value = prefillName;
+    wrap.querySelectorAll('[data-region]').forEach(btn=> btn.addEventListener('click', ()=>{
+      const r = btn.getAttribute('data-region');
+      if(regionSelected.has(r)){ regionSelected.delete(r); btn.classList.remove('is-active'); }
+      else { regionSelected.add(r); btn.classList.add('is-active'); }
+    }));
+    // 이미지가 비어있는 입력칸에만 자동으로 값을 채운다 — 이미 사람이 입력해둔 값은
+    // 절대 덮어쓰지 않는다(§ 기존 "빈 정보만 채우기" 원칙과 동일).
+    function fillIfEmpty(fieldId, val){
+      if(!val) return false;
+      const el = document.getElementById(fieldId);
+      if(!el || el.value.trim()) return false;
+      el.value = val;
+      return true;
+    }
+    function runOcr(file){
+      const statusEl = document.getElementById('crmNewFOcrStatus');
+      ocrState.status = 'running';
+      statusEl.textContent = '이미지 인식 중… (브라우저 안에서만 처리되며 외부로 전송되지 않습니다)';
+      loadTesseractSdk()
+        .then(Tesseract=> Tesseract.recognize(file, 'kor+eng'))
+        .then(({ data })=>{
+          const rawText = (data && data.text) || '';
+          const docType = OCR.coClassifyDocType(rawText) === 'bizreg' ? 'businessRegistration' : 'businessCard';
+          const extracted = docType === 'businessRegistration' ? OCR.extractFromBizRegText(rawText) : OCR.extractFromCardText(rawText);
+          ocrState.status = 'done'; ocrState.docType = docType; ocrState.extracted = extracted;
+          const filled = [];
+          if(fillIfEmpty('crmNewF_phone', extracted.phone && !extracted.phone.ambiguous ? extracted.phone.value : '')) filled.push('연락처');
+          if(fillIfEmpty('crmNewF_fax', extracted.fax && !extracted.fax.ambiguous ? extracted.fax.value : '')) filled.push('FAX');
+          if(fillIfEmpty('crmNewF_email', extracted.email && !extracted.email.ambiguous ? extracted.email.value : '')) filled.push('Email');
+          if(fillIfEmpty('crmNewF_address', extracted.address && !extracted.address.ambiguous ? extracted.address.value : '')) filled.push('주소');
+          if(docType === 'businessRegistration'){
+            if(fillIfEmpty('crmNewF_bizRegNo', extracted.bizRegNo && !extracted.bizRegNo.ambiguous ? extracted.bizRegNo.value : '')) filled.push('사업자번호');
+            if(fillIfEmpty('crmNewF_repName', extracted.repName && !extracted.repName.ambiguous ? extracted.repName.value : '')) filled.push('대표자');
+            if(fillIfEmpty('crmNewF_name', extracted.name && !extracted.name.ambiguous ? extracted.name.value : '')) filled.push('상호');
+          }
+          statusEl.textContent = filled.length
+            ? `인식 완료 — ${filled.join(', ')} 자동 입력됨(직접 수정 가능)`
+            : '인식은 완료됐지만 자동으로 채울 만한 항목을 찾지 못했습니다 — 직접 입력해주세요.';
+        })
+        .catch(err=>{
+          ocrState.status = 'error';
+          statusEl.textContent = '자동 인식에 실패했습니다(' + (err && err.message ? err.message : '알 수 없는 오류') + ') — 직접 입력해주세요. 이미지 자체는 등록 시 그대로 첨부됩니다.';
+        });
+    }
+    document.getElementById('crmNewFImage').addEventListener('change', (e)=>{
+      const file = e.target.files && e.target.files[0];
+      if(!file) return;
+      ocrState.file = file; ocrState.status='idle'; ocrState.docType=null; ocrState.extracted=null;
+      const preview = document.getElementById('crmNewFImagePreview');
+      const url = URL.createObjectURL(file);
+      preview.src = url; preview.style.display = 'block';
+      runOcr(file);
+    });
     document.getElementById('crmNewFSave').addEventListener('click', ()=>{
       const patch = {};
-      CO_FIELD_LABELS.forEach(([k])=>{ patch[k] = document.getElementById('crmNewF_' + k).value.trim(); });
+      NEW_FIELD_LABELS.forEach(([k])=>{ patch[k] = document.getElementById('crmNewF_' + k).value.trim(); });
+      patch.code = document.getElementById('crmNewF_code').value.trim();
+      patch.mouDate = document.getElementById('crmNewF_mouDate').value.trim();
+      patch.note = document.getElementById('crmNewF_note').value.trim();
+      patch.region = Array.from(regionSelected);
+      patch.distributionLists = document.getElementById('crmNewFDualList').checked ? ['contractor','external'] : [];
       if(!patch.name){ document.getElementById('crmNewFErr').style.display = 'block'; return; }
       addingNewCompany = false;
       const rec = D.addCompany(patch);
+      // 첨부 이미지가 있으면 기존 서류함 저장 경로(D.addDocument)를 그대로 재사용해
+      // 저장한다 — OCR로 추출된 값이 있으면 §8 원칙 그대로 extracted로 함께 넘긴다.
+      if(ocrState.file){
+        const docType = ocrState.docType || 'businessCard';
+        D.addDocument(rec.id, docType, ocrState.file, null, ocrState.extracted).catch(()=>{ /* 업체 등록 자체는 이미 끝났으므로 첨부 실패는 조용히 무시 — 사용자는 서류함에서 다시 올릴 수 있음 */ });
+      }
       openCard(rec.id);
       renderList();
     });
@@ -17094,7 +17238,10 @@ window.SHIN2_CRM_APP_INIT = function(){
   // ---------------- 진입 ----------------
   document.getElementById('crmMapDistributionBtn').addEventListener('click', openMapDistributionModal);
   document.getElementById('crmPhoneRequestBtn').addEventListener('click', openPhoneRequestModal);
-  document.getElementById('crmAddBtn').addEventListener('click', openAddCompanyForm);
+  // §업체 추가 폼 이관 라운드에서 함께 수정: addEventListener('click', openAddCompanyForm)로
+  // 직접 등록하면 클릭 이벤트(MouseEvent)가 그대로 prefillName 인자로 들어가 이름칸에
+  // "[object MouseEvent]"가 채워지는 기존 버그가 있었다 — 인자 없이 호출하도록 감싼다.
+  document.getElementById('crmAddBtn').addEventListener('click', ()=> openAddCompanyForm());
   // 기존 두 함수(openPartnerImportModal/openPourImportModal)는 그대로 두고, 드롭다운 메뉴
   // 항목을 눌렀을 때 각각 그대로 호출한다 — 메뉴 클릭 후에는 메뉴를 닫는다.
   document.getElementById('crmPartnerImportBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openPartnerImportModal(); });
