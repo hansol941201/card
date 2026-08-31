@@ -2415,6 +2415,8 @@ body.map-modal-lock{ overflow:hidden; }
 /* §1차미팅 메일 자동발송 라운드(신규) */
 .workq-mail-btn{ height:24px; padding:0 10px; font-size:11.5px; font-weight:700; color:var(--navy); background:#fff; border:1px solid var(--navy); border-radius:5px; cursor:pointer; white-space:nowrap; }
 .workq-mail-btn:hover{ background:#EEF2FA; }
+.workq-mail-btn.is-sent{ color:#0F7A42; border-color:#0F7A42; }
+.workq-mail-skip{ font-size:11px; color:var(--text-muted); }
 .mail-settings-panel{ max-width:640px; }
 .mail-settings-section{ border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:14px; background:var(--surface); }
 .mail-settings-section-title{ font-size:13px; font-weight:700; color:var(--text); margin-bottom:8px; }
@@ -2424,6 +2426,30 @@ body.map-modal-lock{ overflow:hidden; }
 .mail-compose-warn{ font-size:11.5px; color:#9A6B00; background:#FFF7E6; border:1px solid #F0DDA8; border-radius:6px; padding:8px 10px; margin-bottom:12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .mail-compose-status{ font-size:12px; color:var(--text-muted); margin-top:4px; min-height:16px; }
 .mail-compose-status.is-err{ color:#B91C1C; }
+/* §고객 진행단계 3단계 라운드(신규) — 흰색/남색 중심, 카드 모서리 6~8px, 알약/큰
+   아이콘 금지, 등록 팝업의 기존 너비(.pi-panel max-width) 안에서만 움직인다. */
+.deal-stage-block{ max-width:none; }
+.deal-stage-row{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
+.deal-stage-card{ border:1px solid var(--line); border-radius:7px; padding:9px 10px; background:var(--surface); min-width:0; }
+.deal-stage-head{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+.deal-stage-dot{ width:8px; height:8px; border-radius:50%; flex:none; background:#C7CEDB; }
+.deal-stage-dot.is-none{ background:#C7CEDB; }
+.deal-stage-dot.is-scheduled{ background:#1D4ED8; }
+.deal-stage-dot.is-done{ background:#0F7A42; }
+.deal-stage-dot.is-skipped{ background:#E7A75C; }
+.deal-stage-title{ font-size:12px; font-weight:700; color:var(--text); }
+.deal-stage-status, .deal-stage-date{
+  width:100%; padding:6px 7px; font-size:12px; color:var(--text); background:#fff;
+  border:1px solid var(--line); border-radius:6px; outline:none; box-sizing:border-box;
+}
+.deal-stage-status{ margin-bottom:6px; }
+.deal-stage-status:focus, .deal-stage-date:focus{ border-color:#C7CEDB; }
+.deal-stage-warn{ font-size:11.5px; color:#9A6B00; background:#FFF7E6; border:1px solid #F0DDA8; border-radius:6px; padding:8px 10px; margin-top:8px; }
+.deal-stage-warn.is-blocking{ color:#B91C1C; background:#FEECEC; border-color:#F3B4B4; }
+.cdash2-deal-summary{ font-size:11px; color:#C7D3E8; margin-top:1px; }
+@media(max-width:520px){
+  .deal-stage-row{ grid-template-columns:1fr; }
+}
 </style>
 </head>
 <body>
@@ -7269,11 +7295,19 @@ window.SHIN2_CRM_APP_INIT = function(){
     // closeChart()(=closeChartOnlyReturnToMap)를 그대로 호출해 X 버튼과 동일하게
     // 카드만 닫고 지도 분포 팝업(필터·확대·위치)은 그대로 유지한다.
     const showMapBackBtn = chartOpenSource === 'map';
+    // §고객 진행단계 3단계 라운드 §5 "상세 팝업에서는 세 단계를 모두 표시" — 기존
+    // stageText(태그)는 그대로 두고, 그 아래 한 줄로 3단계 요약만 추가한다(§ "기존
+    // 협약 완료 태그와 연결하되 중복 태그는 만들지 않음" — 새 태그 색상 pill이 아니라
+    // 평범한 subtitle 텍스트).
+    const dealSummary = buildDealStageSummaryText(co);
     wrap.innerHTML = `
       <div class="cdash2-header">
         <div class="cdash2-header-left">
           ${showMapBackBtn ? `<button type="button" class="cdash2-map-back-btn" id="chartMapBackBtn">← 지도 분포로 돌아가기</button>` : ''}
-          <div class="cdash2-title" id="chartCoNameTitle" title="${esc(co.name)}">${esc(co.name)}</div>
+          <div>
+            <div class="cdash2-title" id="chartCoNameTitle" title="${esc(co.name)}">${esc(co.name)}</div>
+            <div class="cdash2-deal-summary">${esc(dealSummary)}</div>
+          </div>
           <span class="cdash2-tag${isDone ? ' is-done' : ''}">${esc(stageText)}</span>
           ${isCore ? `<span class="cdash2-tag is-core">핵심 고객</span>` : ''}
           ${isHurdle ? `<span class="cdash2-tag is-hurdle" title="진행 중인 신규 협약(MOU) 건이 허들·보류 상태입니다">허들·보류</span>` : ''}
@@ -9386,9 +9420,15 @@ window.SHIN2_CRM_APP_INIT = function(){
             ${filtered.map(it=> {
               const isOpen = workQueueExpanded && workQueueExpanded.companyId === it.co.id && workQueueExpanded.type === it.type;
               const stageStepperHtml = buildStageStepperHtml(buildProgressStages(it.co));
-              // §1차미팅 메일 자동발송 라운드: [메일발송]은 "1차미팅 잡기" 목록(m1/m1Scheduled)
-              // 항목에만 노출한다 — 다른 단계(2차미팅/MOU/전환관리)는 이번 요청 범위 밖.
-              const showMailBtn = it.type === 'm1' || it.type === 'm1Scheduled';
+              // §1차미팅 메일 자동발송 라운드 — 사용자 재정정(§6): [메일발송]은 "1차미팅이
+              // 아직 예정도 안 잡힌"(type==='m1') 업체에만 노출한다. m1Scheduled(이미 일정
+              // 잡힘)/m2/m2Scheduled/mou는 전부 제외 — "1차 미팅 예정일이 미래인 고객에게
+              // '미팅을 하지 않았다'는 메일을 보내지 말 것" 요구사항 그대로.
+              const showMailBtn = it.type === 'm1';
+              const mailInfo = showMailBtn ? m1MailButtonInfo(it.co) : null;
+              const mailCellHtml = mailInfo && mailInfo.show
+                ? `<button type="button" class="workq-mail-btn${mailInfo.alreadySent ? ' is-sent' : ''}" data-workq-mail="${esc(it.co.id)}">${esc(mailInfo.label)}</button>`
+                : (showMailBtn ? `<span class="workq-mail-skip">${esc((mailInfo && mailInfo.reason) || '—')}</span>` : '—');
               return `<tr>
                 <td><button type="button" class="workq-co-link" data-workq-open-co="${esc(it.co.id)}">${esc(it.co.name)}</button></td>
                 <td>${esc(it.currentStateLabel)}</td>
@@ -9396,7 +9436,7 @@ window.SHIN2_CRM_APP_INIT = function(){
                 <td class="workq-reason">${esc(it.reasonText)}</td>
                 <td class="workq-days">${it.days === null ? '—' : esc(it.days) + '일'}${it.isDelayed ? '<span class="workq-delay-badge">지연</span>' : ''}</td>
                 <td><button type="button" class="workq-action-btn${isOpen ? ' is-open' : ''}" data-workq-toggle="${esc(it.co.id)}" data-workq-toggle-type="${esc(it.type)}">${esc(it.actionLabel)}</button></td>
-                <td>${showMailBtn ? `<button type="button" class="workq-mail-btn" data-workq-mail="${esc(it.co.id)}">메일발송</button>` : '—'}</td>
+                <td>${mailCellHtml}</td>
               </tr>${isOpen ? `<tr class="workq-expand-row"><td colspan="7"><div class="workq-expand">${renderWorkqExpandBody(it)}</div></td></tr>` : ''}`;
             }).join('')}
           </tbody>
@@ -9615,6 +9655,36 @@ window.SHIN2_CRM_APP_INIT = function(){
     const root = document.getElementById('mailComposeModalRoot');
     if(root) root.innerHTML = '';
   }
+  // §1차미팅 메일 자동발송 라운드 §6/§7 — [메일발송] 버튼 노출 여부와 라벨을 한 곳에서
+  // 판정한다. co.email 없음/co.mailOptOut(수신거부)이면 아예 버튼을 숨긴다(§ "수신
+  // 이메일이 없는 업체", "수신 거부 업체" 제외). 이미 발송 성공 기록(co.m1MailLog)이
+  // 있으면 버튼은 그대로 두되 라벨만 "재발송"으로 바꿔 중복발송을 사용자가 명시적으로
+  // 선택하게 한다(§7 "재발송이 필요하면 사용자가 명시적으로 재발송을 선택").
+  function m1MailButtonInfo(co){
+    if(co.mailOptOut) return { show:false, reason:'수신거부' };
+    if(!co.email) return { show:false, reason:'이메일 없음' };
+    const alreadySent = Array.isArray(co.m1MailLog) && co.m1MailLog.some(l=> l.status === 'sent');
+    return { show:true, alreadySent, label: alreadySent ? '재발송' : '메일발송' };
+  }
+  // §7 "발송한 사용자" 기록용 — 서류함 업로드 기록(D.addDocument 내부의
+  // currentUserLabel())과 완전히 같은 규칙(같은 localStorage 키)을 렌더 레이어에서도
+  // 그대로 따른다. D 계층 함수는 export되어 있지 않아 직접 호출할 수 없어 복제했다.
+  function crmCurrentUserLabel(){
+    let uid = '1';
+    try{ uid = localStorage.getItem('shin2-active-user-id') || '1'; }catch(e){}
+    return '사용자 ' + uid;
+  }
+  // 발송 기록 1건을 co.m1MailLog에 추가한다(§7 "메일 종류/고객ID/발송일시/수신주소/
+  // 성공·실패/발송한 사용자/기준 단계/재발송 여부" 최대한 기록). 배열이 계속 자라기만
+  // 하므로 별도 컬렉션을 새로 만들지 않고 companies 배열 자체(이미 Firebase와 동기화되는
+  // 저장 구조)에 얹는다.
+  function appendM1MailLog(companyId, entry){
+    const co = D.findCompany(companyId);
+    if(!co) return;
+    const log = Array.isArray(co.m1MailLog) ? co.m1MailLog.slice() : [];
+    log.push(entry);
+    D.updateCompany(companyId, { m1MailLog: log });
+  }
   // openMailComposeModal: 업무관리 "1차미팅 잡기" 목록의 [메일발송] 버튼에서 연다.
   // 메일 설정 탭에서 저장해 둔 문구 템플릿을 이 업체 값으로 채워 미리 보여주고, 발송
   // 직전에 보내는사람/받는사람/제목/본문을 여기서 다시 손볼 수 있다(§요청 "보내는사람
@@ -9623,6 +9693,8 @@ window.SHIN2_CRM_APP_INIT = function(){
     const co = D.findCompany(companyId);
     if(!co) return;
     const s = D.loadMailSettings();
+    const alreadySent = Array.isArray(co.m1MailLog) && co.m1MailLog.some(l=> l.status === 'sent');
+    const lastSent = alreadySent ? co.m1MailLog.filter(l=> l.status==='sent').slice(-1)[0] : null;
     const modalRoot = document.getElementById('mailComposeModalRoot');
     modalRoot.innerHTML = `
       <div class="pi-overlay" id="mailComposeOverlay">
@@ -9636,15 +9708,22 @@ window.SHIN2_CRM_APP_INIT = function(){
               <div class="mail-compose-warn">메일 설정 탭에서 EmailJS 연동 정보를 먼저 입력해야 실제 발송이 됩니다.
                 <button type="button" class="co-text-action primary" id="mailComposeGoSettings">메일 설정으로 이동</button></div>
             ` : ''}
+            ${alreadySent ? `<div class="mail-compose-warn">이미 ${esc((lastSent && lastSent.sentAt) ? lastSent.sentAt.slice(0,10) : '')}에 발송된 기록이 있습니다 — 다시 보내려면 [재발송]을 눌러주세요(§7 중복발송 방지).</div>` : ''}
             <div class="co-form-field"><label>보내는사람</label><input type="text" id="mailComposeFrom" value="${esc(s.fromName)}${s.fromEmail ? ' <' + esc(s.fromEmail) + '>' : ''}" /></div>
             <div class="co-form-field"><label>받는사람</label><input type="text" id="mailComposeTo" value="${esc(co.email || '')}" placeholder="받는 이메일 주소" /></div>
             <div class="co-form-field"><label>제목</label><input type="text" id="mailComposeSubject" value="${esc(fillMailTemplate(s.subjectTemplate, co, s))}" /></div>
             <div class="co-form-field"><label>본문</label><textarea id="mailComposeBody" rows="10">${esc(fillMailTemplate(s.bodyTemplate, co, s))}</textarea></div>
+            <div class="co-form-field">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);">
+                <input type="checkbox" id="mailComposeOptOut" style="width:auto;" />
+                이 업체는 메일 수신을 원치 않음(다음부터 발송 대상에서 제외)
+              </label>
+            </div>
             <div id="mailComposeStatus" class="mail-compose-status"></div>
           </div>
           <div class="pi-actions">
             <button type="button" class="co-text-action" id="mailComposeCancelBtn">취소</button>
-            <button type="button" class="co-text-action primary" id="mailComposeSendBtn">메일 발송</button>
+            <button type="button" class="co-text-action primary" id="mailComposeSendBtn">${alreadySent ? '재발송' : '메일 발송'}</button>
           </div>
         </div>
       </div>
@@ -9654,7 +9733,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     document.getElementById('mailComposeOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'mailComposeOverlay') closeMailComposeModal(); });
     const goSettingsBtn = document.getElementById('mailComposeGoSettings');
     if(goSettingsBtn) goSettingsBtn.addEventListener('click', ()=>{ closeMailComposeModal(); showMailSettingsTab(); });
-    document.getElementById('mailComposeSendBtn').addEventListener('click', ()=>{
+    document.getElementById('mailComposeOptOut').addEventListener('change', (e)=>{
+      D.updateCompany(co.id, { mailOptOut: !!e.target.checked });
+    });
+    const sendBtn = document.getElementById('mailComposeSendBtn');
+    sendBtn.addEventListener('click', ()=>{
       const statusEl = document.getElementById('mailComposeStatus');
       const toEmail = document.getElementById('mailComposeTo').value.trim();
       if(!toEmail){ statusEl.textContent = '받는사람 이메일을 입력해주세요.'; statusEl.classList.add('is-err'); return; }
@@ -9673,18 +9756,34 @@ window.SHIN2_CRM_APP_INIT = function(){
       };
       statusEl.classList.remove('is-err');
       statusEl.textContent = '발송 중…';
+      // §7 "다중 클릭을 막기 위해 발송 중 버튼 비활성화" — 요청이 끝날 때까지(성공/실패
+      // 무관) 버튼을 잠근다.
+      sendBtn.disabled = true;
       loadEmailJsSdk()
         .then(emailjs=> emailjs.send(latestSettings.emailjsServiceId, latestSettings.emailjsTemplateId, params, { publicKey: latestSettings.emailjsPublicKey }))
         .then(()=>{
           statusEl.textContent = '발송 완료';
-          // §추적 라운드: 메일 발송도 기존 활동기록(activitiesForCompany)에 그대로 남긴다 —
-          // 새 로그 저장소를 만들지 않고 있던 함수(D.addActivity) 재사용.
+          // §7 "발송 성공 후에만 성공 기록 저장" — 구조화된 로그(co.m1MailLog)에 남긴다.
+          appendM1MailLog(co.id, {
+            mailType:'m1Invite', sentAt: new Date().toISOString(), to: toEmail, status:'sent',
+            sentBy: crmCurrentUserLabel(), stage:'m1', isResend: alreadySent
+          });
+          // 기존 활동기록에도 그대로 남긴다(§ "기존 저장 구조 안에서 안전하게 처리").
           D.addActivity(co.id, `1차 미팅 제안 메일 발송 (받는사람: ${toEmail})`);
+          renderWorkQueueView();
           setTimeout(closeMailComposeModal, 900);
         })
         .catch(err=>{
+          sendBtn.disabled = false;
           statusEl.classList.add('is-err');
-          statusEl.textContent = '발송 실패: ' + (err && (err.text || err.message) ? (err.text || err.message) : '알 수 없는 오류') + ' — EmailJS 연동 정보와 하이웍스 SMTP 연결 상태를 확인해주세요.';
+          const errMsg = err && (err.text || err.message) ? (err.text || err.message) : '알 수 없는 오류';
+          statusEl.textContent = '발송 실패: ' + errMsg + ' — EmailJS 연동 정보와 하이웍스 SMTP 연결 상태를 확인해주세요.';
+          // §7 "실패하면 실패 사유를 표시하고 무조건 발송 완료 처리하지 말 것" — 실패도
+          // 기록은 남기되 status는 'sent'가 아니라 'failed'라 재시도를 막지 않는다.
+          appendM1MailLog(co.id, {
+            mailType:'m1Invite', sentAt: new Date().toISOString(), to: toEmail, status:'failed',
+            sentBy: crmCurrentUserLabel(), stage:'m1', isResend: alreadySent, error: errMsg
+          });
         });
     });
   }
@@ -14420,10 +14519,16 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="co-form-field"><label>${l}</label>
         ${k==='memo' ? `<textarea id="crmF_${k}">${esc(co[k]||'')}</textarea>` : `<input type="text" id="crmF_${k}" value="${esc(co[k]||'')}" />`}
       </div>
-    `).join('') + `<div style="display:flex;gap:10px;margin-top:6px;">
+    `).join('')
+      // §고객 진행단계 3단계 라운드: 등록폼과 완전히 같은 블록을 "수정" 화면에도 그대로
+      // 넣는다(idPrefix만 'editco'로 달라 id 충돌 없음) — 값은 이 업체의 실제 저장값으로
+      // 미리 채운다(resolveDealStageFormValues, 새 판정 없음).
+      + renderDealStageBlockHtml('editco', resolveDealStageFormValues(co))
+      + `<div style="display:flex;gap:10px;margin-top:6px;">
         <button type="button" class="co-text-action" id="crmFormCancel">취소</button>
         <button type="button" class="co-text-action primary" id="crmFormSave">저장</button>
       </div>`;
+    bindDealStageBlock('editco');
     document.getElementById('crmFormCancel').addEventListener('click', ()=>{ cardState.chartEditing = false; refreshChart(); });
     document.getElementById('crmFormSave').addEventListener('click', ()=>{
       const patch = {};
@@ -14432,7 +14537,17 @@ window.SHIN2_CRM_APP_INIT = function(){
         if(el) patch[k] = el.value.trim();
       });
       if(!patch.name){ return; }
+      const dealCheck = validateDealStageBlock('editco');
+      const warnEl = document.getElementById('editco_dealStageWarn');
+      if(dealCheck.blocking.length){
+        warnEl.style.display = 'block'; warnEl.classList.add('is-blocking');
+        warnEl.textContent = dealCheck.blocking.join(' ');
+        return;
+      }
+      if(dealCheck.warnings.length && !confirm(dealCheck.warnings.join('\n') + '\n\n그래도 저장하시겠습니까?')) return;
+      warnEl.style.display = 'none'; warnEl.classList.remove('is-blocking');
       D.updateCompany(co.id, patch);
+      applyDealStageValues(co.id, dealCheck.values);
       cardState.chartEditing = false;
       refreshChart();
     });
@@ -15228,6 +15343,201 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
     return tesseractLoadPromise;
   }
+  /* ==========================================================================
+     §고객 진행단계 3단계 라운드(신규) — "체결일 필드만 있던" 등록·수정 화면을
+     1차미팅/2차미팅/협약체결 3단계로 확장한다. 새 저장 필드를 따로 만들지 않고
+     기존 co.partnerDashboard.newMou(m1Label/m1ScheduledLabel/m1Owner/m2Label/
+     m2ScheduledLabel/m2Owner/mouLabel/mouDone — §진행 기록 라운드/§업무관리 라운드에서
+     이미 확정된 실제 필드, buildProgressStages가 바로 이 값들만 읽는다)와
+     co.partnerDashboard.mouDate(resolvePartnerAgreementDate가 최우선으로 읽는 실제
+     협약체결일 필드)를 그대로 재사용한다 — 이미 buildProgressStages/computeWorkQueue/
+     isConfirmedPartner/1차미팅 메일 대상 판정이 전부 이 필드만 보고 있어서, 여기서
+     같은 필드에 쓰기만 하면 고객카드·검색·필터·메일 자동발송에 새 코드 없이 자동으로
+     연결된다(§요청 "동일한 데이터를 사용하도록 연결"). m1Skipped/m2Skipped/mouInProgress
+     3개만 이 라운드에서 새로 추가하는 필드다("진행 안 함"/"진행 중" 상태는 날짜만으로는
+     구분할 수 없어서 최소한으로만 추가 — 기존 필드는 하나도 새로 만들지 않았다).
+     ========================================================================== */
+  // "YY.MM.DD"/"YYYY-MM-DD" 라벨 → <input type="date"> 값. new Date(y,mo-1,d) 로컬시각
+  // getter만 써서 되돌리므로 UTC 왕복에 의한 하루 밀림이 없다(§3 "시간대 문제로 하루씩
+  // 바뀌지 않게 처리").
+  function partnerLabelToInputValue(label){
+    const p = parsePartnerDateLabel(label);
+    if(!p) return '';
+    const d = new Date(p.ts);
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  const DEAL_M_STATUS_LABELS = [['undetermined','미정'],['scheduled','예정'],['done','완료'],['skipped','진행 안 함']];
+  const DEAL_MOU_STATUS_LABELS = [['none','미체결'],['inProgress','진행 중'],['done','체결 완료']];
+  // 편집 화면에 채워 넣을 현재 상태 — 기존 값을 다시 계산만 한다(새 판정 없음, §요청
+  // "먼저 현재 고객 데이터 구조... 확인한 후 수정"에 따라 이미 있는
+  // resolveNewMouForCompany/resolvePartnerAgreementDate/parsePartnerDateLabel만 재사용).
+  function resolveDealStageFormValues(co){
+    const nm = (co && resolveNewMouForCompany(co)) || {};
+    const agreementDateLabel = co ? resolvePartnerAgreementDate(co) : null;
+    function meetingStage(doneLabel, scheduledLabel, skipped){
+      if(doneLabel){ const p = parsePartnerDateLabel(doneLabel); if(p) return { status:'done', date: partnerLabelToInputValue(doneLabel) }; }
+      if(scheduledLabel){ const p = parsePartnerDateLabel(scheduledLabel); if(p) return { status:'scheduled', date: partnerLabelToInputValue(scheduledLabel) }; }
+      if(skipped) return { status:'skipped', date:'' };
+      return { status:'undetermined', date:'' };
+    }
+    const m1 = meetingStage(nm.m1Label, nm.m1ScheduledLabel, nm.m1Skipped);
+    const m2 = meetingStage(nm.m2Label, nm.m2ScheduledLabel, nm.m2Skipped);
+    // §4 "기존 체결일이 있는 업체는 자동으로 체결 완료로 표시" — nm.mouDone과
+    // agreementDateLabel(기존 체결일) 둘 중 하나라도 있으면 체결 완료로 채운다.
+    let mouStatus = 'none', mouDate = '';
+    if(nm.mouDone || agreementDateLabel){
+      mouStatus = 'done';
+      mouDate = (nm.mouDone && partnerLabelToInputValue(nm.mouLabel)) || partnerLabelToInputValue(agreementDateLabel) || '';
+    } else if(nm.mouInProgress){
+      mouStatus = 'inProgress';
+    }
+    return { m1, m2, mou: { status: mouStatus, date: mouDate } };
+  }
+  function dealStageDotClass(key, status){
+    if(key === 'mou'){
+      if(status === 'done') return 'is-done';
+      if(status === 'inProgress') return 'is-scheduled';
+      return 'is-none';
+    }
+    if(status === 'done') return 'is-done';
+    if(status === 'scheduled') return 'is-scheduled';
+    if(status === 'skipped') return 'is-skipped';
+    return 'is-none';
+  }
+  // idPrefix로 등록폼(addco)/수정폼(edit) 두 군데에서 id가 겹치지 않게 한다.
+  function renderDealStageBlockHtml(idPrefix, values){
+    function statusOptions(list, current){ return list.map(([v,l])=> `<option value="${esc(v)}"${v===current?' selected':''}>${esc(l)}</option>`).join(''); }
+    function card(key, title, stageVal){
+      return `
+        <div class="deal-stage-card">
+          <div class="deal-stage-head">
+            <span class="deal-stage-dot ${dealStageDotClass(key, stageVal.status)}" data-deal-dot="${idPrefix}_${key}"></span>
+            <span class="deal-stage-title">${esc(title)}</span>
+          </div>
+          <select class="deal-stage-status" id="${idPrefix}_${key}_status">${statusOptions(key==='mou'?DEAL_MOU_STATUS_LABELS:DEAL_M_STATUS_LABELS, stageVal.status)}</select>
+          <input type="date" class="deal-stage-date" id="${idPrefix}_${key}_date" value="${esc(stageVal.date)}" />
+        </div>`;
+    }
+    return `
+      <div class="co-form-field deal-stage-block">
+        <label>고객 진행단계</label>
+        <div class="deal-stage-row">
+          ${card('m1','1차 미팅', values.m1)}
+          ${card('m2','2차 미팅', values.m2)}
+          ${card('mou','협약 체결', values.mou)}
+        </div>
+        <div class="deal-stage-warn" id="${idPrefix}_dealStageWarn" style="display:none;"></div>
+      </div>`;
+  }
+  function bindDealStageBlock(idPrefix){
+    function refreshDot(key){
+      const sel = document.getElementById(idPrefix + '_' + key + '_status');
+      const dot = document.querySelector(`[data-deal-dot="${idPrefix}_${key}"]`);
+      if(sel && dot) dot.className = 'deal-stage-dot ' + dealStageDotClass(key, sel.value);
+    }
+    ['m1','m2','mou'].forEach(key=>{
+      const sel = document.getElementById(idPrefix + '_' + key + '_status');
+      if(sel) sel.addEventListener('change', ()=> refreshDot(key));
+    });
+  }
+  // 저장 직전 검증(§10) — 예정/완료인데 날짜 없으면 막고(blocking), 날짜 순서/미래·과거
+  // 조합은 경고만(warnings, 확인 후 저장 가능) — "기존 데이터에는 순서가 안 맞는 날짜가
+  // 있을 수 있으므로 열람 자체는 막지 않는다"는 새 입력·수정에만 적용되는 검증이다.
+  function validateDealStageBlock(idPrefix){
+    const get = (key, field)=> document.getElementById(idPrefix + '_' + key + '_' + field);
+    const m1s = get('m1','status').value, m1d = get('m1','date').value;
+    const m2s = get('m2','status').value, m2d = get('m2','date').value;
+    const mous = get('mou','status').value, moud = get('mou','date').value;
+    const blocking = [], warnings = [];
+    if((m1s === 'scheduled' || m1s === 'done') && !m1d) blocking.push('1차 미팅 날짜를 입력해주세요.');
+    if((m2s === 'scheduled' || m2s === 'done') && !m2d) blocking.push('2차 미팅 날짜를 입력해주세요.');
+    if(mous === 'done' && !moud) blocking.push('협약 체결일을 입력해주세요.');
+    const todayTs = new Date(new Date().toDateString()).getTime();
+    function checkDate(dateStr, status, label){
+      if(!dateStr) return;
+      const ts = new Date(dateStr + 'T00:00:00').getTime();
+      if(status === 'done' && ts > todayTs) warnings.push(`${label} 완료일이 미래 날짜입니다.`);
+      if(status === 'scheduled' && ts < todayTs) warnings.push(`${label} 예정일이 과거 날짜입니다.`);
+    }
+    checkDate(m1d, m1s, '1차 미팅');
+    checkDate(m2d, m2s, '2차 미팅');
+    if(mous === 'done') checkDate(moud, 'done', '협약 체결');
+    if(m1d && m2d && m2d < m1d) warnings.push('2차 미팅 날짜가 1차 미팅 날짜보다 빠릅니다.');
+    if(moud && m2d && moud < m2d) warnings.push('협약 체결일이 2차 미팅 날짜보다 빠릅니다.');
+    return { blocking, warnings, values: { m1s, m1d, m2s, m2d, mous, moud } };
+  }
+  // 실제 저장 — co.partnerDashboard.newMou/mouDate에 한 번의 updateCompany로 함께
+  // 써서(중간에 다시 조회하지 않아 다른 patch를 덮어쓰는 사고를 피한다), buildProgressStages
+  // 등 기존 계산이 다음 렌더링부터 바로 새 값을 읽게 한다. status가 'undetermined'인
+  // 단계는 아무것도 쓰지 않는다 — 기존 실제 날짜 기록을 "미정으로 되돌리는" 시도로
+  // 지우는 일이 없게 한다(§14 "기존 체결일 삭제 금지"와 같은 원칙을 1·2차미팅에도 적용).
+  function applyDealStageValues(companyId, values){
+    const co = D.findCompany(companyId);
+    if(!co) return;
+    const currentPd = co.partnerDashboard || {};
+    const currentNm = currentPd.newMou || {};
+    const nmPatch = Object.assign({}, currentNm);
+    function applyMeeting(prefix, status, dateStr){
+      const label = dateStr ? workqDateInputToLabel(dateStr) : null;
+      if(status === 'done' && label){ nmPatch[prefix + 'Label'] = label; nmPatch[prefix + 'Skipped'] = false; }
+      else if(status === 'scheduled' && label){ nmPatch[prefix + 'ScheduledLabel'] = label; nmPatch[prefix + 'Skipped'] = false; }
+      else if(status === 'skipped'){ nmPatch[prefix + 'Skipped'] = true; }
+    }
+    applyMeeting('m1', values.m1s, values.m1d);
+    applyMeeting('m2', values.m2s, values.m2d);
+    // classifyWorkQueueMeeting은 "질문서 회신 완료"를 전제조건으로 요구한다 — 이 화면은
+    // 질문서 단계를 다루지 않지만, 사용자가 1차미팅 상태를 실제로 기록하는 순간(=질문서
+    // 회신을 받았기 때문에 1차미팅을 잡을 수 있었다는 사용자 본인의 전제, §요청 원문
+    // "질문서 회신받으면 1차미팅해야하잖아")에만, 그리고 기존 qReplyLabel이 없을 때만
+    // 그 날짜(또는 오늘)로 채운다 — 임의 날짜를 지어내는 게 아니라 이 화면에 실제로
+    // 입력된 날짜를 그대로 쓴다.
+    if(!currentNm.qReplyLabel && values.m1s !== 'undetermined'){
+      nmPatch.qReplyLabel = values.m1d ? workqDateInputToLabel(values.m1d) : workqTodayLabel();
+    }
+    let mouDateLabel = null;
+    if(values.mous === 'done' && values.moud){
+      mouDateLabel = workqDateInputToLabel(values.moud);
+      nmPatch.mouDone = true;
+      nmPatch.mouLabel = mouDateLabel;
+      nmPatch.mouInProgress = false;
+    } else if(values.mous === 'inProgress'){
+      nmPatch.mouInProgress = true;
+    }
+    const pdPatch = Object.assign({}, currentPd, { newMou: nmPatch });
+    // resolvePartnerAgreementDate가 최우선으로 읽는 실제 필드에도 함께 쓴다(§4 "기존
+    // 체결일 데이터를 그대로 사용하거나 안전하게 연결" — 기존 값이 있으면 절대 지우지
+    // 않고, 새로 체결 완료를 입력했을 때만 채운다).
+    if(mouDateLabel) pdPatch.mouDate = mouDateLabel;
+    D.updateCompany(companyId, { partnerDashboard: pdPatch });
+    // §12: 별도 감사로그 시스템은 없으므로(범위 밖) 기존 활동기록에만 짧게 남긴다.
+    const parts = [];
+    if(values.m1s !== 'undetermined') parts.push(`1차미팅 ${DEAL_M_STATUS_LABELS.find(x=>x[0]===values.m1s)[1]}${values.m1d?' · '+values.m1d:''}`);
+    if(values.m2s !== 'undetermined') parts.push(`2차미팅 ${DEAL_M_STATUS_LABELS.find(x=>x[0]===values.m2s)[1]}${values.m2d?' · '+values.m2d:''}`);
+    if(values.mous !== 'none') parts.push(`협약 ${DEAL_MOU_STATUS_LABELS.find(x=>x[0]===values.mous)[1]}${values.moud?' · '+values.moud:''}`);
+    if(parts.length) workqLogActivity(companyId, '고객 진행단계 저장 — ' + parts.join(' / '));
+  }
+  // 목록/카드에서 쓰는 짧은 요약 텍스트 — "1차 완료 → 2차 예정 → 체결 전"(§5 표시 예시
+  // 그대로). buildProgressStages와 완전히 같은 소스(resolveDealStageFormValues도 결국
+  // 같은 newMou/agreementDateLabel을 읽음)라 두 표시가 어긋나지 않는다.
+  const DEAL_M_SHORT = { undetermined:'미정', scheduled:'예정', done:'완료', skipped:'진행 안 함' };
+  const DEAL_MOU_SHORT = { none:'체결 전', inProgress:'진행 중', done:'체결 완료' };
+  function buildDealStageSummaryText(co){
+    const v = resolveDealStageFormValues(co);
+    return `1차 ${DEAL_M_SHORT[v.m1.status]} → 2차 ${DEAL_M_SHORT[v.m2.status]} → ${DEAL_MOU_SHORT[v.mou.status]}`;
+  }
+  // 업체명 옆에 붙이는 "최종 단계만 간단히" 표시(§5) — 판정 우선순위 그대로: 협약
+  // 완료 > 협약 진행중 > 2차완료 > 2차예정 > 1차완료 > 1차예정 > 미팅 미정.
+  function buildDealStageFinalLabel(co){
+    const v = resolveDealStageFormValues(co);
+    if(v.mou.status === 'done') return { text:'체결 완료', cls:'is-done' };
+    if(v.mou.status === 'inProgress') return { text:'협약 진행중', cls:'is-scheduled' };
+    if(v.m2.status === 'done') return { text:'2차 완료', cls:'is-done' };
+    if(v.m2.status === 'scheduled') return { text: '2차 예정' + (v.m2.date ? ' · ' + v.m2.date : ''), cls:'is-scheduled' };
+    if(v.m1.status === 'done') return { text:'1차 완료', cls:'is-done' };
+    if(v.m1.status === 'scheduled') return { text: '1차 예정' + (v.m1.date ? ' · ' + v.m1.date : ''), cls:'is-scheduled' };
+    return { text:'미팅 미정', cls:'is-none' };
+  }
+
   // §고객등록창 팝업 전환 라운드(신규): 목록 화면을 통째로 가리는 전체화면 전환 대신,
   // 다른 중앙 모달(전화 요청 기록/협력사 데이터 가져오기 등)과 같은 .pi-overlay/
   // .pi-panel 팝업 패턴으로 바꾼다 — 뒤의 목록은 그대로 보이고, X/바깥 클릭으로 닫으면
@@ -15273,7 +15583,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="co-form-field"><label>상호 *</label><input type="text" id="crmNewF_name" /></div>
       <div class="co-form-field"><label>업체코드(자동 생성 — 필요시 수정 가능)</label><input type="text" id="crmNewF_code" /></div>
       ${NEW_FIELD_LABELS.slice(1).map(([k,l])=> `<div class="co-form-field"><label>${esc(l)}</label><input type="text" id="crmNewF_${k}" /></div>`).join('')}
-      <div class="co-form-field"><label>협약체결일</label><input type="date" id="crmNewF_mouDate" /></div>
+      ${renderDealStageBlockHtml('addco', resolveDealStageFormValues(null))}
       <div class="co-form-field"><label>비고</label><textarea id="crmNewF_note"></textarea></div>
       <div class="co-form-field">
         <label>사업자등록증 · 명함 이미지 첨부(선택)</label>
@@ -15295,6 +15605,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     `;
     document.getElementById('crmNewF_code').value = genCompanyCode();
     if(prefillName) document.getElementById('crmNewF_name').value = prefillName;
+    bindDealStageBlock('addco');
     wrap.querySelectorAll('[data-region]').forEach(btn=> btn.addEventListener('click', ()=>{
       const r = btn.getAttribute('data-region');
       if(regionSelected.has(r)){ regionSelected.delete(r); btn.classList.remove('is-active'); }
@@ -15379,12 +15690,23 @@ window.SHIN2_CRM_APP_INIT = function(){
       const patch = {};
       NEW_FIELD_LABELS.forEach(([k])=>{ patch[k] = document.getElementById('crmNewF_' + k).value.trim(); });
       patch.code = document.getElementById('crmNewF_code').value.trim();
-      patch.mouDate = document.getElementById('crmNewF_mouDate').value.trim();
       patch.note = document.getElementById('crmNewF_note').value.trim();
       patch.region = Array.from(regionSelected);
       patch.distributionLists = document.getElementById('crmNewFDualList').checked ? ['contractor','external'] : [];
       if(!patch.name){ document.getElementById('crmNewFErr').style.display = 'block'; return; }
+      const dealCheck = validateDealStageBlock('addco');
+      const warnEl = document.getElementById('addco_dealStageWarn');
+      if(dealCheck.blocking.length){
+        warnEl.style.display = 'block'; warnEl.classList.add('is-blocking');
+        warnEl.textContent = dealCheck.blocking.join(' ');
+        return;
+      }
+      if(dealCheck.warnings.length && !confirm(dealCheck.warnings.join('\n') + '\n\n그래도 저장하시겠습니까?')) return;
+      warnEl.style.display = 'none'; warnEl.classList.remove('is-blocking');
       const rec = D.addCompany(patch);
+      // 진행단계는 co.id가 생긴 뒤에만 partnerDashboard.newMou/mouDate에 안전하게 쓸 수
+      // 있어 등록 직후에 적용한다(§ 첨부 이미지와 같은 "생성 후 부가 처리" 순서).
+      applyDealStageValues(rec.id, dealCheck.values);
       closeAddCompanyForm();
       // 첨부 이미지가 있으면 기존 서류함 저장 경로(D.addDocument)를 그대로 재사용해
       // 저장한다 — OCR로 추출된 값이 있으면 §8 원칙 그대로 extracted로 함께 넘긴다.
