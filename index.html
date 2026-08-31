@@ -2412,6 +2412,18 @@ body.map-modal-lock{ overflow:hidden; }
 .ca-ocr-drop-hint{ font-size:11px; color:var(--text-muted); line-height:1.4; text-align:center; flex:1; min-width:0; }
 .ca-ocr-thumb{ width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid var(--line); flex:none; }
 .ca-ocr-status{ font-size:11px; color:var(--text-muted); flex-basis:100%; line-height:1.4; }
+/* §1차미팅 메일 자동발송 라운드(신규) */
+.workq-mail-btn{ height:24px; padding:0 10px; font-size:11.5px; font-weight:700; color:var(--navy); background:#fff; border:1px solid var(--navy); border-radius:5px; cursor:pointer; white-space:nowrap; }
+.workq-mail-btn:hover{ background:#EEF2FA; }
+.mail-settings-panel{ max-width:640px; }
+.mail-settings-section{ border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:14px; background:var(--surface); }
+.mail-settings-section-title{ font-size:13px; font-weight:700; color:var(--text); margin-bottom:8px; }
+.mail-settings-help{ font-size:11.5px; color:var(--text-muted); line-height:1.5; margin-bottom:10px; }
+.mail-settings-help code{ background:#F0F3F9; padding:1px 4px; border-radius:4px; }
+.mail-settings-save-msg{ font-size:12px; color:#0F7A42; margin-bottom:8px; }
+.mail-compose-warn{ font-size:11.5px; color:#9A6B00; background:#FFF7E6; border:1px solid #F0DDA8; border-radius:6px; padding:8px 10px; margin-bottom:12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.mail-compose-status{ font-size:12px; color:var(--text-muted); margin-top:4px; min-height:16px; }
+.mail-compose-status.is-err{ color:#B91C1C; }
 </style>
 </head>
 <body>
@@ -2450,6 +2462,9 @@ body.map-modal-lock{ overflow:hidden; }
     <div class="top-tab-row" id="crmTopTabs">
       <button type="button" class="top-tab is-active" id="crmTabCustomer" data-tab="customer">고객관리</button>
       <button type="button" class="top-tab" id="crmTabWorkQueue" data-tab="workqueue">업무관리</button>
+      <!-- §1차미팅 메일 자동발송 라운드(신규): "보내는사람/받는사람/문구는 따로 탭 만들어서
+           지정할 수 있게" 요청 그대로 세 번째 최상위 탭으로 추가했다. -->
+      <button type="button" class="top-tab" id="crmTabMailSettings" data-tab="mailsettings">메일 설정</button>
     </div>
   </div>
 
@@ -2574,6 +2589,12 @@ body.map-modal-lock{ overflow:hidden; }
   <!-- §업무관리 탭 1차 구축 라운드 §1/§15: listView/cardView와 완전히 별개인 세 번째 최상위
        view — 읽기 전용, companies/activities를 매번 새로 조회만 한다(별도 저장소 없음). -->
   <div id="workQueueView" style="display:none;"></div>
+  <!-- §1차미팅 메일 자동발송 라운드(신규): listView/cardView/workQueueView와 완전히
+       별개인 네 번째 최상위 view — 메일 발신자/문구 템플릿 + EmailJS 연동 설정 전용. -->
+  <div id="mailSettingsView" style="display:none;"></div>
+  <!-- §1차미팅 메일 자동발송 라운드(신규): 업무관리 "1차미팅 잡기" 목록의 [메일발송]이
+       여는 발송 팝업 전용 root — 다른 중앙 모달과 같은 .pi-overlay/.pi-panel 패턴. -->
+  <div id="mailComposeModalRoot"></div>
   <div id="chartMemoModalRoot"></div>
   <div id="partnerImportModalRoot"></div>
   <div id="pourImportModalRoot"></div>
@@ -3419,6 +3440,14 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   // 한다. 업로드/삭제/수정은 전부 v2 자료실 화면의 몫이고, 이 파일은 그 저장소의 이름과 구조를
   // 절대 바꾸지 않는다(§29). 질문에 "제공자료"를 연결할 때 파일명을 보여주기 위한 참조 전용.
   const LIB_KEY = 'shin2-library-documents-v1';
+  // §1차미팅 메일 자동발송 라운드(신규): "1차미팅 잡기" 목록에서 [메일발송]을 누르면
+  // 나가는 메일의 발신자/문구 템플릿 + EmailJS 연동 정보(진짜 자동 발송을 위해 사용자가
+  // 직접 연결하는 외부 이메일 발송 서비스, 여기서는 하이웍스 SMTP를 EmailJS의 Custom
+  // SMTP로 연결하는 방식을 안내한다)를 저장한다. 회사 전체가 공유하는 설정이 아니라 이
+  // 브라우저에만 저장되는 개인 설정이다(§ 다른 CRM 설정 저장 패턴과 동일 — Firebase에
+  // 올리지 않음, EmailJS Public Key는 비밀키가 아니라 클라이언트에 노출돼도 되는 값이지만
+  // 그래도 로컬에만 둔다).
+  const MAIL_SETTINGS_KEY = 'shin2-crm-mail-settings-v1';
 
   // ============================================================================
   // §데이터 보존 긴급 라운드 — 저장 실패 감지 + 덮어쓰기 차단
@@ -3548,6 +3577,19 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     list.push(rec);
     saveCompanies(list);
     return rec;
+  }
+  // ---- 1차미팅 메일 설정(§1차미팅 메일 자동발송 라운드) ----
+  const DEFAULT_MAIL_SETTINGS = {
+    emailjsPublicKey: '', emailjsServiceId: '', emailjsTemplateId: '',
+    fromName: '', fromEmail: '',
+    subjectTemplate: '[POUR] {업체명} 1차 미팅 일정 제안드립니다',
+    bodyTemplate: '안녕하세요, {업체명} {담당자}님.\n\n보내주신 질문서 잘 확인했습니다.\n협의를 위해 1차 미팅 일정을 제안드리고자 합니다.\n편하신 일정 알려주시면 조율하겠습니다.\n\n감사합니다.\n{보내는사람}'
+  };
+  function loadMailSettings(){ return Object.assign({}, DEFAULT_MAIL_SETTINGS, readObj(MAIL_SETTINGS_KEY)); }
+  function saveMailSettings(patch){
+    const next = Object.assign({}, loadMailSettings(), patch);
+    writeObj(MAIL_SETTINGS_KEY, next);
+    return next;
   }
   // §데이터 업데이트 성능 개선 라운드: patch를 레코드에 적용하는 순수 로직만 분리했다(값/
   // 병합 기준은 한 글자도 안 바꿈, §PART2-12 "빈 정보만 채우기" 그대로) — updateCompany는
@@ -5842,6 +5884,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
 
   window.SHIN2_CRM_DATA = {
     loadCompanies, findCompany, addCompany, updateCompany,
+    loadMailSettings, saveMailSettings,
     loadActivities, addActivity, updateActivityText, deleteActivity, activitiesForCompany, classifyActivity,
     loadDocuments, documentsForCompany, addDocument, updateDocumentExtracted, getBlob, renameDocument, setDocumentMemo, deleteDocument, findDocument, migrateDocumentToCloud,
     memosFor, addMemo, updateMemo, deleteMemo,
@@ -9333,11 +9376,14 @@ window.SHIN2_CRM_APP_INIT = function(){
                2차→MOU 4단계 stepper)을 여기로 옮겼다(요청 "정보를 지우는 게 아니라 이 창을
                업무관리 창으로 이전"). buildStageStepperHtml/buildProgressStages 둘 다
                이미 있던 함수 그대로 재사용 — 새 판정 로직 없음. -->
-          <thead><tr><th>업체명</th><th>현재 상태</th><th>단계 진행상황</th><th>관리 이유</th><th>경과</th><th>해야 할 일</th></tr></thead>
+          <thead><tr><th>업체명</th><th>현재 상태</th><th>단계 진행상황</th><th>관리 이유</th><th>경과</th><th>해야 할 일</th><th>메일</th></tr></thead>
           <tbody>
             ${filtered.map(it=> {
               const isOpen = workQueueExpanded && workQueueExpanded.companyId === it.co.id && workQueueExpanded.type === it.type;
               const stageStepperHtml = buildStageStepperHtml(buildProgressStages(it.co));
+              // §1차미팅 메일 자동발송 라운드: [메일발송]은 "1차미팅 잡기" 목록(m1/m1Scheduled)
+              // 항목에만 노출한다 — 다른 단계(2차미팅/MOU/전환관리)는 이번 요청 범위 밖.
+              const showMailBtn = it.type === 'm1' || it.type === 'm1Scheduled';
               return `<tr>
                 <td><button type="button" class="workq-co-link" data-workq-open-co="${esc(it.co.id)}">${esc(it.co.name)}</button></td>
                 <td>${esc(it.currentStateLabel)}</td>
@@ -9345,7 +9391,8 @@ window.SHIN2_CRM_APP_INIT = function(){
                 <td class="workq-reason">${esc(it.reasonText)}</td>
                 <td class="workq-days">${it.days === null ? '—' : esc(it.days) + '일'}${it.isDelayed ? '<span class="workq-delay-badge">지연</span>' : ''}</td>
                 <td><button type="button" class="workq-action-btn${isOpen ? ' is-open' : ''}" data-workq-toggle="${esc(it.co.id)}" data-workq-toggle-type="${esc(it.type)}">${esc(it.actionLabel)}</button></td>
-              </tr>${isOpen ? `<tr class="workq-expand-row"><td colspan="6"><div class="workq-expand">${renderWorkqExpandBody(it)}</div></td></tr>` : ''}`;
+                <td>${showMailBtn ? `<button type="button" class="workq-mail-btn" data-workq-mail="${esc(it.co.id)}">메일발송</button>` : '—'}</td>
+              </tr>${isOpen ? `<tr class="workq-expand-row"><td colspan="7"><div class="workq-expand">${renderWorkqExpandBody(it)}</div></td></tr>` : ''}`;
             }).join('')}
           </tbody>
         </table>
@@ -9362,6 +9409,9 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
     wrap.querySelectorAll('[data-workq-open-co]').forEach(btn=> btn.addEventListener('click', ()=>{
       openCardFromWorkQueue(btn.getAttribute('data-workq-open-co'));
+    }));
+    wrap.querySelectorAll('[data-workq-mail]').forEach(btn=> btn.addEventListener('click', ()=>{
+      openMailComposeModal(btn.getAttribute('data-workq-mail'));
     }));
     wrap.querySelectorAll('[data-workq-toggle]').forEach(btn=> btn.addEventListener('click', ()=>{
       const companyId = btn.getAttribute('data-workq-toggle');
@@ -9463,6 +9513,176 @@ window.SHIN2_CRM_APP_INIT = function(){
       }
     }));
   }
+
+  /* ==========================================================================
+     §1차미팅 메일 자동발송 라운드(신규) — 요청: "질문서 회신 받으면 1차미팅 잡아야
+     하잖아, 업무관리에서 1차미팅잡기 탭 누르면 그 명단(이미 있는 m1 필터), 거기서
+     [메일발송] 누르면 자동으로 1차미팅 제안 메일이 나가면 좋겠다. 보내는사람/받는사람/
+     문구는 내가 지정할 수 있게 따로 탭 만들고." — 정적 사이트(GitHub Pages, 서버 없음)
+     라 실제로 서버를 거쳐 자동 발송하려면 외부 이메일 발송 서비스를 붙여야 한다(§ 사용자
+     확인: "진짜로 자동 발송까지 원함" + "메일은 하이웍스"). EmailJS(무료 티어 제공, 코드
+     없이 대시보드에서 발신 서비스를 연결하는 방식)에 하이웍스 계정을 Custom SMTP로
+     연결하는 방식을 채택했다 — 이 앱은 EmailJS의 Public Key/Service ID/Template ID만
+     설정값으로 들고 있고, 실제 SMTP 자격증명은 EmailJS 쪽에만 저장된다(이 앱에는 절대
+     들어오지 않음). 계정 생성/SMTP 연결은 사용자가 직접 해야 하는 부분이라 설정 탭에
+     안내 문구로 안내한다.
+     ========================================================================== */
+  const MAIL_TEMPLATE_HELP = '사용 가능한 자리표시자: {업체명} {담당자} {대표자} {보내는사람}';
+  // 회사 데이터에서 자리표시자를 실제 값으로 채운다 — 값이 없으면 빈 문자열로 지운다
+  // (지어낸 값 금지, §2 원칙과 동일).
+  function fillMailTemplate(tpl, co, mailSettings){
+    return String(tpl || '')
+      .replace(/\{업체명\}/g, co.name || '')
+      .replace(/\{담당자\}/g, co.contactName || '담당자')
+      .replace(/\{대표자\}/g, co.repName || '')
+      .replace(/\{보내는사람\}/g, mailSettings.fromName || '');
+  }
+  let emailjsLoadPromise = null;
+  function loadEmailJsSdk(){
+    if(emailjsLoadPromise) return emailjsLoadPromise;
+    if(window.emailjs){ emailjsLoadPromise = Promise.resolve(window.emailjs); return emailjsLoadPromise; }
+    emailjsLoadPromise = new Promise((resolve, reject)=>{
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
+      s.onload = ()=>{ if(window.emailjs) resolve(window.emailjs); else reject(new Error('EmailJS 로드 실패')); };
+      s.onerror = ()=>{ emailjsLoadPromise = null; reject(new Error('EmailJS 스크립트를 불러오지 못했습니다(네트워크 확인 필요)')); };
+      document.head.appendChild(s);
+    });
+    return emailjsLoadPromise;
+  }
+  function renderMailSettingsView(){
+    const wrap = document.getElementById('mailSettingsView');
+    if(!wrap) return;
+    const s = D.loadMailSettings();
+    wrap.innerHTML = `
+      <div class="workq-header-row">
+        <div class="workq-header">
+          <div class="workq-title">메일 설정</div>
+          <div class="workq-subtitle">"1차미팅 잡기" 목록에서 [메일발송]을 누르면 여기 설정한 발신자/문구로 메일이 나갑니다.</div>
+        </div>
+      </div>
+      <div class="mail-settings-panel">
+        <div class="mail-settings-section">
+          <div class="mail-settings-section-title">① 이메일 발송 서비스 연결(EmailJS)</div>
+          <div class="mail-settings-help">
+            이 사이트는 서버가 없어 실제로 메일을 "발송"하려면 외부 이메일 발송 서비스를 연결해야 합니다.
+            <a href="https://www.emailjs.com/" target="_blank" rel="noopener">EmailJS</a>에 무료 가입 후, 하이웍스 계정을
+            Custom SMTP(발신 서버) 서비스로 연결하고 아래 3개 값을 붙여넣어 주세요. 하이웍스 SMTP 정보는 하이웍스
+            관리자센터의 "메일 환경설정 &rarr; POP3/SMTP" 메뉴에서 확인할 수 있습니다. 여기 저장하는 값은 이 브라우저에만
+            보관되며 하이웍스 비밀번호는 EmailJS 쪽에만 저장되고 이 앱에는 전혀 들어오지 않습니다.
+          </div>
+          <div class="co-form-field"><label>EmailJS Public Key</label><input type="text" id="mailSetPublicKey" value="${esc(s.emailjsPublicKey)}" /></div>
+          <div class="co-form-field"><label>EmailJS Service ID</label><input type="text" id="mailSetServiceId" value="${esc(s.emailjsServiceId)}" /></div>
+          <div class="co-form-field"><label>EmailJS Template ID</label><input type="text" id="mailSetTemplateId" value="${esc(s.emailjsTemplateId)}" /></div>
+          <div class="mail-settings-help">EmailJS 템플릿 화면에서는 변수명을 <code>to_email</code>, <code>subject</code>, <code>message</code>, <code>reply_to</code>, <code>from_name</code>으로 맞춰주세요 — 이 앱이 발송 시 그 이름 그대로 값을 채워 보냅니다.</div>
+        </div>
+        <div class="mail-settings-section">
+          <div class="mail-settings-section-title">② 보내는사람</div>
+          <div class="co-form-field"><label>이름</label><input type="text" id="mailSetFromName" value="${esc(s.fromName)}" /></div>
+          <div class="co-form-field"><label>이메일(하이웍스 계정 주소)</label><input type="text" id="mailSetFromEmail" value="${esc(s.fromEmail)}" /></div>
+        </div>
+        <div class="mail-settings-section">
+          <div class="mail-settings-section-title">③ 1차 미팅 제안 메일 문구</div>
+          <div class="mail-settings-help">${esc(MAIL_TEMPLATE_HELP)}</div>
+          <div class="co-form-field"><label>제목</label><input type="text" id="mailSetSubject" value="${esc(s.subjectTemplate)}" /></div>
+          <div class="co-form-field"><label>본문</label><textarea id="mailSetBody" rows="8">${esc(s.bodyTemplate)}</textarea></div>
+        </div>
+        <div id="mailSetSaveMsg" class="mail-settings-save-msg" style="display:none;">저장했습니다.</div>
+        <button type="button" class="co-text-action primary" id="mailSetSaveBtn">저장</button>
+      </div>
+    `;
+    document.getElementById('mailSetSaveBtn').addEventListener('click', ()=>{
+      D.saveMailSettings({
+        emailjsPublicKey: document.getElementById('mailSetPublicKey').value.trim(),
+        emailjsServiceId: document.getElementById('mailSetServiceId').value.trim(),
+        emailjsTemplateId: document.getElementById('mailSetTemplateId').value.trim(),
+        fromName: document.getElementById('mailSetFromName').value.trim(),
+        fromEmail: document.getElementById('mailSetFromEmail').value.trim(),
+        subjectTemplate: document.getElementById('mailSetSubject').value,
+        bodyTemplate: document.getElementById('mailSetBody').value
+      });
+      const msg = document.getElementById('mailSetSaveMsg');
+      msg.style.display = 'block';
+      setTimeout(()=>{ msg.style.display = 'none'; }, 1800);
+    });
+  }
+  function closeMailComposeModal(){
+    const root = document.getElementById('mailComposeModalRoot');
+    if(root) root.innerHTML = '';
+  }
+  // openMailComposeModal: 업무관리 "1차미팅 잡기" 목록의 [메일발송] 버튼에서 연다.
+  // 메일 설정 탭에서 저장해 둔 문구 템플릿을 이 업체 값으로 채워 미리 보여주고, 발송
+  // 직전에 보내는사람/받는사람/제목/본문을 여기서 다시 손볼 수 있다(§요청 "보내는사람
+  // 받는사람 그리고 문구는 내가 지정할 수 있게").
+  function openMailComposeModal(companyId){
+    const co = D.findCompany(companyId);
+    if(!co) return;
+    const s = D.loadMailSettings();
+    const modalRoot = document.getElementById('mailComposeModalRoot');
+    modalRoot.innerHTML = `
+      <div class="pi-overlay" id="mailComposeOverlay">
+        <div class="pi-panel" style="max-width:600px;" role="dialog" aria-modal="true" aria-label="1차 미팅 제안 메일 발송">
+          <div class="pi-head">
+            <div class="pi-title">1차 미팅 제안 메일 — ${esc(co.name)}</div>
+            <button type="button" class="chart-close-btn" id="mailComposeCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body">
+            ${(!s.emailjsServiceId || !s.emailjsTemplateId || !s.emailjsPublicKey) ? `
+              <div class="mail-compose-warn">메일 설정 탭에서 EmailJS 연동 정보를 먼저 입력해야 실제 발송이 됩니다.
+                <button type="button" class="co-text-action primary" id="mailComposeGoSettings">메일 설정으로 이동</button></div>
+            ` : ''}
+            <div class="co-form-field"><label>보내는사람</label><input type="text" id="mailComposeFrom" value="${esc(s.fromName)}${s.fromEmail ? ' <' + esc(s.fromEmail) + '>' : ''}" /></div>
+            <div class="co-form-field"><label>받는사람</label><input type="text" id="mailComposeTo" value="${esc(co.email || '')}" placeholder="받는 이메일 주소" /></div>
+            <div class="co-form-field"><label>제목</label><input type="text" id="mailComposeSubject" value="${esc(fillMailTemplate(s.subjectTemplate, co, s))}" /></div>
+            <div class="co-form-field"><label>본문</label><textarea id="mailComposeBody" rows="10">${esc(fillMailTemplate(s.bodyTemplate, co, s))}</textarea></div>
+            <div id="mailComposeStatus" class="mail-compose-status"></div>
+          </div>
+          <div class="pi-actions">
+            <button type="button" class="co-text-action" id="mailComposeCancelBtn">취소</button>
+            <button type="button" class="co-text-action primary" id="mailComposeSendBtn">메일 발송</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.getElementById('mailComposeCloseBtn').addEventListener('click', closeMailComposeModal);
+    document.getElementById('mailComposeCancelBtn').addEventListener('click', closeMailComposeModal);
+    document.getElementById('mailComposeOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'mailComposeOverlay') closeMailComposeModal(); });
+    const goSettingsBtn = document.getElementById('mailComposeGoSettings');
+    if(goSettingsBtn) goSettingsBtn.addEventListener('click', ()=>{ closeMailComposeModal(); showMailSettingsTab(); });
+    document.getElementById('mailComposeSendBtn').addEventListener('click', ()=>{
+      const statusEl = document.getElementById('mailComposeStatus');
+      const toEmail = document.getElementById('mailComposeTo').value.trim();
+      if(!toEmail){ statusEl.textContent = '받는사람 이메일을 입력해주세요.'; statusEl.classList.add('is-err'); return; }
+      const latestSettings = D.loadMailSettings();
+      if(!latestSettings.emailjsServiceId || !latestSettings.emailjsTemplateId || !latestSettings.emailjsPublicKey){
+        statusEl.textContent = '메일 설정 탭에서 EmailJS 연동 정보를 먼저 입력해주세요.';
+        statusEl.classList.add('is-err');
+        return;
+      }
+      const params = {
+        to_email: toEmail,
+        from_name: document.getElementById('mailComposeFrom').value.trim(),
+        reply_to: latestSettings.fromEmail || '',
+        subject: document.getElementById('mailComposeSubject').value.trim(),
+        message: document.getElementById('mailComposeBody').value
+      };
+      statusEl.classList.remove('is-err');
+      statusEl.textContent = '발송 중…';
+      loadEmailJsSdk()
+        .then(emailjs=> emailjs.send(latestSettings.emailjsServiceId, latestSettings.emailjsTemplateId, params, { publicKey: latestSettings.emailjsPublicKey }))
+        .then(()=>{
+          statusEl.textContent = '발송 완료';
+          // §추적 라운드: 메일 발송도 기존 활동기록(activitiesForCompany)에 그대로 남긴다 —
+          // 새 로그 저장소를 만들지 않고 있던 함수(D.addActivity) 재사용.
+          D.addActivity(co.id, `1차 미팅 제안 메일 발송 (받는사람: ${toEmail})`);
+          setTimeout(closeMailComposeModal, 900);
+        })
+        .catch(err=>{
+          statusEl.classList.add('is-err');
+          statusEl.textContent = '발송 실패: ' + (err && (err.text || err.message) ? (err.text || err.message) : '알 수 없는 오류') + ' — EmailJS 연동 정보와 하이웍스 SMTP 연결 상태를 확인해주세요.';
+        });
+    });
+  }
   // §업무관리 탭 1차 구축 라운드 §1/§2 — 세 최상위 view(listView/cardView/workQueueView)
   // 중 하나만 보이게 한다. 고객관리 쪽으로 돌아갈 때는 currentCompanyId가 남아있으면(카드를
   // 보다가 업무관리로 넘어온 경우) 카드로, 아니면 목록으로 복귀한다 — listView/cardView
@@ -9470,6 +9690,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 변경 금지").
   function showCustomerTab(){
     document.getElementById('workQueueView').style.display = 'none';
+    document.getElementById('mailSettingsView').style.display = 'none';
     if(currentCompanyId && D.findCompany(currentCompanyId)){
       cardView.style.display = 'block';
       listView.style.display = 'none';
@@ -9482,15 +9703,27 @@ window.SHIN2_CRM_APP_INIT = function(){
   function showWorkQueueTab(){
     listView.style.display = 'none';
     cardView.style.display = 'none';
+    document.getElementById('mailSettingsView').style.display = 'none';
     document.getElementById('workQueueView').style.display = 'block';
     renderWorkQueueView();
     updateTopTabsUI('workqueue');
   }
+  // §1차미팅 메일 자동발송 라운드(신규): 나머지 세 view와 완전히 같은 전환 패턴.
+  function showMailSettingsTab(){
+    listView.style.display = 'none';
+    cardView.style.display = 'none';
+    document.getElementById('workQueueView').style.display = 'none';
+    document.getElementById('mailSettingsView').style.display = 'block';
+    renderMailSettingsView();
+    updateTopTabsUI('mailsettings');
+  }
   function updateTopTabsUI(tab){
     const custBtn = document.getElementById('crmTabCustomer');
     const wqBtn = document.getElementById('crmTabWorkQueue');
+    const mailBtn = document.getElementById('crmTabMailSettings');
     if(custBtn) custBtn.classList.toggle('is-active', tab === 'customer');
     if(wqBtn) wqBtn.classList.toggle('is-active', tab === 'workqueue');
+    if(mailBtn) mailBtn.classList.toggle('is-active', tab === 'mailsettings');
   }
   // §11: 업무관리 목록에서 업체명 클릭 -> 새 상세화면을 만들지 않고 기존 openCard(companyId)를
   // 그대로 연다. workQueueView를 먼저 숨기고 탭 UI만 "고객관리"로 되돌린 뒤 openCard를
@@ -17319,6 +17552,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   // searchInput/필터/정렬 등 리스너는 전혀 건드리지 않았다.
   document.getElementById('crmTabCustomer').addEventListener('click', showCustomerTab);
   document.getElementById('crmTabWorkQueue').addEventListener('click', showWorkQueueTab);
+  document.getElementById('crmTabMailSettings').addEventListener('click', showMailSettingsTab);
   searchInput.addEventListener('input', ()=>{ searchQuery = searchInput.value.trim(); currentPage = 1; renderList(); });
   const sortSelect = document.getElementById('crmSortSelect');
   if(sortSelect){
