@@ -2621,6 +2621,11 @@ body.map-modal-lock{ overflow:hidden; }
   <!-- §1차미팅 메일 자동발송 라운드(신규): 업무관리 "1차미팅 잡기" 목록의 [메일발송]이
        여는 발송 팝업 전용 root — 다른 중앙 모달과 같은 .pi-overlay/.pi-panel 패턴. -->
   <div id="mailComposeModalRoot"></div>
+  <!-- §업무관리 처리 팝업 전환 라운드(신규): "1차미팅 잡기" 등 [해야 할 일] 버튼이
+       표 안에 줄을 펼치던 방식(inline expand row) 대신 중앙 팝업으로 연다(§요청
+       "저런형식말고 팝업으로 간단하게") — 다른 중앙 모달과 같은 .pi-overlay/.pi-panel
+       패턴 전용 root. -->
+  <div id="workqActionModalRoot"></div>
   <div id="chartMemoModalRoot"></div>
   <div id="partnerImportModalRoot"></div>
   <div id="pourImportModalRoot"></div>
@@ -9437,7 +9442,7 @@ window.SHIN2_CRM_APP_INIT = function(){
                 <td class="workq-days">${it.days === null ? '—' : esc(it.days) + '일'}${it.isDelayed ? '<span class="workq-delay-badge">지연</span>' : ''}</td>
                 <td><button type="button" class="workq-action-btn${isOpen ? ' is-open' : ''}" data-workq-toggle="${esc(it.co.id)}" data-workq-toggle-type="${esc(it.type)}">${esc(it.actionLabel)}</button></td>
                 <td>${mailCellHtml}</td>
-              </tr>${isOpen ? `<tr class="workq-expand-row"><td colspan="7"><div class="workq-expand">${renderWorkqExpandBody(it)}</div></td></tr>` : ''}`;
+              </tr>`;
             }).join('')}
           </tbody>
         </table>
@@ -9458,14 +9463,20 @@ window.SHIN2_CRM_APP_INIT = function(){
     wrap.querySelectorAll('[data-workq-mail]').forEach(btn=> btn.addEventListener('click', ()=>{
       openMailComposeModal(btn.getAttribute('data-workq-mail'));
     }));
+    // §업무관리 처리 팝업 전환 라운드(신규): 표 안에 줄을 펼치던 방식 대신 중앙 팝업을
+    // 연다(§요청 "저런형식말고 팝업으로 간단하게") — 같은 버튼을 다시 누르면 닫히는
+    // 기존 토글 동작(§3)은 그대로 유지한다.
     wrap.querySelectorAll('[data-workq-toggle]').forEach(btn=> btn.addEventListener('click', ()=>{
       const companyId = btn.getAttribute('data-workq-toggle');
       const type = btn.getAttribute('data-workq-toggle-type');
       const isSame = workQueueExpanded && workQueueExpanded.companyId === companyId && workQueueExpanded.type === type;
-      workQueueExpanded = isSame ? null : { companyId, type }; // §3: 하나를 열면 기존 열린 영역은 닫힘(같은 것을 다시 누르면 닫기)
-      renderWorkQueueView();
+      if(isSame){ workQueueExpanded = null; closeWorkqActionModal(); renderWorkQueueView(); return; }
+      const item = list.find(it=> it.co.id === companyId && it.type === type);
+      if(!item) return;
+      workQueueExpanded = { companyId, type };
+      openWorkqActionModal(item);
+      renderWorkQueueView(); // 버튼 강조(is-open) 갱신만 목적 — 팝업 자체는 별도 root라 안 지워짐
     }));
-    bindWorkqExpandHandlers(wrap, list);
     wrap.querySelectorAll('[data-workq-copy]').forEach(btn=> btn.addEventListener('click', ()=> copyText(btn.getAttribute('data-workq-copy'), btn)));
     const searchInput = document.getElementById('workqSearchInput');
     if(searchInput){
@@ -9496,17 +9507,41 @@ window.SHIN2_CRM_APP_INIT = function(){
       }
     }
   }
+  // §업무관리 처리 팝업 전환 라운드(신규) — "저런형식말고 팝업으로 간단하게" 요청에
+  // 따라 표 안에 줄을 펼치던 inline expand row를 없애고 중앙 팝업(.pi-overlay/
+  // .pi-panel, 다른 모달과 같은 패턴)으로 바꿨다. renderWorkqExpandBody가 만드는
+  // 내용/data-workq-do 액션 처리 로직은 한 글자도 안 바꾸고 그대로 재사용했다 — 담는
+  // 그릇(표 안 → 팝업)만 바뀌었다.
+  function closeWorkqActionModal(){
+    const root = document.getElementById('workqActionModalRoot');
+    if(root) root.innerHTML = '';
+  }
+  function openWorkqActionModal(item){
+    const modalRoot = document.getElementById('workqActionModalRoot');
+    if(!modalRoot) return;
+    modalRoot.innerHTML = `
+      <div class="pi-overlay" id="workqActionOverlay">
+        <div class="pi-panel" style="max-width:480px;" role="dialog" aria-modal="true" aria-label="${esc(item.co.name)} ${esc(item.actionLabel)}">
+          <div class="pi-head">
+            <div class="pi-title">${esc(item.co.name)} · ${esc(item.actionLabel)}</div>
+            <button type="button" class="chart-close-btn" id="workqActionCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body"><div class="workq-expand" id="workqActionBody">${renderWorkqExpandBody(item)}</div></div>
+        </div>
+      </div>
+    `;
+    const finishClose = ()=>{ workQueueExpanded = null; closeWorkqActionModal(); renderWorkQueueView(); };
+    document.getElementById('workqActionCloseBtn').addEventListener('click', finishClose);
+    document.getElementById('workqActionOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'workqActionOverlay') finishClose(); });
+    bindWorkqActionHandlers(item);
+  }
   // §16: 처리 후 즉시 재계산 — 새로고침 없이 renderWorkQueueView()를 다시 부르기만 하면
   // computeWorkQueue()가 companies/activities를 다시 읽어 목록/상단 건수가 바로 갱신된다
   // (별도 diff 로직 불필요, 이미 매번 새로 계산하는 순수 함수라서).
-  function bindWorkqExpandHandlers(wrap, list){
-    const panel = wrap.querySelector('.workq-expand-row');
-    if(!panel || !workQueueExpanded) return;
-    const item = list.find(it=> it.co.id === workQueueExpanded.companyId && it.type === workQueueExpanded.type);
-    if(!item) return;
-    const root = panel.querySelector('.workq-expand');
-    const savedNote = root.querySelector('.workq-saved-note');
-    const finishAndClose = ()=>{ workQueueExpanded = null; renderWorkQueueView(); };
+  function bindWorkqActionHandlers(item){
+    const root = document.getElementById('workqActionBody');
+    if(!root) return;
+    const finishAndClose = ()=>{ workQueueExpanded = null; closeWorkqActionModal(); renderWorkQueueView(); };
     root.querySelectorAll('[data-workq-do]').forEach(btn=> btn.addEventListener('click', ()=>{
       const action = btn.getAttribute('data-workq-do');
       const memo = root.querySelector('.workq-memo-input');
