@@ -2626,6 +2626,10 @@ body.map-modal-lock{ overflow:hidden; }
   <!-- §POUR 시공 아파트 지도 라운드(신규): 아파트 마커 "실적 상세보기" 클릭 시 여는 중앙
        모달 전용 root — 다른 중앙 모달과 같은 .pi-overlay/.pi-panel 패턴 재사용. -->
   <div id="aptHistoryModalRoot"></div>
+  <!-- §고객등록창 팝업 전환 라운드(신규): 목록 화면을 통째로 가리던 "신규 고객 등록"
+       전체화면 전환을 다른 중앙 모달과 같은 .pi-overlay/.pi-panel 팝업으로 바꾼다 —
+       전용 root. -->
+  <div id="addCompanyModalRoot"></div>
 </div>
 
 <script>
@@ -14986,6 +14990,15 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
     return tesseractLoadPromise;
   }
+  // §고객등록창 팝업 전환 라운드(신규): 목록 화면을 통째로 가리는 전체화면 전환 대신,
+  // 다른 중앙 모달(전화 요청 기록/협력사 데이터 가져오기 등)과 같은 .pi-overlay/
+  // .pi-panel 팝업 패턴으로 바꾼다 — 뒤의 목록은 그대로 보이고, X/바깥 클릭으로 닫으면
+  // 목록 화면으로 돌아갈 필요 없이(애초에 안 가려졌으므로) 팝업만 사라진다.
+  function closeAddCompanyForm(){
+    addingNewCompany = false;
+    const root = document.getElementById('addCompanyModalRoot');
+    if(root) root.innerHTML = '';
+  }
   function openAddCompanyForm(prefillName){
     addingNewCompany = true;
     const regionSelected = new Set();
@@ -14993,14 +15006,20 @@ window.SHIN2_CRM_APP_INIT = function(){
     // (저장 전까지는 D.addDocument를 호출하지 않음 — §8 "저장이 성공한 뒤에만 부가
     // 처리" 원칙과 동일하게, 여기서도 [등록] 버튼을 눌러야만 실제로 저장된다).
     const ocrState = { file:null, docType:null, extracted:null, status:'idle' };
-    cardView.innerHTML = `
-      <button type="button" class="back-link" id="crmBackBtn2">&larr; 고객 목록</button>
-      <div class="card-title" style="margin-bottom:14px;">신규 고객 등록</div>
-      <div id="crmAddFormWrap"></div>
+    const modalRoot = document.getElementById('addCompanyModalRoot');
+    modalRoot.innerHTML = `
+      <div class="pi-overlay" id="addCoOverlay">
+        <div class="pi-panel" style="max-width:640px;" role="dialog" aria-modal="true" aria-label="신규 고객 등록">
+          <div class="pi-head">
+            <div class="pi-title">신규 고객 등록</div>
+            <button type="button" class="chart-close-btn" id="addCoCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body" id="crmAddFormWrap"></div>
+        </div>
+      </div>
     `;
-    listView.style.display = 'none';
-    cardView.style.display = 'block';
-    document.getElementById('crmBackBtn2').addEventListener('click', ()=>{ addingNewCompany = false; openList(); });
+    document.getElementById('addCoCloseBtn').addEventListener('click', closeAddCompanyForm);
+    document.getElementById('addCoOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'addCoOverlay') closeAddCompanyForm(); });
     const wrap = document.getElementById('crmAddFormWrap');
     const NEW_FIELD_LABELS = [
       ['name','상호 *'], ['repName','대표자'], ['bizRegNo','사업자번호'], ['address','주소'],
@@ -15127,8 +15146,8 @@ window.SHIN2_CRM_APP_INIT = function(){
       patch.region = Array.from(regionSelected);
       patch.distributionLists = document.getElementById('crmNewFDualList').checked ? ['contractor','external'] : [];
       if(!patch.name){ document.getElementById('crmNewFErr').style.display = 'block'; return; }
-      addingNewCompany = false;
       const rec = D.addCompany(patch);
+      closeAddCompanyForm();
       // 첨부 이미지가 있으면 기존 서류함 저장 경로(D.addDocument)를 그대로 재사용해
       // 저장한다 — OCR로 추출된 값이 있으면 §8 원칙 그대로 extracted로 함께 넘긴다.
       if(ocrState.file){
