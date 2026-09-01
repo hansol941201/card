@@ -2724,16 +2724,18 @@ body.map-modal-lock{ overflow:hidden; }
         <button type="button" id="crmAddBtn" class="list-add-btn">+ 고객 등록</button>
       </div>
     </div>
-    <!-- §전면 리디자인 라운드(신규) — KPI 요약 바(전체 고객/MOU 체결/상승 업체/관리 필요)
-         + 분석 영역(올해의 고객 흐름 60% / 오늘의 관리 목록 40%). 전부 renderList()가
-         이미 계산해 둔 값(filterCounts/managementNeedCache)만 다시 보여준다. -->
+    <!-- §전면 리디자인 라운드(신규) — KPI 요약 바(전체 고객/MOU 체결/상승 업체/관리 필요).
+         전부 renderList()가 이미 계산해 둔 값(filterCounts)만 다시 보여준다.
+         §오늘의 관리 목록 제거 라운드(신규, §요청): "오늘의 관리 목록" 패널을 화면에서
+         뺐다 — analysis-grid의 두 번째 칸(analysis-panel-today)과 그걸 채우던
+         renderManagementTodayPanel() 호출만 없앤다(§ 화면에서만 제거, 데이터/판정
+         로직(classifyManagementNeed 등)과 "관리필요" 버튼·모달은 그대로 유지). 남는
+         "올해의 고객 흐름" 칸은 폭을 그대로 두면 어색해서 analysis-grid 자체를 걷어내고
+         .rising-section을 직접 배치해 전체 폭을 쓰게 한다. -->
     <div class="kpi-strip" id="crmKpiStrip"></div>
-    <div class="analysis-grid">
-      <div class="analysis-panel analysis-panel-rising">
-        <div class="analysis-panel-title">올해의 고객 흐름</div>
-        <div class="rising-section" id="crmRisingSection"></div>
-      </div>
-      <div class="analysis-panel analysis-panel-today" id="crmTodayMgmtPanel"></div>
+    <div class="analysis-panel analysis-panel-rising">
+      <div class="analysis-panel-title">올해의 고객 흐름</div>
+      <div class="rising-section" id="crmRisingSection"></div>
     </div>
     <div class="list-filter-row" id="crmFilterRow"></div>
     <div class="list-search-row">
@@ -6871,11 +6873,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     managementNeedCache = computeManagementNeedList(enriched, pourLatestIndex);
     filterCounts.manageNeeded = managementNeedCache.counts.total;
     renderFilterChips(filterCounts);
-    // §전면 리디자인 라운드(신규) — "KPI 요약 바"/"오늘의 관리 목록"은 여기서 이미 계산된
-    // filterCounts/managementNeedCache를 그대로 다시 보여줄 뿐 새 판정/집계를 전혀
-    // 만들지 않는다(§ "임의의 숫자를 하드코딩하지 않는다").
+    // §전면 리디자인 라운드(신규) — "KPI 요약 바"는 여기서 이미 계산된 filterCounts를
+    // 그대로 다시 보여줄 뿐 새 판정/집계를 전혀 만들지 않는다(§ "임의의 숫자를
+    // 하드코딩하지 않는다"). §오늘의 관리 목록 제거 라운드(신규, §요청): 이 패널
+    // 호출만 없앴다 — renderManagementTodayPanel 함수 정의와 managementNeedCache
+    // 계산(관리필요 버튼/모달/고객카드 배너가 계속 씀) 자체는 그대로 둔다.
     renderKpiStrip(filterCounts);
-    renderManagementTodayPanel(managementNeedCache);
 
     const rows = enriched
       .filter(r=> matchesFilter(r.co, r.progress, filterKey))
