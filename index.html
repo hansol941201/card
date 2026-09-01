@@ -2423,8 +2423,21 @@ body.map-modal-lock{ overflow:hidden; }
 .mail-settings-help{ font-size:11.5px; color:var(--text-muted); line-height:1.5; margin-bottom:10px; }
 .mail-settings-help code{ background:#F0F3F9; padding:1px 4px; border-radius:4px; }
 .mail-settings-save-msg{ font-size:12px; color:#0F7A42; margin-bottom:8px; }
+.mail-tpl-enable{ float:right; font-size:11.5px; font-weight:500; color:var(--text-muted); display:inline-flex; align-items:center; gap:4px; }
+.mail-settings-updated-at{ font-size:11px; color:var(--text-muted); margin-top:8px; }
 .mail-compose-warn{ font-size:11.5px; color:#9A6B00; background:#FFF7E6; border:1px solid #F0DDA8; border-radius:6px; padding:8px 10px; margin-bottom:12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .mail-compose-status{ font-size:12px; color:var(--text-muted); margin-top:4px; min-height:16px; }
+.mail-compose-attach{ border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:4px 0 10px; background:var(--bg); }
+.mail-compose-attach-title{ font-size:12px; font-weight:700; color:var(--text); margin-bottom:6px; }
+.mail-compose-attach-row{ font-size:12px; color:var(--text); display:flex; justify-content:space-between; gap:8px; padding:3px 0; }
+.mail-compose-attach-row.is-missing{ color:var(--text-muted); }
+.mail-compose-attach-meta{ color:var(--text-muted); white-space:nowrap; }
+.mail-compose-attach-note{ font-size:11px; color:var(--text-muted); margin-top:4px; line-height:1.4; }
+.mail-compose-panel .pi-body{ max-height:70vh; overflow-y:auto; }
+.mail-final-confirm-row{ display:flex; justify-content:space-between; gap:10px; font-size:12.5px; padding:5px 0; border-bottom:1px solid var(--line); }
+.mail-final-confirm-row:last-child{ border-bottom:0; }
+.mail-final-confirm-row span{ color:var(--text-muted); }
+.mail-final-confirm-row b{ text-align:right; font-weight:600; word-break:break-all; }
 .mail-compose-status.is-err{ color:#B91C1C; }
 /* §고객 진행단계 3단계 라운드(신규) — 흰색/남색 중심, 카드 모서리 6~8px, 알약/큰
    아이콘 금지, 등록 팝업의 기존 너비(.pi-panel max-width) 안에서만 움직인다. */
@@ -3789,9 +3802,69 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     subjectTemplate: '[POUR] {업체명} 1차 미팅 일정 제안드립니다',
     bodyTemplate: '안녕하세요, {업체명} {담당자}님.\n\n보내주신 질문서 잘 확인했습니다.\n협의를 위해 1차 미팅 일정을 제안드리고자 합니다.\n편하신 일정 알려주시면 조율하겠습니다.\n\n감사합니다.\n{보내는사람}'
   };
-  function loadMailSettings(){ return Object.assign({}, DEFAULT_MAIL_SETTINGS, readObj(MAIL_SETTINGS_KEY)); }
+  // §메일 3종 템플릿 확장 라운드(신규) — 사용자 확정 지시 [8]: 기존 평면 subjectTemplate/
+  // bodyTemplate는 절대 지우거나 즉시 덮어쓰지 않고 그대로 둔 채, 그 옆에 4종 독립 템플릿
+  // (questionnaire/firstMeeting/postSecondMeeting/documentRequest)을 새로 추가한다.
+  // firstMeeting은 기존 값을 초기값으로 그대로 읽어오는 호환 처리(§8 "새 3종 구조가
+  // 저장되기 전에도 기존 1차 미팅 메일이 정상 작동해야 한다")를 loadMailSettings에서 한다.
+  const MAIL_TEMPLATE_KEYS = ['questionnaire', 'firstMeeting', 'postSecondMeeting', 'documentRequest'];
+  const DEFAULT_MAIL_TEMPLATES = {
+    questionnaire: {
+      enabled: true,
+      subjectTemplate: '[POUR] {업체명} 협력 검토 질문서 전달드립니다',
+      bodyTemplate: '안녕하세요, {업체명} {담당자}님.\n\nPOUR 협력 검토를 위한 질문서를 전달드립니다.\n\n첨부된 질문서를 확인하신 후 작성하여 회신 부탁드립니다.\n작성 중 문의사항이 있으시면 편하게 연락해 주세요.\n\n감사합니다.\n{보내는사람}',
+      attachmentDocType: 'questionnaire', videoUrl: '', updatedAt: null
+    },
+    // firstMeeting 기본값은 아래 loadMailSettings에서 기존 flat subjectTemplate/bodyTemplate가
+    // 있으면 그 값으로 대체된다(§8 호환) — 여기 기본값은 flat 값도 전혀 없는 최초 설치
+    // 상태에서만 쓰인다.
+    firstMeeting: {
+      enabled: true,
+      subjectTemplate: '[POUR] {업체명} 1차 미팅 일정 제안드립니다',
+      bodyTemplate: '안녕하세요, {업체명} {담당자}님.\n\n보내주신 질문서를 잘 확인했습니다.\n\n향후 협력 방향을 논의하기 위해 1차 미팅 일정을 제안드리고자 합니다.\n가능하신 일정 또는 시간을 알려주시면 확인 후 조율하겠습니다.\n\n감사합니다.\n{보내는사람}',
+      attachmentDocType: null, videoUrl: '', updatedAt: null
+    },
+    postSecondMeeting: {
+      enabled: true,
+      subjectTemplate: '[POUR] {업체명} 2차 미팅 후 협약 관련 안내드립니다',
+      bodyTemplate: '안녕하세요, {업체명} {담당자}님.\n\n2차 미팅에 참석해 주셔서 감사합니다.\n\n미팅에서 협의한 내용을 바탕으로 향후 협력 및 협약 진행에 필요한 자료를 전달드립니다.\n첨부자료를 확인해 주시고, 추가로 필요한 내용이나 문의사항이 있으시면 편하게 연락해 주세요.\n\n감사합니다.\n{보내는사람}',
+      attachmentDocType: null, videoUrl: '', updatedAt: null
+    },
+    documentRequest: {
+      enabled: true,
+      subjectTemplate: '[POUR] {업체명} 협력 서류 요청드립니다',
+      bodyTemplate: '안녕하세요, {업체명} {담당자}님.\n\n원활한 협력 진행을 위해 아래 자료 전달을 요청드립니다.\n\n{요청서류목록}\n\n확인 후 회신 부탁드립니다. 문의사항이 있으시면 편하게 연락해 주세요.\n\n감사합니다.\n{보내는사람}',
+      attachmentDocType: null, videoUrl: '', updatedAt: null
+    }
+  };
+  function loadMailSettings(){
+    const stored = readObj(MAIL_SETTINGS_KEY) || {};
+    const merged = Object.assign({}, DEFAULT_MAIL_SETTINGS, stored);
+    const storedTemplates = (stored && stored.mailTemplates) || {};
+    const templates = {};
+    MAIL_TEMPLATE_KEYS.forEach(key=>{
+      templates[key] = Object.assign({}, DEFAULT_MAIL_TEMPLATES[key], storedTemplates[key]);
+    });
+    // §8 호환 처리: firstMeeting이 아직 한 번도 새 구조로 저장된 적 없으면(=stored.mailTemplates.
+    // firstMeeting 없음), 기존 평면 subjectTemplate/bodyTemplate(사용자가 예전에 실제로
+    // 저장해 둔 값일 수 있음)을 firstMeeting의 초기값으로 그대로 읽어온다 — 새 구조가 한 번
+    // 저장되고 나면(아래 saveMailSettings) 그때부터는 이 분기를 안 타고 저장된 값을 쓴다.
+    if(!storedTemplates.firstMeeting){
+      if(stored.subjectTemplate) templates.firstMeeting.subjectTemplate = stored.subjectTemplate;
+      if(stored.bodyTemplate) templates.firstMeeting.bodyTemplate = stored.bodyTemplate;
+    }
+    merged.mailTemplates = templates;
+    return merged;
+  }
   function saveMailSettings(patch){
-    const next = Object.assign({}, loadMailSettings(), patch);
+    const current = loadMailSettings();
+    const next = Object.assign({}, current, patch);
+    if(patch && patch.mailTemplates){
+      next.mailTemplates = Object.assign({}, current.mailTemplates);
+      Object.keys(patch.mailTemplates).forEach(key=>{
+        next.mailTemplates[key] = Object.assign({}, current.mailTemplates[key], patch.mailTemplates[key], { updatedAt: nowIso() });
+      });
+    }
     writeObj(MAIL_SETTINGS_KEY, next);
     return next;
   }
@@ -9489,6 +9562,11 @@ window.SHIN2_CRM_APP_INIT = function(){
         ${contact}
         <textarea class="workq-memo-input" id="workqMemo_mou_${esc(co.id)}" placeholder="메모"></textarea>
         <div class="workq-btn-row">
+          <!-- §요청 [8] 연결 위치: "2차미팅 완료·MOU 미체결 대상"(item.type==='mou'인 이
+               분기 자체가 이미 그 조건)에만 협약 후속 메일 버튼을 둔다. 메일 발송은
+               finishAndClose()를 부르지 않는다 — 발송이 MOU 체결/서류 상태를 자동으로
+               바꾸면 안 된다(§요청 [10] "메일 발송과 단계 완료는 서로 다른 상태"). -->
+          <button type="button" class="workq-btn" data-workq-do="post-mail">협약 후속 메일</button>
           <button type="button" class="workq-btn" data-workq-do="mou-negotiating">체결 협의</button>
           <button type="button" class="workq-btn" data-workq-do="mou-doc">서류 요청</button>
           <button type="button" class="workq-btn primary" data-workq-do="mou-done">체결 완료</button>
@@ -9682,7 +9760,8 @@ window.SHIN2_CRM_APP_INIT = function(){
       openCardFromWorkQueue(btn.getAttribute('data-workq-open-co'));
     }));
     wrap.querySelectorAll('[data-workq-mail]').forEach(btn=> btn.addEventListener('click', ()=>{
-      openMailComposeModal(btn.getAttribute('data-workq-mail'));
+      // §요청 [8] 연결 위치: 업무관리 1차미팅 대상(type==='m1') 버튼은 firstMeeting 템플릿.
+      openMailComposeModal(btn.getAttribute('data-workq-mail'), 'firstMeeting');
     }));
     // §업무관리 처리 팝업 전환 라운드(신규): 표 안에 줄을 펼치던 방식 대신 중앙 팝업을
     // 연다(§요청 "저런형식말고 팝업으로 간단하게") — 같은 버튼을 다시 누르면 닫히는
@@ -9796,6 +9875,10 @@ window.SHIN2_CRM_APP_INIT = function(){
         if(!holdDateEl || !holdDateEl.value){ holdDateEl && holdDateEl.focus(); return; }
         workqSaveHold(item, holdDateEl.value, memoVal);
         finishAndClose();
+      } else if(action === 'post-mail'){
+        // 팝업을 닫지 않는다 — 메일 발송 팝업이 이 팝업 위에 겹쳐 열린다(둘 다
+        // #mailComposeModalRoot/#workqActionModalRoot로 서로 다른 root라 공존 가능).
+        openMailComposeModal(item.co.id, 'postSecondMeeting');
       } else if(action === 'mou-negotiating'){
         workqSaveMouStatus(item, 'negotiating', memoVal); finishAndClose();
       } else if(action === 'mou-doc'){
@@ -9851,6 +9934,47 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
     return emailjsLoadPromise;
   }
+  // §메일 3종 템플릿 확장 라운드(신규) — 사용자 확정 지시 [8]: 4개 템플릿(questionnaire/
+  // firstMeeting/postSecondMeeting/documentRequest) 각각 독립된 설정 섹션. 제목·본문만
+  // 다르고 필드 구성은 동일해서 한 번 만든 마크업/바인딩 함수를 4번 재사용한다(§ "한
+  // 템플릿을 수정해도 다른 템플릿이 변경되면 안 된다" — id를 타입별로 완전히 분리해서
+  // 보장한다).
+  // §D 계층의 MAIL_TEMPLATE_KEYS는 export되어 있지 않아 렌더 레이어에서 직접 참조할 수
+  // 없다(§이 세션에서 이미 확인된 계층 분리 규칙 — D.loadMailSettings()가 돌려주는
+  // "값"만 쓸 수 있고, D 안의 상수/함수 자체는 못 씀) — 같은 4개 키를 렌더 레이어에도
+  // 그대로 복제한다(값 자체는 100% 동일, 새 개념 아님).
+  const MAIL_TEMPLATE_KEYS = ['questionnaire', 'firstMeeting', 'postSecondMeeting', 'documentRequest'];
+  const MAIL_TEMPLATE_SECTION_LABEL = {
+    questionnaire: '③ 질문서 발송',
+    firstMeeting: '④ 1차 미팅 제안',
+    postSecondMeeting: '⑤ 2차 미팅 후 협약 안내',
+    documentRequest: '⑥ 서류 요청'
+  };
+  function mailTemplateSectionHtml(key, tpl){
+    // documentRequest는 첨부 문서 슬롯 하나를 고정 지정하는 대신 발송 시점에 사용자가
+    // 미등록/재요청 서류를 직접 골라 본문에 자동으로 채운다(§7) — 그래서 여기 첨부문서
+    // select는 questionnaire/firstMeeting/postSecondMeeting 3개에만 보여준다.
+    const attachHtml = key === 'documentRequest' ? '' : `
+      <div class="co-form-field"><label>첨부 문서(서류함 종류)</label>
+        <select id="mailSetAttach_${key}">
+          <option value="">선택 안 함</option>
+          ${DOC_TYPES.map(([type,label])=> `<option value="${esc(type)}" ${tpl.attachmentDocType===type?'selected':''}>${esc(label)}</option>`).join('')}
+        </select>
+      </div>`;
+    const updatedText = tpl.updatedAt ? `마지막 수정: ${esc(fmtDate(tpl.updatedAt))} ${esc(fmtTime(tpl.updatedAt))}` : '아직 저장한 적 없음(기본값 사용 중)';
+    return `
+      <div class="mail-settings-section" data-mail-tpl-section="${esc(key)}">
+        <div class="mail-settings-section-title">${esc(MAIL_TEMPLATE_SECTION_LABEL[key])}
+          <label class="mail-tpl-enable"><input type="checkbox" id="mailSetEnabled_${key}" ${tpl.enabled!==false?'checked':''} /> 사용</label>
+        </div>
+        <div class="mail-settings-help">${esc(MAIL_TEMPLATE_HELP)}${key==='documentRequest' ? ' {요청서류목록}(발송 시 선택한 서류명이 자동으로 들어감)' : ''}</div>
+        <div class="co-form-field"><label>제목</label><input type="text" id="mailSetSubject_${key}" value="${esc(tpl.subjectTemplate)}" /></div>
+        <div class="co-form-field"><label>본문</label><textarea id="mailSetBody_${key}" rows="7">${esc(tpl.bodyTemplate)}</textarea></div>
+        ${attachHtml}
+        <div class="co-form-field"><label>동영상 링크(선택)</label><input type="text" id="mailSetVideo_${key}" placeholder="https://..." value="${esc(tpl.videoUrl||'')}" /></div>
+        <div class="mail-settings-updated-at">${updatedText}</div>
+      </div>`;
+  }
   function renderMailSettingsView(){
     const wrap = document.getElementById('mailSettingsView');
     if(!wrap) return;
@@ -9859,7 +9983,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="workq-header-row">
         <div class="workq-header">
           <div class="workq-title">메일 설정</div>
-          <div class="workq-subtitle">"1차미팅 잡기" 목록에서 [메일발송]을 누르면 여기 설정한 발신자/문구로 메일이 나갑니다.</div>
+          <div class="workq-subtitle">업체 진행단계에 맞춰 4종 메일(질문서 발송/1차 미팅 제안/2차 미팅 후 협약 안내/서류 요청)을 각각 발송할 수 있습니다. 제목·본문·첨부는 템플릿별로 독립적으로 저장됩니다.</div>
         </div>
       </div>
       <div class="mail-settings-panel">
@@ -9878,33 +10002,43 @@ window.SHIN2_CRM_APP_INIT = function(){
           <div class="mail-settings-help">EmailJS 템플릿 화면에서는 변수명을 <code>to_email</code>, <code>subject</code>, <code>message</code>, <code>reply_to</code>, <code>from_name</code>으로 맞춰주세요 — 이 앱이 발송 시 그 이름 그대로 값을 채워 보냅니다.</div>
         </div>
         <div class="mail-settings-section">
-          <div class="mail-settings-section-title">② 보내는사람</div>
+          <div class="mail-settings-section-title">② 보내는사람 (4종 템플릿 공통)</div>
           <div class="co-form-field"><label>이름</label><input type="text" id="mailSetFromName" value="${esc(s.fromName)}" /></div>
           <div class="co-form-field"><label>이메일(하이웍스 계정 주소)</label><input type="text" id="mailSetFromEmail" value="${esc(s.fromEmail)}" /></div>
         </div>
-        <div class="mail-settings-section">
-          <div class="mail-settings-section-title">③ 1차 미팅 제안 메일 문구</div>
-          <div class="mail-settings-help">${esc(MAIL_TEMPLATE_HELP)}</div>
-          <div class="co-form-field"><label>제목</label><input type="text" id="mailSetSubject" value="${esc(s.subjectTemplate)}" /></div>
-          <div class="co-form-field"><label>본문</label><textarea id="mailSetBody" rows="8">${esc(s.bodyTemplate)}</textarea></div>
-        </div>
+        ${MAIL_TEMPLATE_KEYS.map(key=> mailTemplateSectionHtml(key, s.mailTemplates[key])).join('')}
         <div id="mailSetSaveMsg" class="mail-settings-save-msg" style="display:none;">저장했습니다.</div>
         <button type="button" class="co-text-action primary" id="mailSetSaveBtn">저장</button>
       </div>
     `;
     document.getElementById('mailSetSaveBtn').addEventListener('click', ()=>{
+      const mailTemplates = {};
+      MAIL_TEMPLATE_KEYS.forEach(key=>{
+        const attachEl = document.getElementById('mailSetAttach_' + key);
+        mailTemplates[key] = {
+          enabled: document.getElementById('mailSetEnabled_' + key).checked,
+          subjectTemplate: document.getElementById('mailSetSubject_' + key).value,
+          bodyTemplate: document.getElementById('mailSetBody_' + key).value,
+          attachmentDocType: attachEl ? (attachEl.value || null) : null,
+          videoUrl: document.getElementById('mailSetVideo_' + key).value.trim()
+        };
+      });
       D.saveMailSettings({
         emailjsPublicKey: document.getElementById('mailSetPublicKey').value.trim(),
         emailjsServiceId: document.getElementById('mailSetServiceId').value.trim(),
         emailjsTemplateId: document.getElementById('mailSetTemplateId').value.trim(),
         fromName: document.getElementById('mailSetFromName').value.trim(),
         fromEmail: document.getElementById('mailSetFromEmail').value.trim(),
-        subjectTemplate: document.getElementById('mailSetSubject').value,
-        bodyTemplate: document.getElementById('mailSetBody').value
+        mailTemplates
       });
+      // §"마지막 수정일" 갱신 표시를 위해 다시 그린 뒤(§4 요구사항) 저장 메시지를 보여준다
+      // — 순서를 반대로 하면 재렌더링이 메시지의 display:none을 되돌려버린다.
+      renderMailSettingsView();
       const msg = document.getElementById('mailSetSaveMsg');
-      msg.style.display = 'block';
-      setTimeout(()=>{ msg.style.display = 'none'; }, 1800);
+      if(msg){
+        msg.style.display = 'block';
+        setTimeout(()=>{ msg.style.display = 'none'; }, 1800);
+      }
     });
   }
   function closeMailComposeModal(){
@@ -9919,7 +10053,12 @@ window.SHIN2_CRM_APP_INIT = function(){
   function m1MailButtonInfo(co){
     if(co.mailOptOut) return { show:false, reason:'수신거부' };
     if(!co.email) return { show:false, reason:'이메일 없음' };
-    const alreadySent = Array.isArray(co.m1MailLog) && co.m1MailLog.some(l=> l.status === 'sent');
+    // §메일 3종+1 템플릿 확장 라운드: co.m1MailLog가 이제 4개 mailType을 함께 담으므로,
+    // 이 표(1차미팅 잡기)의 "이미 보냈는지"는 mailType==='firstMeeting' 기록만 본다 —
+    // 아니면 질문서만 보낸 업체도 "재발송"으로 잘못 표시된다. 이 라운드 이전에 쌓인
+    // 기존 기록은 전부 mailType==='m1Invite'였으므로(§ 옛 하드코딩 값) 그것도 같이
+    // 인정해 기존에 발송했던 업체의 "재발송" 표시가 이번 개편으로 사라지지 않게 한다.
+    const alreadySent = Array.isArray(co.m1MailLog) && co.m1MailLog.some(l=> l.status === 'sent' && (l.mailType === 'firstMeeting' || l.mailType === 'm1Invite'));
     return { show:true, alreadySent, label: alreadySent ? '재발송' : '메일발송' };
   }
   // §7 "발송한 사용자" 기록용 — 서류함 업로드 기록(D.addDocument 내부의
@@ -9945,18 +10084,69 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 메일 설정 탭에서 저장해 둔 문구 템플릿을 이 업체 값으로 채워 미리 보여주고, 발송
   // 직전에 보내는사람/받는사람/제목/본문을 여기서 다시 손볼 수 있다(§요청 "보내는사람
   // 받는사람 그리고 문구는 내가 지정할 수 있게").
-  function openMailComposeModal(companyId){
+  // §메일 3종+1 템플릿 확장 라운드(신규) — 사용자 확정 지시: "openMailComposeModal(companyId,
+  // mailType) 방식으로 확장". 팝업 디자인(.pi-overlay/.pi-panel, 필드 순서, 버튼 위치)은
+  // 기존 그대로 두고, mailType에 따라 제목/템플릿/발송기록만 갈아끼운다 — 팝업을 새로
+  // 만들지 않고 기존 하나를 재사용한다(§ "새 메일 팝업을 중복 생성하지 마").
+  const MAIL_TYPE_POPUP_TITLE = {
+    questionnaire: '질문서 발송 메일',
+    firstMeeting: '1차 미팅 제안 메일',
+    postSecondMeeting: '협약 후속 메일',
+    documentRequest: '서류 요청 메일'
+  };
+  const MAIL_TYPE_SUCCESS_LOG_TEXT = {
+    questionnaire: '질문서 발송 완료',
+    firstMeeting: '1차 미팅 제안 메일 발송 완료',
+    postSecondMeeting: '2차 미팅 후 협약 안내 메일 발송 완료',
+    documentRequest: '서류 요청 메일 발송 완료'
+  };
+  // §요청 [7]: 메일 종류별로 co.m1MailLog(이름은 예전 그대로지만 mailType으로 구분해
+  // 4종을 함께 쓴다 — 새 배열을 만들면 "재발송/최근 발송" 판정을 두 곳에서 따로 관리해야
+  // 해서 기존 배열 하나를 그대로 재사용한다)에서 해당 종류의 최근 발송 기록만 골라낸다.
+  function mailLogForType(co, mailType){
+    return Array.isArray(co.m1MailLog) ? co.m1MailLog.filter(l=> l.mailType === mailType) : [];
+  }
+  function mailAlreadySentInfo(co, mailType){
+    const log = mailLogForType(co, mailType);
+    const sent = log.filter(l=> l.status === 'sent');
+    const last = sent.length ? sent[sent.length-1] : null;
+    return { alreadySent: !!last, last };
+  }
+  // 템플릿에 지정된 첨부 문서(서류함 documentType)의 "지금 이 업체" 현재 파일을 조회한다 —
+  // 새 저장소를 만들지 않고 D.documentsForCompany를 그대로 재사용, 가장 최근(마지막) 파일
+  // 하나만 "현재 첨부 대상"으로 본다.
+  function resolveMailAttachmentDoc(co, tpl){
+    if(!tpl || !tpl.attachmentDocType) return null;
+    const docs = D.documentsForCompany(co.id, tpl.attachmentDocType);
+    return docs.length ? docs[docs.length-1] : null;
+  }
+  function openMailComposeModal(companyId, mailType, opts){
+    mailType = mailType || 'firstMeeting';
+    opts = opts || {};
     const co = D.findCompany(companyId);
     if(!co) return;
     const s = D.loadMailSettings();
-    const alreadySent = Array.isArray(co.m1MailLog) && co.m1MailLog.some(l=> l.status === 'sent');
-    const lastSent = alreadySent ? co.m1MailLog.filter(l=> l.status==='sent').slice(-1)[0] : null;
+    // s.mailTemplates는 D.loadMailSettings()가 MAIL_TEMPLATE_KEYS 4개를 항상 채워서
+    // 돌려주므로(데이터 계층 쪽 기본값 병합, §8) 정상 mailType이면 undefined일 수 없다 —
+    // 방어적으로만 빈 객체를 둔다(잘못된 mailType으로 불렸을 때 렌더 자체가 죽지 않도록).
+    const tpl = (s.mailTemplates && s.mailTemplates[mailType]) || { subjectTemplate:'', bodyTemplate:'', enabled:true };
+    const { alreadySent, last: lastSent } = mailAlreadySentInfo(co, mailType);
+    const attachDoc = resolveMailAttachmentDoc(co, tpl);
+    const docTypeLabel = tpl.attachmentDocType ? (DOC_TYPES.find(d=> d[0]===tpl.attachmentDocType) || [,tpl.attachmentDocType])[1] : null;
+    // §요청 [5]: 서류 요청 메일은 미등록/재요청 서류 목록을 자동으로 본문에 채운다
+    // (opts.requestedDocLabels — 협약 진행관리 팝업 쪽에서 사용자가 고른 서류명 배열을
+    // 그대로 넘겨준다, 여기서 새로 판정하지 않음).
+    const requestedNames = Array.isArray(opts.requestedDocLabels) ? opts.requestedDocLabels : [];
+    const requestedListText = requestedNames.length ? '요청드리는 자료:\n' + requestedNames.map(n=> '- ' + n).join('\n') : '';
+    let bodyFilled = fillMailTemplate(tpl.bodyTemplate, co, s).replace(/\{요청서류목록\}/g, requestedListText);
+    if(tpl.videoUrl) bodyFilled += `\n\n관련 안내 영상: ${tpl.videoUrl}`;
+    const subjectFilled = fillMailTemplate(tpl.subjectTemplate, co, s);
     const modalRoot = document.getElementById('mailComposeModalRoot');
     modalRoot.innerHTML = `
       <div class="pi-overlay" id="mailComposeOverlay">
-        <div class="pi-panel" style="max-width:600px;" role="dialog" aria-modal="true" aria-label="1차 미팅 제안 메일 발송">
+        <div class="pi-panel mail-compose-panel" style="max-width:600px;" role="dialog" aria-modal="true" aria-label="${esc(MAIL_TYPE_POPUP_TITLE[mailType])} 발송">
           <div class="pi-head">
-            <div class="pi-title">1차 미팅 제안 메일 — ${esc(co.name)}</div>
+            <div class="pi-title">${esc(MAIL_TYPE_POPUP_TITLE[mailType])} — ${esc(co.name)}</div>
             <button type="button" class="chart-close-btn" id="mailComposeCloseBtn" aria-label="닫기">&times;</button>
           </div>
           <div class="pi-body">
@@ -9964,14 +10154,28 @@ window.SHIN2_CRM_APP_INIT = function(){
               <div class="mail-compose-warn">메일 설정 탭에서 EmailJS 연동 정보를 먼저 입력해야 실제 발송이 됩니다.
                 <button type="button" class="co-text-action primary" id="mailComposeGoSettings">메일 설정으로 이동</button></div>
             ` : ''}
-            ${alreadySent ? `<div class="mail-compose-warn">이미 ${esc((lastSent && lastSent.sentAt) ? lastSent.sentAt.slice(0,10) : '')}에 발송된 기록이 있습니다 — 다시 보내려면 [재발송]을 눌러주세요(§7 중복발송 방지).</div>` : ''}
-            <div class="co-form-field"><label>보내는사람</label><input type="text" id="mailComposeFrom" value="${esc(s.fromName)}${s.fromEmail ? ' <' + esc(s.fromEmail) + '>' : ''}" /></div>
+            ${tpl.enabled === false ? `<div class="mail-compose-warn">메일 설정에서 이 템플릿이 "사용 안 함"으로 꺼져 있습니다 — 발송은 되지만, 메일 설정에서 다시 켜는 걸 권장합니다.</div>` : ''}
+            ${alreadySent ? `<div class="mail-compose-warn">최근 발송: ${esc((lastSent && lastSent.sentAt) ? lastSent.sentAt.slice(0,16).replace('T',' ') : '')} — 다시 보내려면 [재발송]을 눌러주세요.</div>` : ''}
+            <div class="co-form-field"><label>보내는사람</label><input type="text" id="mailComposeFrom" value="${esc(s.fromName)}${s.fromEmail ? ' <' + esc(s.fromEmail) + '>' : ''}" disabled /></div>
             <div class="co-form-field"><label>받는사람</label><input type="text" id="mailComposeTo" value="${esc(co.email || '')}" placeholder="받는 이메일 주소" /></div>
-            <div class="co-form-field"><label>제목</label><input type="text" id="mailComposeSubject" value="${esc(fillMailTemplate(s.subjectTemplate, co, s))}" /></div>
-            <div class="co-form-field"><label>본문</label><textarea id="mailComposeBody" rows="10">${esc(fillMailTemplate(s.bodyTemplate, co, s))}</textarea></div>
+            <div class="co-form-field"><label>참조(선택)</label><input type="text" id="mailComposeCc" value="" placeholder="참조 이메일(콤마로 구분)" /></div>
+            <div class="co-form-field"><label>제목</label><input type="text" id="mailComposeSubject" value="${esc(subjectFilled)}" /></div>
+            <div class="co-form-field"><label>본문</label><textarea id="mailComposeBody" rows="10">${esc(bodyFilled)}</textarea></div>
+            <div class="mail-compose-attach">
+              <div class="mail-compose-attach-title">첨부자료</div>
+              ${docTypeLabel ? (attachDoc ? `
+                <div class="mail-compose-attach-row">
+                  <span>${esc(docTypeLabel)} · ${esc(attachDoc.fileName || attachDoc.originalFileName || '(이름 없음)')}</span>
+                  <span class="mail-compose-attach-meta">${esc((attachDoc.mimeType||'').split('/').pop() || '')}${(attachDoc.size||attachDoc.fileSize) ? ' · ' + esc(fmtFileSize(attachDoc.size||attachDoc.fileSize)) : ''}</span>
+                </div>
+                <div class="mail-compose-attach-note">메일 본문/서류함에서 실제 첨부 발송은 EmailJS 첨부 API 확인 후 연결 예정 — 지금은 받는 분께 서류함에서 직접 전달하시거나, 파일을 별도로 첨부해 보내주세요.</div>
+              ` : `<div class="mail-compose-attach-row is-missing">${esc(docTypeLabel)} — 자료 설정 필요(서류함에 아직 업로드된 파일이 없습니다)</div>`) : ''}
+              ${tpl.videoUrl ? `<div class="mail-compose-attach-row">동영상 링크 포함됨 — 본문 끝에 자동 삽입</div>` : ''}
+              ${!docTypeLabel && !tpl.videoUrl ? `<div class="mail-compose-attach-row is-missing">이 템플릿에는 설정된 첨부자료가 없습니다</div>` : ''}
+            </div>
             <div class="co-form-field">
               <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);">
-                <input type="checkbox" id="mailComposeOptOut" style="width:auto;" />
+                <input type="checkbox" id="mailComposeOptOut" style="width:auto;" ${co.mailOptOut ? 'checked' : ''} />
                 이 업체는 메일 수신을 원치 않음(다음부터 발송 대상에서 제외)
               </label>
             </div>
@@ -9993,10 +10197,11 @@ window.SHIN2_CRM_APP_INIT = function(){
       D.updateCompany(co.id, { mailOptOut: !!e.target.checked });
     });
     const sendBtn = document.getElementById('mailComposeSendBtn');
-    sendBtn.addEventListener('click', ()=>{
+    // §요청 [7] 발송 전 최종 확인 — [메일 발송]을 누르면 바로 안 보내고, 종류/받는사람/
+    // 참조/제목/첨부/기존 발송기록을 한 번 더 보여주는 확인창을 먼저 띄운다. 실제 발송
+    // 함수(doSend, 기존 EmailJS 호출 로직 그대로) 호출은 [최종 발송]을 눌러야만 한다.
+    function doSend(toEmail, ccEmails){
       const statusEl = document.getElementById('mailComposeStatus');
-      const toEmail = document.getElementById('mailComposeTo').value.trim();
-      if(!toEmail){ statusEl.textContent = '받는사람 이메일을 입력해주세요.'; statusEl.classList.add('is-err'); return; }
       const latestSettings = D.loadMailSettings();
       if(!latestSettings.emailjsServiceId || !latestSettings.emailjsTemplateId || !latestSettings.emailjsPublicKey){
         statusEl.textContent = '메일 설정 탭에서 EmailJS 연동 정보를 먼저 입력해주세요.';
@@ -10005,42 +10210,134 @@ window.SHIN2_CRM_APP_INIT = function(){
       }
       const params = {
         to_email: toEmail,
-        from_name: document.getElementById('mailComposeFrom').value.trim(),
+        cc_email: ccEmails.join(','),
+        from_name: document.getElementById('mailComposeFrom').value.replace(/<.*>/, '').trim(),
         reply_to: latestSettings.fromEmail || '',
         subject: document.getElementById('mailComposeSubject').value.trim(),
         message: document.getElementById('mailComposeBody').value
       };
       statusEl.classList.remove('is-err');
       statusEl.textContent = '발송 중…';
-      // §7 "다중 클릭을 막기 위해 발송 중 버튼 비활성화" — 요청이 끝날 때까지(성공/실패
-      // 무관) 버튼을 잠근다.
+      // §요청 [7] "중복 클릭 방지를 위해 발송 중에는 모든 발송 버튼을 비활성화" —
+      // 최종확인 버튼과 이 팝업의 발송 버튼을 함께 잠근다.
       sendBtn.disabled = true;
       loadEmailJsSdk()
         .then(emailjs=> emailjs.send(latestSettings.emailjsServiceId, latestSettings.emailjsTemplateId, params, { publicKey: latestSettings.emailjsPublicKey }))
-        .then(()=>{
+        .then((res)=>{
           statusEl.textContent = '발송 완료';
-          // §7 "발송 성공 후에만 성공 기록 저장" — 구조화된 로그(co.m1MailLog)에 남긴다.
           appendM1MailLog(co.id, {
-            mailType:'m1Invite', sentAt: new Date().toISOString(), to: toEmail, status:'sent',
-            sentBy: crmCurrentUserLabel(), stage:'m1', isResend: alreadySent
+            mailType, sentAt: new Date().toISOString(), to: toEmail, cc: ccEmails, status:'sent',
+            sentBy: crmCurrentUserLabel(), isResend: alreadySent,
+            subject: params.subject,
+            attachmentName: attachDoc ? (attachDoc.fileName || attachDoc.originalFileName || null) : null,
+            hasVideoLink: !!tpl.videoUrl,
+            emailjsStatus: res && res.status != null ? res.status : null
           });
-          // 기존 활동기록에도 그대로 남긴다(§ "기존 저장 구조 안에서 안전하게 처리").
-          D.addActivity(co.id, `1차 미팅 제안 메일 발송 (받는사람: ${toEmail})`);
-          renderWorkQueueView();
+          D.addActivity(co.id, `${MAIL_TYPE_SUCCESS_LOG_TEXT[mailType]} (받는사람: ${toEmail})`);
+          if(typeof renderWorkQueueView === 'function' && document.getElementById('workQueueView') && document.getElementById('workQueueView').style.display === 'block') renderWorkQueueView();
+          if(currentCompanyId === co.id && cardView.style.display === 'block' && typeof refreshChart === 'function') refreshChart();
+          if(typeof opts.onSent === 'function') opts.onSent();
           setTimeout(closeMailComposeModal, 900);
         })
         .catch(err=>{
           sendBtn.disabled = false;
           statusEl.classList.add('is-err');
           const errMsg = err && (err.text || err.message) ? (err.text || err.message) : '알 수 없는 오류';
-          statusEl.textContent = '발송 실패: ' + errMsg + ' — EmailJS 연동 정보와 하이웍스 SMTP 연결 상태를 확인해주세요.';
-          // §7 "실패하면 실패 사유를 표시하고 무조건 발송 완료 처리하지 말 것" — 실패도
-          // 기록은 남기되 status는 'sent'가 아니라 'failed'라 재시도를 막지 않는다.
+          statusEl.textContent = '발송 실패: ' + errMsg + ' — EmailJS 연동 정보와 발신 서버 연결 상태를 확인해주세요.';
+          // §요청 [9] "실패 시 성공 기록을 남기지 않고, 실패일시·사유를 기록하고 다시
+          // 시도 버튼을 제공" — 다시 시도는 같은 팝업의 [메일 발송] 버튼을 다시 누르면
+          // 되므로(팝업이 안 닫힘) 별도 버튼을 새로 만들지 않는다.
           appendM1MailLog(co.id, {
-            mailType:'m1Invite', sentAt: new Date().toISOString(), to: toEmail, status:'failed',
-            sentBy: crmCurrentUserLabel(), stage:'m1', isResend: alreadySent, error: errMsg
+            mailType, sentAt: new Date().toISOString(), to: toEmail, cc: ccEmails, status:'failed',
+            sentBy: crmCurrentUserLabel(), isResend: alreadySent, error: errMsg
           });
         });
+    }
+    sendBtn.addEventListener('click', ()=>{
+      const statusEl = document.getElementById('mailComposeStatus');
+      const toEmail = document.getElementById('mailComposeTo').value.trim();
+      if(!toEmail){ statusEl.textContent = '받는사람 이메일을 입력해주세요.'; statusEl.classList.add('is-err'); return; }
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)){ statusEl.textContent = '받는사람 이메일 형식을 확인해주세요.'; statusEl.classList.add('is-err'); return; }
+      const ccRaw = document.getElementById('mailComposeCc').value.trim();
+      const ccEmails = ccRaw ? ccRaw.split(',').map(s=> s.trim()).filter(Boolean) : [];
+      const badCc = ccEmails.find(e=> !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+      if(badCc){ statusEl.textContent = `참조 이메일 형식을 확인해주세요: ${badCc}`; statusEl.classList.add('is-err'); return; }
+      // §요청 [6] 수신거부 업체 발송 경고 — 명시적 확인 없이는 보내지 않는다.
+      if(co.mailOptOut && !confirm(`${co.name}은(는) 메일 수신거부 상태입니다. 그래도 발송하시겠습니까?`)) return;
+      openMailFinalConfirmModal({
+        mailType, co, toEmail, ccEmails,
+        subject: document.getElementById('mailComposeSubject').value.trim(),
+        attachDocLabel: docTypeLabel, attachDoc, hasVideoLink: !!tpl.videoUrl,
+        alreadySent,
+        onConfirm: ()=> doSend(toEmail, ccEmails)
+      });
+    });
+  }
+  // §요청 [1] 신규 업체 등록 직후 "질문서 메일 발송 / 나중에 발송" 확인 팝업 — 저장은
+  // 이미 끝난 뒤(고객 데이터는 그대로) 순수 안내용. [질문서 메일 발송]을 누르면 기존
+  // 메일 팝업(openMailComposeModal)을 questionnaire 템플릿으로 그대로 연다 — 새 팝업을
+  // 만들지 않는다(§ "새 메일 팝업을 중복 생성하지 마").
+  function openPostRegistrationMailPrompt(companyId){
+    const co = D.findCompany(companyId);
+    if(!co) return;
+    const root = document.getElementById('mailComposeModalRoot');
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div class="pi-overlay" id="postRegMailPromptOverlay">
+        <div class="pi-panel" style="max-width:400px;" role="dialog" aria-modal="true" aria-label="질문서 메일 발송">
+          <div class="pi-head"><div class="pi-title">${esc(co.name)} 등록 완료</div></div>
+          <div class="pi-body">
+            <div style="font-size:13px;color:var(--text);">신규 업체 등록이 완료되었습니다. 질문서 발송 메일을 바로 보내시겠습니까?</div>
+          </div>
+          <div class="pi-actions">
+            <button type="button" class="co-text-action" id="postRegMailLaterBtn">나중에 발송</button>
+            <button type="button" class="co-text-action primary" id="postRegMailSendBtn">질문서 메일 발송</button>
+          </div>
+        </div>
+      </div>`;
+    root.appendChild(wrap.firstElementChild);
+    function closePrompt(){ const el = document.getElementById('postRegMailPromptOverlay'); if(el) el.remove(); }
+    document.getElementById('postRegMailLaterBtn').addEventListener('click', closePrompt);
+    document.getElementById('postRegMailPromptOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'postRegMailPromptOverlay') closePrompt(); });
+    document.getElementById('postRegMailSendBtn').addEventListener('click', ()=>{
+      closePrompt();
+      openMailComposeModal(companyId, 'questionnaire');
+    });
+  }
+  // §요청 [7] 발송 전 최종 확인창 — 별도 작은 팝업(.pi-overlay 재사용, 중첩 열림 — 아래
+  // z-index는 기존 .pi-overlay 규칙을 그대로 따른다). [최종 발송]을 눌러야만 onConfirm
+  // (=실제 EmailJS 호출)이 실행된다.
+  function openMailFinalConfirmModal(info){
+    const root = document.getElementById('mailComposeModalRoot');
+    const prevHtml = root.innerHTML;
+    const confirmWrap = document.createElement('div');
+    confirmWrap.innerHTML = `
+      <div class="pi-overlay" id="mailFinalConfirmOverlay" style="z-index:10001;">
+        <div class="pi-panel" style="max-width:440px;" role="dialog" aria-modal="true" aria-label="발송 최종 확인">
+          <div class="pi-head"><div class="pi-title">발송 전 최종 확인</div></div>
+          <div class="pi-body">
+            <div class="mail-final-confirm-row"><span>메일 종류</span><b>${esc(MAIL_TYPE_POPUP_TITLE[info.mailType])}</b></div>
+            <div class="mail-final-confirm-row"><span>업체명</span><b>${esc(info.co.name)}</b></div>
+            <div class="mail-final-confirm-row"><span>받는사람</span><b>${esc(info.toEmail)}</b></div>
+            ${info.ccEmails.length ? `<div class="mail-final-confirm-row"><span>참조</span><b>${esc(info.ccEmails.join(', '))}</b></div>` : ''}
+            <div class="mail-final-confirm-row"><span>제목</span><b>${esc(info.subject)}</b></div>
+            <div class="mail-final-confirm-row"><span>첨부 문서</span><b>${info.attachDocLabel ? (info.attachDoc ? esc(info.attachDocLabel) : esc(info.attachDocLabel) + '(파일 없음)') : '없음'}</b></div>
+            <div class="mail-final-confirm-row"><span>동영상 링크</span><b>${info.hasVideoLink ? '포함' : '없음'}</b></div>
+            ${info.alreadySent ? `<div class="mail-compose-warn">이 업체에 같은 종류 메일을 이미 보낸 적 있습니다(재발송).</div>` : ''}
+          </div>
+          <div class="pi-actions">
+            <button type="button" class="co-text-action" id="mailFinalCancelBtn">취소</button>
+            <button type="button" class="co-text-action primary" id="mailFinalSendBtn">최종 발송</button>
+          </div>
+        </div>
+      </div>`;
+    root.appendChild(confirmWrap.firstElementChild);
+    function closeConfirm(){ const el = document.getElementById('mailFinalConfirmOverlay'); if(el) el.remove(); }
+    document.getElementById('mailFinalCancelBtn').addEventListener('click', closeConfirm);
+    document.getElementById('mailFinalConfirmOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'mailFinalConfirmOverlay') closeConfirm(); });
+    document.getElementById('mailFinalSendBtn').addEventListener('click', ()=>{
+      closeConfirm();
+      info.onConfirm();
     });
   }
   // §업무관리 탭 1차 구축 라운드 §1/§2 — 세 최상위 view(listView/cardView/workQueueView)
@@ -15981,6 +16278,12 @@ window.SHIN2_CRM_APP_INIT = function(){
       }
       openCard(rec.id);
       renderList();
+      // §요청 [1] "고객이 저장됐다고 자동 발송하지 않음 — 사용자가 직접 [질문서 메일
+      // 발송]을 눌렀을 때만 발송": 카드가 열린 직후 작은 확인 팝업으로 물어보고,
+      // 누르면 기존 메일 팝업(questionnaire 템플릿)을 그대로 연다. 이메일이 없어도
+      // 버튼은 보여준다 — "고객 이메일이 없으면 수신자 칸을 비우고 사용자가 직접
+      // 입력할 수 있게" 요구사항 그대로, 메일 팝업 자체가 이미 그렇게 동작한다.
+      openPostRegistrationMailPrompt(rec.id);
     });
   }
 
