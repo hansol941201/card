@@ -2582,141 +2582,6 @@ body.map-modal-lock{ overflow:hidden; }
 @media(max-width:1023px){
   .analysis-grid{ grid-template-columns:1fr; }
 }
-/* ==========================================================================
-   §고객관리 첫화면 전면 재디자인 라운드(신규) — 사용자 확정 시안 기준 전면 재작성.
-   이 style 블록 맨 끝(닫는 태그 직전)이라 — 과거 라운드에서 이 종료 태그 문자열을
-   주석 안에 그대로 적었다가 브라우저가 거기서 스타일시트를 끊어버린 사고가 있었다,
-   그 재발 방지 규칙에 따라 이 주석에도 그 문자열을 다시 쓰지 않는다 —
-   이라 캐스케이드상 이 파일의 다른 모든 규칙(!important 포함)을 이긴다.
-   흰색/연회색/네이비 중심, 파랑=선택·링크 전용, 초록=정상·상승·체결 전용, 주황=허들·
-   보류·주의 전용. 그라데이션/유리효과/과한 그림자 금지, 모서리 8~12px, 8px 간격 체계.
-   ========================================================================== */
-:root{
-  --nf-navy:#102B49; --nf-navy-ink:#0B1F35; --nf-blue:#1D6FE0; --nf-green:#0F7A42;
-  --nf-orange:#B5620A; --nf-orange-bg:#FDF3E4; --nf-orange-line:#F0D9AE;
-  --nf-green-bg:#E9F6EF; --nf-green-line:#BEE3CC; --nf-blue-bg:#EAF2FE; --nf-blue-line:#C9DDFB;
-  --nf-gray-bg:#F1F3F6; --nf-gray-line:#DFE3E9; --nf-gray-text:#69707C;
-  --nf-bg:#F5F7FA; --nf-line:#E4E8EE; --nf-text:#16233A; --nf-text-sub:#6B7688; --nf-radius:10px;
-}
-/* ---- 헤더: 한 줄 컴팩트, 탭 모양 제거 ---- */
-.gnav{ height:60px; background:#fff !important; border-bottom:1px solid var(--nf-line) !important; box-shadow:none !important; }
-.gnav-inner{ height:60px; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 24px; max-width:1600px; margin:0 auto; }
-.gnav-brand{ display:flex; align-items:center; gap:12px; }
-.gnav-brand .brand-logo{ height:22px !important; }
-.gnav-page-title{ font-size:15px; font-weight:700; color:var(--nf-text); padding-left:12px; border-left:1px solid var(--nf-line); }
-.gnav-count{ font-size:13px; color:var(--nf-text-sub); font-variant-numeric:tabular-nums; }
-.gnav-right{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
-.gnav-outline-btn{
-  height:32px; padding:0 12px; display:inline-flex; align-items:center; gap:6px;
-  background:#fff; color:var(--nf-navy); border:1px solid var(--nf-line); border-radius:8px;
-  font-size:12.5px; font-weight:600; cursor:pointer; white-space:nowrap;
-}
-.gnav-outline-btn:hover{ background:var(--nf-bg); border-color:#C7CEDA; }
-.gnav-outline-btn .list-phone-btn-icon{ display:inline-flex; color:var(--nf-navy); }
-.gnav-primary-btn{
-  height:32px; padding:0 14px; background:var(--nf-navy); color:#fff; border:0; border-radius:8px;
-  font-size:12.5px; font-weight:700; cursor:pointer; white-space:nowrap; box-shadow:none;
-}
-.gnav-primary-btn:hover{ background:var(--nf-navy-ink); }
-.gnav-settings-link{
-  height:32px; padding:0 8px; background:transparent; border:0; color:var(--nf-text-sub);
-  font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;
-}
-.gnav-settings-link:hover{ color:var(--nf-navy); text-decoration:underline; }
-#crmUpdateMenuWrap{ position:relative; }
-@media(max-width:900px){
-  .gnav-inner{ padding:0 12px; flex-wrap:wrap; height:auto; padding-top:8px; padding-bottom:8px; }
-  .gnav{ height:auto; }
-  .gnav-page-title{ display:none; }
-}
-/* ---- 첫 화면 본문 공통 폭/간격 ---- */
-#listView{ overflow-x:visible; }
-.app{ padding-left:24px !important; padding-right:24px !important; }
-.list-status-row:empty{ margin:0; }
-.list-status-row{ margin-bottom:8px; }
-/* ---- [2] 실적 상승 업체: 접이식 컴팩트 ---- */
-.rising-compact{ background:#fff; border:1px solid var(--nf-line); border-radius:var(--nf-radius); margin-bottom:8px; overflow:hidden; }
-.rising-compact-head{
-  width:100%; display:flex; align-items:center; gap:8px; padding:10px 14px; background:transparent;
-  border:0; cursor:pointer; text-align:left; font-family:inherit;
-}
-.rising-compact-head:hover{ background:var(--nf-bg); }
-.rising-compact-title{ font-size:13px; font-weight:700; color:var(--nf-text); }
-.rising-compact-count{ font-size:12px; color:var(--nf-text-sub); }
-.rising-compact-arrow{ margin-left:auto; font-size:11px; color:var(--nf-text-sub); transition:transform .15s; }
-.rising-compact-head[aria-expanded="true"] .rising-compact-arrow{ transform:rotate(180deg); }
-#crmRisingSection{ border-top:1px solid var(--nf-line); padding:12px 14px 14px !important; background:#fff !important; box-shadow:none !important; border-radius:0 !important; border-left:0 !important; border-right:0 !important; border-bottom:0 !important; }
-#crmRisingSection[hidden]{ display:none !important; }
-.rising-sub{ font-size:11.5px; color:var(--nf-text-sub); margin-bottom:8px; }
-.rising-card{ background:#fff !important; border:1px solid var(--nf-line) !important; box-shadow:none !important; border-radius:8px !important; }
-.rising-rank{ background:var(--nf-navy) !important; }
-.rising-up{ color:var(--nf-green) !important; }
-.rising-minibar-fill.y2025{ background:var(--nf-green) !important; }
-.rising-minibar-fill.y2024{ background:#C7CEDA !important; }
-/* ---- [3] 고객 분류 요약: 얇은 바 ---- */
-.list-filter-row{ display:flex; align-items:stretch; background:#fff; border:1px solid var(--nf-line); border-radius:var(--nf-radius); margin-bottom:8px; overflow-x:auto; }
-.class-summary-item{
-  flex:1 0 auto; display:flex; align-items:center; gap:8px; padding:10px 16px; background:transparent;
-  border:0; border-right:1px solid var(--nf-line); cursor:pointer; font-family:inherit; white-space:nowrap;
-  color:var(--nf-text-sub);
-}
-.class-summary-item:last-child{ border-right:0; }
-.class-summary-item:hover{ background:var(--nf-bg); }
-.class-summary-item.is-active{ background:var(--nf-navy); color:#fff; }
-.class-summary-item.is-active svg{ color:#fff !important; }
-.class-summary-label{ font-size:12.5px; font-weight:600; }
-.class-summary-value{ font-size:14px; font-weight:800; font-variant-numeric:tabular-nums; margin-left:2px; }
-/* ---- [4] 검색·정렬 줄 ---- */
-.list-search-row{ background:transparent !important; border:0 !important; box-shadow:none !important; padding:0 !important; align-items:center; margin-bottom:8px !important; }
-.search-box{ flex:1; border:1px solid var(--nf-line) !important; border-radius:8px !important; box-shadow:none !important; }
-.list-sort-select{ border:1px solid var(--nf-line) !important; border-radius:8px !important; box-shadow:none !important; }
-.mgmt-need-chip{
-  height:34px; padding:0 12px; background:#fff; border:1px solid var(--nf-orange-line); color:var(--nf-orange);
-  border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;
-}
-.mgmt-need-chip:hover{ background:var(--nf-orange-bg); }
-/* ---- [5] 고객 목록 테이블 ---- */
-.co-table-head,.co-row{
-  display:grid !important;
-  grid-template-columns:minmax(180px,1.3fr) 110px 130px 74px 150px 96px 96px 84px 84px 118px !important;
-  gap:10px !important; align-items:center !important;
-}
-.co-table-head{
-  background:var(--nf-bg) !important; border:1px solid var(--nf-line) !important; border-radius:var(--nf-radius) var(--nf-radius) 0 0 !important;
-  color:var(--nf-text-sub) !important; font-weight:700 !important; padding:10px 14px !important;
-}
-.co-list{ border:1px solid var(--nf-line) !important; border-top:0 !important; border-radius:0 0 var(--nf-radius) var(--nf-radius) !important; background:#fff !important; }
-.co-row{ min-height:56px !important; padding:8px 14px !important; border-bottom:1px solid var(--nf-line) !important; }
-.co-row:hover{ background:var(--nf-blue-bg) !important; box-shadow:none !important; }
-.col-name .co-name-text{ font-weight:700 !important; color:var(--nf-text) !important; }
-.col-name-relation{ font-size:11px !important; color:var(--nf-text-sub) !important; }
-.col-yr, .col-total-revenue, .col-yr-revenue{ font-weight:700 !important; color:var(--nf-text) !important; }
-.col-yr .yr-cell-btn, .col-total-revenue .revenue-cell-btn, .col-yr-revenue .revenue-cell-btn{ color:var(--nf-blue) !important; }
-.data-none{ color:#A6ADB9 !important; }
-/* 진행상황 배지: 핵심 상태 1개만 */
-.status-badge{
-  display:inline-flex; align-items:center; height:22px; padding:0 9px; border-radius:6px;
-  font-size:11px; font-weight:700; white-space:nowrap; border:1px solid transparent;
-}
-.status-badge.is-mou{ background:var(--nf-green-bg); color:var(--nf-green); border-color:var(--nf-green-line); }
-.status-badge.is-progress{ background:var(--nf-blue-bg); color:var(--nf-blue); border-color:var(--nf-blue-line); }
-.status-badge.is-hurdle{ background:var(--nf-orange-bg); color:var(--nf-orange); border-color:var(--nf-orange-line); }
-.status-badge.is-none{ background:var(--nf-gray-bg); color:var(--nf-gray-text); border-color:var(--nf-gray-line); }
-/* 고객 상세카드로 옮긴 [메일발송] 버튼 — 기존 .co-text-action(밑줄 텍스트 버튼) 톤 유지,
-   강조가 필요해 파란색(선택·링크 전용 색)만 입힌다. */
-.cdash-mail-btn{ color:var(--nf-blue) !important; }
-@media(max-width:1439px){
-  /* §요청 [6]: "업체명/최근 실적/총매출/최근 흐름/진행상황은 최대한 유지" — 여기서는
-     우선순위가 낮은 최근 요청/고객 성향/2026 매출/실적·매출 4개를 먼저 뺀다. */
-  .co-table-head,.co-row{ grid-template-columns:minmax(160px,1.3fr) 130px 74px 150px 96px 118px !important; }
-  .col-request,.col-insight,.col-yr-revenue,.col-contrib{ display:none !important; }
-}
-@media(max-width:1023px){
-  .co-table-head,.co-row{ grid-template-columns:minmax(150px,1.3fr) 130px 150px 90px 118px !important; }
-  .col-yr{ display:none !important; }
-  #listView{ overflow-x:auto; }
-  .co-table-head,.co-list{ min-width:700px; }
-}
 </style>
 </head>
 <body>
@@ -2749,45 +2614,23 @@ body.map-modal-lock{ overflow:hidden; }
        오른쪽 영역에 넣지 않았다(모바일 햄버거만 실제 기능 — 아래 drawer). -->
   <header class="gnav">
    <div class="gnav-inner">
-    <div class="brand-wrap gnav-brand"><img src="data:image/png;base64,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" alt="NETFORM" class="brand-logo" /><span class="gnav-page-title">고객관리</span><span class="gnav-count" id="gnavCustomerCount">고객 0명</span></div>
-    <!-- §고객관리 첫화면 전면 재디자인 라운드(신규) — 사용자 확정 지시: "업무관리 탭은
-         완전히 제거. 고객관리만 남으므로 불필요한 탭 모양도 제거." 기존 3탭 버튼(showCustomerTab/
-         showWorkQueueTab/showMailSettingsTab/updateTopTabsUI)은 아래 JS에 그대로 있지만
-         화면엔 "고객관리" 하나만 남아 헤더는 고정 타이틀 텍스트로만 보여준다. "메일 설정"은
-         실제 살아있는 기능(§1차미팅 메일 자동발송 라운드)이라 삭제하지 않고 오른쪽의 작은
-         텍스트 링크(gnav-settings-link)로 계속 열 수 있게 뒀다. 지도 분포/전화 요청 기록/
-         고객 등록/데이터 업데이트 버튼은 예전엔 #listView 안 .list-toolbar에 있었는데,
-         시안대로 헤더 오른쪽으로 옮겼다(같은 id/클릭 핸들러를 그대로 재사용 — 새로 만들지
-         않고 위치만 이동, §"기존 기능 삭제 금지"). -->
-    <div class="gnav-right" id="gnavActionRow">
-      <button type="button" id="crmMapDistributionBtn" class="gnav-outline-btn">
-        <span class="list-phone-btn-icon" aria-hidden="true">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.4-7-11.5A7 7 0 0 1 19 9.5C19 14.6 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg>
-        </span>지도 분포
+    <div class="brand-wrap gnav-brand"><img src="data:image/png;base64,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" alt="NETFORM" class="brand-logo" /><span class="brand-sub">고객업무관리</span></div>
+    <!-- §업무관리 탭 1차 구축 라운드 §1 / §1차미팅 메일 자동발송 라운드 — 3개 실제 탭
+         버튼은 그대로, class/부모만 gnav-menu로 바꿨다. -->
+    <nav class="gnav-menu" id="crmTopTabs" aria-label="주요 메뉴">
+      <button type="button" class="top-tab is-active" id="crmTabCustomer" data-tab="customer">고객관리</button>
+      <button type="button" class="top-tab" id="crmTabWorkQueue" data-tab="workqueue">업무관리</button>
+      <button type="button" class="top-tab" id="crmTabMailSettings" data-tab="mailsettings">메일 설정</button>
+    </nav>
+    <div class="gnav-right">
+      <!-- 알림/도움말/사용자 메뉴는 이 앱에 실제로 연결된 기능이 없어 넣지 않았다(§요청
+           "가짜 메뉴 추가 금지"). 모바일 전용 햄버거만 실제 동작(drawer)한다. -->
+      <button type="button" class="gnav-hamburger" id="gnavMenuBtn" aria-expanded="false" aria-controls="gnavDrawer" aria-label="메뉴 열기">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
       </button>
-      <button type="button" id="crmPhoneRequestBtn" class="gnav-outline-btn">
-        <span class="list-phone-btn-icon" aria-hidden="true">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-        </span>전화 요청 기록
-      </button>
-      <button type="button" id="crmAddBtn" class="gnav-primary-btn">+ 고객 등록</button>
-      <div class="update-menu-wrap" id="crmUpdateMenuWrap">
-        <button type="button" id="crmDataUpdateBtn" class="gnav-settings-link">데이터 업데이트 ▾</button>
-        <div class="update-menu" id="crmUpdateMenu">
-          <button type="button" id="crmPartnerImportBtn" style="display:none;">협력사 데이터 업데이트</button>
-          <button type="button" id="crmPourImportBtn" style="display:none;">POUR 시공실적 업데이트</button>
-          <button type="button" id="crmPartnerSyncBtn" style="display:none;">협력사 동기화</button>
-          <button type="button" id="crmSyncDiagBtn" style="display:none;">동기화 진단(업체 1건 추적)</button>
-          <button type="button" id="crmPartnerListSyncBtn">협력업체 동기화</button>
-        </div>
-      </div>
-      <button type="button" class="gnav-settings-link" id="gnavMailSettingsBtn">메일 설정</button>
     </div>
    </div>
   </header>
-  <!-- §고객관리 첫화면 전면 재디자인 라운드: 예전엔 3탭을 담던 모바일 drawer였는데, 이제
-       탭이 없어 "메일 설정" + "고객 목록으로" 2개 항목만 남긴다(showMailSettingsTab/
-       showCustomerTab 그대로 재사용) — drawer 자체(포커스 트랩/Esc/backdrop)는 그대로 둔다. -->
   <div class="gnav-drawer-overlay" id="gnavDrawerOverlay" hidden>
     <div class="gnav-drawer" id="gnavDrawer" role="dialog" aria-modal="true" aria-label="메뉴">
       <div class="gnav-drawer-head">
@@ -2795,7 +2638,8 @@ body.map-modal-lock{ overflow:hidden; }
         <button type="button" class="gnav-drawer-close" id="gnavDrawerCloseBtn" aria-label="메뉴 닫기">&times;</button>
       </div>
       <nav class="gnav-drawer-menu" aria-label="주요 메뉴(모바일)">
-        <button type="button" class="gnav-drawer-item is-active" id="gnavDrawerTabCustomer">고객 목록으로</button>
+        <button type="button" class="gnav-drawer-item is-active" id="gnavDrawerTabCustomer">고객관리</button>
+        <button type="button" class="gnav-drawer-item" id="gnavDrawerTabWorkQueue">업무관리</button>
         <button type="button" class="gnav-drawer-item" id="gnavDrawerTabMailSettings">메일 설정</button>
       </nav>
     </div>
@@ -2806,39 +2650,84 @@ body.map-modal-lock{ overflow:hidden; }
        만들지 않는다 — 해당 업무 데이터/자동 Todo(§고객 진행단계 연동 라운드)는 그대로
        살아있고 v2의 "내 할 일"에서 계속 보인다(§1, 첫 화면 표시만 뺀 것). -->
   <div id="listView">
-    <!-- §고객관리 첫화면 전면 재디자인 라운드(신규): 예전 .list-toolbar의 제목/버튼은
-         헤더로 옮겼다(§위 .gnav 참고). 여기 남는 건 미등록 업체 경고 배지 하나뿐 —
-         renderUnregisteredBadge()는 전혀 안 바꿨다(같은 id, §"기존 기능 삭제 금지"). -->
-    <div class="list-status-row">
-      <button type="button" class="unreg-badge" id="crmUnregBadge" style="display:none;"></button>
+    <div class="list-toolbar">
+      <div class="list-title-row">
+        <div class="list-title" id="crmListTitle">고객</div>
+        <!-- §미등록 업체 관리 라운드: 매출자료-CRM 비교 결과 미등록 업체가 있을 때만 보이는
+             작은 경고 배지. 0건이면 아예 렌더링하지 않는다(§ "0개면 표시 안 해도 됨"). -->
+        <button type="button" class="unreg-badge" id="crmUnregBadge" style="display:none;"></button>
+        <!-- §상단 경고 정리 라운드: "⏱ 기한 초과 N" 배지는 메인 첫화면 상단 경고에서
+             제거했다(§요청) — buildOverdueCompanies/getStageDurationInfo/D+N 계산 자체와
+             행 왼쪽 빨간 라인(.co-row.is-overdue) 강조는 그대로 두고, 배지 버튼(#crmOverdueBadge)
+             과 그걸 부르던 renderOverdueBadge() 호출만 없앴다(§ "기능 자체를 삭제하지 마세요,
+             상단 경고에서만 제거"). -->
+      </div>
+      <div class="list-secondary-actions">
+        <!-- §데이터 가져오기 버튼 통합 라운드: 평소에 늘 보이던 큰 버튼 2개를 작은 [데이터
+             업데이트] 하나로 합쳤다 — 기존 가져오기 함수(openPartnerImportModal/
+             openPourImportModal, previewXxxImport/applyXxxImport)는 전혀 바꾸지 않았고,
+             그 함수를 부르는 버튼을 드롭다운 메뉴 안으로 옮겼을 뿐이다(§ 아래 완료 보고에서
+             이 버튼들이 "매번 눌러야 하는" 게 아니라는 걸 설명). -->
+        <div class="update-menu-wrap" id="crmUpdateMenuWrap">
+          <button type="button" id="crmDataUpdateBtn" class="list-secondary-link">데이터 업데이트 ▾</button>
+          <div class="update-menu" id="crmUpdateMenu">
+            <!-- §협력업체 동기화 단순화 라운드(§요청 1/2) — 기존 4개 버튼(협력사 데이터
+                 업데이트/POUR 시공실적 업데이트/협력사 동기화/동기화 진단)은 지우지 않고
+                 display:none으로 숨기기만 했다(§요청 "제거하거나 숨겨줘" — 다른 기능이
+                 남아있어야 할 경우를 대비해 코드/이벤트는 그대로 둔다, §11 "필요한 파일만
+                 수정"). 새 버튼 하나(crmPartnerListSyncBtn)만 보인다. -->
+            <button type="button" id="crmPartnerImportBtn" style="display:none;">협력사 데이터 업데이트</button>
+            <button type="button" id="crmPourImportBtn" style="display:none;">POUR 시공실적 업데이트</button>
+            <button type="button" id="crmPartnerSyncBtn" style="display:none;">협력사 동기화</button>
+            <button type="button" id="crmSyncDiagBtn" style="display:none;">동기화 진단(업체 1건 추적)</button>
+            <!-- §협력업체 동기화 단순화 라운드(§요청 3/4/10) — partner-dashboard의 "협력업체
+                 리스트"(internal/contractor/external, RTDB partnerList_* 9개 키 포함)만
+                 가져온다. 신규 MOU 파이프라인(질문서/미팅/체결 진행 상태, mouOverrides/
+                 newMouAdds)은 이 버튼에서 전혀 fetch하지 않는다(§요청 4). -->
+            <button type="button" id="crmPartnerListSyncBtn">협력업체 동기화</button>
+          </div>
+        </div>
+        <!-- §전화 요청 기록 라운드(신규) — "+ 고객 등록"과 같은 줄에 배치. 처음엔 작은
+             밑줄 텍스트(list-secondary-link)였는데 잘 안 보인다는 피드백으로 같은 높이의
+             테두리형 버튼(.list-phone-btn)+📞 아이콘으로 키웠다(§전화 요청 기록 버튼 확대
+             라운드) — 다만 진한 네이비로 채운 주 CTA "+ 고객 등록"보다는 한 단계 낮은
+             톤(흰 배경+네이비 테두리)이라 위계는 그대로 유지된다. -->
+        <!-- §지도 분포 라운드(신규): "전화 요청 기록"과 완전히 같은 보조 버튼 스타일
+             (.list-phone-btn 그대로 재사용 — 높이/테두리/글꼴/hover 전부 동일)로, 그
+             왼쪽에 배치한다. 이모지 대신 작은 SVG 핀 아이콘을 쓴다(§요청사항). -->
+        <button type="button" id="crmMapDistributionBtn" class="list-phone-btn">
+          <span class="list-phone-btn-icon" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.4-7-11.5A7 7 0 0 1 19 9.5C19 14.6 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg>
+          </span>지도 분포
+        </button>
+        <!-- §전면 내비게이션 리디자인 라운드: 이모지(📞) 대신 지도 분포 버튼과 같은
+             line icon(stroke-width 2, 24 viewBox) 규칙의 SVG로 교체했다(§요청 "이모지를
+             UI 아이콘으로 사용하지 마라") — 기능/클릭 핸들러는 전혀 안 바뀜. -->
+        <button type="button" id="crmPhoneRequestBtn" class="list-phone-btn">
+          <span class="list-phone-btn-icon" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          </span>전화 요청 기록
+        </button>
+        <button type="button" id="crmAddBtn" class="list-add-btn">+ 고객 등록</button>
+      </div>
     </div>
-    <!-- §요청 [2] "실적 상승 업체" — 삭제 대신 접을 수 있는 컴팩트 영역으로. 기본은 한 줄
-         요약(제목+업체수+펼치기), 펼치면 기존 renderRisingSection()이 그대로 그리는
-         업체별 카드(computeRisingCompanies/buildRisingCompaniesTop5, 2025 vs 2024 POUR
-         실적 비교 — 새 계산 없음)가 나온다. -->
-    <div class="rising-compact" id="crmRisingCompact">
-      <button type="button" class="rising-compact-head" id="crmRisingToggle" aria-expanded="false" aria-controls="crmRisingSection">
-        <span class="rising-compact-title">실적 상승 업체</span>
-        <span class="rising-compact-count" id="crmRisingCount">0개 업체</span>
-        <span class="rising-compact-arrow" aria-hidden="true">▾</span>
-      </button>
-      <div class="rising-section" id="crmRisingSection" hidden></div>
+    <!-- §전면 리디자인 라운드(신규) — KPI 요약 바(전체 고객/MOU 체결/상승 업체/관리 필요)
+         + 분석 영역(올해의 고객 흐름 60% / 오늘의 관리 목록 40%). 전부 renderList()가
+         이미 계산해 둔 값(filterCounts/managementNeedCache)만 다시 보여준다. -->
+    <div class="kpi-strip" id="crmKpiStrip"></div>
+    <div class="analysis-grid">
+      <div class="analysis-panel analysis-panel-rising">
+        <div class="analysis-panel-title">올해의 고객 흐름</div>
+        <div class="rising-section" id="crmRisingSection"></div>
+      </div>
+      <div class="analysis-panel analysis-panel-today" id="crmTodayMgmtPanel"></div>
     </div>
-    <!-- §요청 [3] "고객 분류 요약" — 예전 6개 필터 칩(FILTER_DEFS)을 되살려 얇은 요약
-         바 하나로 보여준다. 판정은 전부 matchesFilter가 이미 갖고 있던 분기
-         (partner/agreementInProgress/hurdle/nonPartnerRevenue/receivable, §지도분포
-         MAP_FILTER_DEFS가 계속 재사용 중이라 지우지 않고 남겨뒀던 바로 그 로직) 그대로
-         재사용한다 — 새 판정 로직 없음. -->
     <div class="list-filter-row" id="crmFilterRow"></div>
     <div class="list-search-row">
       <div class="search-box">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input type="text" id="crmSearchInput" placeholder="업체명 · 담당자 · 활동내용 검색" />
+        <input type="text" id="crmSearchInput" placeholder="업체명 / 담당자 / 활동내용 검색" />
       </div>
-      <!-- §요청 [4]: "관리필요 버튼이 필요하다면 검색·정렬 줄 오른쪽에 작게 유지" —
-           예전엔 필터 칩 줄 끝에 붙어있던 버튼(openManagementNeedModal, 판정 로직 그대로)을
-           여기로만 옮겼다. -->
-      <button type="button" class="mgmt-need-chip" id="mgmtNeedBtn">관리필요 0</button>
       <!-- §정렬 드롭다운 정리 라운드: "전체 실적순"(pour, 옛 co.pourTrackRecords 상태값
            기준)/"최근 1년 매출순"(revenue, co.partnerDashboard.gradeSales 단일 스냅샷
            기준)은 메인 테이블에 더 이상 없는 옛 용어라 드롭다운에서 뺐다(계산 코드 자체는
@@ -2881,12 +2770,10 @@ body.map-modal-lock{ overflow:hidden; }
       <div class="col-yr-revenue">2026 매출</div>
       <div class="col-contrib" title="실적 1건당 평균 매출을 전체 업체와 비교한 상대 순위(하위 30%=낮음·중간 40%=보통·상위 30%=높음). 클릭하면 근거를 볼 수 있습니다.">실적↔매출</div>
       <div class="col-trend" title="POUR 시공실적 건수의 전년 대비 증감(작년 vs 재작년, ±10% 기준). 클릭하면 근거를 볼 수 있습니다.">최근 흐름</div>
-      <!-- §고객관리 첫화면 전면 재디자인 라운드(신규) — 사용자 확정 지시 [5]: "단계
-           진행상황"(4단계 stepper, 위 §단계 진행상황 이전 라운드에서 업무관리로 옮겼던 것)
-           대신 핵심 상태 배지 하나만 다시 목록에 추가한다("한 행에 상태 배지를 여러 개
-           나열하지 말고 핵심 상태 하나만" — buildStageStepperHtml은 그대로 두고 안 부른다,
-           새 buildProgressStatusBadge만 쓴다). -->
-      <div class="col-status">진행상황</div>
+      <!-- §단계 진행상황 이전 라운드: "단계 진행상황"(4단계 stepper) 컬럼을 목록 화면에서
+           뺐다(요청 "정보를 지우는 게 아니라 창에서 안 보이게, 업무관리 창으로 이전"—
+           buildStageStepperHtml 함수/r.progress 데이터/§업무관리 화면 쪽 렌더링은 그대로
+           보존, 아래 renderWorkQueueView 표에 새로 추가했다). -->
     </div>
     <div class="co-list" id="crmList"></div>
     <div class="list-pagination" id="crmPagination"></div>
@@ -6472,11 +6359,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   const listView = document.getElementById('listView');
   const cardView = document.getElementById('cardView');
   const searchInput = document.getElementById('crmSearchInput');
-  // §고객관리 첫화면 전면 재디자인 라운드: #crmListTitle(옛 ".list-title")은 헤더의
-  // "고객 N명"(#gnavCustomerCount)으로 옮겨져 더 이상 DOM에 없다 — 같은 변수명을
-  // 그대로 두고 새 대상만 가리키게 해서 renderList()의 listTitle.textContent 갱신
-  // 코드는 하나도 안 건드렸다(§ "필요한 파일만 최소 수정").
-  const listTitle = document.getElementById('gnavCustomerCount');
+  const listTitle = document.getElementById('crmListTitle');
   let searchQuery = '';
   let currentCompanyId = null;
   // §첫 화면 최종 수정 라운드: 필터/정렬/페이지 상태. 서버가 없는 순수 클라이언트 화면이라
@@ -6525,15 +6408,8 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 리스트 동기화가 안되도 협력사로 들어온건 다 mou체결로 해줘" — 결국 isConfirmedPartner
   // (리스트 등재 co.partnerStatus==='partner' OR MOU 단계 done) 그대로다. 새 판정 로직
   // 없음 — 이미 있는 isConfirmedPartner를 그대로 재사용한다.
-  // §고객관리 첫화면 전면 재디자인 라운드(신규) — 사용자 확정 지시 [3] "고객 분류 요약":
-  // 전체/우리 협력사/협약 진행 중/허들·보류/비협력 매출 시공사/미수금 있는 업체 6개로
-  // 되돌린다. matchesFilter의 partner/agreementInProgress/hurdle/nonPartnerRevenue/
-  // receivable 분기는 위 §고객관리 탭 3개 재구성 라운드에서 이미 "다른 화면(지도분포)이
-  // 여전히 참조하니 지우지 않는다"고 남겨뒀던 바로 그 로직 — 새 판정 로직 없이 키만
-  // 다시 노출한다.
   const FILTER_DEFS = [
-    ['all','전체'], ['partner','우리 협력사'], ['agreementInProgress','협약 진행 중'],
-    ['hurdle','허들·보류'], ['nonPartnerRevenue','비협력 매출 시공사'], ['receivable','미수금 있는 업체']
+    ['all','전체'], ['mouDone','MOU체결'], ['trendUp','최근흐름 상승세']
   ];
   function getMouStage(progress){
     return progress.stages.find(s=> s.key === 'mou') || null;
@@ -6541,16 +6417,6 @@ window.SHIN2_CRM_APP_INIT = function(){
   function isHurdleCompany(co){
     const nm = resolveNewMouForCompany(co);
     return !!(nm && nm.hurdle);
-  }
-  // §고객관리 첫화면 전면 재디자인 라운드(신규) — 사용자 확정 지시 [5] "진행상황" 컬럼:
-  // 목록 표시 전용 배지 하나. 새 판정 로직이 아니라 위에서 이미 만들어진
-  // isConfirmedPartner/isHurdleCompany/progress.hasAny를 그대로 조합만 한다(§고객 분류
-  // 요약과 같은 소스, 우선순위: MOU 체결완료 > 허들·보류 > 진행 중 > 미등록).
-  function buildProgressStatusBadge(co, progress){
-    if(isConfirmedPartner(co, progress)) return { cls:'is-mou', label:'MOU 체결 완료' };
-    if(progress.hasAny && isHurdleCompany(co)) return { cls:'is-hurdle', label:'허들·보류' };
-    if(progress.hasAny) return { cls:'is-progress', label:'협약 진행 중' };
-    return { cls:'is-none', label:'미등록' };
   }
   // §협력업체 리스트 등재 기준 재정정 라운드 — 사용자 재정정: "날짜가 없어도 체결리스트에
   // 있으면 협력사". 실제 사례로 확인됨: partner-dashboard 내부용 리스트(전체 289개)에는
@@ -6748,25 +6614,22 @@ window.SHIN2_CRM_APP_INIT = function(){
     mouDone: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12.5 8 21l4-2 4 2-1-8.5"/><circle cx="12" cy="7" r="5"/><path d="m9.3 7 1.8 1.8L15 5.3"/></svg>',
     trendUp: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17 10 11l4 4 6-7"/><path d="M15 8h5v5"/></svg>'
   };
-  // §고객관리 첫화면 전면 재디자인 라운드(신규) — "고객 분류 요약" 얇은 바. 카드형이
-  // 아니라 아이콘+라벨+숫자를 1px 구분선으로 나눈 한 줄 스트립(§요청 "커다란 카드
-  // 형태로 만들지 말 것"). 값/클릭 동작은 예전 .list-filter-chip과 완전히 동일 —
-  // matchesFilter 재계산 없이 counts만 새 마크업으로 보여준다.
   function renderFilterChips(counts){
     const wrap = document.getElementById('crmFilterRow');
     if(!wrap) return;
+    // §고객관리 탭 4개 재구성 라운드: 탭 좌측 아이콘 + 우측 작은 숫자 배지(.chip-count)로
+    // 한 줄 컴팩트 탭 UI를 만든다(§요청 "카드형으로 과하게 크게 만들지 말 것" — 기존
+    // .list-filter-chip 높이/폰트는 그대로 재사용, 새 크기 체계를 만들지 않았다).
     wrap.innerHTML = FILTER_DEFS.map(([key,label])=>
-      `<button type="button" class="class-summary-item${filterKey===key?' is-active':''}" data-filter="${esc(key)}">${FILTER_ICON_SVG[key]||''}<span class="class-summary-label">${esc(label)}</span><span class="class-summary-value">${counts[key]||0}</span></button>`
-    ).join('');
+      `<button type="button" class="list-filter-chip${filterKey===key?' is-active':''}" data-filter="${esc(key)}">${FILTER_ICON_SVG[key]||''}<span>${esc(label)}</span><span class="chip-count">${counts[key]||0}</span></button>`
+    ).join('') + `<button type="button" class="list-filter-chip mgmt-need-chip" id="mgmtNeedBtn">관리필요 ${counts.manageNeeded||0}</button>`;
     wrap.querySelectorAll('[data-filter]').forEach(btn=> btn.addEventListener('click', ()=>{
       filterKey = btn.getAttribute('data-filter');
       currentPage = 1;
       renderList();
     }));
-    // §요청 [4]: 관리필요 버튼은 이제 검색·정렬 줄의 정적 HTML(#mgmtNeedBtn)로 옮겼다 —
-    // 여기서는 숫자만 갱신한다(판정/클릭 로직은 그대로).
     const mgmtBtn = document.getElementById('mgmtNeedBtn');
-    if(mgmtBtn) mgmtBtn.textContent = '관리필요 ' + (counts.manageNeeded || 0);
+    if(mgmtBtn) mgmtBtn.addEventListener('click', ()=> openManagementNeedModal());
   }
   // §전면 리디자인 라운드(신규) — "KPI 요약 바": 전체 고객/MOU 체결/상승 업체/관리 필요를
   // 카드 4개가 아니라 1px 세로 구분선을 쓴 가로 스트립 하나로 보여준다. 값은 전부 이미
@@ -6935,11 +6798,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     managementNeedCache = computeManagementNeedList(enriched, pourLatestIndex);
     filterCounts.manageNeeded = managementNeedCache.counts.total;
     renderFilterChips(filterCounts);
-    // §고객관리 첫화면 전면 재디자인 라운드: 이전 라운드의 "KPI 요약 바"/"오늘의 관리
-    // 목록"은 이번 시안에 없는 영역이라 호출을 없앴다(§요청 목록에 없는 영역, "기능 없는
-    // 장식용 카드" 정리 원칙과 동일) — renderKpiStrip/renderManagementTodayPanel 함수
-    // 정의 자체와 관리필요 판정(classifyManagementNeed 등, 관리필요 모달/고객카드 배너가
-    // 계속 쓴다)은 전혀 안 지웠다.
+    // §전면 리디자인 라운드(신규) — "KPI 요약 바"/"오늘의 관리 목록"은 여기서 이미 계산된
+    // filterCounts/managementNeedCache를 그대로 다시 보여줄 뿐 새 판정/집계를 전혀
+    // 만들지 않는다(§ "임의의 숫자를 하드코딩하지 않는다").
+    renderKpiStrip(filterCounts);
+    renderManagementTodayPanel(managementNeedCache);
 
     const rows = enriched
       .filter(r=> matchesFilter(r.co, r.progress, filterKey))
@@ -7091,10 +6954,6 @@ window.SHIN2_CRM_APP_INIT = function(){
       // (buildProgressStages 결과, 위 stageInfo와 같은 소스 — §3 "중복 계산 금지")를 그대로
       // 읽어서 stepper와 다음 행동 chip을 만든다.
       const stageStepperHtml = buildStageStepperHtml(r.progress);
-      // §고객관리 첫화면 전면 재디자인 라운드(신규) — "진행상황" 컬럼: r.progress를 그대로
-      // 재사용해 buildProgressStatusBadge(co, r.progress) 하나만 조회한다(중복 계산 없음).
-      const statusBadge = buildProgressStatusBadge(co, r.progress);
-      const statusBadgeHtml = `<span class="status-badge ${statusBadge.cls}">${esc(statusBadge.label)}</span>`;
       // §목록 테이블 표시방식 조정 라운드(신규): "다음 행동" 열을 목록에서만 숨긴다(§요청
       // "목록 테이블에서만 숨기거나 렌더링하지 않도록 처리") — buildNextActionCellHtml
       // 함수와 co.nextActions 원본 데이터, 고객 상세 화면(renderNextActionsCol)의 다음 행동
@@ -7171,7 +7030,9 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="col-yr-revenue">${yrRevenueHtml}</div>
         <div class="col-contrib">${contribHtml}</div>
         <div class="col-trend">${trendHtml}</div>
-        <div class="col-status">${statusBadgeHtml}</div>
+        <!-- §단계 진행상황 이전 라운드: 이 컬럼은 목록에서 뺐다(업무관리 화면으로 이전,
+             stageStepperHtml 변수/buildStageStepperHtml 함수는 그대로 계산돼 있다 —
+             §"데이터 제거가 아니라 숨김" 관례 그대로). -->
       </div>`;
     }).join('');
     // §실적↔매출 실제 구현 라운드: "실적↔매출" 클릭 -> 실적·매출 분석 Drawer(다른 컬럼과
@@ -7706,16 +7567,6 @@ window.SHIN2_CRM_APP_INIT = function(){
     const wrap = document.getElementById('cdashInfoStrip');
     if(!wrap) return;
     const addr = co.address || '';
-    // §고객관리 첫화면 전면 재디자인 라운드(신규) — [메일발송] 진입점을 업무관리 "1차미팅
-    // 잡기" 표에서 고객 상세카드로 옮긴다(업무관리 화면 제거로 원래 진입점이 사라져서).
-    // 대상 판정은 새로 만들지 않고 그대로 재사용: classifyWorkQueueMeeting(progress)이
-    // type:'m1'(질문서 회신 완료 + 1차미팅 일정 전혀 없음, "예정" 상태는 제외 — 예전
-    // 버그 수정과 같은 기준)을 반환할 때만 m1MailButtonInfo(co)로 노출/라벨을 그대로 판정.
-    const wqMeeting = classifyWorkQueueMeeting(buildProgressStages(co));
-    const mailInfo = (wqMeeting && wqMeeting.type === 'm1') ? m1MailButtonInfo(co) : null;
-    const mailBtnHtml = (mailInfo && mailInfo.show)
-      ? `<button type="button" class="co-text-action cdash-mail-btn" id="cdashMailBtn">${esc(mailInfo.label)}</button>`
-      : '';
     wrap.innerHTML = `
       <div class="cdash2-info-strip">
         <div class="cdash2-info-item">
@@ -7731,12 +7582,9 @@ window.SHIN2_CRM_APP_INIT = function(){
           <span class="cdash2-info-value">${esc(addr || '미확인')}</span>
         </div>
         <div class="cdash2-info-strip-spacer"></div>
-        ${mailBtnHtml}
         <button type="button" class="co-text-action" id="cdashInfoEditBtn">✎ 고객 정보 수정</button>
       </div>
     `;
-    const mailBtn = document.getElementById('cdashMailBtn');
-    if(mailBtn) mailBtn.addEventListener('click', ()=> openMailComposeModal(co.id));
     document.getElementById('cdashInfoEditBtn').addEventListener('click', ()=>{
       cardState.accordionOpen.info = true;
       cardState.chartEditing = true;
@@ -9252,10 +9100,175 @@ window.SHIN2_CRM_APP_INIT = function(){
   }
   // §9: 앵커 날짜가 없으면(ts===null, 파싱 불가) 임의 경과일을 만들지 않는다 — days를 null로
   // 두고 문구에서도 "N일" 부분을 아예 뺀다.
-  // §고객관리 첫화면 전면 재디자인 라운드: 이 3개 함수는 원래 업무관리 전용 블록
-  // (workqSaveMeetingSchedule 등)에 있었지만, 고객 진행단계 저장(applyDealStageValues,
-  // 아래 §고객 진행단계 라운드)이 여전히 그대로 쓰고 있어 업무관리 화면 삭제와 별개로
-  // 남겨둔다(§ "사용처 확인 후 정리" — 실제로 다른 곳에서 쓰이는 함수는 지우지 않는다).
+  function buildMeetingReasonText(type, days){
+    if(type === 'm1') return days === null ? '질문서 회신 완료 · 1차미팅 일정 없음' : `질문서 회신 후 ${days}일 · 1차미팅 일정 없음`;
+    if(type === 'm2') return days === null ? '1차미팅 완료 · 2차미팅 일정 없음' : `1차미팅 후 ${days}일 · 2차미팅 일정 없음`;
+    if(type === 'm1Scheduled' || type === 'm2Scheduled') return '일정 잡힘 · 완료 확인 필요';
+    return days === null ? '2차미팅 완료 · MOU 미체결' : `2차미팅 완료 후 ${days}일 · MOU 미체결`;
+  }
+  // §고객 단계 전환관리 라운드 §5/§8 — 표의 "해야 할 일" 버튼 문구만 스펙 표현("[L2 전환]"/
+  // "[L3 전환]")에 맞춰 바꾼다. 판정값(firstActivity/l2Stall) 자체는 그대로다.
+  const WORKQ_L2L3_ACTION_LABEL = { firstActivity:'L2 전환', l2Stall:'L3 전환' };
+  const WORKQ_TYPE_PRIORITY = { m1:0, m1Scheduled:0, m2:1, m2Scheduled:1, mou:2, firstActivity:3, l2Stall:4, reuse:5, newPartner:6 };
+  // §신규 협력업체 관리 라운드 — 샤인하우징 실사례 조사 결과: partner-dashboard 동기화로
+  // CRM에는 신규 고객으로 정상 생성됐지만(previewPartnerSync 2차 패스, §협력사 동기화
+  // 근본원인 수정 라운드), 업무관리는 classifyWorkQueueMeeting(질문서 회신 완료를 전제조건으로
+  // 함, §6 전제조건)과 classifyManagementNeed(mouDone을 전제조건으로 함, §mouDoneTs==null이면
+  // 'none')를 순서대로만 판정해서, "질문서/미팅/MOU 어느 것도 아직 시작 안 한" 이런 업체는
+  // 두 판정 모두 통과하지 못해 buildWorkQueueItem이 끝까지 null을 반환했다(§ 실제 확인된
+  // 원인 — 업무관리가 "모든 고객"이 아니라 "특정 후속행동 조건에 해당하는 업체만" 보여주는
+  // 설계 자체는 의도된 동작이고, 이 케이스만 그 조건표에 아예 없었다). q/m1/m2/mou 넷 다
+  // 실제 날짜(ts)가 없고 MOU도 미체결인 경우에만 "신규 협력업체"로 최하위 우선순위에 추가한다
+  // — 다른 실제 후속상태가 하나라도 있으면(질문서 발송만 됐어도 q.ts가 생김) 이 판정보다
+  // 우선순위가 높은 위 판정들이 먼저 걸려 여기까지 오지 않는다(§ "다른 실제 후속상태가 하나도
+  // 없을 때만 표시").
+  function isNewPartnerNoProgress(progress){
+    if(!progress.hasAny) return false;
+    const byKey = {}; progress.stages.forEach(s=> byKey[s.key] = s);
+    if(byKey.mou.state === 'done') return false; // MOU 완료 업체는 신규 업무로 다시 잡히면 안 됨(§ 요구사항)
+    return byKey.q.ts == null && byKey.m1.ts == null && byKey.m2.ts == null;
+  }
+  // §업무관리 제외 조건 추가: "질문서 발송/회신 기록도, 1차·2차미팅 기록도 전혀 없이
+  // MOU만 체결완료"된 업체(기존협약업체를 곧바로 MOU 완료 상태로 들여온 실제 사례 —
+  // ㈜종명건설 등, 첫 라운드의 "1·2차 미팅 없이 MOU 체결" 예외와 같은 부류)는 업무관리에서
+  // 제외한다. buildProgressStages가 이미 계산해 둔 stages의 ts(질문서/1차/2차미팅 날짜
+  // 파싱 결과)가 셋 다 null일 때만 "기록이 아예 없음"으로 본다 — 하나라도 실제 날짜가
+  // 있으면(즉 어떤 형태로든 절차를 거쳤으면) 이 제외 규칙을 적용하지 않는다.
+  function hasNoFunnelHistoryBeforeMou(progress){
+    if(!progress.hasAny) return false;
+    const byKey = {}; progress.stages.forEach(s=> byKey[s.key] = s);
+    if(byKey.mou.state !== 'done') return false;
+    return byKey.q.ts == null && byKey.m1.ts == null && byKey.m2.ts == null;
+  }
+  function buildWorkQueueItem(co, acts, progress, hasPour){
+    if(hasNoFunnelHistoryBeforeMou(progress)) return null; // 질문서/미팅 기록 없이 바로 MOU 체결된 업체는 제외
+    const meeting = classifyWorkQueueMeeting(progress);
+    if(meeting){
+      const isScheduled = meeting.type === 'm1Scheduled' || meeting.type === 'm2Scheduled';
+      if(isScheduled){
+        // §partner-dashboard 진행정보 동기화 라운드 §6 — "예정된 미팅"은 anchor.ts가 예정일
+        // 그 자체(미래일 수 있음)라 "완료 후 경과일"과 같은 의미로 쓰면 안 된다. 예정일이
+        // 이미 지났는데 아직도 완료 처리가 안 됐을 때만 "지연"으로 표시한다.
+        const ts = meeting.anchor && typeof meeting.anchor.ts === 'number' ? meeting.anchor.ts : null;
+        const daysUntil = ts != null ? Math.floor((ts - Date.now()) / 86400000) : null;
+        const ownerText = meeting.owner ? ` · 담당 ${meeting.owner}` : '';
+        const reasonText = `${meeting.scheduledLabel || ''} 예정${ownerText}`.trim();
+        return {
+          co, type: meeting.type, category: 'meeting',
+          currentStateLabel: meeting.stageLabel, reasonText,
+          days: daysUntil, actionLabel: meeting.label, isDelayed: daysUntil !== null && daysUntil < 0
+        };
+      }
+      const days = meeting.anchor && typeof meeting.anchor.ts === 'number' ? Math.floor((Date.now() - meeting.anchor.ts) / 86400000) : null;
+      // §10: 세 유형(1차미팅 잡기/2차미팅 잡기/MOU 진행)만 7일 이상이면 "지연" — 날짜가
+      // 실제로 있을 때만 계산한다.
+      return {
+        co, type: meeting.type, category: meeting.type === 'mou' ? 'mou' : 'meeting',
+        currentStateLabel: meeting.stageLabel, reasonText: buildMeetingReasonText(meeting.type, days),
+        days, actionLabel: meeting.label, isDelayed: days !== null && days >= 7
+      };
+    }
+    const mgmt = classifyManagementNeed(co, acts, progress, hasPour);
+    if(mgmt.type === 'firstActivity' || mgmt.type === 'l2Stall'){
+      return {
+        co, type: mgmt.type, category: 'l2l3',
+        currentStateLabel: mgmtNeedStageLabel(mgmt), reasonText: mgmtNeedReasonText(mgmt),
+        days: mgmt.days, actionLabel: WORKQ_L2L3_ACTION_LABEL[mgmt.type], isDelayed: false
+      };
+    }
+    if(mgmt.type === 'reuse'){
+      return {
+        co, type: 'reuse', category: 'reuse',
+        currentStateLabel: mgmtNeedStageLabel(mgmt), reasonText: mgmtNeedReasonText(mgmt),
+        days: mgmt.days, actionLabel: '재사용', isDelayed: false
+      };
+    }
+    // §신규 협력업체 관리 라운드 — 위 미팅/L2·L3/재사용 판정에 전부 해당하지 않을 때만(=
+    // 최하위 우선순위) 도달한다. days/isDelayed는 근거 날짜가 없으므로 항상 null/false다
+    // (§ "임의 날짜 생성 금지"와 같은 원칙).
+    if(isNewPartnerNoProgress(progress)){
+      return {
+        co, type: 'newPartner', category: 'newPartner',
+        currentStateLabel: '신규 협력업체', reasonText: '신규 등록 · 후속 진행 없음',
+        days: null, actionLabel: '첫 연락 / 온보딩', isDelayed: false
+      };
+    }
+    return null; // 정상 진행 중이거나(판정 대상 아님) 판정불가(mgmt.type==='unknown') — 억지로 만들지 않는다(§6)
+  }
+  // computeWorkQueue: companies/activities/POUR 인덱스를 매번 새로 읽기만 하는 순수 계산 —
+  // 별도 저장소 없음(§14 READ-ONLY). "오래된 업체가 위로"(§9) — days가 클수록 위(내림차순),
+  // 날짜 없는 업체(days===null)는 순서를 지어낼 수 없으므로 맨 아래로 보낸다.
+  function computeWorkQueue(){
+    const companies = D.loadCompanies();
+    const pourLatestIndex = D.buildPourLatestIndex();
+    const list = [];
+    companies.forEach(co=>{
+      const acts = D.activitiesForCompany(co.id);
+      const progress = buildProgressStages(co);
+      const hasPour = pourLatestIndex.get(co.id) != null;
+      const item = buildWorkQueueItem(co, acts, progress, hasPour);
+      if(item) list.push(item);
+    });
+    // §실행형 업무관리 라운드 §14: 단순 "경과일 오래된 순"만 쓰지 않고, 실제 행동
+    // 우선순위(1차미팅 잡기→2차미팅 잡기→MOU 진행→첫 L2 필요→L3 전환 필요→재사용 필요)를
+    // 먼저 적용한 뒤, 같은 행동 안에서만 오래된 업체가 위로 오게 한다.
+    // §경과일 짧은 업체 분리 보기 라운드: "막 5일" 같은 경과일이 적은(=이제 막 발생한) 건을
+    // 오래된 업체들 사이에서 따로 찾기 어렵다는 요청 — 같은 행동 우선순위 안에서 정렬
+    // 방향만 뒤집는 workQueueSortAsc 토글을 추가했다(기본은 기존과 동일하게 오래된 순).
+    // 날짜 없는 업체(days===null)는 어느 방향으로 봐도 "얼마나 지났는지 알 수 없다"는
+    // 사실 자체가 바뀌지 않으므로 항상 맨 아래로 보낸다(§9 원칙 유지).
+    list.sort((a,b)=>{
+      const pa = WORKQ_TYPE_PRIORITY[a.type] != null ? WORKQ_TYPE_PRIORITY[a.type] : 99;
+      const pb = WORKQ_TYPE_PRIORITY[b.type] != null ? WORKQ_TYPE_PRIORITY[b.type] : 99;
+      if(pa !== pb) return pa - pb;
+      if(a.days === null && b.days === null) return 0;
+      if(a.days === null) return 1;
+      if(b.days === null) return -1;
+      return workQueueSortAsc ? (a.days - b.days) : (b.days - a.days);
+    });
+    // §고객 단계 전환관리 라운드 §12 — 기존 category(l2l3) 집계는 그대로 두고, 새 필터/
+    // 히어로가 L1→L2와 L2→L3를 따로 세도록 type(firstActivity/l2Stall) 기준 집계만
+    // 추가한다. 새 판정 로직이 아니라 이미 계산된 it.type을 다른 키로도 세는 것뿐이다.
+    const counts = { all: list.length, meeting: 0, mou: 0, l2l3: 0, reuse: 0, firstActivity: 0, l2Stall: 0, m1: 0, m2: 0 };
+    list.forEach(it=>{
+      counts[it.category] = (counts[it.category] || 0) + 1;
+      // firstActivity/l2Stall만 별도 키로 추가 집계(§고객 단계 전환관리 라운드 §12) —
+      // 이 둘은 category('l2l3')와 이름이 겹치지 않아 이중 집계가 안 된다. mou/reuse는
+      // category와 type이 같은 문자열이라 위 category 집계로 이미 반영돼 있다.
+      if(it.type === 'firstActivity' || it.type === 'l2Stall') counts[it.type] = (counts[it.type] || 0) + 1;
+      // §업무관리 1·2차미팅 탭 분리 라운드 — "미팅"(category='meeting')이 m1/m1Scheduled/
+      // m2/m2Scheduled를 전부 묶어서 세던 걸 1차/2차로 따로 센다. 새 판정이 아니라 이미
+      // 있는 it.type을 다른 키로 한 번 더 세는 것뿐(§ firstActivity/l2Stall과 같은 패턴).
+      if(it.type === 'm1' || it.type === 'm1Scheduled') counts.m1++;
+      if(it.type === 'm2' || it.type === 'm2Scheduled') counts.m2++;
+    });
+    return { list, counts };
+  }
+
+  /* ==========================================================================
+     §실행형 업무관리 라운드 §18 — 데이터 출처 조사 결과.
+
+     질문서/1차미팅/2차미팅/MOU의 실제 저장 위치: co.partnerDashboard.newMou
+     (§협력사 동기화 라운드에서 이미 확정 — qSentLabel/qReplyLabel/m1Label/m1Done/
+     m1Scheduled/m1ScheduledLabel/m1Owner/m2Label/m2Done/m2Scheduled/m2ScheduledLabel/
+     m2Owner/mouLabel/mouDone). partner-dashboard 동기화든, 예전 Partner Dashboard
+     스냅샷 가져오기든 전부 이 같은 구조에 쓴다 — 그래서 여기서 쓰는 값도 정확히 같은
+     필드에, 정확히 같은 라벨 포맷("YY.MM.DD", parsePartnerDateLabel이 읽는 형식)으로
+     써야 buildProgressStages/computeNextActionLabel 등 기존 계산이 즉시 이어받는다.
+     새 meeting1/meeting2 필드를 만들지 않는다(§5/§6 명시).
+
+     활동기록/메모: D.addActivity(companyId, text)(customerActivities) /
+     D.addMemo(companyId, text)(memos) — 둘 다 §관리필요·협력사 동기화 라운드에서도
+     쓴 기존 함수 그대로. "최근 요청"(buildRequestListItems)과 고객카드의 "고객 정보"
+     자동 요약(buildCustomerInfoFacts)이 이미 activities를 읽으므로, 여기서 activities에
+     남기면 고객카드에서 별도 연결 코드 없이 그대로 보인다(§11/§17).
+
+     보류(§13): "다음 확인일"을 안전하게 저장할 기존 필드가 없어(co.nextActions는
+     done/completedAt만 있는 체크리스트라 "특정 날짜에 다시 보기"와 다른 개념) 최소한의
+     CRM 전용 필드 co.workQueueHold({type,until,note,createdAt})를 새로 추가했다 —
+     partner-dashboard 원본(newMou)은 전혀 건드리지 않는다(§13 "원본 진행데이터를 보류
+     데이터로 덮어쓰지 않는다").
+     ========================================================================== */
   function workqTodayLabel(){
     const d = new Date();
     return String(d.getFullYear()).slice(2) + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0');
@@ -9267,12 +9280,550 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(!m) return null;
     return m[1].slice(2) + '.' + m[2] + '.' + m[3];
   }
+  function workqMergeNewMou(co, patch){
+    const current = (co.partnerDashboard && co.partnerDashboard.newMou) || {};
+    const merged = Object.assign({}, current, patch);
+    D.updateCompany(co.id, { partnerDashboard: Object.assign({}, co.partnerDashboard, { newMou: merged }) });
+  }
   function workqLogActivity(companyId, text){ if(text) D.addActivity(companyId, text); }
-  function buildMeetingReasonText(type, days){
-    if(type === 'm1') return days === null ? '질문서 회신 완료 · 1차미팅 일정 없음' : `질문서 회신 후 ${days}일 · 1차미팅 일정 없음`;
-    if(type === 'm2') return days === null ? '1차미팅 완료 · 2차미팅 일정 없음' : `1차미팅 후 ${days}일 · 2차미팅 일정 없음`;
-    if(type === 'm1Scheduled' || type === 'm2Scheduled') return '일정 잡힘 · 완료 확인 필요';
-    return days === null ? '2차미팅 완료 · MOU 미체결' : `2차미팅 완료 후 ${days}일 · MOU 미체결`;
+  function workqLogMemo(companyId, text){ const t = (text||'').trim(); if(t) D.addMemo(companyId, t); }
+  // §11/§17 조사 결과: 고객카드의 "최근 요청 / 고객 메모"(cdashReqPreviewBlock)는
+  // buildRequestListItems가 그리는데, 이 함수는 customerActivities를 직접 읽지 않고
+  // D.memosFor(메모)와 co.requestedMaterials(활동 텍스트에서 키워드로 추출된 것)만 합쳐서
+  // 보여준다 — 그래서 순수 활동기록만 남기면 "최근 요청"에 나타나지 않는다(실제
+  // Playwright로 재현/확인). 업무관리에서 남긴 행동 요약은 customerActivities(활동
+  // 이력 — §11 "가능하면 기존 customerActivities/memos 구조를 그대로 재사용")와 memos
+  // (카드에 바로 보이도록) 양쪽에 함께 남긴다.
+  function workqLogEvent(companyId, text){
+    workqLogActivity(companyId, text);
+    if(text) D.addMemo(companyId, text);
+  }
+
+  // §5/§6: 1차/2차미팅 일정 저장 — m1Scheduled/m1ScheduledLabel/m1Owner(또는 m2 쪽)만
+  // 채운다. m1Done/m2Done(완료 여부)은 절대 여기서 true로 바꾸지 않는다 — "일정을 잡았다"와
+  // "미팅을 완료했다"는 다른 사실이고, 완료 처리는 이번 1차 범위 밖(§18 "실제 원본 데이터와
+  // 상태가 불일치하게 만들지 않는다")이다. 저장 즉시 buildProgressStages가 scheduledLabel을
+  // 인식해 classifyWorkQueueMeeting이 이 업체를 "잡기" 대상에서 자동으로 뺀다(§16, 새 재계산
+  // 로직 불필요 — 이미 있는 판정이 새 데이터를 보고 스스로 다시 판단할 뿐).
+  function workqSaveMeetingSchedule(item, dateStr, timeStr, owner, memo){
+    const label = workqDateInputToLabel(dateStr);
+    if(!label) return false;
+    const isM1 = item.type === 'm1' || item.type === 'm1Scheduled';
+    const patch = isM1
+      ? { m1Scheduled: dateStr, m1ScheduledLabel: label, m1Owner: owner || null }
+      : { m2Scheduled: dateStr, m2ScheduledLabel: label, m2Owner: owner || null };
+    workqMergeNewMou(item.co, patch);
+    const stageName = isM1 ? '1차미팅' : '2차미팅';
+    const timeText = timeStr ? ` ${timeStr}` : '';
+    const ownerText = owner ? ` · 담당 ${owner}` : '';
+    workqLogEvent(item.co.id, `${stageName} 일정 조율 — ${label}${timeText} 예정${ownerText}`);
+    workqLogMemo(item.co.id, memo);
+    return true;
+  }
+  // §partner-dashboard 진행정보 동기화 라운드 §6/§8 — "예정된 미팅"의 실제 다음 단계는
+  // 완료 확정이다. m1Done/m1Label(또는 m2)만 채운다 — 예정 필드(m1Scheduled 등)는 그대로
+  // 남겨 원본을 지우지 않는다(§7 "MERGE/PATCH만, 기존 필드 삭제 금지"). 날짜를 안 고르면
+  // 오늘 날짜로 완료 처리한다(실제 미팅이 방금 끝났을 때 바로 누르는 버튼이라 §7의 다른
+  // 버튼들과 달리 완료일 입력을 필수로 요구하지 않는다).
+  function workqSaveMeetingDone(item, dateStr, memo){
+    const isM1 = item.type === 'm1' || item.type === 'm1Scheduled';
+    const label = dateStr ? workqDateInputToLabel(dateStr) : workqTodayLabel();
+    if(!label) return false;
+    const patch = isM1 ? { m1Done: true, m1Label: label } : { m2Done: true, m2Label: label };
+    workqMergeNewMou(item.co, patch);
+    const stageName = isM1 ? '1차미팅' : '2차미팅';
+    workqLogEvent(item.co.id, `${stageName} 완료 (${label})`);
+    workqLogMemo(item.co.id, memo);
+    return true;
+  }
+  // §7: MOU 상태 — "체결 완료"만 실제 mouDone/mouLabel을 바꾼다. "체결 협의"/"서류 요청"은
+  // 기존 newMou 구조에 대응하는 중간상태 필드가 없어(있는 필드는 완료 여부뿐) 원본을 억지로
+  // 바꾸지 않고 활동기록만 남긴다(§18 "실제 원본과 상태가 불일치하게 만들지 않는다").
+  function workqSaveMouStatus(item, kind, memo){
+    if(kind === 'done'){
+      workqMergeNewMou(item.co, { mouDone: true, mouLabel: workqTodayLabel() });
+      workqLogEvent(item.co.id, `MOU 체결 완료 (${workqTodayLabel()})`);
+    } else if(kind === 'negotiating'){
+      workqLogEvent(item.co.id, 'MOU 체결 협의 진행 중');
+    } else if(kind === 'docRequested'){
+      workqLogEvent(item.co.id, 'MOU 서류 요청');
+    }
+    workqLogMemo(item.co.id, memo);
+  }
+  // §8/§9/§10/§12: L2/L3/재사용 후속 버튼 — 전부 활동기록만 남기고 진행상태는 절대 바꾸지
+  // 않는다(§8 "실제 L2는 실제 현장등록 데이터가 들어왔을 때만 인정", §9 "실제 L3 데이터가
+  // 생기기 전에는 임의 변경하지 않는다"). "연락했지만 미확정"도 같은 원칙(§12) — 상태
+  // 불변, 활동기록만.
+  function workqLogSimpleAction(item, actionLabel, memo){
+    workqLogEvent(item.co.id, actionLabel);
+    workqLogMemo(item.co.id, memo);
+  }
+  // §13: 보류 — 진행단계/원본 partner-dashboard 데이터는 전혀 건드리지 않고, 최소한의
+  // CRM 전용 필드(workQueueHold)에 다음 확인일만 기록한다. 활동기록도 함께 남겨 고객카드
+  // "최근 요청"에서도 보인다(§17).
+  function workqSaveHold(item, dateStr, memo){
+    const label = workqDateInputToLabel(dateStr);
+    if(!label) return false;
+    D.updateCompany(item.co.id, { workQueueHold: { type: item.type, until: dateStr, untilLabel: label, note: (memo||'').trim(), createdAt: new Date().toISOString() } });
+    workqLogEvent(item.co.id, `보류 처리 — 다음 확인일 ${label}`);
+    workqLogMemo(item.co.id, memo);
+    return true;
+  }
+
+  // 유형별 인라인 작업영역 정의 — 필드/버튼 구성만 다르고 저장 함수는 위 write 함수들을
+  // 그대로 부른다.
+  // §고객 단계 전환관리 라운드 §5/§8/§10 — 버튼 구성을 스펙 목록에 맞춘다. 셋 다 '보류'가
+  // 추가돼(§10) 아래 renderWorkqExpandBody에서 hold-panel도 세 유형 모두에 렌더링한다.
+  const WORKQ_L2L3_BUTTONS = {
+    firstActivity: ['현장등록 요청', '전화 확인', '자료 안내', '보류'],
+    l2Stall: ['견적 제안', 'PT 제안', '현장검토 제안', '자료 안내', '전화 확인', '보류'],
+    reuse: ['새 현장 확인', '다른 공종 제안', '자료 재안내', '전화 확인', '보류'],
+    // §신규 협력업체 관리 라운드 — 아래 renderWorkqExpandBody의 기존 fallback 분기(firstActivity/
+    // l2Stall/reuse와 동일하게 활동기록 버튼 + 메모 + 보류)를 새 계산 없이 그대로 재사용한다.
+    newPartner: ['첫 연락 완료', '온보딩 안내', '전화 확인', '보류']
+  };
+  function workqContactBlockHtml(co){
+    return `
+      <div class="workq-expand-grid">
+        <div class="workq-expand-label">담당자</div><div class="workq-expand-value">${co.contactName ? esc(co.contactName) : '—'}</div>
+        <div class="workq-expand-label">전화번호</div><div class="workq-expand-value">${co.phone ? esc(co.phone) : '—'}${co.phone ? `<button type="button" class="workq-copy-btn" data-workq-copy="${esc(co.phone)}">복사</button>` : ''}</div>
+      </div>
+    `;
+  }
+  function renderWorkqExpandBody(item){
+    const co = item.co;
+    const contact = workqContactBlockHtml(co);
+    if(item.type === 'm1' || item.type === 'm2'){
+      const isM1 = item.type === 'm1';
+      const stageName = isM1 ? '1차미팅' : '2차미팅';
+      // §6: "1차미팅 완료일: 실제 기존 날짜 표시" — buildProgressStages가 이미 계산해 둔
+      // m1 stage의 dateDisplay를 그대로 읽는다(새 계산 없음).
+      const priorDoneLine = !isM1 ? (()=>{
+        const pg = buildProgressStages(co);
+        const m1s = pg.stages.find(s=> s.key === 'm1');
+        return `<div class="workq-expand-label">1차미팅 완료일</div><div class="workq-expand-value">${esc(m1s && m1s.dateDisplay ? m1s.dateDisplay : '—')}</div>`;
+      })() : '';
+      return `
+        <div class="workq-expand-title">${esc(co.name)} · ${esc(stageName)} 후속</div>
+        ${contact}
+        <div class="workq-expand-grid">
+          ${priorDoneLine}
+          <div class="workq-expand-label">일정</div>
+          <div class="workq-expand-value">
+            <input type="date" class="workq-field-input is-date" id="workqDate_${esc(item.type)}_${esc(co.id)}" />
+            <input type="time" class="workq-field-input is-time" id="workqTime_${esc(item.type)}_${esc(co.id)}" />
+          </div>
+          <div class="workq-expand-label">담당</div>
+          <div class="workq-expand-value"><input type="text" class="workq-field-input is-owner" id="workqOwner_${esc(item.type)}_${esc(co.id)}" placeholder="담당자명" /></div>
+        </div>
+        <textarea class="workq-memo-input" id="workqMemo_${esc(item.type)}_${esc(co.id)}" placeholder="메모"></textarea>
+        <div class="workq-btn-row">
+          <button type="button" class="workq-btn primary" data-workq-do="save-schedule">일정 저장</button>
+          <button type="button" class="workq-btn" data-workq-do="uncertain">연락했지만 미확정</button>
+          <button type="button" class="workq-btn muted" data-workq-do="hold-open">보류</button>
+        </div>
+        <div class="workq-hold-panel" style="display:none;">
+          <div class="workq-hold-row">
+            <span class="workq-expand-label">다시 확인일</span>
+            <input type="date" class="workq-field-input is-date" id="workqHoldDate_${esc(item.type)}_${esc(co.id)}" />
+            <button type="button" class="workq-btn primary" data-workq-do="hold-save">보류 저장</button>
+          </div>
+        </div>
+        <div class="workq-saved-note" style="display:none;">저장되었습니다.</div>
+      `;
+    }
+    if(item.type === 'm1Scheduled' || item.type === 'm2Scheduled'){
+      // §partner-dashboard 진행정보 동기화 라운드 §3/§6/§8 — "예정된 미팅" 전용 패널. 이미
+      // 잡혀 있는 예정일/담당(scheduledLabel/owner, byKey.m1|m2에서 그대로 옴)을 보여주고,
+      // 실제 다음 행동인 "완료 처리"를 추가한다. "일정 변경"은 m1/m2 패널과 같은 저장
+      // 함수(workqSaveMeetingSchedule)를 그대로 재사용한다.
+      const isM1 = item.type === 'm1Scheduled';
+      const stageName = isM1 ? '1차미팅' : '2차미팅';
+      return `
+        <div class="workq-expand-title">${esc(co.name)} · ${esc(stageName)} 일정 확인</div>
+        ${contact}
+        <div class="workq-expand-grid">
+          <div class="workq-expand-label">예정일</div><div class="workq-expand-value">${esc(item.co.partnerDashboard && item.co.partnerDashboard.newMou ? (isM1 ? item.co.partnerDashboard.newMou.m1ScheduledLabel : item.co.partnerDashboard.newMou.m2ScheduledLabel) || '—' : '—')}</div>
+          <div class="workq-expand-label">담당</div><div class="workq-expand-value">${item.co.partnerDashboard && item.co.partnerDashboard.newMou && (isM1 ? item.co.partnerDashboard.newMou.m1Owner : item.co.partnerDashboard.newMou.m2Owner) ? esc(isM1 ? item.co.partnerDashboard.newMou.m1Owner : item.co.partnerDashboard.newMou.m2Owner) : '—'}</div>
+        </div>
+        <div class="workq-btn-row">
+          <button type="button" class="workq-btn primary" data-workq-do="mark-done-open">미팅 완료 처리</button>
+          <button type="button" class="workq-btn" data-workq-do="reschedule-open">일정 변경</button>
+          <button type="button" class="workq-btn muted" data-workq-do="hold-open">보류</button>
+        </div>
+        <div class="workq-mark-done-panel" style="display:none;">
+          <div class="workq-expand-grid">
+            <div class="workq-expand-label">완료일</div>
+            <div class="workq-expand-value"><input type="date" class="workq-field-input is-date" id="workqDoneDate_${esc(item.type)}_${esc(co.id)}" /></div>
+          </div>
+          <textarea class="workq-memo-input" id="workqMemo_${esc(item.type)}_${esc(co.id)}" placeholder="메모"></textarea>
+          <div class="workq-btn-row"><button type="button" class="workq-btn primary" data-workq-do="mark-done-save">완료 저장(오늘 날짜, 미입력 시)</button></div>
+        </div>
+        <div class="workq-reschedule-panel" style="display:none;">
+          <div class="workq-expand-grid">
+            <div class="workq-expand-label">새 일정</div>
+            <div class="workq-expand-value">
+              <input type="date" class="workq-field-input is-date" id="workqDate_${esc(item.type)}_${esc(co.id)}" />
+              <input type="time" class="workq-field-input is-time" id="workqTime_${esc(item.type)}_${esc(co.id)}" />
+            </div>
+            <div class="workq-expand-label">담당</div>
+            <div class="workq-expand-value"><input type="text" class="workq-field-input is-owner" id="workqOwner_${esc(item.type)}_${esc(co.id)}" placeholder="담당자명" /></div>
+          </div>
+          <div class="workq-btn-row"><button type="button" class="workq-btn primary" data-workq-do="save-schedule">일정 변경 저장</button></div>
+        </div>
+        <div class="workq-hold-panel" style="display:none;">
+          <div class="workq-hold-row">
+            <span class="workq-expand-label">다시 확인일</span>
+            <input type="date" class="workq-field-input is-date" id="workqHoldDate_${esc(item.type)}_${esc(co.id)}" />
+            <button type="button" class="workq-btn primary" data-workq-do="hold-save">보류 저장</button>
+          </div>
+        </div>
+        <div class="workq-saved-note" style="display:none;">저장되었습니다.</div>
+      `;
+    }
+    if(item.type === 'mou'){
+      return `
+        <div class="workq-expand-title">${esc(co.name)} · MOU 진행</div>
+        ${contact}
+        <textarea class="workq-memo-input" id="workqMemo_mou_${esc(co.id)}" placeholder="메모"></textarea>
+        <div class="workq-btn-row">
+          <button type="button" class="workq-btn" data-workq-do="mou-negotiating">체결 협의</button>
+          <button type="button" class="workq-btn" data-workq-do="mou-doc">서류 요청</button>
+          <button type="button" class="workq-btn primary" data-workq-do="mou-done">체결 완료</button>
+        </div>
+        <div class="workq-saved-note" style="display:none;">저장되었습니다.</div>
+      `;
+    }
+    // firstActivity / l2Stall / reuse — 전부 활동기록 버튼 + 메모
+    const buttons = WORKQ_L2L3_BUTTONS[item.type] || [];
+    const recentAct = (D.activitiesForCompany(co.id)[0] || null);
+    return `
+      <div class="workq-expand-title">${esc(co.name)} · ${esc(item.actionLabel)}</div>
+      ${contact}
+      <div class="workq-expand-grid">
+        <div class="workq-expand-label">최근 활동</div>
+        <div class="workq-expand-value">${recentAct ? esc(fmtDate(recentAct.createdAt)) + ' ' + esc(recentAct.activityText) : '기록 없음'}</div>
+      </div>
+      <textarea class="workq-memo-input" id="workqMemo_${esc(item.type)}_${esc(co.id)}" placeholder="메모"></textarea>
+      <div class="workq-btn-row">
+        ${buttons.map(b=> `<button type="button" class="workq-btn${b==='보류'?' muted':''}" data-workq-do="log" data-workq-label="${esc(b)}">${esc(b)}</button>`).join('')}
+      </div>
+      ${(item.type === 'firstActivity' || item.type === 'l2Stall' || item.type === 'reuse' || item.type === 'newPartner') ? `
+      <div class="workq-hold-panel" style="display:none;">
+        <div class="workq-hold-row">
+          <span class="workq-expand-label">다시 확인일</span>
+          <input type="date" class="workq-field-input is-date" id="workqHoldDate_${esc(item.type)}_${esc(co.id)}" />
+          <button type="button" class="workq-btn primary" data-workq-do="hold-save">보류 저장</button>
+        </div>
+      </div>` : ''}
+      <div class="workq-saved-note" style="display:none;">저장되었습니다.</div>
+    `;
+  }
+
+  // §고객 단계 전환관리 라운드 §12 — 기존 "L2·L3" 합산 칩을 L1→L2/L2→L3로 분리한다.
+  // 필터 값은 새로 만들지 않고 classifyManagementNeed가 이미 반환하는 type 값
+  // (firstActivity/l2Stall)을 그대로 키로 쓴다 — filtered 계산의
+  // `it.type === workQueueFilter` 조건이 이미 이 값을 처리하므로 로직 추가 없음.
+  // §업무관리 1·2차미팅 탭 분리 라운드 — 사용자 요청 "1차미팅/2차미팅/MOU 파트 나눠서
+  // 탭 만들어줘": 기존 "미팅"(1차+2차를 하나로 묶던 칩)을 "1차미팅"/"2차미팅" 두 개로
+  // 나눴다. "MOU"는 이미 별도 칩이었어서 그대로 뒀다 — 아래 filtered 계산에서 m1/m2 키를
+  // "type이 m1 또는 m1Scheduled(예정된 미팅 포함)"로 매칭하도록만 확장했다(§ 새 판정
+  // 로직 아님, 이미 있는 it.type 값을 다른 키로 묶어서 보는 것뿐).
+  // §업무관리 필터 탭 정리 라운드 — 사용자 요청 "재사용, 신규 협력업체는 없어도 될 것
+  // 같아": 필터 칩 목록에서만 뺐다(§ "데이터를 지우는 게 아니라 화면에서만" 관례 그대로
+  // — computeWorkQueue의 counts.reuse/counts.newPartner 집계, buildWorkQueueItem의
+  // reuse/newPartner 판정 로직, "다음 단계로 전환" 섹션의 "다시 연락하기" 카드는 전혀
+  // 안 건드렸다. 저 카드를 눌러 workQueueFilter='reuse'가 되는 경로는 여전히 있으니,
+  // filtered 계산 자체도 그대로 둔다 — 이 칩 행에만 안 보일 뿐이다).
+  const WORKQ_FILTER_DEFS = [
+    ['all','전체'], ['m1','1차미팅'], ['m2','2차미팅'], ['mou','MOU'], ['firstActivity','L1→L2'], ['l2Stall','L2→L3']
+  ];
+  let workQueueFilter = 'all';
+  // §업무관리 검색창 라운드 — 고객관리 목록 검색(matchesSearch, §searchQuery)과 완전히
+  // 같은 함수를 재사용한다. 새 매칭 로직을 만들지 않는다. 요약 패널의 숫자/필터 칩 숫자는
+  // 고객관리 쪽 선례(filterCounts는 searchQuery 적용 전 enriched로 계산)와 똑같이 검색과
+  // 무관하게 유지하고, 검색은 아래 표에 실제로 보이는 행에만 적용한다.
+  let workQueueSearch = '';
+  // §경과일 짧은 업체 분리 보기 라운드: false=기존 그대로(오래된 순), true=경과일 적은
+  // 업체가 위로(같은 행동 우선순위 안에서만 방향이 바뀐다 — 우선순위 자체는 안 바뀜).
+  let workQueueSortAsc = false;
+  // §실행형 업무관리 라운드 §3: 한 번에 하나의 행만 펼쳐진다 — companyId 기준(같은 업체가
+  // 필터 전환으로 다시 나타나도 펼침 상태가 이어지게, type도 함께 저장해 어떤 업무의
+  // 작업영역인지 구분).
+  let workQueueExpanded = null; // { companyId, type } | null
+  // §업무관리 탭 1차 구축 라운드 §4/§8/§13 — 작은 제목 한 줄 + 컴팩트 필터 칩 + 표 + "오늘
+  // 먼저 확인" 한 줄. 큰 배너/카드/차트 없음(§3/§4/§16). 업체명 클릭은 openCardFromWorkQueue로
+  // 기존 openCard(companyId)를 그대로 연다(§11, 새 상세화면/신규 업체 생성 없음).
+  function renderWorkQueueView(){
+    const wrap = document.getElementById('workQueueView');
+    if(!wrap) return;
+    // §업무관리 검색창 라운드 — wrap.innerHTML을 매 렌더링마다 통째로 새로 그리기 때문에,
+    // 아무 대책 없이 검색창에 한 글자씩 입력할 때마다 포커스/커서 위치가 날아간다(§ 실제
+    // 관찰됨). 값 자체는 workQueueSearch에 이미 있으니, 재렌더링 직전에 "지금 이 입력창에
+    // 포커스가 있었는지 + 커서 위치"만 기억했다가 다시 그린 뒤 그대로 복원한다 — 새 데이터/
+    // 저장값이 아니라 순수 DOM 포커스 상태다.
+    const prevSearchInput = document.getElementById('workqSearchInput');
+    const searchHadFocus = !!(prevSearchInput && document.activeElement === prevSearchInput);
+    const searchCaret = searchHadFocus ? prevSearchInput.selectionStart : null;
+    const { list, counts } = computeWorkQueue();
+    // §15: today-line 숫자도 필터로 쓸 수 있게 workQueueFilter가 category뿐 아니라 type
+    // 값(m1/m2/mou)도 받을 수 있게 한다 — 기존 category 필터 칩 로직은 그대로 두고
+    // 조건만 넓힌다. §업무관리 검색창 라운드: 검색은 고객관리 목록과 완전히 같은
+    // matchesSearch(co, acts, q)를 재사용해 필터 뒤에 한 번 더 좁힌다 — 요약 패널/필터 칩
+    // 숫자(위 counts, list 기준)는 검색과 무관하게 그대로 둔다(고객관리 filterCounts 선례와
+    // 동일한 원칙).
+    // §업무관리 1·2차미팅 탭 분리 라운드 — 'm1'/'m2' 필터는 예정된 미팅(m1Scheduled/
+    // m2Scheduled)도 같은 탭에 포함해야 한다(§7 "일정 잡아둔 업체가 어디에도 안 보이는
+    // 문제" 방지 원칙과 동일 이유 — 새 판정 아니라 이미 있는 두 type을 한 탭으로 묶어 보는 것).
+    const filtered = (workQueueFilter === 'all' ? list : list.filter(it=>{
+      if(workQueueFilter === 'm1') return it.type === 'm1' || it.type === 'm1Scheduled';
+      if(workQueueFilter === 'm2') return it.type === 'm2' || it.type === 'm2Scheduled';
+      return it.category === workQueueFilter || it.type === workQueueFilter;
+    }))
+      .filter(it=> matchesSearch(it.co, D.activitiesForCompany(it.co.id), workQueueSearch));
+    const m1Count = list.filter(it=> it.type==='m1').length;
+    const m2Count = list.filter(it=> it.type==='m2').length;
+    const mouCount = list.filter(it=> it.type==='mou').length;
+    // §업무관리 상단 재구성 라운드 §1/§2 — 숫자는 전부 위에서 이미 계산된 list를 그대로
+    // 세기만 한다(§5 "새 숫자를 하드코딩하지 마세요") — 새 판정 로직 없음.
+    // §네모형 업무 카드 라운드 §4 — 보조문구(sub)는 표시용 문구일 뿐 새 계산이 아니다.
+    // 숫자(count)는 여전히 위에서 이미 계산된 m1Count/m2Count/mouCount 그대로.
+    const heroItems = [
+      { key:'m1', cls:'c-navy', label:'1차미팅 잡기', sub:'일정 미등록', count:m1Count },
+      { key:'m2', cls:'c-orange', label:'2차미팅 잡기', sub:'후속미팅 필요', count:m2Count },
+      { key:'mou', cls:'c-green', label:'MOU 진행', sub:'체결 후속', count:mouCount }
+    ];
+    // §고객 단계 전환관리 라운드 §4/§6/§9 — 숫자는 computeWorkQueue()가 이미 계산해 둔
+    // counts.firstActivity/counts.l2Stall/counts.reuse를 그대로 읽는다(§5 하드코딩 금지).
+    // 클릭 시 data-workq-filter로 넘기는 값도 classifyManagementNeed의 실제 type 값이라
+    // 기존 필터 처리 로직을 그대로 재사용한다(새 판정/필터 로직 없음). §네모형 업무 카드
+    // 라운드 §5: "L1→L2" 같은 내부 단계명보다 실제 행동(action)을 먼저 보여준다 — action/
+    // stage/need 전부 표시 문구일 뿐 판정값(key)은 그대로다.
+    const transitionItems = [
+      { key:'firstActivity', action:'첫 현장 만들기', stage:'L1 → L2', need:'현장등록 필요', count: counts.firstActivity||0 },
+      { key:'l2Stall', action:'후속요청 만들기', stage:'L2 → L3', need:'후속요청 필요', count: counts.l2Stall||0 },
+      { key:'reuse', action:'다시 연락하기', stage:'재사용', need:'새 현장 필요', count: counts.reuse||0 }
+    ];
+    function workqTaskCard(item, isRow2){
+      const numCls = isRow2 ? (item.count === 0 ? 'is-zero' : 'c-orange') : (item.cls || '');
+      const label = isRow2 ? item.action : item.label;
+      const sub = isRow2 ? item.need : item.sub;
+      const stageLine = isRow2 ? `<div class="workq-task-card-stage">${esc(item.stage)}</div>` : '';
+      return `
+        <button type="button" class="workq-task-card" data-workq-filter="${esc(item.key)}">
+          <div class="workq-task-card-num ${numCls}">${esc(item.count)}<span class="workq-task-card-unit">건</span></div>
+          <div class="workq-task-card-label">${esc(label)}</div>
+          ${stageLine}
+          <div class="workq-task-card-sub">${esc(sub)}</div>
+        </button>`;
+    }
+    wrap.innerHTML = `
+      <div class="workq-header-row">
+        <div class="workq-header">
+          <div class="workq-title">업무관리</div>
+          <div class="workq-subtitle">오늘 확인해야 할 업체를 단계별로 확인합니다.</div>
+        </div>
+        <button type="button" class="list-filter-chip" id="workqSortToggle">${workQueueSortAsc ? '경과일 적은 순 ▾' : '경과일 많은 순 ▾'}</button>
+      </div>
+      <div class="workq-task-section">
+        <div class="workq-task-section-title">지금 해야 할 업무</div>
+        <div class="workq-task-row">
+          ${heroItems.map(h=> workqTaskCard(h, false)).join('')}
+        </div>
+      </div>
+      <div class="workq-task-section">
+        <div class="workq-task-section-title">다음 단계로 전환</div>
+        <div class="workq-task-row">
+          ${transitionItems.map(t=> workqTaskCard(t, true)).join('')}
+        </div>
+      </div>
+      <div class="list-search-row workq-search-row">
+        <div class="search-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input type="text" id="workqSearchInput" placeholder="업체명 / 담당자 / 활동내용 검색" value="${esc(workQueueSearch)}" />
+        </div>
+      </div>
+      <div class="workq-filter-row" id="workqFilterRow">
+        ${WORKQ_FILTER_DEFS.map(([key,label])=> `<button type="button" class="list-filter-chip${workQueueFilter===key?' is-active':''}" data-workq-filter="${esc(key)}">${esc(label)} ${esc(counts[key]||0)}</button>`).join('')}
+      </div>
+      ${filtered.length ? `
+        <table class="workq-table">
+          <!-- §단계 진행상황 이전 라운드 — 고객관리 목록 컬럼("단계 진행상황", 질문서→1차→
+               2차→MOU 4단계 stepper)을 여기로 옮겼다(요청 "정보를 지우는 게 아니라 이 창을
+               업무관리 창으로 이전"). buildStageStepperHtml/buildProgressStages 둘 다
+               이미 있던 함수 그대로 재사용 — 새 판정 로직 없음. -->
+          <thead><tr><th>업체명</th><th>현재 상태</th><th>단계 진행상황</th><th>관리 이유</th><th>경과</th><th>해야 할 일</th><th>메일</th></tr></thead>
+          <tbody>
+            ${filtered.map(it=> {
+              const isOpen = workQueueExpanded && workQueueExpanded.companyId === it.co.id && workQueueExpanded.type === it.type;
+              const stageStepperHtml = buildStageStepperHtml(buildProgressStages(it.co));
+              // §1차미팅 메일 자동발송 라운드 — 사용자 재정정(§6): [메일발송]은 "1차미팅이
+              // 아직 예정도 안 잡힌"(type==='m1') 업체에만 노출한다. m1Scheduled(이미 일정
+              // 잡힘)/m2/m2Scheduled/mou는 전부 제외 — "1차 미팅 예정일이 미래인 고객에게
+              // '미팅을 하지 않았다'는 메일을 보내지 말 것" 요구사항 그대로.
+              const showMailBtn = it.type === 'm1';
+              const mailInfo = showMailBtn ? m1MailButtonInfo(it.co) : null;
+              const mailCellHtml = mailInfo && mailInfo.show
+                ? `<button type="button" class="workq-mail-btn${mailInfo.alreadySent ? ' is-sent' : ''}" data-workq-mail="${esc(it.co.id)}">${esc(mailInfo.label)}</button>`
+                : (showMailBtn ? `<span class="workq-mail-skip">${esc((mailInfo && mailInfo.reason) || '—')}</span>` : '—');
+              return `<tr>
+                <td><button type="button" class="workq-co-link" data-workq-open-co="${esc(it.co.id)}">${esc(it.co.name)}</button></td>
+                <td>${esc(it.currentStateLabel)}</td>
+                <td class="workq-stage-progress">${stageStepperHtml}</td>
+                <td class="workq-reason">${esc(it.reasonText)}</td>
+                <td class="workq-days">${it.days === null ? '—' : esc(it.days) + '일'}${it.isDelayed ? '<span class="workq-delay-badge">지연</span>' : ''}</td>
+                <td><button type="button" class="workq-action-btn${isOpen ? ' is-open' : ''}" data-workq-toggle="${esc(it.co.id)}" data-workq-toggle-type="${esc(it.type)}">${esc(it.actionLabel)}</button></td>
+                <td>${mailCellHtml}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      ` : `<div class="workq-empty">해당 조건의 업체가 없습니다.</div>`}
+    `;
+    wrap.querySelectorAll('[data-workq-filter]').forEach(btn=> btn.addEventListener('click', ()=>{
+      workQueueFilter = btn.getAttribute('data-workq-filter');
+      renderWorkQueueView();
+    }));
+    const sortToggle = document.getElementById('workqSortToggle');
+    if(sortToggle) sortToggle.addEventListener('click', ()=>{
+      workQueueSortAsc = !workQueueSortAsc;
+      renderWorkQueueView();
+    });
+    wrap.querySelectorAll('[data-workq-open-co]').forEach(btn=> btn.addEventListener('click', ()=>{
+      openCardFromWorkQueue(btn.getAttribute('data-workq-open-co'));
+    }));
+    wrap.querySelectorAll('[data-workq-mail]').forEach(btn=> btn.addEventListener('click', ()=>{
+      openMailComposeModal(btn.getAttribute('data-workq-mail'));
+    }));
+    // §업무관리 처리 팝업 전환 라운드(신규): 표 안에 줄을 펼치던 방식 대신 중앙 팝업을
+    // 연다(§요청 "저런형식말고 팝업으로 간단하게") — 같은 버튼을 다시 누르면 닫히는
+    // 기존 토글 동작(§3)은 그대로 유지한다.
+    wrap.querySelectorAll('[data-workq-toggle]').forEach(btn=> btn.addEventListener('click', ()=>{
+      const companyId = btn.getAttribute('data-workq-toggle');
+      const type = btn.getAttribute('data-workq-toggle-type');
+      const isSame = workQueueExpanded && workQueueExpanded.companyId === companyId && workQueueExpanded.type === type;
+      if(isSame){ workQueueExpanded = null; closeWorkqActionModal(); renderWorkQueueView(); return; }
+      const item = list.find(it=> it.co.id === companyId && it.type === type);
+      if(!item) return;
+      workQueueExpanded = { companyId, type };
+      openWorkqActionModal(item);
+      renderWorkQueueView(); // 버튼 강조(is-open) 갱신만 목적 — 팝업 자체는 별도 root라 안 지워짐
+    }));
+    wrap.querySelectorAll('[data-workq-copy]').forEach(btn=> btn.addEventListener('click', ()=> copyText(btn.getAttribute('data-workq-copy'), btn)));
+    const searchInput = document.getElementById('workqSearchInput');
+    if(searchInput){
+      // §업무관리 검색 한글 조합 깨짐 수정 — 한글은 IME로 자모를 조합해 한 음절을 만드는데,
+      // 'input' 이벤트마다 renderWorkQueueView()가 wrap.innerHTML을 통째로 다시 그려 입력창
+      // DOM 자체를 새로 만들어버리면 조합 중이던 음절이 끊겨 "사이노"가 아니라
+      // "ㅅㅏㅇㅣㄴㅗ"처럼 자모가 낱개로 따로 찍힌다(실제 스크린샷으로 확인된 버그). 조합 중
+      // (compositionstart~compositionend 사이)에는 재렌더링을 미루고, 조합이 끝난 뒤에만
+      // 검색을 반영한다 — 영문/숫자처럼 조합이 필요 없는 입력은 기존처럼 매 타이핑마다 바로
+      // 반영된다.
+      let isComposing = false;
+      searchInput.addEventListener('compositionstart', ()=>{ isComposing = true; });
+      searchInput.addEventListener('compositionend', ()=>{
+        isComposing = false;
+        workQueueSearch = searchInput.value;
+        renderWorkQueueView();
+      });
+      searchInput.addEventListener('input', ()=>{
+        if(isComposing) return; // 조합 중인 입력은 compositionend에서 한 번에 반영
+        workQueueSearch = searchInput.value;
+        renderWorkQueueView();
+      });
+      // §업무관리 검색창 라운드 — 위에서 기억해 둔 포커스/커서 위치를 새로 그려진 입력창에
+      // 그대로 되돌려 준다(재렌더링마다 포커스가 풀리지 않게).
+      if(searchHadFocus){
+        searchInput.focus();
+        if(searchCaret != null) searchInput.setSelectionRange(searchCaret, searchCaret);
+      }
+    }
+  }
+  // §업무관리 처리 팝업 전환 라운드(신규) — "저런형식말고 팝업으로 간단하게" 요청에
+  // 따라 표 안에 줄을 펼치던 inline expand row를 없애고 중앙 팝업(.pi-overlay/
+  // .pi-panel, 다른 모달과 같은 패턴)으로 바꿨다. renderWorkqExpandBody가 만드는
+  // 내용/data-workq-do 액션 처리 로직은 한 글자도 안 바꾸고 그대로 재사용했다 — 담는
+  // 그릇(표 안 → 팝업)만 바뀌었다.
+  function closeWorkqActionModal(){
+    const root = document.getElementById('workqActionModalRoot');
+    if(root) root.innerHTML = '';
+  }
+  function openWorkqActionModal(item){
+    const modalRoot = document.getElementById('workqActionModalRoot');
+    if(!modalRoot) return;
+    modalRoot.innerHTML = `
+      <div class="pi-overlay" id="workqActionOverlay">
+        <div class="pi-panel" style="max-width:480px;" role="dialog" aria-modal="true" aria-label="${esc(item.co.name)} ${esc(item.actionLabel)}">
+          <div class="pi-head">
+            <div class="pi-title">${esc(item.co.name)} · ${esc(item.actionLabel)}</div>
+            <button type="button" class="chart-close-btn" id="workqActionCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body"><div class="workq-expand" id="workqActionBody">${renderWorkqExpandBody(item)}</div></div>
+        </div>
+      </div>
+    `;
+    const finishClose = ()=>{ workQueueExpanded = null; closeWorkqActionModal(); renderWorkQueueView(); };
+    document.getElementById('workqActionCloseBtn').addEventListener('click', finishClose);
+    document.getElementById('workqActionOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'workqActionOverlay') finishClose(); });
+    bindWorkqActionHandlers(item);
+  }
+  // §16: 처리 후 즉시 재계산 — 새로고침 없이 renderWorkQueueView()를 다시 부르기만 하면
+  // computeWorkQueue()가 companies/activities를 다시 읽어 목록/상단 건수가 바로 갱신된다
+  // (별도 diff 로직 불필요, 이미 매번 새로 계산하는 순수 함수라서).
+  function bindWorkqActionHandlers(item){
+    const root = document.getElementById('workqActionBody');
+    if(!root) return;
+    const finishAndClose = ()=>{ workQueueExpanded = null; closeWorkqActionModal(); renderWorkQueueView(); };
+    root.querySelectorAll('[data-workq-do]').forEach(btn=> btn.addEventListener('click', ()=>{
+      const action = btn.getAttribute('data-workq-do');
+      const memo = root.querySelector('.workq-memo-input');
+      const memoVal = memo ? memo.value : '';
+      if(action === 'save-schedule'){
+        const dateEl = document.getElementById(`workqDate_${item.type}_${item.co.id}`);
+        const timeEl = document.getElementById(`workqTime_${item.type}_${item.co.id}`);
+        const ownerEl = document.getElementById(`workqOwner_${item.type}_${item.co.id}`);
+        if(!dateEl || !dateEl.value){ dateEl && dateEl.focus(); return; }
+        workqSaveMeetingSchedule(item, dateEl.value, timeEl ? timeEl.value : '', ownerEl ? ownerEl.value.trim() : '', memoVal);
+        finishAndClose();
+      } else if(action === 'uncertain'){
+        const stageName = item.type === 'm1' ? '1차미팅' : '2차미팅';
+        workqLogSimpleAction(item, `${stageName} 일정 조율 연락 — 일정 미확정`, memoVal);
+        finishAndClose(); // §12: 상태 변경 없이 업무는 그대로 유지 — 목록 재계산해도 이 업체는 계속 남는다(재계산이 상태를 안 바꿨으므로)
+      } else if(action === 'mark-done-open'){
+        const p = root.querySelector('.workq-mark-done-panel');
+        if(p) p.style.display = 'block';
+      } else if(action === 'mark-done-save'){
+        const doneDateEl = document.getElementById(`workqDoneDate_${item.type}_${item.co.id}`);
+        workqSaveMeetingDone(item, doneDateEl ? doneDateEl.value : '', memoVal);
+        finishAndClose();
+      } else if(action === 'reschedule-open'){
+        const p = root.querySelector('.workq-reschedule-panel');
+        if(p) p.style.display = 'block';
+      } else if(action === 'hold-open'){
+        const p = root.querySelector('.workq-hold-panel');
+        if(p) p.style.display = 'block';
+      } else if(action === 'hold-save'){
+        const holdDateEl = document.getElementById(`workqHoldDate_${item.type}_${item.co.id}`);
+        if(!holdDateEl || !holdDateEl.value){ holdDateEl && holdDateEl.focus(); return; }
+        workqSaveHold(item, holdDateEl.value, memoVal);
+        finishAndClose();
+      } else if(action === 'mou-negotiating'){
+        workqSaveMouStatus(item, 'negotiating', memoVal); finishAndClose();
+      } else if(action === 'mou-doc'){
+        workqSaveMouStatus(item, 'docRequested', memoVal); finishAndClose();
+      } else if(action === 'mou-done'){
+        workqSaveMouStatus(item, 'done', memoVal); finishAndClose();
+      } else if(action === 'log'){
+        const label = btn.getAttribute('data-workq-label');
+        if(label === '보류'){
+          const p = root.querySelector('.workq-hold-panel');
+          if(p) p.style.display = 'block';
+          return;
+        }
+        workqLogSimpleAction(item, label, memoVal);
+        finishAndClose();
+      }
+    }));
   }
 
   /* ==========================================================================
@@ -9486,10 +10037,7 @@ window.SHIN2_CRM_APP_INIT = function(){
           });
           // 기존 활동기록에도 그대로 남긴다(§ "기존 저장 구조 안에서 안전하게 처리").
           D.addActivity(co.id, `1차 미팅 제안 메일 발송 (받는사람: ${toEmail})`);
-          // §고객관리 첫화면 전면 재디자인 라운드: [메일발송] 진입점이 업무관리 표에서
-          // 고객 상세카드로 옮겨왔다 — renderWorkQueueView() 대신, 지금 이 업체 카드가
-          // 열려있으면 refreshChart()로 버튼 라벨("재발송")만 갱신한다.
-          if(currentCompanyId === co.id && cardView.style.display === 'block') refreshChart();
+          renderWorkQueueView();
           setTimeout(closeMailComposeModal, 900);
         })
         .catch(err=>{
@@ -9523,8 +10071,14 @@ window.SHIN2_CRM_APP_INIT = function(){
     }
     updateTopTabsUI('customer');
   }
-  // §고객관리 첫화면 전면 재디자인 라운드: showWorkQueueTab()은 업무관리 화면과 함께
-  // 제거했다(더 이상 호출하는 곳이 없다 — 헤더 탭도 없어짐).
+  function showWorkQueueTab(){
+    listView.style.display = 'none';
+    cardView.style.display = 'none';
+    document.getElementById('mailSettingsView').style.display = 'none';
+    document.getElementById('workQueueView').style.display = 'block';
+    renderWorkQueueView();
+    updateTopTabsUI('workqueue');
+  }
   // §1차미팅 메일 자동발송 라운드(신규): 나머지 세 view와 완전히 같은 전환 패턴.
   function showMailSettingsTab(){
     listView.style.display = 'none';
@@ -9551,8 +10105,14 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(dWq) dWq.classList.toggle('is-active', tab === 'workqueue');
     if(dMail) dMail.classList.toggle('is-active', tab === 'mailsettings');
   }
-  // §고객관리 첫화면 전면 재디자인 라운드: openCardFromWorkQueue()는 업무관리 화면과
-  // 함께 제거했다(호출하던 표 자체가 없어짐).
+  // §11: 업무관리 목록에서 업체명 클릭 -> 새 상세화면을 만들지 않고 기존 openCard(companyId)를
+  // 그대로 연다. workQueueView를 먼저 숨기고 탭 UI만 "고객관리"로 되돌린 뒤 openCard를
+  // 호출한다(openCard 자체는 전혀 수정하지 않음).
+  function openCardFromWorkQueue(id){
+    document.getElementById('workQueueView').style.display = 'none';
+    updateTopTabsUI('customer');
+    openCard(id);
+  }
   // §최근 활동 컬럼: firstActivity는 앵커가 된 MOU 완료일 + "MOU" 라벨, l2Stall/reuse는
   // 앵커가 된 실제 활동의 날짜 + 그 활동의 실제 category(classifyActivity 결과, 지어낸
   // 텍스트 아님)를 그대로 이어붙인다(§6 예시 "2026.07.04 현장등록"과 같은 형태).
@@ -10585,21 +11145,19 @@ window.SHIN2_CRM_APP_INIT = function(){
     const root = document.getElementById('crmRisingSection');
     if(!root) return;
     const data = buildRisingCompaniesTop5(companies);
-    // §요청 [2]: 접이식 헤더(#crmRisingToggle)의 업체 수 배지는 이 함수가 이미 계산해 둔
-    // data.totalComparable을 그대로 보여준다(새 집계 없음). 제목 텍스트가 접이식 헤더에도
-    // 있어 본문 안의 중복 타이틀(.rising-head)은 뺐다 — 부제(2025년 vs 2024년 POUR
-    // 실적 기준)만 남긴다.
-    const countBadge = document.getElementById('crmRisingCount');
-    if(countBadge) countBadge.textContent = data.totalComparable + '개 업체';
     if(!data.available){
       root.innerHTML = `
-        <div class="rising-sub">2025년 vs 2024년 POUR 실적 기준</div>
+        <div class="rising-head">
+          <div class="rising-title"><span class="rising-arrow">▲</span> 실적 상승 업체 <span class="rising-sub">(2025년 vs 2024년 POUR 실적 기준)</span></div>
+        </div>
         <div class="rising-empty">비교 가능한 실적 데이터가 없습니다.</div>
       `;
       return;
     }
     root.innerHTML = `
-      <div class="rising-sub">2025년 vs 2024년 POUR 실적 기준</div>
+      <div class="rising-head">
+        <div class="rising-title"><span class="rising-arrow">▲</span> 실적 상승 업체 <span class="rising-sub">(2025년 vs 2024년 POUR 실적 기준)</span></div>
+      </div>
       <div class="rising-grid">${data.items.map((it, i)=> {
         // §TOP5 카드 그래프 변경 라운드: 하단의 "증가율" 단일 막대 대신, 2024건/2025건
         // 두 값을 나란히 비교하는 미니 막대 그래프로 바꿨다 — 카드 안 수치(y2024/y2025)는
@@ -11386,6 +11944,8 @@ window.SHIN2_CRM_APP_INIT = function(){
         // 안 건드리고 다시 그린다), 업무관리는 지금 그 탭이 보일 때만(renderWorkQueueView).
         renderList();
         if(currentCompanyId && cardView.style.display === 'block') refreshChart();
+        const wq = document.getElementById('workQueueView');
+        if(wq && wq.style.display === 'block') renderWorkQueueView();
       }, 0);
     });
   }
@@ -17591,26 +18151,11 @@ window.SHIN2_CRM_APP_INIT = function(){
   });
   // §한솔 업무페이지 버튼 제거 라운드: hansolLinkBtn 클릭 리스너를 없앴다(버튼 자체를
   // 지웠으므로 이 리스너가 붙을 대상도 없다) — 링크/클릭 이벤트를 함께 제거한다는 요구사항.
-  // §고객관리 첫화면 전면 재디자인 라운드: 데스크톱 탭 버튼(crmTabCustomer 등)은 헤더에서
-  // 빠졌다 — "메일 설정" 하나만 작은 텍스트 링크(gnavMailSettingsBtn)로 남아 기존
-  // showMailSettingsTab()을 그대로 부른다(새 라우팅 없음, §"기존 기능 삭제 금지").
-  const gnavMailSettingsBtn = document.getElementById('gnavMailSettingsBtn');
-  if(gnavMailSettingsBtn) gnavMailSettingsBtn.addEventListener('click', showMailSettingsTab);
-  // §고객관리 첫화면 전면 재디자인 라운드: #mgmtNeedBtn이 이제 정적 HTML이라 한 번만
-  // 바인딩한다(예전엔 renderFilterChips가 매번 새로 만들어서 매번 새로 바인딩했다) —
-  // openManagementNeedModal 호출은 그대로.
-  const mgmtNeedBtnStatic = document.getElementById('mgmtNeedBtn');
-  if(mgmtNeedBtnStatic) mgmtNeedBtnStatic.addEventListener('click', ()=> openManagementNeedModal());
-  // §요청 [2] "실적 상승 업체" 접이식 토글 — 펼치기 전에는 렌더링을 계속 최신 상태로만
-  // 유지(hidden 속성만 토글, 재렌더링 함수는 그대로).
-  const risingToggleBtn = document.getElementById('crmRisingToggle');
-  if(risingToggleBtn) risingToggleBtn.addEventListener('click', ()=>{
-    const body = document.getElementById('crmRisingSection');
-    if(!body) return;
-    const nowOpen = body.hasAttribute('hidden');
-    if(nowOpen) body.removeAttribute('hidden'); else body.setAttribute('hidden','');
-    risingToggleBtn.setAttribute('aria-expanded', nowOpen ? 'true' : 'false');
-  });
+  // §업무관리 탭 1차 구축 라운드 §1: 탭 클릭 리스너 — 여기서만 새로 추가, 기존
+  // searchInput/필터/정렬 등 리스너는 전혀 건드리지 않았다.
+  document.getElementById('crmTabCustomer').addEventListener('click', showCustomerTab);
+  document.getElementById('crmTabWorkQueue').addEventListener('click', showWorkQueueTab);
+  document.getElementById('crmTabMailSettings').addEventListener('click', showMailSettingsTab);
 
   /* ==========================================================================
      §전면 내비게이션 리디자인 라운드(신규) — 모바일(≤767px) 전용 내비게이션 drawer.
