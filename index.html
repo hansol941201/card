@@ -9106,10 +9106,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(type === 'm1Scheduled' || type === 'm2Scheduled') return '일정 잡힘 · 완료 확인 필요';
     return days === null ? '2차미팅 완료 · MOU 미체결' : `2차미팅 완료 후 ${days}일 · MOU 미체결`;
   }
-  // §고객 단계 전환관리 라운드 §5/§8 — 표의 "해야 할 일" 버튼 문구만 스펙 표현("[L2 전환]"/
-  // "[L3 전환]")에 맞춰 바꾼다. 판정값(firstActivity/l2Stall) 자체는 그대로다.
-  const WORKQ_L2L3_ACTION_LABEL = { firstActivity:'L2 전환', l2Stall:'L3 전환' };
-  const WORKQ_TYPE_PRIORITY = { m1:0, m1Scheduled:0, m2:1, m2Scheduled:1, mou:2, firstActivity:3, l2Stall:4, reuse:5, newPartner:6 };
+  // §업무관리 L단계 제거 라운드(신규) — 사용자 확정 지시: "업무관리 화면에서 L단계 개념을
+  // 전부 제거". WORKQ_L2L3_ACTION_LABEL("L2 전환"/"L3 전환" 문구)은 firstActivity/l2Stall
+  // 유형을 업무관리 표에 아예 안 띄우면서(§buildWorkQueueItem 참고) 더 이상 쓸 곳이 없어
+  // 통째로 지웠다 — classifyManagementNeed 자체와 그 결과를 쓰는 고객관리 탭의 "관리 필요"
+  // 배너/모달(고객 상세카드·목록 쪽, 이번 요청 범위 밖)은 전혀 안 건드렸다.
+  const WORKQ_TYPE_PRIORITY = { m1:0, m1Scheduled:0, m2:1, m2Scheduled:1, mou:2, reuse:5, newPartner:6 };
   // §신규 협력업체 관리 라운드 — 샤인하우징 실사례 조사 결과: partner-dashboard 동기화로
   // CRM에는 신규 고객으로 정상 생성됐지만(previewPartnerSync 2차 패스, §협력사 동기화
   // 근본원인 수정 라운드), 업무관리는 classifyWorkQueueMeeting(질문서 회신 완료를 전제조건으로
@@ -9168,18 +9170,25 @@ window.SHIN2_CRM_APP_INIT = function(){
         days, actionLabel: meeting.label, isDelayed: days !== null && days >= 7
       };
     }
+    // §업무관리 L단계 제거 라운드(신규) — classifyManagementNeed가 반환하는
+    // firstActivity/l2Stall(L단계 전환 판정)은 업무관리 표에 더 이상 올리지 않는다(§요청
+    // "표에 다시 나타나지 않도록 계산 결과에서도 제외" — buildWorkQueueItem이 애초에 그
+    // 유형의 항목을 만들지 않으므로 computeWorkQueue의 list/counts에도 안 잡힌다).
+    // classifyManagementNeed 함수 자체와 firstActivity/l2Stall 판정 로직, 그 결과를 쓰는
+    // 고객관리 탭의 "관리 필요" 배너/모달은 이번 요청 범위(업무관리 탭) 밖이라 그대로
+    // 둔다 — 여기서는 mgmt.type==='reuse'(재사용 필요, §요청 "재사용 유지")만 계속 쓴다.
     const mgmt = classifyManagementNeed(co, acts, progress, hasPour);
-    if(mgmt.type === 'firstActivity' || mgmt.type === 'l2Stall'){
-      return {
-        co, type: mgmt.type, category: 'l2l3',
-        currentStateLabel: mgmtNeedStageLabel(mgmt), reasonText: mgmtNeedReasonText(mgmt),
-        days: mgmt.days, actionLabel: WORKQ_L2L3_ACTION_LABEL[mgmt.type], isDelayed: false
-      };
-    }
     if(mgmt.type === 'reuse'){
+      // §업무관리 L단계 제거 라운드(신규) — mgmtNeedStageLabel/mgmtNeedReasonText(고객관리
+      // 탭 "관리 필요" 모달/배너와 공유하는 함수, 그쪽은 이번 요청 범위 밖이라 안 건드림)는
+      // reuse 유형에 대해 "L3"/"L4"/"신규 L2 없음" 같은 L단계 문구를 그대로 반환한다 —
+      // 업무관리 화면에는 이 값을 그대로 노출하지 않고, 같은 근거 값(mgmt.days/mgmt.hasPour,
+      // 새 판정 아님)만 가져와 L단계 표현 없이 다시 문구를 만든다(§요청 [1] "L단계 개념을
+      // 전부 제거").
       return {
         co, type: 'reuse', category: 'reuse',
-        currentStateLabel: mgmtNeedStageLabel(mgmt), reasonText: mgmtNeedReasonText(mgmt),
+        currentStateLabel: mgmt.hasPour ? '실사용 확인됨' : '활동 기록 있음',
+        reasonText: `최근 활용 후 ${mgmt.days}일 이상 · 후속 현장 없음`,
         days: mgmt.days, actionLabel: '재사용', isDelayed: false
       };
     }
@@ -9210,7 +9219,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(item) list.push(item);
     });
     // §실행형 업무관리 라운드 §14: 단순 "경과일 오래된 순"만 쓰지 않고, 실제 행동
-    // 우선순위(1차미팅 잡기→2차미팅 잡기→MOU 진행→첫 L2 필요→L3 전환 필요→재사용 필요)를
+    // 우선순위(1차미팅 잡기→2차미팅 잡기→MOU 진행→재사용 필요)를
     // 먼저 적용한 뒤, 같은 행동 안에서만 오래된 업체가 위로 오게 한다.
     // §경과일 짧은 업체 분리 보기 라운드: "막 5일" 같은 경과일이 적은(=이제 막 발생한) 건을
     // 오래된 업체들 사이에서 따로 찾기 어렵다는 요청 — 같은 행동 우선순위 안에서 정렬
@@ -9226,19 +9235,15 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(b.days === null) return -1;
       return workQueueSortAsc ? (a.days - b.days) : (b.days - a.days);
     });
-    // §고객 단계 전환관리 라운드 §12 — 기존 category(l2l3) 집계는 그대로 두고, 새 필터/
-    // 히어로가 L1→L2와 L2→L3를 따로 세도록 type(firstActivity/l2Stall) 기준 집계만
-    // 추가한다. 새 판정 로직이 아니라 이미 계산된 it.type을 다른 키로도 세는 것뿐이다.
-    const counts = { all: list.length, meeting: 0, mou: 0, l2l3: 0, reuse: 0, firstActivity: 0, l2Stall: 0, m1: 0, m2: 0 };
+    // §업무관리 L단계 제거 라운드(신규) — l2l3/firstActivity/l2Stall 집계 키를 없앴다
+    // (buildWorkQueueItem이 그 유형의 항목을 더 이상 만들지 않아 list에 아예 없으므로
+    // 집계할 대상 자체가 없다 — §요청 "계산 결과에서도 제외").
+    const counts = { all: list.length, meeting: 0, mou: 0, reuse: 0, m1: 0, m2: 0 };
     list.forEach(it=>{
       counts[it.category] = (counts[it.category] || 0) + 1;
-      // firstActivity/l2Stall만 별도 키로 추가 집계(§고객 단계 전환관리 라운드 §12) —
-      // 이 둘은 category('l2l3')와 이름이 겹치지 않아 이중 집계가 안 된다. mou/reuse는
-      // category와 type이 같은 문자열이라 위 category 집계로 이미 반영돼 있다.
-      if(it.type === 'firstActivity' || it.type === 'l2Stall') counts[it.type] = (counts[it.type] || 0) + 1;
       // §업무관리 1·2차미팅 탭 분리 라운드 — "미팅"(category='meeting')이 m1/m1Scheduled/
       // m2/m2Scheduled를 전부 묶어서 세던 걸 1차/2차로 따로 센다. 새 판정이 아니라 이미
-      // 있는 it.type을 다른 키로 한 번 더 세는 것뿐(§ firstActivity/l2Stall과 같은 패턴).
+      // 있는 it.type을 다른 키로 한 번 더 세는 것뿐.
       if(it.type === 'm1' || it.type === 'm1Scheduled') counts.m1++;
       if(it.type === 'm2' || it.type === 'm2Scheduled') counts.m2++;
     });
@@ -9372,14 +9377,11 @@ window.SHIN2_CRM_APP_INIT = function(){
 
   // 유형별 인라인 작업영역 정의 — 필드/버튼 구성만 다르고 저장 함수는 위 write 함수들을
   // 그대로 부른다.
-  // §고객 단계 전환관리 라운드 §5/§8/§10 — 버튼 구성을 스펙 목록에 맞춘다. 셋 다 '보류'가
-  // 추가돼(§10) 아래 renderWorkqExpandBody에서 hold-panel도 세 유형 모두에 렌더링한다.
-  const WORKQ_L2L3_BUTTONS = {
-    firstActivity: ['현장등록 요청', '전화 확인', '자료 안내', '보류'],
-    l2Stall: ['견적 제안', 'PT 제안', '현장검토 제안', '자료 안내', '전화 확인', '보류'],
+  // §업무관리 L단계 제거 라운드(신규) — firstActivity/l2Stall 버튼 구성은 지웠다(그
+  // 유형의 항목이 더 이상 업무관리 표에 나타나지 않으므로 쓸 일이 없다). reuse/newPartner
+  // 버튼 구성은 그대로(§요청 "재사용, 신규 협력업체는 그대로 유지").
+  const WORKQ_ACTION_BUTTONS = {
     reuse: ['새 현장 확인', '다른 공종 제안', '자료 재안내', '전화 확인', '보류'],
-    // §신규 협력업체 관리 라운드 — 아래 renderWorkqExpandBody의 기존 fallback 분기(firstActivity/
-    // l2Stall/reuse와 동일하게 활동기록 버튼 + 메모 + 보류)를 새 계산 없이 그대로 재사용한다.
     newPartner: ['첫 연락 완료', '온보딩 안내', '전화 확인', '보류']
   };
   function workqContactBlockHtml(co){
@@ -9494,8 +9496,9 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="workq-saved-note" style="display:none;">저장되었습니다.</div>
       `;
     }
-    // firstActivity / l2Stall / reuse — 전부 활동기록 버튼 + 메모
-    const buttons = WORKQ_L2L3_BUTTONS[item.type] || [];
+    // reuse / newPartner — 활동기록 버튼 + 메모(§업무관리 L단계 제거 라운드: firstActivity/
+    // l2Stall 분기는 이 함수까지 도달하지 않으므로 지웠다).
+    const buttons = WORKQ_ACTION_BUTTONS[item.type] || [];
     const recentAct = (D.activitiesForCompany(co.id)[0] || null);
     return `
       <div class="workq-expand-title">${esc(co.name)} · ${esc(item.actionLabel)}</div>
@@ -9508,7 +9511,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="workq-btn-row">
         ${buttons.map(b=> `<button type="button" class="workq-btn${b==='보류'?' muted':''}" data-workq-do="log" data-workq-label="${esc(b)}">${esc(b)}</button>`).join('')}
       </div>
-      ${(item.type === 'firstActivity' || item.type === 'l2Stall' || item.type === 'reuse' || item.type === 'newPartner') ? `
+      ${(item.type === 'reuse' || item.type === 'newPartner') ? `
       <div class="workq-hold-panel" style="display:none;">
         <div class="workq-hold-row">
           <span class="workq-expand-label">다시 확인일</span>
@@ -9535,8 +9538,10 @@ window.SHIN2_CRM_APP_INIT = function(){
   // reuse/newPartner 판정 로직, "다음 단계로 전환" 섹션의 "다시 연락하기" 카드는 전혀
   // 안 건드렸다. 저 카드를 눌러 workQueueFilter='reuse'가 되는 경로는 여전히 있으니,
   // filtered 계산 자체도 그대로 둔다 — 이 칩 행에만 안 보일 뿐이다).
+  // §업무관리 L단계 제거 라운드(신규) — 사용자 확정 지시 [4]: 필터에서 L1→L2/L2→L3
+  // 제거. 남은 4개(전체/1차미팅/2차미팅/MOU)는 손대지 않았다.
   const WORKQ_FILTER_DEFS = [
-    ['all','전체'], ['m1','1차미팅'], ['m2','2차미팅'], ['mou','MOU'], ['firstActivity','L1→L2'], ['l2Stall','L2→L3']
+    ['all','전체'], ['m1','1차미팅'], ['m2','2차미팅'], ['mou','MOU']
   ];
   let workQueueFilter = 'all';
   // §업무관리 검색창 라운드 — 고객관리 목록 검색(matchesSearch, §searchQuery)과 완전히
@@ -9593,28 +9598,18 @@ window.SHIN2_CRM_APP_INIT = function(){
       { key:'m2', cls:'c-orange', label:'2차미팅 잡기', sub:'후속미팅 필요', count:m2Count },
       { key:'mou', cls:'c-green', label:'MOU 진행', sub:'체결 후속', count:mouCount }
     ];
-    // §고객 단계 전환관리 라운드 §4/§6/§9 — 숫자는 computeWorkQueue()가 이미 계산해 둔
-    // counts.firstActivity/counts.l2Stall/counts.reuse를 그대로 읽는다(§5 하드코딩 금지).
-    // 클릭 시 data-workq-filter로 넘기는 값도 classifyManagementNeed의 실제 type 값이라
-    // 기존 필터 처리 로직을 그대로 재사용한다(새 판정/필터 로직 없음). §네모형 업무 카드
-    // 라운드 §5: "L1→L2" 같은 내부 단계명보다 실제 행동(action)을 먼저 보여준다 — action/
-    // stage/need 전부 표시 문구일 뿐 판정값(key)은 그대로다.
-    const transitionItems = [
-      { key:'firstActivity', action:'첫 현장 만들기', stage:'L1 → L2', need:'현장등록 필요', count: counts.firstActivity||0 },
-      { key:'l2Stall', action:'후속요청 만들기', stage:'L2 → L3', need:'후속요청 필요', count: counts.l2Stall||0 },
-      { key:'reuse', action:'다시 연락하기', stage:'재사용', need:'새 현장 필요', count: counts.reuse||0 }
-    ];
-    function workqTaskCard(item, isRow2){
-      const numCls = isRow2 ? (item.count === 0 ? 'is-zero' : 'c-orange') : (item.cls || '');
-      const label = isRow2 ? item.action : item.label;
-      const sub = isRow2 ? item.need : item.sub;
-      const stageLine = isRow2 ? `<div class="workq-task-card-stage">${esc(item.stage)}</div>` : '';
+    // §업무관리 L단계 제거 라운드(신규) — 사용자 확정 지시 [3]: "다음 단계로 전환" 영역
+    // 전체(첫 현장 만들기/후속요청 만들기/L1→L2/L2→L3 카드)를 삭제한다. "다시 연락하기"
+    // (재사용) 카드도 이 섹션 소속이라 함께 없앴지만, 재사용 기능 자체(§요청 [8] 유지
+    // 대상)는 살아있다 — reuse 유형 항목은 여전히 computeWorkQueue의 list/counts.reuse에
+    // 잡히고, "전체" 필터로 보면 표에 그대로 나온다(행 클릭 -> renderWorkqExpandBody의
+    // reuse 분기도 그대로) — 이 카드는 그 목록으로 바로 점프하는 지름길이었을 뿐이다.
+    function workqTaskCard(item){
       return `
         <button type="button" class="workq-task-card" data-workq-filter="${esc(item.key)}">
-          <div class="workq-task-card-num ${numCls}">${esc(item.count)}<span class="workq-task-card-unit">건</span></div>
-          <div class="workq-task-card-label">${esc(label)}</div>
-          ${stageLine}
-          <div class="workq-task-card-sub">${esc(sub)}</div>
+          <div class="workq-task-card-num ${item.cls || ''}">${esc(item.count)}<span class="workq-task-card-unit">건</span></div>
+          <div class="workq-task-card-label">${esc(item.label)}</div>
+          <div class="workq-task-card-sub">${esc(item.sub)}</div>
         </button>`;
     }
     wrap.innerHTML = `
@@ -9628,13 +9623,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="workq-task-section">
         <div class="workq-task-section-title">지금 해야 할 업무</div>
         <div class="workq-task-row">
-          ${heroItems.map(h=> workqTaskCard(h, false)).join('')}
-        </div>
-      </div>
-      <div class="workq-task-section">
-        <div class="workq-task-section-title">다음 단계로 전환</div>
-        <div class="workq-task-row">
-          ${transitionItems.map(t=> workqTaskCard(t, true)).join('')}
+          ${heroItems.map(h=> workqTaskCard(h)).join('')}
         </div>
       </div>
       <div class="list-search-row workq-search-row">
