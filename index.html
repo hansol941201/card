@@ -10218,6 +10218,14 @@ window.SHIN2_CRM_APP_INIT = function(){
       .replace(/\{대표자\}/g, co.repName || '')
       .replace(/\{보내는사람\}/g, mailSettings.fromName || '');
   }
+  // §수신자 주소 오류 조사 라운드(신규) — "The recipients address is corrupted" 오류 재현
+  // 조사 결과: 화면에는 정상 주소로 보여도 문자열 안에 폭이 0인 유니코드 문자(제로폭
+  // 공백 U+200B 등)가 섞여 있으면 .trim()과 이메일 형식 정규식(\s 제외 규칙)을 둘 다
+  // 통과해 EmailJS로 그대로 전달된다 — 실제 Playwright로 재현 확인(줄바꿈/전각공백/NBSP/
+  // BOM은 이미 .trim()이 제거하지만 제로폭 문자류는 안 걸러짐). 받는사람/참조 이메일을
+  // 형식 검사하기 직전에 이 문자들만 제거한다 — 그 외 문자·로직은 손대지 않는다.
+  const INVISIBLE_CHARS_RE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF\u00AD]/g;
+  function stripInvisibleChars(s){ return String(s || '').replace(INVISIBLE_CHARS_RE, ''); }
   let emailjsLoadPromise = null;
   function loadEmailJsSdk(){
     if(emailjsLoadPromise) return emailjsLoadPromise;
@@ -10509,7 +10517,9 @@ window.SHIN2_CRM_APP_INIT = function(){
         to_email: toEmail,
         cc_email: ccEmails.join(','),
         from_name: document.getElementById('mailComposeFrom').value.replace(/<.*>/, '').trim(),
-        reply_to: latestSettings.fromEmail || '',
+        // reply_to도 같은 이유로 제로폭 문자류를 제거한다 — 메일 설정 탭에 저장된 값을
+        // 복사·붙여넣기 했을 때 같은 문제가 생길 수 있다(§수신자 주소 오류 조사 라운드).
+        reply_to: stripInvisibleChars(latestSettings.fromEmail || ''),
         subject: document.getElementById('mailComposeSubject').value.trim(),
         message: document.getElementById('mailComposeBody').value
       };
@@ -10552,11 +10562,14 @@ window.SHIN2_CRM_APP_INIT = function(){
     }
     sendBtn.addEventListener('click', ()=>{
       const statusEl = document.getElementById('mailComposeStatus');
-      const toEmail = document.getElementById('mailComposeTo').value.trim();
+      // §수신자 주소 오류 조사 라운드 — 형식 검사 전에 제로폭 문자류를 먼저 제거한다.
+      // 화면에는 정상으로 보여도 이 문자가 섞여 있으면 정규식(\s 기준)과 .trim()을 둘 다
+      // 통과해 그대로 EmailJS로 전달되던 문제를 막는다(위 stripInvisibleChars 참고).
+      const toEmail = stripInvisibleChars(document.getElementById('mailComposeTo').value.trim());
       if(!toEmail){ statusEl.textContent = '받는사람 이메일을 입력해주세요.'; statusEl.classList.add('is-err'); return; }
       if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)){ statusEl.textContent = '받는사람 이메일 형식을 확인해주세요.'; statusEl.classList.add('is-err'); return; }
       const ccRaw = document.getElementById('mailComposeCc').value.trim();
-      const ccEmails = ccRaw ? ccRaw.split(',').map(s=> s.trim()).filter(Boolean) : [];
+      const ccEmails = ccRaw ? ccRaw.split(',').map(s=> stripInvisibleChars(s.trim())).filter(Boolean) : [];
       const badCc = ccEmails.find(e=> !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
       if(badCc){ statusEl.textContent = `참조 이메일 형식을 확인해주세요: ${badCc}`; statusEl.classList.add('is-err'); return; }
       // §요청 [6] 수신거부 업체 발송 경고 — 명시적 확인 없이는 보내지 않는다.
