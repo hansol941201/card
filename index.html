@@ -2786,6 +2786,29 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .agr-doc-actions{ display:flex; flex-wrap:wrap; gap:8px; }
 .agr-doc-memo-edit{ display:flex; gap:6px; margin-top:6px; }
 .agr-doc-memo-edit input{ flex:1; }
+/* §고객관리 사진·서류 통합 라운드(신규) — 카드+썸네일 체크리스트 */
+.doc-card-summary{ font-size:12px; color:var(--text-muted); margin-bottom:8px; }
+.doc-card-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:10px; }
+.doc-card{ display:flex; gap:10px; padding:8px; }
+.doc-card-thumb{ flex:none; width:56px; height:56px; border-radius:6px; overflow:hidden; background:var(--bg); display:flex; align-items:center; justify-content:center; }
+.doc-card-thumb img{ width:100%; height:100%; object-fit:cover; }
+.doc-card-thumb.is-file{ background:var(--bg); }
+.doc-card-file-icon{ font-size:10.5px; font-weight:700; color:var(--text-muted); }
+.doc-card-thumb-loading{ font-size:9.5px; color:var(--text-muted); text-align:center; }
+.doc-card-body{ flex:1; min-width:0; }
+.doc-card-head{ display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:2px; }
+.doc-card-filename{ font-size:11px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.doc-card-actions{ position:relative; margin-top:6px; }
+.doc-card-actions-primary{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.doc-card-more-btn{ font-size:11px; background:none; border:1px solid var(--line); border-radius:6px; padding:2px 7px; cursor:pointer; color:var(--text-muted); }
+.doc-card-actions-more{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; padding-top:6px; border-top:1px dashed var(--line); }
+/* §고객관리 사진·서류 통합 라운드(신규) — 파일 미리보기 라이트박스(신규 기능,
+   기존 코드에 미리보기가 없어 새로 만듦) */
+.doc-preview-panel{ max-width:820px; width:92vw; }
+.doc-preview-body{ display:flex; align-items:center; justify-content:center; min-height:200px; max-height:76vh; overflow:auto; background:var(--bg); border-radius:8px; }
+.doc-preview-img{ max-width:100%; max-height:74vh; object-fit:contain; }
+.doc-preview-iframe{ width:100%; height:74vh; border:none; background:#fff; }
+.doc-preview-fallback, .doc-preview-loading{ padding:32px; text-align:center; color:var(--text-muted); font-size:12.5px; }
 .workq-doc-filter-row{ align-items:center; }
 .workq-doc-filter-label{ font-size:11.5px; color:var(--text-muted); font-weight:600; margin-right:4px; }
 .workq-doc-status{ font-size:11.5px; white-space:nowrap; }
@@ -2896,6 +2919,10 @@ table.pdf-doc-table thead{ background:var(--bg); }
                  후보만 뽑아 보여준 뒤 사람이 한 건씩(또는 여러 건 일괄) 확인해야만
                  기존 addCompanyRelation/removeCompanyRelation으로 저장된다. -->
             <button type="button" id="crmAffiliateReviewBtn">계열사 관계 후보 검토</button>
+            <!-- §고객관리 목록 출력(PDF) 후속 — "시공사/외부 발송용에 0건만 뜬다" 문제의
+                 실제 원인(기존 업체에 distributionLists 태그가 없음)을 해결하는 가져오기.
+                 매칭된 업체만, 이미 켜진 값은 그대로 두고 새로 켜지는 태그만 추가한다. -->
+            <button type="button" id="crmDistListSyncBtn">공개범위 가져오기(시공사·외부용)</button>
           </div>
         </div>
         <!-- §전화 요청 기록 라운드(신규) — "+ 고객 등록"과 같은 줄에 배치. 처음엔 작은
@@ -3044,6 +3071,8 @@ table.pdf-doc-table thead{ background:var(--bg); }
        이 화면은 브라우저 인쇄(window.print)로만 PDF를 만든다 — 외부 API 전송, Firebase
        업로드, 실제 발송 기능이 전혀 없다. -->
   <div id="pdfExportModalRoot"></div>
+  <!-- §고객관리 목록 출력(PDF) 후속 — "공개범위 가져오기" 전용 모달 root. -->
+  <div id="distListSyncModalRoot"></div>
   <div id="sideDrawerRoot"></div>
   <div id="memoPanelRoot"></div>
   <!-- §총 매출 Popover 전환 라운드: 전용 root — sideDrawerRoot(전체 높이 오른쪽 패널,
@@ -6152,6 +6181,92 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   }
 
   /* ==========================================================================
+     §고객관리 목록 출력(PDF) 라운드 후속 — "시공사 발송용/외부 발송용에 0건만 뜬다"
+     실제 문제 확인: co.distributionLists는 신규 등록폼에서만 채워지는 필드라, 기존에
+     partner-dashboard에서 가져온 업체(대다수)는 이 태그가 아예 없어 항상 0건으로
+     보였다. partner-dashboard의 partnerList(internal/contractor/external, 위
+     pdBuildContactIndex/previewPartnerListSync가 이미 fetch하는 바로 그 3분류 원본)를
+     다시 훑어서, 각 업체가 실제로 어느 목록(들)에 속해 있었는지를 co.distributionLists에
+     반영하는 가져오기다. 새 fetch/매칭 로직을 만들지 않고 기존 pdFetchBaselineData/
+     pdFetchPartnerListOverrides/pdBuildEffectivePartnerList/pdMatchCompany를 그대로
+     재사용한다. 'internal'은 이 동기화가 손대지 않는다(§ 기존 고객은 내부용에만 자동
+     포함이라는 안전한 기본값을 그대로 유지 — 명시적으로 뺀 업체만 co.distributionLists에
+     'excludeInternal'로 남는데, 이 동기화는 그 값도 건드리지 않는다). 매칭 안 되는 업체는
+     저장하지 않고 review로만 보여준다(§ 새 업체를 임의로 만들지 않는다, 기존
+     applyPartnerListSync와 같은 원칙 — 이 동기화는 신규 업체를 만들지 않음).
+     ========================================================================== */
+  async function previewDistributionListSync(){
+    const baseline = await pdFetchBaselineData();
+    const overridesResult = await pdFetchPartnerListOverrides();
+    const overrides = overridesResult.data;
+    const contactIndex = pdBuildContactIndex(baseline, overrides);
+    const companies = loadCompanies();
+    const bizIndex = new Map();
+    companies.forEach(c=>{ if(c.bizRegNo){ const k = String(c.bizRegNo).trim(); if(!bizIndex.has(k)) bizIndex.set(k, []); bizIndex.get(k).push(c); } });
+    const nameIndex = new Map();
+    companies.forEach(c=>{ const n = normCompanyName(c.name); if(!n) return; if(!nameIndex.has(n)) nameIndex.set(n, []); nameIndex.get(n).push(c); });
+
+    const SYNCED_CATS = ['contractor', 'external']; // internal은 이 동기화가 다루지 않는다.
+    const membership = new Map(); // co.id -> Set(cat)
+    const review = [];
+    SYNCED_CATS.forEach(cat=>{
+      const list = overrides ? pdBuildEffectivePartnerList(baseline, overrides, cat) : ((baseline.partnerList && baseline.partnerList[cat]) || []);
+      list.forEach(row=>{
+        if(!row || !row.company) return;
+        const m = pdMatchCompany({ company: row.company }, companies, bizIndex, nameIndex, contactIndex);
+        if(!m.co){
+          if(m.via === 'ambiguous-bizno' || m.via === 'ambiguous-name') review.push({ category: cat, companyName: row.company, reason: m.via === 'ambiguous-bizno' ? '동일 사업자번호의 CRM 업체가 여러 건' : '동일 정규화 업체명의 CRM 업체가 여러 건' });
+          else review.push({ category: cat, companyName: row.company, reason: 'CRM에서 찾지 못함(신규 업체는 만들지 않음)' });
+          return;
+        }
+        if(!membership.has(m.co.id)) membership.set(m.co.id, new Set());
+        membership.get(m.co.id).add(cat);
+      });
+    });
+
+    const updates = [];
+    membership.forEach((catsSet, coId)=>{
+      const co = companies.find(c=> c.id === coId);
+      if(!co) return;
+      const existingTags = Array.isArray(co.distributionLists) ? co.distributionLists : [];
+      const existingSet = new Set(existingTags);
+      const newSet = new Set(existingTags);
+      const addedCategories = [];
+      SYNCED_CATS.forEach(cat=>{
+        if(catsSet.has(cat) && !existingSet.has(cat)){ newSet.add(cat); addedCategories.push(cat); }
+      });
+      if(addedCategories.length){
+        updates.push({ co, before: existingTags.slice(), after: Array.from(newSet), addedCategories });
+      }
+    });
+
+    return {
+      updates, review,
+      counts: {
+        matchedCompanies: membership.size, updates: updates.length,
+        review: review.length, contractorTotal: (overrides ? pdBuildEffectivePartnerList(baseline, overrides, 'contractor') : ((baseline.partnerList && baseline.partnerList.contractor) || [])).length,
+        externalTotal: (overrides ? pdBuildEffectivePartnerList(baseline, overrides, 'external') : ((baseline.partnerList && baseline.partnerList.external) || [])).length
+      },
+      usedOverrides: overridesResult.diagnostics ? overridesResult.diagnostics.some(d=> d.ok && d.hasData) : false,
+      fetchDiagnostics: overridesResult.diagnostics || []
+    };
+  }
+  function applyDistributionListSync(preview){
+    if(!preview || !Array.isArray(preview.updates)) throw new Error('먼저 미리보기를 확인해 주세요.');
+    const companies = loadCompanies();
+    const byId = new Map(companies.map(c=> [c.id, c]));
+    let updatedCount = 0;
+    preview.updates.forEach(u=>{
+      const co = byId.get(u.co.id);
+      if(!co) return;
+      co.distributionLists = u.after.slice();
+      updatedCount++;
+    });
+    if(updatedCount) saveCompanies(companies);
+    return { updatedCount, reviewCount: preview.review.length };
+  }
+
+  /* ==========================================================================
      미등록 업체 관리(§미등록 업체 관리 라운드) — 2025년 매출 스냅샷(SHIN2_REVENUE_2025_SNAPSHOT,
      위에서 embed)과 현재 CRM companies를 정규화된 업체명으로만 비교한다. 유사 이름이라는
      이유로 자동 연결하지 않는다(§매칭 기준, 기존 Partner/POUR 가져오기와 동일한 원칙). 이
@@ -6637,6 +6752,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     buildRequestHistory, buildRequestHistoryIndex,
     previewPartnerSync, applyPartnerSync,
     previewPartnerListSync, applyPartnerListSync,
+    previewDistributionListSync, applyDistributionListSync,
     // §동기화 단건 진단 라운드 — 렌더 스크립트(별도 <script> 블록)가 이 함수들을 직접
     // 재선언하지 않고 그대로 재사용할 수 있게 export만 추가한다(§ "CO_KEY is not defined"류
     // 크로스 스크립트 버그를 반복하지 않기 위해 항상 D.* 다리를 통해서만 부른다). 함수
@@ -12533,7 +12649,11 @@ window.SHIN2_CRM_APP_INIT = function(){
   function resolveAgreementDocSlot(companyId, type){
     const docs = D.documentsForCompany(companyId, type);
     if(!docs.length) return { status:'unregistered', doc:null };
-    const doc = docs[docs.length - 1];
+    // §고객관리 사진·서류 통합 라운드에서 발견해 함께 고친 버그 — documentsForCompany는
+    // 이미 최신순(newest-first)으로 정렬해서 돌려주는데(§데이터 계층 정의 그대로) 여기서
+    // 마지막 원소(docs.length-1, 가장 오래된 파일)를 골라 같은 종류로 재등록했을 때 옛
+    // 파일 상태가 계속 보이는 문제가 있었다. 첫 원소(가장 최근 파일)를 쓰도록 수정.
+    const doc = docs[0];
     return { status: doc.verificationStatus || 'registered', doc };
   }
   function buildAgreementDocChecklist(companyId){
@@ -12594,12 +12714,25 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="agr-doc-list">${rows}</div>
     `;
   }
-  function bindAgreementDocChecklistHandlers(companyId){
-    const wrap = document.getElementById('agreementDocSection');
+  // §고객관리 사진·서류 통합 라운드(신규) — opts로 컨테이너 id와 렌더 함수를 바꿀 수
+  // 있게만 확장했다(업무관리 협약 팝업의 기본값은 그대로 유지, 새 호출부만 다른 값을
+  // 넘김). 업로드/열기/다운로드/교체/확인/재요청/메모/삭제 로직 자체는 한 글자도
+  // 안 바꿨다 — data-agr-doc-* 속성과 .agr-doc-row/.agr-doc-actions 클래스만 그대로
+  // 있으면 어떤 카드 마크업이든 동작한다.
+  function bindAgreementDocChecklistHandlers(companyId, opts){
+    opts = opts || {};
+    const containerId = opts.containerId || 'agreementDocSection';
+    const renderHtml = opts.renderHtml || agreementDocChecklistHtml;
+    const wrap = document.getElementById(containerId);
     if(!wrap) return;
     const co = D.findCompany(companyId);
     if(!co) return;
-    function refresh(){ wrap.innerHTML = agreementDocChecklistHtml(companyId); bindAgreementDocChecklistHandlers(companyId); renderAgreementDocFilterCount(); }
+    function refresh(){
+      wrap.innerHTML = renderHtml(companyId);
+      bindAgreementDocChecklistHandlers(companyId, opts);
+      renderAgreementDocFilterCount();
+      if(typeof opts.afterRefresh === 'function') opts.afterRefresh();
+    }
     function doUpload(type, file){
       if(!file) return;
       D.addDocument(companyId, type, file).then(()=> refresh()).catch((err)=>{
@@ -12704,6 +12837,169 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 자체가 표+칩+히어로 전체를 다시 그리는 기존 함수 그대로).
   function renderAgreementDocFilterCount(){
     if(document.getElementById('workQueueView') && document.getElementById('workQueueView').style.display === 'block') renderWorkQueueView();
+  }
+
+  /* ==========================================================================
+     §고객관리 사진·서류 통합 라운드(신규) — 업무관리 "협약 진행관리" 팝업의 6종 서류
+     체크리스트(buildAgreementDocSummary/resolveAgreementDocSlot/
+     bindAgreementDocChecklistHandlers, 위에서 전부 재사용)를 고객카드 "서류 현황"
+     자리에 카드+썸네일 형태로 통합한다. 같은 companyId·같은 D.documentsForCompany를
+     읽고 쓰므로 업무관리와 고객카드 중 어느 쪽에서 등록·교체·확인·재요청·메모·삭제해도
+     즉시 서로 반영된다 — 별도 저장소를 만들지 않았다.
+     기본 버튼은 열기/등록·교체만 보이고, 다운로드·확인완료·재요청·메모·삭제는 "더보기"
+     안에 접어 넣는다(§요청 [2]). 실제 클릭 로직은 bindAgreementDocChecklistHandlers를
+     opts로 감싸 그대로 재사용 — 새 업로드/삭제/검증 로직을 만들지 않았다.
+     ========================================================================== */
+  function customerCardDocChecklistHtml(companyId){
+    const summary = buildAgreementDocSummary(companyId);
+    const cards = summary.list.map(it=>{
+      const doc = it.doc;
+      const hasBlob = doc ? (doc.localOnly ? !!D.getBlob(doc.id) : true) : false;
+      const isImage = doc && (doc.mimeType||'').startsWith('image/');
+      // 로컬전용 이미지는 기존 object URL 캐시(getDocObjectUrl)로 동기 썸네일이 바로
+      // 되고, 클라우드 이미지는 Storage에서 매번 새 URL을 받아야 해서(§기존 getDocUrl
+      // 규칙 그대로) 일단 "불러오는 중" 표시 후 bindCustomerCardDocExtras가 비동기로
+      // 채운다 — 카드 자체 렌더는 항상 동기(다른 카드/입력값에 영향 없음).
+      const thumbSrc = (isImage && doc && doc.localOnly) ? getDocObjectUrl(doc) : '';
+      const fileName = doc ? esc(doc.fileName || doc.originalFileName || '(이름 없음)') : '';
+      const metaBits = [];
+      if(doc){
+        if(doc.mimeType) metaBits.push(esc((doc.mimeType.split('/').pop()||'').toUpperCase()));
+        if(doc.size||doc.fileSize) metaBits.push(esc(fmtFileSize(doc.size||doc.fileSize)));
+      }
+      const metaLine2 = doc ? [
+        doc.createdAt ? (esc(fmtDate(doc.createdAt)) + ' 등록' + (doc.uploadedBy ? ' · ' + esc(doc.uploadedBy) : '')) : '',
+        doc.verifiedAt ? ('확인 ' + esc(fmtDate(doc.verifiedAt)) + (doc.verifiedBy ? ' · ' + esc(doc.verifiedBy) : '')) : '',
+        doc.verificationMemo ? ('메모: ' + esc(doc.verificationMemo)) : ''
+      ].filter(Boolean).join(' · ') : '';
+      const thumbInner = !doc ? `<div class="doc-card-file-icon">−</div>`
+        : isImage ? (thumbSrc ? `<img src="${esc(thumbSrc)}" alt="" />` : `<div class="doc-card-thumb-loading">불러오는 중…</div>`)
+        : `<div class="doc-card-file-icon">${esc((doc.mimeType||'').split('/').pop()||'FILE').toUpperCase()}</div>`;
+      return `
+        <div class="agr-doc-row doc-card" data-agr-doc-type="${esc(it.type)}">
+          <div class="doc-card-thumb${isImage?'':' is-file'}" data-doc-card-thumb="${doc?esc(doc.id):''}" data-doc-card-mime="${doc?esc(doc.mimeType||''):''}" data-doc-card-cloud="${doc && !doc.localOnly ? '1':'0'}">${thumbInner}</div>
+          <div class="doc-card-body">
+            <div class="doc-card-head">
+              <span class="agr-doc-name">${esc(it.label)}</span>
+              <span class="status-badge ${AGREEMENT_DOC_STATUS_CLASS[it.status]}">${esc(AGREEMENT_DOC_STATUS_LABEL[it.status])}</span>
+            </div>
+            ${doc ? `<div class="doc-card-filename" title="${fileName}">${fileName}</div><div class="agr-doc-meta">${[metaBits.join(' · '), metaLine2].filter(Boolean).join(' · ')}</div>`
+                  : `<div class="agr-doc-meta is-empty">등록된 파일이 없습니다</div>`}
+            <div class="agr-doc-actions doc-card-actions">
+              <input type="file" id="agrDocInput_${esc(it.type)}" style="display:none;" accept="image/*,application/pdf" />
+              <div class="doc-card-actions-primary">
+                ${doc && hasBlob ? `<button type="button" class="co-text-action" data-doc-card-preview="${esc(doc.id)}">열기</button>` : ''}
+                ${!doc ? `<button type="button" class="co-text-action primary" data-agr-doc-do="upload" data-agr-doc-type="${esc(it.type)}">파일 등록</button>`
+                       : `<button type="button" class="co-text-action" data-agr-doc-do="replace" data-agr-doc-type="${esc(it.type)}">교체</button>`}
+                ${doc ? `<button type="button" class="doc-card-more-btn" data-doc-card-more-toggle="${esc(it.type)}" aria-haspopup="true" aria-expanded="false">더보기 ▾</button>` : ''}
+              </div>
+              ${doc ? `
+              <div class="doc-card-actions-more" data-doc-card-more="${esc(it.type)}" hidden>
+                ${hasBlob ? `<button type="button" class="co-text-action" data-agr-doc-do="download" data-agr-doc-id="${esc(doc.id)}">다운로드</button>` : ''}
+                ${it.status !== 'verified' ? `<button type="button" class="co-text-action" data-agr-doc-do="verify" data-agr-doc-id="${esc(doc.id)}">확인 완료</button>` : ''}
+                ${it.status !== 'reRequest' ? `<button type="button" class="co-text-action" data-agr-doc-do="rerequest" data-agr-doc-id="${esc(doc.id)}">재요청</button>` : ''}
+                <button type="button" class="co-text-action" data-agr-doc-do="memo" data-agr-doc-id="${esc(doc.id)}">메모</button>
+                <button type="button" class="co-text-action danger" data-agr-doc-do="delete" data-agr-doc-id="${esc(doc.id)}">삭제</button>
+              </div>` : ''}
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+    return `
+      <div class="doc-card-summary">서류 ${summary.registeredCount} / ${summary.total} 등록 · 확인 완료 ${summary.counts.verified}건 · 미등록 ${summary.counts.unregistered}건${summary.counts.reRequest ? ' · 재요청 ' + summary.counts.reRequest + '건' : ''}</div>
+      <div class="doc-card-grid">${cards}</div>
+    `;
+  }
+  // bindCustomerCardDocExtras: 카드 전용 부가 동작(더보기 토글 + 클라우드 이미지
+  // 비동기 썸네일 + "열기" 미리보기 라이트박스). 실제 업로드/삭제/검증은 전부
+  // bindAgreementDocChecklistHandlers가 그대로 처리하므로 여기서는 손대지 않는다.
+  function bindCustomerCardDocExtras(companyId, containerId){
+    const wrap = document.getElementById(containerId);
+    if(!wrap) return;
+    wrap.querySelectorAll('[data-doc-card-more-toggle]').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const type = btn.getAttribute('data-doc-card-more-toggle');
+        const menu = wrap.querySelector(`[data-doc-card-more="${type}"]`);
+        if(!menu) return;
+        const willOpen = menu.hidden;
+        wrap.querySelectorAll('.doc-card-actions-more').forEach(m=> m.hidden = true);
+        wrap.querySelectorAll('[data-doc-card-more-toggle]').forEach(b=> b.setAttribute('aria-expanded','false'));
+        if(willOpen){ menu.hidden = false; btn.setAttribute('aria-expanded','true'); }
+      });
+    });
+    wrap.querySelectorAll('[data-doc-card-preview]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-doc-card-preview');
+        const doc = D.documentsForCompany(companyId).find(d=> d.id === id);
+        if(doc) openDocPreviewModal(doc);
+      });
+    });
+    wrap.querySelectorAll('[data-doc-card-thumb][data-doc-card-cloud="1"]').forEach(box=>{
+      const id = box.getAttribute('data-doc-card-thumb');
+      const mime = box.getAttribute('data-doc-card-mime') || '';
+      if(!id || !mime.startsWith('image/')) return;
+      const doc = D.documentsForCompany(companyId).find(d=> d.id === id);
+      if(!doc) return;
+      getDocUrl(doc).then(url=>{
+        if(url) box.innerHTML = `<img src="${esc(url)}" alt="" />`;
+      }).catch(()=>{
+        box.innerHTML = `<div class="doc-card-file-icon">${esc((mime.split('/').pop()||'FILE').toUpperCase())}</div>`;
+      });
+    });
+  }
+  function renderCustomerCardDocChecklist(companyId){
+    const wrap = document.getElementById('cdashDocChecklist');
+    if(!wrap) return;
+    wrap.innerHTML = customerCardDocChecklistHtml(companyId);
+    bindAgreementDocChecklistHandlers(companyId, {
+      containerId: 'cdashDocChecklist',
+      renderHtml: customerCardDocChecklistHtml,
+      afterRefresh: ()=> bindCustomerCardDocExtras(companyId, 'cdashDocChecklist')
+    });
+    bindCustomerCardDocExtras(companyId, 'cdashDocChecklist');
+  }
+  // openDocPreviewModal: 이미지=팝업 안 확대, PDF=iframe 미리보기, 그 외=다운로드
+  // 안내(§요청 "미리보기 미지원 형식은 다운로드로 안내"). 기존 코드 어디에도 파일
+  // 미리보기 기능이 없어(§조사 결과) 새로 만들었다 — 고객카드 팝업 위에 별도 레이어로
+  // 뜨므로 닫아도 고객카드와 선택했던 탭은 그대로 유지된다(§요청).
+  function closeDocPreviewModal(){
+    const root = document.getElementById('docPreviewModalRoot');
+    if(root) root.innerHTML = '';
+    document.removeEventListener('keydown', docPreviewEscHandler);
+  }
+  function docPreviewEscHandler(e){ if(e.key === 'Escape') closeDocPreviewModal(); }
+  function openDocPreviewModal(doc){
+    let root = document.getElementById('docPreviewModalRoot');
+    if(!root){ root = document.createElement('div'); root.id = 'docPreviewModalRoot'; document.body.appendChild(root); }
+    const fileName = doc.fileName || doc.originalFileName || '파일';
+    root.innerHTML = `
+      <div class="pi-overlay doc-preview-overlay" id="docPreviewOverlay" style="z-index:10020;">
+        <div class="pi-panel doc-preview-panel" role="dialog" aria-modal="true" aria-label="${esc(fileName)} 미리보기">
+          <div class="pi-head">
+            <div class="pi-title">${esc(fileName)}</div>
+            <button type="button" class="chart-close-btn" id="docPreviewCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body doc-preview-body" id="docPreviewBody">
+            <div class="doc-preview-loading">불러오는 중…</div>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('docPreviewCloseBtn').addEventListener('click', closeDocPreviewModal);
+    document.getElementById('docPreviewOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'docPreviewOverlay') closeDocPreviewModal(); });
+    document.addEventListener('keydown', docPreviewEscHandler);
+    const isImage = (doc.mimeType||'').startsWith('image/');
+    const isPdf = (doc.mimeType||'') === 'application/pdf';
+    getDocUrl(doc).then(url=>{
+      const body = document.getElementById('docPreviewBody');
+      if(!body || !url) return;
+      if(isImage) body.innerHTML = `<img src="${esc(url)}" class="doc-preview-img" alt="" />`;
+      else if(isPdf) body.innerHTML = `<iframe src="${esc(url)}" class="doc-preview-iframe" title="PDF 미리보기"></iframe>`;
+      else body.innerHTML = `<div class="doc-preview-fallback">이 형식은 미리보기를 지원하지 않습니다.<br/><a href="${esc(url)}" target="_blank" rel="noopener" download="${esc(fileName)}">다운로드해서 확인</a></div>`;
+    }).catch(()=>{
+      const body = document.getElementById('docPreviewBody');
+      if(body) body.innerHTML = `<div class="doc-preview-fallback">파일을 불러오지 못했습니다(로그인 상태를 확인해주세요).</div>`;
+    });
   }
 
   function closeAgreementPopup(){
@@ -15125,6 +15421,105 @@ window.SHIN2_CRM_APP_INIT = function(){
         // 반영되던 문제를 반복하지 않는다).
         renderList();
         if(currentCompanyId && cardView.style.display === 'block') refreshChart();
+      }, 0);
+    });
+  }
+
+  /* ==========================================================================
+     §고객관리 목록 출력(PDF) 후속 — "공개범위 가져오기" 모달. 위 협력업체 동기화
+     모달과 완전히 같은 단계 구조(loading→preview→applying→result)를 그대로 따른다.
+     여기서 만지는 값은 오직 co.distributionLists(contractor/external 태그)뿐 —
+     연락처/진행상황/신규 업체 생성은 전혀 건드리지 않는다(§ 위 previewPartnerListSync와
+     역할이 겹치지 않음).
+     ========================================================================== */
+  let distListSyncState = { step: 'idle', preview: null, result: null, error: null };
+  function closeDistListSyncModal(){
+    const root = document.getElementById('distListSyncModalRoot');
+    if(root) root.innerHTML = '';
+    distListSyncState = { step: 'idle', preview: null, result: null, error: null };
+  }
+  async function openDistListSyncModal(){
+    distListSyncState = { step: 'loading', preview: null, result: null, error: null };
+    renderDistListSyncModal();
+    try{
+      const preview = await D.previewDistributionListSync();
+      distListSyncState = { step: 'preview', preview, result: null, error: null };
+    }catch(e){
+      distListSyncState = { step: 'error', preview: null, result: null, error: String((e && e.message) || e) };
+    }
+    renderDistListSyncModal();
+  }
+  function renderDistListSyncModal(){
+    const root = document.getElementById('distListSyncModalRoot');
+    if(!root) return;
+    const s = distListSyncState;
+    let bodyHtml, actionsHtml;
+    if(s.step === 'loading'){
+      bodyHtml = `<div class="pi-note">partner-dashboard 협력업체 리스트(시공사·외부 발송용 구분)를 가져오는 중입니다...</div>`;
+      actionsHtml = `<button type="button" class="co-text-action" id="dlsCancelBtn">취소</button>`;
+    } else if(s.step === 'error'){
+      bodyHtml = `<div class="pi-note">가져오기에 실패했습니다.<br/><span style="color:#B91C1C;">${esc(s.error)}</span></div>`;
+      actionsHtml = `<button type="button" class="co-text-action primary" id="dlsCloseBtn">닫기</button>`;
+    } else if(s.step === 'preview'){
+      const c = s.preview.counts;
+      bodyHtml = `
+        <div class="cat-dist-total">${s.preview.usedOverrides ? 'partner-dashboard 협력업체 리스트(실시간 편집분 포함) 확인됨' : '협력업체 리스트 기본 데이터만 확인됨(실시간 편집분을 가져오지 못했을 수 있습니다)'}</div>
+        <table class="pi-sample-table"><tbody>
+          <tr><td>시공사 발송용 원본 건수</td><td>${esc(c.contractorTotal)}개</td></tr>
+          <tr><td>외부 발송용 원본 건수</td><td>${esc(c.externalTotal)}개</td></tr>
+          <tr><td>CRM에서 찾은 업체</td><td>${esc(c.matchedCompanies)}개</td></tr>
+          <tr><td>공개범위가 새로 추가될 업체</td><td>${esc(c.updates)}개</td></tr>
+          <tr><td>매칭 안 됨(자동 반영 안 함)</td><td>${esc(c.review)}개</td></tr>
+        </table>
+        <div class="mail-settings-help" style="margin-top:8px;">이미 매칭된 업체의 "시공사 발송용"/"외부 발송용" 체크만 추가로 켭니다 — 이미 켜져 있는 값을 끄지 않고, 내부용·고객정보·업무 진행기록·메일 발송기록·첨부서류는 전혀 건드리지 않습니다.</div>
+        ${s.preview.updates.length ? `<button type="button" class="co-text-action" id="dlsListToggle" style="margin-top:10px;">${s.listOpen ? '▼' : '▶'} 추가될 업체 목록 보기(${esc(s.preview.updates.length)}개)</button>` : ''}
+        ${s.listOpen && s.preview.updates.length ? `<div class="pi-note" style="margin-top:6px;max-height:180px;overflow-y:auto;">${s.preview.updates.map(u=> esc(u.co.name) + ' → ' + u.addedCategories.map(c=> c==='contractor'?'시공사 발송용':'외부 발송용').join(', ')).join('<br/>')}</div>` : ''}
+        ${s.preview.review.length ? `<button type="button" class="co-text-action" id="dlsReviewToggle" style="margin-top:8px;">${s.reviewOpen ? '▼' : '▶'} 매칭 안 된 목록 보기(${esc(s.preview.review.length)}개)</button>` : ''}
+        ${s.reviewOpen && s.preview.review.length ? `<div class="pi-note" style="margin-top:6px;max-height:180px;overflow-y:auto;color:#B45309;">${s.preview.review.slice(0,50).map(r=> esc(r.companyName) + '(' + (r.category==='contractor'?'시공사':'외부') + ' · ' + esc(r.reason) + ')').join('<br/>')}${s.preview.review.length>50 ? '<br/>...외 ' + (s.preview.review.length-50) + '건' : ''}</div>` : ''}
+      `;
+      actionsHtml = s.preview.updates.length
+        ? `<button type="button" class="co-text-action" id="dlsCancelBtn">취소</button><button type="button" class="co-text-action primary" id="dlsApplyBtn">적용(${esc(s.preview.updates.length)}개)</button>`
+        : `<button type="button" class="co-text-action primary" id="dlsCloseBtn">닫기(새로 추가할 업체 없음)</button>`;
+    } else if(s.step === 'applying'){
+      bodyHtml = `<div class="pi-note">적용 중...</div>`;
+      actionsHtml = `<button type="button" class="co-text-action" disabled>적용 중...</button>`;
+    } else if(s.step === 'result'){
+      const r = s.result;
+      bodyHtml = `<div class="cat-dist-total">공개범위 가져오기 완료 — ${esc(r.updatedCount)}개 업체에 반영했습니다.</div>
+        <div class="mail-settings-help" style="margin-top:8px;">고객관리 목록의 "목록 출력"에서 시공사 발송용/외부 발송용을 다시 확인해 주세요.</div>`;
+      actionsHtml = `<button type="button" class="co-text-action primary" id="dlsCloseBtn">닫기</button>`;
+    }
+    root.innerHTML = `
+      <div class="pi-overlay" id="dlsOverlay">
+        <div class="pi-panel" role="dialog" aria-modal="true" aria-label="공개범위 가져오기">
+          <div class="pi-head">
+            <div class="pi-title">공개범위 가져오기(시공사·외부 발송용)</div>
+            <button type="button" class="chart-close-btn" id="dlsHeadCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body">${bodyHtml}</div>
+          <div class="pi-actions">${actionsHtml}</div>
+        </div>
+      </div>
+    `;
+    document.getElementById('dlsHeadCloseBtn').addEventListener('click', closeDistListSyncModal);
+    const cancelBtn = document.getElementById('dlsCancelBtn');
+    if(cancelBtn) cancelBtn.addEventListener('click', closeDistListSyncModal);
+    const closeBtn = document.getElementById('dlsCloseBtn');
+    if(closeBtn) closeBtn.addEventListener('click', closeDistListSyncModal);
+    const overlay = document.getElementById('dlsOverlay');
+    if(overlay) overlay.addEventListener('click', (e)=>{ if(e.target.id === 'dlsOverlay') closeDistListSyncModal(); });
+    const listToggle = document.getElementById('dlsListToggle');
+    if(listToggle) listToggle.addEventListener('click', ()=>{ distListSyncState.listOpen = !s.listOpen; renderDistListSyncModal(); });
+    const reviewToggle = document.getElementById('dlsReviewToggle');
+    if(reviewToggle) reviewToggle.addEventListener('click', ()=>{ distListSyncState.reviewOpen = !s.reviewOpen; renderDistListSyncModal(); });
+    const applyBtn = document.getElementById('dlsApplyBtn');
+    if(applyBtn) applyBtn.addEventListener('click', ()=>{
+      distListSyncState.step = 'applying';
+      renderDistListSyncModal();
+      setTimeout(()=>{
+        const result = D.applyDistributionListSync(distListSyncState.preview);
+        distListSyncState = { step: 'result', preview: distListSyncState.preview, result, error: null };
+        renderDistListSyncModal();
       }, 0);
     });
   }
@@ -17751,7 +18146,15 @@ window.SHIN2_CRM_APP_INIT = function(){
           ${list.map(d=> `<span class="cdash-doc-status-chip${d.count ? ' is-on' : ''}">${esc(d.label)} ${esc(d.statusText)}</span>`).join('')}
         </div>
         ${mouMismatch ? `<div class="cdash-doc-status-note">MOU 체결서 미등록 (진행상태는 협약 완료로 표시됨)</div>` : ''}
-        <div class="chart-section-title" style="margin-top:12px;">서류</div>
+        <!-- §고객관리 사진·서류 통합 라운드(신규) — 업무관리 협약 진행관리 팝업과 같은
+             체크리스트(명함/사업자등록증/통장사본/회사 로고/체결서/기본물품공급서 6종)를
+             카드+썸네일 형태로 여기 추가한다. 아래 기존 "서류"(질문서 포함 7종 드래그앤드롭
+             업로드)는 하나도 안 바꾸고 그대로 둔다(§ "기존 등록·수정 흐름은 유지") — 두 UI가
+             같은 D.documentsForCompany/addDocument를 읽고 쓰므로 어느 쪽에서 등록해도 즉시
+             서로 반영된다. -->
+        <div class="chart-section-title" style="margin-top:12px;">서류 체크리스트</div>
+        <div id="cdashDocChecklist"></div>
+        <div class="chart-section-title" style="margin-top:12px;">서류(전체, 질문서 포함)</div>
         <div id="chartDocCounts"></div>
         <div id="crmDocsSection"></div>
       </div>
@@ -17760,6 +18163,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       cardState.accordionOpen.docs = !open;
       refreshChart();
     });
+    if(open) renderCustomerCardDocChecklist(co.id);
   }
 
   // ---- [미팅 기록] 버튼 패널(§14) — 이 업체와 연결된 캘린더 일정 전체(예정+지난 일정 모두,
@@ -21601,6 +22005,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   // §협력업체 동기화 단순화 라운드(§요청 2) — 데이터 업데이트 메뉴에 보이는 유일한 버튼.
   document.getElementById('crmPartnerListSyncBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openPartnerListSyncModal(); });
   document.getElementById('crmAffiliateReviewBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openAffiliateReviewModal(); });
+  document.getElementById('crmDistListSyncBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openDistListSyncModal(); });
   function closeUpdateMenu(){ document.getElementById('crmUpdateMenu').classList.remove('is-open'); }
   document.getElementById('crmDataUpdateBtn').addEventListener('click', (e)=>{
     e.stopPropagation();
