@@ -2491,6 +2491,44 @@ body.map-modal-lock{ overflow:hidden; }
 .mail-asset-progress{ font-size:11.5px; color:var(--navy); margin-top:6px; }
 .mail-asset-status{ font-size:11.5px; color:var(--text-muted); margin-top:4px; }
 .mail-asset-status.is-err{ color:#B3261E; }
+/* §메일 설정 첨부파일 업로드 인증 연결 라운드(신규) */
+.mail-asset-authgate{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:11.5px; padding:7px 9px; border-radius:6px; margin-bottom:6px; }
+.mail-asset-authgate.is-checking{ background:var(--bg); color:var(--text-muted); }
+.mail-asset-authgate.is-blocked{ background:#FDECEC; color:#B3261E; }
+.mail-asset-authgate .mail-relogin-pw{ font-size:12px; padding:3px 6px; }
+.mail-asset-authgate .mail-relogin-msg{ color:#B3261E; }
+.mail-asset-dropzone.is-locked, [data-mail-global-img-drop].is-locked{ opacity:.55; cursor:not-allowed; }
+[data-mail-body-img-add].is-locked{ opacity:.5; cursor:not-allowed; }
+/* §고객관리 목록 출력(PDF) 라운드(신규) — 목록 공개 범위 체크박스 */
+.dist-list-row{ display:flex; flex-wrap:wrap; gap:12px; }
+.dist-list-check{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--text); font-weight:400; }
+.dist-list-check input{ width:auto; }
+.dist-list-warn{ font-size:11.5px; color:#B3261E; margin-top:6px; }
+/* §고객관리 목록 출력(PDF) 라운드(신규) */
+.pdf-export-panel{ max-width:980px; width:96vw; }
+.pdf-export-body{ display:flex; gap:22px; align-items:flex-start; }
+.pdf-export-left{ flex:0 0 320px; min-width:260px; }
+.pdf-export-right{ flex:1 1 auto; min-width:0; }
+@media (max-width: 860px){
+  .pdf-export-body{ flex-direction:column; }
+  .pdf-export-left{ flex:none; width:100%; }
+}
+.pdf-type-row{ display:flex; flex-direction:column; gap:8px; }
+.pdf-type-card{ text-align:left; border:1.5px solid var(--line); border-radius:8px; padding:9px 11px; background:#fff; cursor:pointer; }
+.pdf-type-card.is-active{ border-color:var(--navy); background:var(--bg); box-shadow:inset 0 0 0 1px var(--navy); }
+.pdf-type-card:focus-visible{ outline:2px solid var(--navy); outline-offset:1px; }
+.pdf-type-name{ font-size:13px; font-weight:700; color:var(--text); }
+.pdf-type-desc{ font-size:11.5px; color:var(--text-muted); margin-top:2px; }
+.pdf-export-count{ font-size:12.5px; color:var(--text); margin:8px 0; }
+.pdf-export-actions{ display:flex; gap:8px; margin-bottom:10px; }
+.pdf-preview-wrap{ border:1px solid var(--line); border-radius:8px; padding:12px; max-height:56vh; overflow:auto; background:#fff; }
+.pdf-preview-note{ font-size:11px; color:var(--text-muted); margin-bottom:8px; }
+.pdf-doc-title{ font-size:15px; font-weight:700; color:var(--navy); margin-bottom:4px; }
+.pdf-doc-meta{ display:flex; gap:12px; flex-wrap:wrap; font-size:11px; color:var(--text-muted); margin-bottom:8px; }
+table.pdf-doc-table{ width:100%; border-collapse:collapse; font-size:11px; }
+table.pdf-doc-table th, table.pdf-doc-table td{ border:1px solid var(--line); padding:4px 6px; text-align:left; word-break:break-all; vertical-align:top; }
+table.pdf-doc-table thead{ background:var(--bg); }
+.pdf-doc-empty{ text-align:center; color:var(--text-muted); }
 .mail-tpl-preview-row{ display:flex; align-items:center; gap:10px; margin:6px 0; flex-wrap:wrap; }
 .mail-tpl-preview-row .co-text-action{ white-space:nowrap; }
 .mail-preview-box{ background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:10px; }
@@ -2724,6 +2762,13 @@ body.map-modal-lock{ overflow:hidden; }
 .stage-history-item{ font-size:12px; border-bottom:1px solid var(--line); padding-bottom:8px; }
 .stage-history-item:last-child{ border-bottom:none; }
 .stage-history-meta{ color:var(--text-muted); font-size:11px; margin-bottom:2px; }
+/* §계열사 관계 후보 검토 라운드(신규) */
+.affiliate-review-table{ width:100%; border-collapse:collapse; font-size:12px; min-width:820px; }
+.affiliate-review-table th{ text-align:left; padding:6px 8px; border-bottom:2px solid var(--line); color:var(--text-muted); font-weight:700; white-space:nowrap; }
+.affiliate-review-table td{ padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+.affiliate-group-badge{ font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:9px; background:var(--bg); color:var(--text-muted); white-space:nowrap; }
+.affiliate-note-cell{ color:var(--text-muted); font-size:11.5px; max-width:260px; }
+.affiliate-decision-select{ font-size:12px; }
 .agr-next-action{ font-size:13px; font-weight:700; color:var(--navy); background:var(--bg); border-radius:6px; padding:8px 10px; margin-bottom:10px; }
 .agr-stage-btn-row{ display:flex; flex-wrap:wrap; gap:6px; }
 .agr-recent-list{ display:flex; flex-direction:column; gap:4px; margin-top:6px; }
@@ -2847,6 +2892,10 @@ body.map-modal-lock{ overflow:hidden; }
                  가져온다. 신규 MOU 파이프라인(질문서/미팅/체결 진행 상태, mouOverrides/
                  newMouAdds)은 이 버튼에서 전혀 fetch하지 않는다(§요청 4). -->
             <button type="button" id="crmPartnerListSyncBtn">협력업체 동기화</button>
+            <!-- §계열사 관계 후보 검토 라운드(신규) — 실제 관계는 여기서 자동 저장하지 않고,
+                 후보만 뽑아 보여준 뒤 사람이 한 건씩(또는 여러 건 일괄) 확인해야만
+                 기존 addCompanyRelation/removeCompanyRelation으로 저장된다. -->
+            <button type="button" id="crmAffiliateReviewBtn">계열사 관계 후보 검토</button>
           </div>
         </div>
         <!-- §전화 요청 기록 라운드(신규) — "+ 고객 등록"과 같은 줄에 배치. 처음엔 작은
@@ -2908,6 +2957,10 @@ body.map-modal-lock{ overflow:hidden; }
         <option value="trend">최근 흐름순</option>
         <option value="name">업체명순</option>
       </select>
+      <!-- §고객관리 목록 출력(PDF) 라운드(신규) — 내부용/시공사 발송용/외부 발송용 3종
+           출력. 클릭 시 열리는 모달 안에서 유형·지역·검색을 다시 선택한 뒤에만 실제
+           출력 대상이 정해진다(§요청 "화면 필터와 출력 필터를 혼동하지 않게"). -->
+      <button type="button" class="co-text-action" id="crmPdfExportBtn">목록 출력</button>
     </div>
     <!-- §최근 실적 독립 컬럼 복원 라운드: "최근 시공"을 업체명 옆에 붙이던 걸 취소하고
          독립 컬럼(라벨은 "최근 실적"으로 변경)으로 되돌렸다(§1/§2/§3) — 협력사 컬럼에는
@@ -2980,9 +3033,17 @@ body.map-modal-lock{ overflow:hidden; }
   <!-- §협력사 동기화 라운드: partner-dashboard 동기화 미리보기/결과 중앙 모달 전용 root. -->
   <div id="partnerSyncModalRoot"></div>
   <div id="syncDiagModalRoot"></div>
+  <!-- §계열사 관계 후보 검토 라운드(신규) — 후보 분석/검토 전용 모달 root, 같은
+       .pi-overlay/.pi-panel 패턴. 이 화면은 사람이 "확인"하기 전까지 어떤 고객 데이터도
+       바꾸지 않는다. -->
+  <div id="affiliateReviewModalRoot"></div>
   <!-- §협력업체 동기화 단순화 라운드: 새 "협력업체 동기화" 버튼 전용 모달 root(위
        partnerSyncModalRoot와 별개 — 기존 기능을 안 건드리기 위해 새로 만들었다). -->
   <div id="partnerListSyncModalRoot"></div>
+  <!-- §고객관리 목록 출력(PDF) 라운드(신규) — 출력 유형/지역/미리보기 전용 모달 root.
+       이 화면은 브라우저 인쇄(window.print)로만 PDF를 만든다 — 외부 API 전송, Firebase
+       업로드, 실제 발송 기능이 전혀 없다. -->
+  <div id="pdfExportModalRoot"></div>
   <div id="sideDrawerRoot"></div>
   <div id="memoPanelRoot"></div>
   <!-- §총 매출 Popover 전환 라운드: 전용 root — sideDrawerRoot(전체 높이 오른쪽 패널,
@@ -3493,6 +3554,30 @@ window.SHIN2_CRM_OCR = (function(){
   }
   gateEnterBtn.addEventListener('click', handleGateEnter);
   gatePasswordInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') handleGateEnter(); });
+
+  // §메일 설정 첨부파일 업로드 인증 연결 라운드(신규) — 이미 CRM_SESSION_KEY로 게이트를
+  // 통과한 재방문(위 handleGateEnter를 건너뜀)에서는 'shin2-crm-unlocked'가 다시 발생하지
+  // 않아 Firebase 로그인 시도 자체가 한 번도 안 될 수 있다(Firebase Auth의 자체 로컬
+  // 지속성이 이 기기/브라우저 설정에서 살아있지 않은 경우 — 게이트는 통과했는데
+  // window.SHIN2_STORAGE.isSignedIn()이 계속 false로 남는 실제 원인). 비밀번호는 애초에
+  // 저장하지 않으므로 자동 재로그인은 불가능하다 — 대신 화면에서 다시 입력받아 같은
+  // 검증(PBKDF2+AES-GCM check)을 거친 뒤에만 'shin2-crm-unlocked'를 다시 쏴서 Firebase
+  // 로그인을 재시도하게 한다. 임시/공용 uid로 우회하지 않고 반드시 이 비밀번호 검증을
+  // 통과해야만 로그인 이벤트가 나간다.
+  window.SHIN2_CRM_TRY_REAUTH = async function(pw){
+    if(!pw) return { ok:false, reason:'비밀번호를 입력해주세요.' };
+    const current = loadVaultRaw();
+    if(!current) return { ok:false, reason:'이 기기에 계정함이 없습니다.' };
+    try{
+      const saltBytes = new Uint8Array(bufFromB64(current.salt));
+      const rawBytes = await deriveRawKeyBytes(pw, saltBytes);
+      const key = await importAesKey(rawBytes);
+      const ok = (await decryptStr(key, current.check.cipher, current.check.iv)) === CHECK_PLAINTEXT;
+      if(!ok) return { ok:false, reason:'비밀번호가 올바르지 않습니다.' };
+    }catch(e){ return { ok:false, reason:'비밀번호가 올바르지 않습니다.' }; }
+    window.dispatchEvent(new CustomEvent('shin2-crm-unlocked', { detail: { password: pw } }));
+    return { ok:true };
+  };
 })();
 </script>
 
@@ -4238,6 +4323,20 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     applyPatchToRecord(rec, patch, !!(opts && opts.onlyFillEmpty));
     saveCompanies(list);
     return rec;
+  }
+  // §고객관리 목록 출력(PDF) 라운드(신규) — "시공사발송용·외부발송용 함께 표시"
+  // 체크박스(§협력업체 리스트 추가폼 이관 라운드)가 이미 co.distributionLists = ['contractor','external']
+  // 형태로 저장하고 있던 실제 필드를 그대로 재사용한다(새 필드 includeInInternalList/
+  // includeInContractorList/includeInExternalList를 따로 만들지 않음). 내부용은 이 배열에
+  // 아무 태그가 없어도(과거 등록된 366건 전부 포함) 기본적으로 포함되는 쪽으로 두되
+  // ("기존 고객은 내부용에만 자동 포함" 요청), 특정 업체를 내부용 목록에서도 완전히 빼고
+  // 싶은 드문 경우를 위해 'excludeInternal' 태그 하나만 같은 배열 안에서 추가로 허용한다
+  // (새 필드가 아니라 기존 배열이 받는 값 하나를 더 정의한 것).
+  const DISTRIBUTION_LIST_TYPES = ['internal', 'contractor', 'external'];
+  function isInDistributionList(co, kind){
+    const tags = Array.isArray(co && co.distributionLists) ? co.distributionLists : [];
+    if(kind === 'internal') return !tags.includes('excludeInternal');
+    return tags.includes(kind);
   }
 
   // ---- customerActivities ----
@@ -6544,7 +6643,8 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     // 본문은 전혀 안 바꿨다 — previewPartnerSync/applyPartnerSync가 이미 내부적으로 쓰던
     // 그 함수들 그대로.
     pdFetchBaselineData, pdFetchOverrides, pdBuildEffectiveRows, pdBuildContactIndex, pdMatchCompany, pdUnescapeKey,
-    loadCompetitorMethodDict, addCompetitorMethodEntry
+    loadCompetitorMethodDict, addCompetitorMethodEntry,
+    DISTRIBUTION_LIST_TYPES, isInDistributionList
   };
 })();
 </script>
@@ -8364,7 +8464,15 @@ window.SHIN2_CRM_APP_INIT = function(){
     `;
     document.getElementById('cdashFooterDocsBtn').addEventListener('click', ()=>{
       cardState.accordionOpen.docs = true;
+      // §Firebase 인증 사용자 미생성 원인 조사 라운드(신규) — 기존 버그 발견: renderDocCounts
+      // → renderDocStatusBlock이 #cdashDocStatusBlock 안(서류 업로드 UI 컨테이너
+      // #crmDocsSection의 부모)을 통째로 새로 그리면서 그 안의 #crmDocsSection을 빈
+      // placeholder로 덮어쓰는데, 그 뒤를 채우는 renderDocsSection(co)는 호출되지 않아
+      // 첫 클릭에서는 "공용으로 업로드" 버튼/파일 목록이 안 보이고 아코디언을 다시 열어야만
+      // (refreshChart가 renderDocsSection을 다시 부르므로) 보였다 — renderDocCounts 뒤에
+      // renderDocsSection(co)를 다시 불러 첫 클릭에서도 바로 채워지게 고쳤다.
       renderDocCounts(co);
+      renderDocsSection(co);
       openHeaderSection('docs');
     });
     document.getElementById('cdashFooterMemoBtn').addEventListener('click', ()=>{
@@ -10475,6 +10583,97 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 다른 탭을 눌렀을 때 "저장/변경 취소/계속 편집" 확인 전까지 보류 중인 목적지 키.
   let mailSettingsUI = { activeTab: 'questionnaire', accountOpen: false, dirty:{}, pendingTab:null };
   function mailAssetSizeLabel(bytes){ return fmtFileSize ? fmtFileSize(bytes) : (Math.round((bytes||0)/1024)) + 'KB'; }
+  // §메일 설정 첨부파일 업로드 인증 연결 라운드(신규) — 서류함 업로드가 쓰는 것과 동일한
+  // window.SHIN2_STORAGE(Firebase Auth/Storage 단일 인스턴스, §3514 module 블록 참고)를
+  // 그대로 재사용한다(새 Firebase 앱을 만들지 않음). 이 블록이 하는 일은 오직 "로그인 확인이
+  // 끝나기 전/로그인 안 된 상태"에서 업로드 버튼·파일선택창이 눌리지 않게 화면을 잠그는
+  // 것뿐 — uid 없이 D.uploadMailAssetFile을 호출하는 경로 자체를 아예 막는다.
+  let mailAuthGateReadyEverFired = false;
+  function mailAssetAuthState(){
+    const cfg = window.FIREBASE_CONFIG;
+    if(!cfg || !cfg.projectId || cfg.projectId === 'YOUR_PROJECT_ID') return 'unavailable';
+    if(!mailAuthGateReadyEverFired) return 'checking';
+    const ST = window.SHIN2_STORAGE;
+    return (ST && ST.isSignedIn && ST.isSignedIn()) ? 'ready' : 'signed-out';
+  }
+  function mailAssetAuthNoticeHtml(){
+    const st = mailAssetAuthState();
+    if(st === 'ready') return '';
+    if(st === 'checking') return `<div class="mail-asset-authgate is-checking">로그인 확인 중…</div>`;
+    if(st === 'unavailable') return `<div class="mail-asset-authgate is-blocked">클라우드 저장 기능을 사용할 수 없습니다(Firebase 설정 없음) — 이 화면에서는 파일을 등록할 수 없습니다.</div>`;
+    return `<div class="mail-asset-authgate is-blocked" data-mail-authgate-idle>
+      <span>파일을 등록하려면 먼저 로그인해주세요.</span>
+      <button type="button" class="co-text-action" data-mail-asset-relogin>로그인</button>
+    </div>`;
+  }
+  // 잠금 표시/해제만 다시 그린다 — 탭 전체를 다시 그리면(mailTabPanelHtml 재생성) 사용자가
+  // 입력 중이던 제목·본문이 날아갈 수 있어(§기존 dirty 보호와 충돌), authgate 부분과
+  // dropzone의 잠금 상태만 targeted하게 갱신한다.
+  function applyMailAssetAuthGateDom(){
+    const noticeHtml = mailAssetAuthNoticeHtml();
+    const locked = mailAssetAuthState() !== 'ready';
+    document.querySelectorAll('[data-mail-authgate]').forEach(el=>{
+      el.innerHTML = noticeHtml;
+      el.style.display = noticeHtml ? 'block' : 'none';
+    });
+    document.querySelectorAll('.mail-asset-dropzone, [data-mail-global-img-drop], [data-mail-body-img-add]').forEach(dz=>{
+      dz.classList.toggle('is-locked', locked);
+      dz.setAttribute('aria-disabled', locked ? 'true' : 'false');
+    });
+  }
+  window.addEventListener('shin2-crm-firebase-ready', ()=>{ mailAuthGateReadyEverFired = true; applyMailAssetAuthGateDom(); });
+  // 파일선택창을 열기 직전에 호출 — 로그인 확인 전/미로그인 상태면 창을 열지 않고 안내만
+  // 남긴 뒤 true(막혔음)를 반환한다. statusElId가 있으면 그 자리에, 없으면 아무 데도
+  // 안 남기고 화면의 authgate 안내만 다시 그린다.
+  function mailAssetBlockIfLocked(statusElId){
+    const st = mailAssetAuthState();
+    if(st === 'ready') return false;
+    applyMailAssetAuthGateDom();
+    const msg = st === 'checking' ? '로그인 확인 중입니다 — 잠시 후 다시 시도해주세요.'
+      : st === 'unavailable' ? '클라우드 저장 기능을 사용할 수 없습니다(Firebase 설정 없음).'
+      : '파일을 등록하려면 먼저 로그인해주세요.';
+    if(statusElId){
+      const el = document.getElementById(statusElId);
+      if(el){ el.textContent = msg; el.classList.add('is-err'); }
+    }
+    return true;
+  }
+  // 로그인 버튼 위임 클릭 — 인라인으로 사이트 비밀번호를 다시 받아 window.SHIN2_CRM_TRY_REAUTH로
+  // 검증한다(임시/공용 uid로 우회하지 않음, §3417 게이트 스크립트의 실제 검증 로직을 그대로 탐).
+  document.addEventListener('click', (e)=>{
+    const reloginBtn = e.target.closest('[data-mail-asset-relogin]');
+    if(reloginBtn){
+      const holder = reloginBtn.closest('.mail-asset-authgate');
+      if(!holder) return;
+      holder.innerHTML = `
+        <input type="password" class="mail-relogin-pw" placeholder="사이트 비밀번호" autocomplete="current-password" />
+        <button type="button" class="co-text-action" data-mail-relogin-submit>확인</button>
+        <button type="button" class="co-text-action" data-mail-relogin-cancel>취소</button>
+        <span class="mail-relogin-msg"></span>`;
+      const pwInput = holder.querySelector('.mail-relogin-pw');
+      if(pwInput) pwInput.focus();
+      return;
+    }
+    const cancelBtn = e.target.closest('[data-mail-relogin-cancel]');
+    if(cancelBtn){ applyMailAssetAuthGateDom(); return; }
+    const submitBtn = e.target.closest('[data-mail-relogin-submit]');
+    if(submitBtn){
+      const holder = submitBtn.closest('.mail-asset-authgate');
+      const pwInput = holder && holder.querySelector('.mail-relogin-pw');
+      const msgEl = holder && holder.querySelector('.mail-relogin-msg');
+      const pw = pwInput ? pwInput.value : '';
+      if(!window.SHIN2_CRM_TRY_REAUTH){ if(msgEl) msgEl.textContent = '로그인 기능을 사용할 수 없습니다.'; return; }
+      submitBtn.disabled = true;
+      window.SHIN2_CRM_TRY_REAUTH(pw).then(res=>{
+        submitBtn.disabled = false;
+        if(!res.ok){ if(msgEl) msgEl.textContent = res.reason || '로그인 실패'; return; }
+        if(msgEl) msgEl.textContent = '로그인 처리 중…';
+        // 실제 상태 전환은 onAuthStateChanged -> 'shin2-crm-firebase-ready' 이벤트로 온다
+        // (applyMailAssetAuthGateDom이 그때 다시 그림) — 여기서 임의로 ready로 넘기지 않는다.
+      });
+      return;
+    }
+  });
   // 첨부/동영상 각각 "문서·이미지 파일 선택/드래그" 박스 — D.uploadMailAssetFile로
   // 업로드하고 D.saveMailAssetPatch로 메타데이터를 저장한다(팀 공유 Firestore 동기화,
   // §데이터 계층 참고). 실제 이메일 첨부가 아니라 다운로드/시청 "링크"로 보낸다는 점을
@@ -10503,6 +10702,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="mail-asset-box" data-mail-global-img-box>
         <div class="mail-asset-box-head"><span>모든 메일에 자동 포함할 이미지</span></div>
         <div class="mail-asset-limit-text">허용 형식: ${(D.MAIL_ASSET_ALLOWED_EXT.inlineImage||[]).join(', ')} · 최대 ${mailAssetSizeLabel(D.MAIL_ASSET_MAX_CLOUD_BYTES.inlineImage)}</div>
+        <span data-mail-authgate style="display:${mailAssetAuthNoticeHtml() ? 'block' : 'none'};">${mailAssetAuthNoticeHtml()}</span>
         ${fileRow}
         <div class="mail-asset-dropzone" data-mail-global-img-drop tabindex="0" role="button" aria-label="모든 메일에 포함할 이미지 선택 또는 드래그하여 업로드">
           파일을 여기로 끌어다 놓거나 클릭해서 선택
@@ -10537,6 +10737,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="mail-asset-box" data-mail-asset-box="${esc(key)}" data-mail-asset-kind="${assetKind}">
         <div class="mail-asset-box-head"><span>${label} 파일</span>${shareBadge}</div>
         <div class="mail-asset-limit-text">${esc(limitText)}</div>
+        <span data-mail-authgate style="display:${mailAssetAuthNoticeHtml() ? 'block' : 'none'};">${mailAssetAuthNoticeHtml()}</span>
         ${fileRow}
         <div class="mail-asset-dropzone" data-mail-asset-drop="${esc(key)}" data-mail-asset-kind="${assetKind}" tabindex="0" role="button" aria-label="${label} 파일 선택 또는 드래그하여 업로드">
           파일을 여기로 끌어다 놓거나 클릭해서 선택
@@ -10899,12 +11100,13 @@ window.SHIN2_CRM_APP_INIT = function(){
     const input = document.getElementById('mailGlobalImgInput');
     const dropzone = box.querySelector('[data-mail-global-img-drop]');
     if(dropzone && input){
-      dropzone.addEventListener('click', ()=> input.click());
+      dropzone.addEventListener('click', ()=>{ if(mailAssetBlockIfLocked('mailGlobalImgStatus')) return; input.click(); });
       dropzone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropzone.classList.add('drag-over'); });
       dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('drag-over'));
       dropzone.addEventListener('drop', (e)=>{
         e.preventDefault();
         dropzone.classList.remove('drag-over');
+        if(mailAssetBlockIfLocked('mailGlobalImgStatus')) return;
         const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
         mailGlobalImgHandleUpload(file);
       });
@@ -10927,7 +11129,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       });
     });
     const replaceBtn = box.querySelector('[data-mail-global-img-replace]');
-    if(replaceBtn && input) replaceBtn.addEventListener('click', ()=> input.click());
+    if(replaceBtn && input) replaceBtn.addEventListener('click', ()=>{ if(mailAssetBlockIfLocked('mailGlobalImgStatus')) return; input.click(); });
     const removeBtn = box.querySelector('[data-mail-global-img-remove]');
     if(removeBtn) removeBtn.addEventListener('click', ()=>{
       if(!confirm('모든 메일에 자동 포함되던 이미지를 제거하시겠습니까? 이후 발송되는 메일부터는 이미지 없이 나갑니다(이미 보낸 메일에는 영향 없음).')) return;
@@ -11113,6 +11315,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(msg){ msg.style.display = 'inline'; setTimeout(()=>{ msg.style.display = 'none'; }, 1800); }
     });
     bindMailGlobalImgBox();
+    applyMailAssetAuthGateDom();
     const tabsBar = document.getElementById('mailTabsBar');
     if(tabsBar) tabsBar.addEventListener('click', (e)=>{
       const renameBtn = e.target.closest('[data-mail-tab-rename]');
@@ -11188,6 +11391,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       const imgAddBtn = e.target.closest('[data-mail-body-img-add]');
       if(imgAddBtn){
         const key = imgAddBtn.getAttribute('data-mail-body-img-add');
+        if(mailAssetBlockIfLocked('mailBodyImgStatus_' + key)) return;
         const fileInput = document.getElementById('mailBodyImgInput_' + key);
         if(fileInput) fileInput.click();
         return;
@@ -11233,6 +11437,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(dropzone && !e.target.closest('.mail-asset-file-input')){
         const key = dropzone.getAttribute('data-mail-asset-drop');
         const kind = dropzone.getAttribute('data-mail-asset-kind');
+        if(mailAssetBlockIfLocked(`mailAssetStatus_${kind}_${key}`)) return;
         document.getElementById(`mailAssetInput_${kind}_${key}`).click();
         return;
       }
@@ -11253,6 +11458,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(replaceBtn){
         const key = replaceBtn.getAttribute('data-mail-asset-replace');
         const kind = replaceBtn.getAttribute('data-mail-asset-kind');
+        if(mailAssetBlockIfLocked(`mailAssetStatus_${kind}_${key}`)) return;
         document.getElementById(`mailAssetInput_${kind}_${key}`).click();
         return;
       }
@@ -11288,6 +11494,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       dz.classList.remove('drag-over');
       const key = dz.getAttribute('data-mail-asset-drop');
       const kind = dz.getAttribute('data-mail-asset-kind');
+      if(mailAssetBlockIfLocked(`mailAssetStatus_${kind}_${key}`)) return;
       const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
       mailAssetHandleUpload(key, kind, file);
     });
@@ -14328,6 +14535,316 @@ window.SHIN2_CRM_APP_INIT = function(){
      D.previewPartnerSync()/D.applyPartnerSync()(데이터 레이어 쪽 함수, §12 조사 결과에
      따라 작성)를 그대로 호출만 한다 — 여기는 순수 UI다.
      ========================================================================== */
+  /* ==========================================================================
+     §계열사 관계 후보 검토 라운드(신규) — buildAffiliateCandidateReport(위 정의)가
+     읽기만 하는 순수 분석 결과를 보여주고, 사람이 한 건씩(또는 일괄) 확인해야만
+     기존 D.addCompanyRelation/removeCompanyRelation으로 저장한다. 이 화면 자체는
+     열려 있는 동안 고객 데이터를 전혀 바꾸지 않는다(§요청 "저장 전에는 확인 내용만
+     보여주고, 확인 전까지는 바꾸지 마").
+     ========================================================================== */
+  const AFFILIATE_DECISION_LABEL = {
+    parent: '본사로 연결', sub: '자회사로 연결', affiliate: '관계사로 연결',
+    keep: '단순 참고정보로 유지', none: '관계 없음', later: '나중에 확인'
+  };
+  const AFFILIATE_DECISION_TO_RELATION = { parent: '모회사', sub: '자회사', affiliate: '관계사' };
+  let affiliateReviewState = null; // { report, decisions: Map(rowIndex -> decisionKey) }
+  function closeAffiliateReviewModal(){
+    const root = document.getElementById('affiliateReviewModalRoot');
+    if(root) root.innerHTML = '';
+    affiliateReviewState = null;
+  }
+  function affiliateCandidatesToCsv(rows){
+    // §요청 [6] 이메일·전화번호 같은 개인정보는 내보내지 않는다 — 관계 검토에 필요한
+    // 최소 항목만.
+    const header = ['번호','현재 등록 업체','지역','대표자','사업자등록번호','연결 회사명 원문','연결 회사 고객등록 여부','일치한 고객 ID','관계 추정 근거','확인 필요'];
+    const lines = [header];
+    rows.forEach((r, i)=>{
+      const region = (r.company.partnerDashboard && r.company.partnerDashboard.region) || '';
+      lines.push([
+        String(i + 1), r.company.name, region, r.company.repName || '', r.company.bizRegNo || '',
+        r.candidateTextRaw,
+        r.matchType === 'exact' ? '등록됨' : (r.matchType === 'review' ? '동명 여러 건' : '미등록/불확실'),
+        r.matchedCompanyId || '',
+        r.note, '예'
+      ]);
+    });
+    const escCsv = (v)=>{
+      const s = String(v == null ? '' : v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const csv = lines.map(row=> row.map(escCsv).join(',')).join('\r\n');
+    return '﻿' + csv; // UTF-8 BOM — 엑셀에서 한글이 깨지지 않도록
+  }
+  function downloadAffiliateCsv(rows){
+    const csv = affiliateCandidatesToCsv(rows);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    a.href = url; a.download = `계열사_관계후보_${dateStr}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=> URL.revokeObjectURL(url), 1000);
+  }
+  function affiliateRowHtml(r, idx){
+    const decision = affiliateReviewState.decisions.get(idx) || 'later';
+    const canLink = r.matchType === 'exact';
+    const groupLabel = r.matchType === 'exact' ? 'A. 정확 일치' : (r.matchType === 'similar' ? 'B. 유사 후보' : (r.matchType === 'review' ? 'B. 유사 후보(동명 여러 건)' : 'C. 고객목록에 없음'));
+    return `
+      <tr data-affiliate-row="${idx}">
+        <td><input type="checkbox" class="affiliate-row-check" data-affiliate-check="${idx}" /></td>
+        <td>${idx + 1}</td>
+        <td>${esc(r.company.name)}</td>
+        <td>${esc(r.candidateTextRaw)}</td>
+        <td><span class="affiliate-group-badge">${esc(groupLabel)}</span></td>
+        <td class="affiliate-note-cell">${esc(r.note)}</td>
+        <td>
+          <select class="affiliate-decision-select" data-affiliate-decision="${idx}" ${canLink ? '' : 'title="정확히 일치하는 고객이 있어야 본사/자회사/관계사로 연결할 수 있습니다"'}>
+            <option value="parent" ${!canLink?'disabled':''} ${decision==='parent'?'selected':''}>${esc(AFFILIATE_DECISION_LABEL.parent)}</option>
+            <option value="sub" ${!canLink?'disabled':''} ${decision==='sub'?'selected':''}>${esc(AFFILIATE_DECISION_LABEL.sub)}</option>
+            <option value="affiliate" ${!canLink?'disabled':''} ${decision==='affiliate'?'selected':''}>${esc(AFFILIATE_DECISION_LABEL.affiliate)}</option>
+            <option value="keep" ${decision==='keep'?'selected':''}>${esc(AFFILIATE_DECISION_LABEL.keep)}</option>
+            <option value="none" ${decision==='none'?'selected':''}>${esc(AFFILIATE_DECISION_LABEL.none)}</option>
+            <option value="later" ${decision==='later'?'selected':''}>${esc(AFFILIATE_DECISION_LABEL.later)}</option>
+          </select>
+        </td>
+      </tr>`;
+  }
+  function renderAffiliateReviewModal(){
+    const root = document.getElementById('affiliateReviewModalRoot');
+    if(!root || !affiliateReviewState) return;
+    const { report } = affiliateReviewState;
+    const s = report.summary;
+    root.innerHTML = `
+      <div class="pi-overlay" id="affiliateReviewOverlay" style="z-index:10010;">
+        <div class="pi-panel" style="max-width:980px; width:96vw;" role="dialog" aria-modal="true" aria-label="계열사 관계 후보 검토">
+          <div class="pi-head">
+            <div class="pi-title">계열사 관계 후보 검토</div>
+            <button type="button" class="chart-close-btn" id="affiliateReviewCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body" style="max-height:72vh; overflow-y:auto;">
+            <div class="mail-settings-help">
+              <b>partnerDashboard.note</b>(파트너 대시보드에서 가져온 비고 필드 — 원래 용도가 "이전 상호명"으로
+              고정돼 있지 않고 자유 텍스트입니다)에 적힌 다른 회사명을 기존 고객 목록과 대조한 결과입니다.
+              여기서 어떤 항목도 자동으로 저장되지 않습니다 — 아래에서 방향을 고른 뒤 [선택 항목 저장]을
+              눌러야만 실제로 연결됩니다.
+            </div>
+            <div class="stage-edit-impact">
+              <b>요약</b>
+              <ul>
+                <li>회사명이 기재된 항목 수: ${s.totalRows}건 (업체 ${s.companiesWithAny}곳)</li>
+                <li>고유한 연결 회사명 수: ${s.uniqueCandidateTexts}건</li>
+                <li>정확 일치: ${s.exactCount}건 · 유사 후보만: ${s.similarOnlyCount}건 · 동명 여러 건(확인 필요): ${s.reviewCount}건 · 고객목록에 없음: ${s.notFoundCount}건</li>
+                <li>중복 기재된 연결 회사명: ${s.duplicateCandidateTexts.length ? esc(s.duplicateCandidateTexts.join(', ')) : '없음'}</li>
+                <li>한 업체에 여러 회사가 기재된 사례: ${s.multipleCandidateCompanies.length ? esc(s.multipleCandidateCompanies.join(', ')) : '없음'}</li>
+                <li>서로 상대방을 기재한 양방향 사례: ${s.bidirectional.length ? esc(s.bidirectional.join(', ')) : '없음'}</li>
+              </ul>
+            </div>
+            ${report.rows.length ? `
+              <div style="display:flex; gap:8px; align-items:center; margin:8px 0;">
+                <button type="button" class="co-text-action" id="affiliateSelectAllBtn">전체 선택</button>
+                <select id="affiliateBulkDecision">
+                  ${Object.keys(AFFILIATE_DECISION_LABEL).map(k=> `<option value="${k}">${esc(AFFILIATE_DECISION_LABEL[k])}</option>`).join('')}
+                </select>
+                <button type="button" class="co-text-action" id="affiliateBulkApplyBtn">선택 항목에 일괄 적용</button>
+                <span style="flex:1;"></span>
+                <button type="button" class="co-text-action" id="affiliateExportCsvBtn">CSV로 내보내기</button>
+              </div>
+              <div style="overflow-x:auto;">
+                <table class="affiliate-review-table">
+                  <thead><tr><th></th><th>#</th><th>현재 등록 업체</th><th>연결 회사명 원문</th><th>분류</th><th>관계 추정 근거</th><th>결정</th></tr></thead>
+                  <tbody>${report.rows.map((r,i)=> affiliateRowHtml(r,i)).join('')}</tbody>
+                </table>
+              </div>
+              <div class="pi-actions" style="margin-top:12px;">
+                <button type="button" class="co-text-action" id="affiliateReviewCancelBtn">닫기</button>
+                <button type="button" class="co-text-action primary" id="affiliateReviewSaveBtn">선택 항목 저장</button>
+              </div>
+            ` : `<div class="agr-recent-item is-empty">partnerDashboard.note에 다른 회사명으로 보이는 값이 없습니다.</div>`}
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('affiliateReviewCloseBtn').addEventListener('click', closeAffiliateReviewModal);
+    const cancelBtn = document.getElementById('affiliateReviewCancelBtn');
+    if(cancelBtn) cancelBtn.addEventListener('click', closeAffiliateReviewModal);
+    document.getElementById('affiliateReviewOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'affiliateReviewOverlay') closeAffiliateReviewModal(); });
+    root.querySelectorAll('[data-affiliate-decision]').forEach(sel=>{
+      sel.addEventListener('change', ()=>{
+        const idx = Number(sel.getAttribute('data-affiliate-decision'));
+        affiliateReviewState.decisions.set(idx, sel.value);
+      });
+    });
+    const exportBtn = document.getElementById('affiliateExportCsvBtn');
+    if(exportBtn) exportBtn.addEventListener('click', ()=> downloadAffiliateCsv(report.rows));
+    const selectAllBtn = document.getElementById('affiliateSelectAllBtn');
+    if(selectAllBtn) selectAllBtn.addEventListener('click', ()=>{
+      const checks = root.querySelectorAll('.affiliate-row-check');
+      const allChecked = Array.from(checks).every(c=> c.checked);
+      checks.forEach(c=> c.checked = !allChecked);
+    });
+    const bulkApplyBtn = document.getElementById('affiliateBulkApplyBtn');
+    if(bulkApplyBtn) bulkApplyBtn.addEventListener('click', ()=>{
+      const decision = document.getElementById('affiliateBulkDecision').value;
+      root.querySelectorAll('.affiliate-row-check:checked').forEach(chk=>{
+        const idx = Number(chk.getAttribute('data-affiliate-check'));
+        const row = report.rows[idx];
+        // 정확 일치가 아닌 행에는 본사/자회사/관계사 연결을 강제하지 않는다(§요청 "정확히
+        // 일치한 경우에만" — 링크는 실제 companyId가 있어야 가능하다).
+        if(AFFILIATE_DECISION_TO_RELATION[decision] && row.matchType !== 'exact') return;
+        affiliateReviewState.decisions.set(idx, decision);
+      });
+      renderAffiliateReviewModal();
+    });
+    const saveBtn = document.getElementById('affiliateReviewSaveBtn');
+    if(saveBtn) saveBtn.addEventListener('click', openAffiliateSaveConfirmModal);
+  }
+  // §계열사 관계 후보 검토 라운드(신규) — 실제 관계는 사람이 확인한 뒤에만
+  // 기존 D.addCompanyRelation으로 저장한다(이 함수는 조회만 하고 아무것도 저장하지 않음).
+  const AFFILIATE_SOURCE_FIELDS = [
+    { key: 'partnerDashboard.note', label: '파트너 대시보드 비고(partnerDashboard.note)',
+      get: (co)=> (co.partnerDashboard && co.partnerDashboard.note) || '' }
+  ];
+  function splitAffiliateCandidateText(raw){
+    return String(raw || '').split(/[,\n\r、，]+/).map(s=> s.trim()).filter(Boolean);
+  }
+  function buildAffiliateCandidateReport(){
+    const companies = D.loadCompanies();
+    const nameIndex = new Map();
+    companies.forEach(co=>{
+      const key = normCompanyNameForPartnerMatch(co.name);
+      if(!key) return;
+      if(!nameIndex.has(key)) nameIndex.set(key, []);
+      nameIndex.get(key).push(co);
+    });
+    const rows = [];
+    const candidateTextCount = new Map();
+    companies.forEach(co=>{
+      AFFILIATE_SOURCE_FIELDS.forEach(field=>{
+        const raw = field.get(co);
+        if(!raw || !String(raw).trim()) return;
+        splitAffiliateCandidateText(raw).forEach(candidateText=>{
+          const key = normCompanyNameForPartnerMatch(candidateText);
+          if(!key) return;
+          if(key === normCompanyNameForPartnerMatch(co.name)) return;
+          candidateTextCount.set(candidateText, (candidateTextCount.get(candidateText) || 0) + 1);
+          const exactHits = (nameIndex.get(key) || []).filter(c=> c.id !== co.id);
+          let matchType, matchedCompanyId = null, note;
+          if(exactHits.length === 1){
+            matchType = 'exact'; matchedCompanyId = exactHits[0].id;
+            note = '정확 일치(정규화 후 완전히 같은 이름의 고객이 1건)';
+          } else if(exactHits.length > 1){
+            matchType = 'review';
+            note = `동명 후보 ${exactHits.length}건 — 자동 연결하지 않음(확인 필요)`;
+          } else {
+            const similar = companies.filter(c=>{
+              if(c.id === co.id) return false;
+              const ck = normCompanyNameForPartnerMatch(c.name);
+              return ck && key && ck.length >= 2 && key.length >= 2 && (ck.indexOf(key) !== -1 || key.indexOf(ck) !== -1);
+            });
+            if(similar.length){
+              matchType = 'similar';
+              note = `유사 후보 ${similar.length}건: ${similar.map(c=> c.name).join(', ')} — 자동 연결하지 않음(확인 필요)`;
+            } else {
+              matchType = 'notfound';
+              note = '고객목록에서 찾지 못함';
+            }
+          }
+          rows.push({ company: co, candidateTextRaw: candidateText, sourceField: field.label, matchType, matchedCompanyId, note });
+        });
+      });
+    });
+    const duplicateCandidateTexts = Array.from(candidateTextCount.entries()).filter(([,n])=> n > 1).map(([t])=> t);
+    const mentionPairs = new Set();
+    const bidirectional = [];
+    rows.forEach(r=>{
+      if(r.matchType !== 'exact') return;
+      const a = r.company.id, b = r.matchedCompanyId;
+      const pairKey = [a,b].sort().join('|');
+      if(mentionPairs.has(pairKey)){
+        const aName = (companies.find(c=> c.id===a)||{}).name;
+        const bName = (companies.find(c=> c.id===b)||{}).name;
+        bidirectional.push(`${aName} ↔ ${bName}`);
+      }
+      mentionPairs.add(pairKey);
+    });
+    const companiesWithMultiple = new Map();
+    rows.forEach(r=>{ companiesWithMultiple.set(r.company.id, (companiesWithMultiple.get(r.company.id)||0) + 1); });
+    const summary = {
+      totalRows: rows.length,
+      companiesWithAny: new Set(rows.map(r=> r.company.id)).size,
+      uniqueCandidateTexts: new Set(rows.map(r=> normCompanyNameForPartnerMatch(r.candidateTextRaw))).size,
+      exactCount: rows.filter(r=> r.matchType === 'exact').length,
+      similarOnlyCount: rows.filter(r=> r.matchType === 'similar').length,
+      notFoundCount: rows.filter(r=> r.matchType === 'notfound').length,
+      reviewCount: rows.filter(r=> r.matchType === 'review').length,
+      duplicateCandidateTexts,
+      multipleCandidateCompanies: Array.from(companiesWithMultiple.entries()).filter(([,n])=> n > 1)
+        .map(([id])=> (companies.find(c=> c.id===id)||{}).name).filter(Boolean),
+      bidirectional
+    };
+    return { rows, summary };
+  }
+  function openAffiliateReviewModal(){
+    const report = buildAffiliateCandidateReport();
+    affiliateReviewState = { report, decisions: new Map() };
+    renderAffiliateReviewModal();
+  }
+  // 저장 전 최종 확인 — §요청 [5] "변경될 업체/연결될 고객/관계 방향/원본 필드값/기존
+  // 관계정보/충돌 여부"를 보여준 뒤에만 실제로 addCompanyRelation을 호출한다.
+  function closeAffiliateSaveConfirmModal(){
+    const el = document.getElementById('affiliateSaveConfirmOverlay');
+    if(el) el.remove();
+  }
+  function openAffiliateSaveConfirmModal(){
+    const { report, decisions } = affiliateReviewState;
+    const toApply = [];
+    decisions.forEach((decision, idx)=>{
+      const relation = AFFILIATE_DECISION_TO_RELATION[decision];
+      if(!relation) return; // keep/none/later는 저장할 것이 없다(고객 데이터를 건드리지 않음)
+      const row = report.rows[idx];
+      if(row.matchType !== 'exact' || !row.matchedCompanyId) return;
+      const targetCo = D.findCompany(row.matchedCompanyId);
+      if(!targetCo) return;
+      const existing = (row.company.relatedCompanies || []).find(x=> x.companyId === row.matchedCompanyId);
+      toApply.push({ row, relation, targetCo, conflict: existing && existing.relation !== relation ? existing.relation : null });
+    });
+    if(!toApply.length){ alert('저장할 항목이 없습니다 — "본사로 연결/자회사로 연결/관계사로 연결" 중 하나를 선택한 정확 일치 항목이 있어야 합니다.'); return; }
+    const root = document.getElementById('affiliateReviewModalRoot');
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div class="pi-overlay" id="affiliateSaveConfirmOverlay" style="z-index:10020;">
+        <div class="pi-panel" style="max-width:640px;" role="dialog" aria-modal="true" aria-label="계열사 관계 저장 확인">
+          <div class="pi-head"><div class="pi-title">${toApply.length}건 연결 저장 확인</div></div>
+          <div class="pi-body" style="max-height:60vh; overflow-y:auto;">
+            <div class="stage-cancel-warn">아래 내용대로 실제 고객 데이터(관계 정보)가 저장됩니다. 다른 항목(단순 참고정보로 유지/관계 없음/나중에 확인)은 전혀 저장되지 않습니다.</div>
+            ${toApply.map(a=> `
+              <div class="stage-history-item">
+                <div><b>${esc(a.row.company.name)}</b> → <b>${esc(a.targetCo.name)}</b> : ${esc(AFFILIATE_DECISION_TO_RELATION[decisions.get(report.rows.indexOf(a.row))] || '')}</div>
+                <div class="stage-history-meta">원본 필드값: "${esc(a.row.candidateTextRaw)}"(${esc(a.row.sourceField)})${a.conflict ? ` · 기존 관계정보와 충돌: 이미 "${esc(a.conflict)}"로 등록되어 있었음 — 새 값으로 덮어씁니다` : ' · 기존 관계정보 없음'}</div>
+              </div>`).join('')}
+          </div>
+          <div class="pi-actions">
+            <button type="button" class="co-text-action" id="affiliateSaveConfirmCancelBtn">돌아가기</button>
+            <button type="button" class="co-text-action primary" id="affiliateSaveConfirmOkBtn">저장</button>
+          </div>
+        </div>
+      </div>`;
+    root.appendChild(wrap.firstElementChild);
+    document.getElementById('affiliateSaveConfirmCancelBtn').addEventListener('click', closeAffiliateSaveConfirmModal);
+    document.getElementById('affiliateSaveConfirmOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'affiliateSaveConfirmOverlay') closeAffiliateSaveConfirmModal(); });
+    document.getElementById('affiliateSaveConfirmOkBtn').addEventListener('click', ()=>{
+      toApply.forEach(a=>{
+        D.addCompanyRelation(a.row.company.id, a.targetCo.id, AFFILIATE_DECISION_TO_RELATION[decisions.get(report.rows.indexOf(a.row))]);
+      });
+      closeAffiliateSaveConfirmModal();
+      closeAffiliateReviewModal();
+      // 목록 화면의 관계 배지(.col-name-relation)는 다음 목록 렌더링(화면 전환 등) 때
+      // 자연히 최신값으로 그려진다 — 기존 addCompanyRelation 호출부(고객카드)도 카드
+      // 자신만 다시 그리고 목록 전체를 강제로 다시 그리지 않는 것과 같은 방식이다.
+      alert(`${toApply.length}건의 관계를 저장했습니다. 업체 목록 화면에서 확인해주세요(화면을 새로고침하거나 다른 화면으로 이동했다가 돌아오면 바로 보입니다).`);
+    });
+  }
+
   let partnerSyncState = { step: 'idle', preview: null, result: null, error: null };
   function closePartnerSyncModal(){
     const root = document.getElementById('partnerSyncModalRoot');
@@ -17318,6 +17835,46 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
   }
 
+  // §고객관리 목록 출력(PDF) 라운드(신규) — 등록폼/수정폼 양쪽에서 공유하는 "목록 공개
+  // 범위" 블록. 저장 필드는 새로 만들지 않고 기존 co.distributionLists 배열(§협력업체
+  // 리스트 추가폼 이관 라운드에서 이미 만든 필드)을 그대로 읽고 쓴다.
+  function renderDistributionListsBlockHtml(idPrefix, co){
+    const tags = (co && Array.isArray(co.distributionLists)) ? co.distributionLists : [];
+    const checked = {
+      internal: !tags.includes('excludeInternal'),
+      contractor: tags.includes('contractor'),
+      external: tags.includes('external')
+    };
+    return `
+      <div class="co-form-field dist-list-block">
+        <label>목록 공개 범위</label>
+        <div class="dist-list-row">
+          <label class="dist-list-check"><input type="checkbox" id="${idPrefix}_dist_internal" ${checked.internal ? 'checked' : ''} /> 내부용 목록에 포함</label>
+          <label class="dist-list-check"><input type="checkbox" id="${idPrefix}_dist_contractor" ${checked.contractor ? 'checked' : ''} /> 시공사 발송용 목록에 포함</label>
+          <label class="dist-list-check"><input type="checkbox" id="${idPrefix}_dist_external" ${checked.external ? 'checked' : ''} /> 외부 발송용 목록에 포함</label>
+        </div>
+        <div class="dist-list-warn" id="${idPrefix}_distExternalWarn" style="display:none;">외부 발송용에 포함하면 사업자번호·이메일·협약일·자본금·비고 등 민감정보 없이 지역/업체명/업체코드/대표자/주소/연락처만 노출됩니다.</div>
+      </div>`;
+  }
+  function bindDistributionListsBlock(idPrefix){
+    const externalEl = document.getElementById(idPrefix + '_dist_external');
+    const warnEl = document.getElementById(idPrefix + '_distExternalWarn');
+    if(externalEl && warnEl){
+      const sync = ()=>{ warnEl.style.display = externalEl.checked ? 'block' : 'none'; };
+      externalEl.addEventListener('change', sync);
+      sync();
+    }
+  }
+  function readDistributionListsFromForm(idPrefix){
+    const tags = [];
+    const internalEl = document.getElementById(idPrefix + '_dist_internal');
+    const contractorEl = document.getElementById(idPrefix + '_dist_contractor');
+    const externalEl = document.getElementById(idPrefix + '_dist_external');
+    if(internalEl && !internalEl.checked) tags.push('excludeInternal');
+    if(contractorEl && contractorEl.checked) tags.push('contractor');
+    if(externalEl && externalEl.checked) tags.push('external');
+    return tags;
+  }
   function renderBasicInfoForm(co){
     const wrap = document.getElementById('crmBasicInfo');
     wrap.innerHTML = CO_FIELD_LABELS.concat([['memo','기본메모']]).map(([k,l])=> `
@@ -17329,11 +17886,13 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 넣는다(idPrefix만 'editco'로 달라 id 충돌 없음) — 값은 이 업체의 실제 저장값으로
       // 미리 채운다(resolveDealStageFormValues, 새 판정 없음).
       + renderDealStageBlockHtml('editco', resolveDealStageFormValues(co))
+      + renderDistributionListsBlockHtml('editco', co)
       + `<div style="display:flex;gap:10px;margin-top:6px;">
         <button type="button" class="co-text-action" id="crmFormCancel">취소</button>
         <button type="button" class="co-text-action primary" id="crmFormSave">저장</button>
       </div>`;
     bindDealStageBlock('editco');
+    bindDistributionListsBlock('editco');
     document.getElementById('crmFormCancel').addEventListener('click', ()=>{ cardState.chartEditing = false; refreshChart(); });
     document.getElementById('crmFormSave').addEventListener('click', ()=>{
       const patch = {};
@@ -17342,6 +17901,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         if(el) patch[k] = el.value.trim();
       });
       if(!patch.name){ return; }
+      patch.distributionLists = readDistributionListsFromForm('editco');
       const dealCheck = validateDealStageBlock('editco');
       const warnEl = document.getElementById('editco_dealStageWarn');
       if(dealCheck.blocking.length){
@@ -17597,6 +18157,7 @@ window.SHIN2_CRM_APP_INIT = function(){
             ${doc.localOnly !== false ? `<button type="button" class="co-text-action" data-migrate="${esc(doc.id)}">공용으로 업로드</button>` : ''}
             <button type="button" class="co-text-action danger" data-del="${esc(doc.id)}">삭제</button>
           </div>
+          ${doc.localOnly !== false ? `<span class="doc-cloud-authgate" data-mail-authgate style="display:${mailAssetAuthNoticeHtml() ? 'block' : 'none'};">${mailAssetAuthNoticeHtml()}</span>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -17652,6 +18213,10 @@ window.SHIN2_CRM_APP_INIT = function(){
       btn.addEventListener('click', ()=>{
         // §15: 사용자가 이 버튼을 명시적으로 눌렀을 때만 로컬 전용 파일을 클라우드로
         // 올린다 — 자동 마이그레이션은 절대 하지 않는다.
+        // §Firebase 인증 사용자 미생성 원인 조사 라운드(신규) — 로그인 확인 전/미로그인
+        // 상태에서 눌러도 곧장 NOT_AUTHENTICATED 업로드 실패로 가지 않고, 먼저 로그인
+        // 안내(옆의 authgate)만 다시 그린 뒤 멈춘다 — 임시 uid로 우회하지 않는다.
+        if(mailAssetAuthState() !== 'ready'){ applyMailAssetAuthGateDom(); return; }
         const id = btn.getAttribute('data-migrate');
         btn.disabled = true; btn.textContent = '업로드 중…';
         D.migrateDocumentToCloud(id, (pct)=>{ btn.textContent = '업로드 중 ' + pct + '%'; }).then(()=>{
@@ -18405,18 +18970,14 @@ window.SHIN2_CRM_APP_INIT = function(){
           <div class="ca-ocr-status" id="crmNewFOcrStatus"></div>
         </div>
       </div>
-      <div class="co-form-field">
-        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);">
-          <input type="checkbox" id="crmNewFDualList" style="width:auto;" />
-          시공사발송용 · 외부발송용 목록에도 함께 표시
-        </label>
-      </div>
+      ${renderDistributionListsBlockHtml('addco', null)}
       <div id="crmNewFErr" style="display:none;color:#B91C1C;font-size:12px;margin-bottom:8px;">업체명을 입력하세요.</div>
       <button type="button" class="co-text-action primary" id="crmNewFSave">등록</button>
     `;
     document.getElementById('crmNewF_code').value = genCompanyCode();
     if(prefillName) document.getElementById('crmNewF_name').value = prefillName;
     bindDealStageBlock('addco');
+    bindDistributionListsBlock('addco');
     wrap.querySelectorAll('[data-region]').forEach(btn=> btn.addEventListener('click', ()=>{
       const r = btn.getAttribute('data-region');
       if(regionSelected.has(r)){ regionSelected.delete(r); btn.classList.remove('is-active'); }
@@ -18629,7 +19190,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       patch.code = document.getElementById('crmNewF_code').value.trim();
       patch.note = document.getElementById('crmNewF_note').value.trim();
       patch.region = Array.from(regionSelected);
-      patch.distributionLists = document.getElementById('crmNewFDualList').checked ? ['contractor','external'] : [];
+      patch.distributionLists = readDistributionListsFromForm('addco');
       if(!patch.name){ document.getElementById('crmNewFErr').style.display = 'block'; return; }
       const dealCheck = validateDealStageBlock('addco');
       const warnEl = document.getElementById('addco_dealStageWarn');
@@ -20794,9 +21355,239 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(e && e.detail && e.detail.key === 'companies') refreshMapIfOpen();
   });
 
+  /* ==========================================================================
+     §고객관리 목록 출력(PDF) 라운드(신규) — partner-dashboard의 "내부용/시공사
+     발송용/외부 발송용" 3종 출력 구분을 참고했다(그 저장소·데이터는 읽기 전용 참고자료,
+     이 파일은 전혀 손대지 않았다). 실제 PDF는 별도 라이브러리/외부 폰트를 새로 추가하지
+     않고 브라우저 내장 인쇄(window.print → "PDF로 저장")로 만든다 — 정적 GitHub Pages
+     구조에 맞는 최소 의존성이면서, 한글이 시스템 폰트로 그대로 렌더링되어 폰트 임베딩·
+     인코딩 깨짐 문제가 원천적으로 없다. 미리보기와 실제 저장이 완전히 같은 HTML/CSS를
+     쓰므로 "미리보기에서 본 그대로" 나온다. 출력 대상 판정은 co.distributionLists(§고객
+     정보 수정/등록 폼에서 이미 쓰던 실제 필드)만 보고, 첨부서류·활동기록·Firebase 경로·
+     인증정보 등은 이 코드가 아예 읽지 않는다(§6 "PDF 전용 복제 데이터 금지").
+     ========================================================================== */
+  const PDF_EXPORT_TYPES = [
+    { key:'internal', label:'내부용', desc:'사내 보관용 전체 정보', fileLabel:'내부용', landscape:true,
+      columns:['no','region','name','code','repName','bizRegNo','address','phone','fax','email','mouDate','capital','note'] },
+    { key:'contractor', label:'시공사 발송용', desc:'시공사에 전달 가능한 업무 연락처 목록', fileLabel:'시공사용', landscape:false,
+      columns:['no','region','name','code','repName','address','phone','fax'] },
+    { key:'external', label:'외부 발송용', desc:'외부 공유용 최소 정보', fileLabel:'외부용', landscape:false,
+      columns:['no','region','name','code','repName','address','phone'] }
+  ];
+  const PDF_EXPORT_COLUMN_LABELS = {
+    no:'번호', region:'지역', name:'업체명', code:'업체코드', repName:'대표자', bizRegNo:'사업자번호',
+    address:'주소', phone:'연락처', fax:'FAX', email:'이메일', mouDate:'협약일', capital:'자본금', note:'비고'
+  };
+  // 지역: 새 등록폼이 저장하는 co.region(배열, 복수 선택)을 최우선으로 쓰고, 없으면
+  // partner-dashboard 임포트 당시 저장된 co.partnerDashboard.region(단일 문자열, 이미
+  // 다른 화면에서도 그대로 표시해 온 값)을 쓴다. 둘 다 없을 때만 주소에서 안전하게
+  // 파생한다(OCR 모듈의 REGION_MAP 재사용 — 새 매핑표를 만들지 않음). 어떤 경우에도
+  // 원본 고객 레코드에 다시 저장하지 않는다(조회 전용).
+  function resolveCompanyRegionList(co){
+    if(Array.isArray(co.region) && co.region.length) return co.region;
+    const pdRegion = co.partnerDashboard && co.partnerDashboard.region;
+    if(pdRegion && String(pdRegion).trim()) return [String(pdRegion).trim()];
+    const addr = co.address || (co.partnerDashboard && co.partnerDashboard.address) || '';
+    const derived = (window.SHIN2_CRM_OCR && window.SHIN2_CRM_OCR.coDeriveRegion) ? window.SHIN2_CRM_OCR.coDeriveRegion(addr) : null;
+    return derived ? [derived] : [];
+  }
+  // 필드값은 항상 문자열 그대로 다룬다(Number 변환 없음) — 전화번호/사업자번호 앞자리
+  // 0이 없어지는 문제가 애초에 생기지 않는다. 값이 없으면 '-'.
+  function pdfExportResolveField(co, key, rowIndex){
+    if(key === 'no') return String(rowIndex + 1);
+    const pd = co.partnerDashboard || {};
+    switch(key){
+      case 'region': { const r = resolveCompanyRegionList(co); return r.length ? r.join(', ') : '-'; }
+      case 'name': return co.name || '-';
+      case 'code': return co.code || pd.code || '-';
+      case 'repName': return co.repName || pd.ceo || '-';
+      case 'bizRegNo': return co.bizRegNo || pd.bizno || '-';
+      case 'address': return co.address || pd.address || '-';
+      case 'phone': return co.phone || co.mobile || pd.phone || '-';
+      case 'fax': return co.fax || pd.fax || '-';
+      case 'email': return co.email || pd.email || '-';
+      case 'mouDate': return resolvePartnerAgreementDate(co) || '-';
+      case 'capital': return co.capital || pd.capital || '-';
+      case 'note': return co.note || pd.note || '-';
+      default: return '-';
+    }
+  }
+  function pdfMatchesSearch(co, q){
+    if(!q) return true;
+    const s = q.trim().toLowerCase();
+    if(!s) return true;
+    const hay = [co.name, pdfExportResolveField(co,'repName',0), pdfExportResolveField(co,'code',0),
+      pdfExportResolveField(co,'address',0), pdfExportResolveField(co,'phone',0)].join(' ').toLowerCase();
+    return hay.includes(s);
+  }
+  let pdfExportState = { type:'internal', regions: new Set(), search:'' };
+  function pdfExportFilteredCompanies(){
+    const regions = pdfExportState.regions;
+    return D.loadCompanies().filter(co=>{
+      if(!D.isInDistributionList(co, pdfExportState.type)) return false;
+      if(regions.size){
+        const coRegions = resolveCompanyRegionList(co);
+        if(!coRegions.some(r=> regions.has(r))) return false;
+      }
+      return pdfMatchesSearch(co, pdfExportState.search);
+    });
+  }
+  function pdfExportBuildDocHtml(){
+    const type = PDF_EXPORT_TYPES.find(t=> t.key === pdfExportState.type);
+    const rows = pdfExportFilteredCompanies();
+    const now = new Date();
+    const genLabel = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    const regionLabel = pdfExportState.regions.size ? Array.from(pdfExportState.regions).join(', ') : '전체 지역';
+    const theadHtml = `<tr>${type.columns.map(c=> `<th>${esc(PDF_EXPORT_COLUMN_LABELS[c])}</th>`).join('')}</tr>`;
+    const tbodyHtml = rows.map((co,i)=> `<tr>${type.columns.map(c=> `<td>${esc(pdfExportResolveField(co,c,i))}</td>`).join('')}</tr>`).join('')
+      || `<tr><td colspan="${type.columns.length}" class="pdf-doc-empty">출력 대상 업체가 없습니다.</td></tr>`;
+    return {
+      type, rows,
+      html: `
+        <div class="pdf-doc">
+          <div class="pdf-doc-header">
+            <div class="pdf-doc-title">NETFORM 고객 목록</div>
+            <div class="pdf-doc-meta">
+              <span>출력 유형: ${esc(type.label)}</span>
+              <span>지역: ${esc(regionLabel)}</span>
+              <span>생성 일시: ${esc(genLabel)}</span>
+              <span>총 업체 수: ${rows.length}건</span>
+            </div>
+          </div>
+          <table class="pdf-doc-table">
+            <thead>${theadHtml}</thead>
+            <tbody>${tbodyHtml}</tbody>
+          </table>
+        </div>`
+    };
+  }
+  function pdfExportModalHtml(){
+    const all = D.loadCompanies();
+    const filtered = pdfExportFilteredCompanies();
+    const typeCardsHtml = PDF_EXPORT_TYPES.map(t=> `
+      <button type="button" class="pdf-type-card${pdfExportState.type===t.key?' is-active':''}" data-pdf-type="${t.key}">
+        <div class="pdf-type-name">${esc(t.label)}</div>
+        <div class="pdf-type-desc">${esc(t.desc)}</div>
+      </button>`).join('');
+    const regionChipsHtml = COMPANY_REGIONS.map(r=> `
+      <button type="button" class="list-filter-chip${pdfExportState.regions.has(r)?' is-active':''}" data-pdf-region="${esc(r)}">${esc(r)}</button>`).join('');
+    return `
+      <div class="pi-overlay" id="pdfExportOverlay">
+        <div class="pi-panel pdf-export-panel" role="dialog" aria-modal="true" aria-label="목록 출력">
+          <div class="pi-head">
+            <div class="pi-title">목록 출력</div>
+            <button type="button" class="chart-close-btn" id="pdfExportCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body pdf-export-body">
+            <div class="pdf-export-left">
+              <div class="co-form-field"><label>출력 유형</label><div class="pdf-type-row">${typeCardsHtml}</div></div>
+              <div class="co-form-field"><label>지역(복수 선택 가능, 선택 안 하면 전체)</label><div class="list-filter-row">${regionChipsHtml}</div></div>
+              <div class="co-form-field">
+                <label>검색(업체명 / 대표자 / 업체코드 / 주소 / 연락처)</label>
+                <input type="text" id="pdfExportSearchInput" value="${esc(pdfExportState.search)}" placeholder="검색어 입력" />
+                <div class="mail-settings-help">이 검색·지역 조건은 이 출력 화면에서만 적용됩니다 — 뒤의 고객 목록 화면 검색·정렬과는 별개이며, 이 창을 닫아도 화면 목록에는 아무 영향이 없습니다.</div>
+              </div>
+              <div class="pdf-export-count">출력 대상 업체 수: <b id="pdfExportCountVal">${filtered.length}</b>건 · 전체 고객 수: ${all.length}건</div>
+              ${pdfExportState.type === 'internal' ? `<div class="dist-list-warn">내부용 문서에는 사업자번호·이메일 등 개인정보가 포함될 수 있습니다. 외부 공유에 사용하지 마세요.</div>` : ''}
+              ${pdfExportState.type === 'external' ? `<div class="mail-settings-help">외부 발송용은 FAX·이메일·사업자번호·협약일·자본금·비고·내부 메모 등 민감정보가 자동으로 제외됩니다.</div>` : ''}
+            </div>
+            <div class="pdf-export-right">
+              <div class="pdf-export-actions">
+                <button type="button" class="co-text-action primary" id="pdfExportPreviewBtn">미리보기</button>
+                <button type="button" class="co-text-action" id="pdfExportSaveBtn">PDF 저장</button>
+              </div>
+              <div class="pdf-preview-wrap" id="pdfExportPreviewWrap"><div class="chart-empty">"미리보기" 버튼을 눌러 실제 출력 내용을 확인하세요. 미리보기는 파일 저장·발송·업로드를 하지 않습니다.</div></div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+  function closePdfExportModal(){
+    const el = document.getElementById('pdfExportModalRoot');
+    if(el) el.innerHTML = '';
+  }
+  function refreshPdfExportCount(){
+    const el = document.getElementById('pdfExportCountVal');
+    if(el) el.textContent = String(pdfExportFilteredCompanies().length);
+  }
+  function renderPdfExportPreview(){
+    const wrap = document.getElementById('pdfExportPreviewWrap');
+    if(!wrap) return;
+    const { type, rows, html } = pdfExportBuildDocHtml();
+    wrap.innerHTML = `
+      <div class="pdf-preview-note">포함되는 열: ${type.columns.map(c=> esc(PDF_EXPORT_COLUMN_LABELS[c])).join(', ')} · 여러 페이지가 되면 표 머리글이 자동으로 반복되고 브라우저 인쇄 옵션에서 페이지 번호를 켤 수 있습니다. 아래는 실제 PDF와 같은 내용/열 구성입니다(파일 저장·발송·업로드 없음).</div>
+      <div class="pdf-preview-frame">${html}</div>`;
+  }
+  function renderPdfExportModal(){
+    const root = document.getElementById('pdfExportModalRoot');
+    if(!root) return;
+    root.innerHTML = pdfExportModalHtml();
+    document.getElementById('pdfExportCloseBtn').addEventListener('click', closePdfExportModal);
+    document.getElementById('pdfExportOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'pdfExportOverlay') closePdfExportModal(); });
+    root.querySelectorAll('[data-pdf-type]').forEach(btn=> btn.addEventListener('click', ()=>{
+      pdfExportState.type = btn.getAttribute('data-pdf-type');
+      renderPdfExportModal();
+    }));
+    root.querySelectorAll('[data-pdf-region]').forEach(btn=> btn.addEventListener('click', ()=>{
+      const r = btn.getAttribute('data-pdf-region');
+      if(pdfExportState.regions.has(r)) pdfExportState.regions.delete(r); else pdfExportState.regions.add(r);
+      renderPdfExportModal();
+    }));
+    const searchInput = document.getElementById('pdfExportSearchInput');
+    if(searchInput){
+      searchInput.addEventListener('input', ()=>{ pdfExportState.search = searchInput.value; refreshPdfExportCount(); });
+    }
+    document.getElementById('pdfExportPreviewBtn').addEventListener('click', renderPdfExportPreview);
+    document.getElementById('pdfExportSaveBtn').addEventListener('click', doPdfExportSave);
+  }
+  function openPdfExportModal(){
+    pdfExportState = { type:'internal', regions:new Set(), search:'' };
+    renderPdfExportModal();
+  }
+  // §4 "미리보기는 저장/발송/업로드를 실행하면 안 됨" — PDF 저장은 완전히 별도 함수이며,
+  // 여기서도 브라우저 인쇄창을 여는 것 말고는 아무 것도 하지 않는다(외부 API 전송 없음,
+  // Firebase 업로드 없음, 이메일 발송 없음). 시공사/외부용도 명칭일 뿐 실제 발송 기능이
+  // 아니다(§4 "버튼 문구는 PDF 저장/다운로드로, 발송 버튼을 만들지 마라").
+  function doPdfExportSave(){
+    const { type, html } = pdfExportBuildDocHtml();
+    const now = new Date();
+    const dateStr = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+    const filename = `NETFORM_고객목록_${type.fileLabel}_${dateStr}`;
+    // §window.open에 noopener를 주면 명세상 반환값이 항상 null이 되어(연결 관계 자체를
+    // 끊는 옵션이라) printWin.print()를 절대 호출할 수 없게 되는 실수를 했었다 — 이 창은
+    // 같은 출처(same-origin)의 순수 표/문구만 담아 열기 때문에 opener 참조를 남겨도
+    // 안전하다(외부 사이트로 열리는 링크가 아님). noopener를 빼서 실제로 print()가
+    // 호출되게 고쳤다.
+    const printWin = window.open('', '_blank');
+    if(!printWin){ alert('팝업이 차단되어 PDF 저장 창을 열 수 없습니다 — 브라우저의 팝업 차단을 해제한 뒤 다시 시도해주세요.'); return; }
+    printWin.document.open();
+    printWin.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(filename)}</title>
+      <style>
+        @page { size: A4 ${type.landscape ? 'landscape' : 'portrait'}; margin: 14mm 10mm; }
+        body{ font-family:'Malgun Gothic','맑은 고딕',sans-serif; color:#111; margin:0; }
+        .pdf-doc-header{ margin-bottom:10px; }
+        .pdf-doc-title{ font-size:16px; font-weight:700; color:#0B2545; margin-bottom:4px; }
+        .pdf-doc-meta{ display:flex; gap:14px; flex-wrap:wrap; font-size:10.5px; color:#555; }
+        table.pdf-doc-table{ width:100%; border-collapse:collapse; font-size:10px; table-layout:fixed; }
+        table.pdf-doc-table th, table.pdf-doc-table td{ border:1px solid #ccc; padding:4px 6px; text-align:left; word-break:break-all; vertical-align:top; }
+        table.pdf-doc-table thead{ display:table-header-group; background:#eef1f6; }
+        table.pdf-doc-table tr{ break-inside:avoid; }
+        .pdf-doc-empty{ text-align:center; color:#888; }
+      </style>
+    </head><body>${html}</body></html>`);
+    printWin.document.close();
+    // document.write 직후 load 이벤트가 일부 브라우저에서 늦게/안 오는 경우가 있어
+    // onload와 짧은 지연 둘 다로 print()를 시도한다(중복 호출돼도 print()는 안전 — 두 번째
+    // 호출은 이미 열린 인쇄창을 다시 포커스할 뿐 추가 다운로드/전송을 만들지 않는다).
+    const triggerPrint = ()=>{ try{ printWin.focus(); printWin.print(); }catch(e){} };
+    printWin.onload = triggerPrint;
+    setTimeout(triggerPrint, 300);
+  }
+
   // ---------------- 진입 ----------------
   document.getElementById('crmMapDistributionBtn').addEventListener('click', openMapDistributionModal);
   document.getElementById('crmPhoneRequestBtn').addEventListener('click', openPhoneRequestModal);
+  document.getElementById('crmPdfExportBtn').addEventListener('click', openPdfExportModal);
   // §업체 추가 폼 이관 라운드에서 함께 수정: addEventListener('click', openAddCompanyForm)로
   // 직접 등록하면 클릭 이벤트(MouseEvent)가 그대로 prefillName 인자로 들어가 이름칸에
   // "[object MouseEvent]"가 채워지는 기존 버그가 있었다 — 인자 없이 호출하도록 감싼다.
@@ -20809,6 +21600,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   document.getElementById('crmSyncDiagBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openSyncDiagModal(); });
   // §협력업체 동기화 단순화 라운드(§요청 2) — 데이터 업데이트 메뉴에 보이는 유일한 버튼.
   document.getElementById('crmPartnerListSyncBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openPartnerListSyncModal(); });
+  document.getElementById('crmAffiliateReviewBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openAffiliateReviewModal(); });
   function closeUpdateMenu(){ document.getElementById('crmUpdateMenu').classList.remove('is-open'); }
   document.getElementById('crmDataUpdateBtn').addEventListener('click', (e)=>{
     e.stopPropagation();
