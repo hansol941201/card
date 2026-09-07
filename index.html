@@ -2496,6 +2496,18 @@ body.map-modal-lock{ overflow:hidden; }
 .mail-preview-box{ background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:10px; }
 .mail-preview-subject{ font-size:13px; font-weight:700; color:var(--text); margin-bottom:6px; }
 .mail-preview-body{ font-size:12.5px; color:var(--text); white-space:pre-wrap; line-height:1.5; margin-bottom:6px; }
+/* §본문 이미지 첨부 라운드(신규) */
+.mail-body-toolbar{ display:flex; align-items:center; gap:10px; margin-bottom:6px; flex-wrap:wrap; }
+.mail-body-editor{ min-height:220px; max-height:480px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:13px; line-height:1.6; color:var(--text); background:#fff; font-family:inherit; }
+.mail-body-editor:focus{ outline:none; border-color:var(--navy); }
+.mail-body-editor img{ max-width:100%; height:auto; display:block; margin:8px 0; border-radius:4px; cursor:pointer; }
+.mail-body-img-placeholder{ display:inline-block; padding:4px 10px; font-size:11.5px; color:var(--navy); background:var(--bg); border:1px dashed var(--navy); border-radius:6px; margin:4px 0; }
+.mail-body-img-overlay{ position:absolute; z-index:10040; display:flex; gap:4px; padding:4px 6px; background:#fff; border:1px solid var(--line); border-radius:6px; box-shadow:0 4px 14px rgba(20,40,70,.18); }
+.mail-body-img-overlay button{ border:none; background:transparent; cursor:pointer; font-size:11.5px; padding:4px 8px; border-radius:5px; color:var(--text); }
+.mail-body-img-overlay button:hover{ background:var(--bg); }
+.mail-body-img-overlay button.danger{ color:#B3261E; }
+.mail-preview-body-html{ font-size:12.5px; color:var(--text); line-height:1.5; margin-bottom:6px; }
+.mail-preview-body-html img{ max-width:100%; height:auto; display:block; margin:8px 0; border-radius:4px; }
 .mail-preview-global-img{ font-size:11.5px; color:var(--text-muted); margin-bottom:6px; }
 .mail-preview-global-img img{ max-width:100%; height:auto; border-radius:4px; border:1px solid var(--line); }
 .mail-tpl-save-bar{ display:flex; align-items:center; gap:10px; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
@@ -10370,6 +10382,34 @@ window.SHIN2_CRM_APP_INIT = function(){
       .replace(/\{대표자\}/g, co.repName || '')
       .replace(/\{보내는사람\}/g, mailSettings.fromName || '');
   }
+  // §본문 이미지 첨부 라운드(신규) — 본문 입력란을 textarea에서 contenteditable로 바꿔
+  // 이미지를 커서 위치에 바로 삽입할 수 있게 한다. 기존에 저장된 bodyTemplate는 전부
+  // 평문(줄바꿈 \n 포함)이었으므로, 앞으로 이 에디터가 저장하는 값(HTML, <img>/<br> 등
+  // 실제 태그 포함)과 구분해야 한다 — 별도 스키마 필드를 추가하지 않고, "평문에는 절대
+  // '<' 문자가 없다"는 이 앱의 실제 데이터(업무 안내 문구)로는 안전한 성질을 이용해
+  // 판별한다(레거시 평문에 우연히 '<'가 들어있는 극단적인 경우만 예외 — 그때도 화면이
+  // 깨지지 않고 그 문자만 이상하게 보일 뿐 기능 자체가 죽지는 않는다).
+  function mailBodyIsHtml(raw){ return typeof raw === 'string' && raw.indexOf('<') !== -1; }
+  function mailBodyPlainToHtml(raw){ return esc(String(raw || '')).replace(/\n/g, '<br>'); }
+  function mailBodyToEditorHtml(raw){ return mailBodyIsHtml(raw) ? String(raw) : mailBodyPlainToHtml(raw); }
+  // sanitizeMailBodyHtml: 이 에디터가 만드는 값은 사용자가 직접 타이핑/붙여넣기한
+  // 내용이라 완전히 신뢰할 수 없다(예: 붙여넣기로 섞여 들어온 <img onerror=...>) —
+  // 미리보기/작성창처럼 실제 라이브 DOM에 다시 꽂아 넣는 지점마다 이 함수를 거친다.
+  // <script> 태그는 innerHTML로 넣어도 애초에 실행되지 않지만(브라우저 표준 동작),
+  // on* 이벤트 속성과 javascript: 링크는 라이브 DOM에서 실제로 실행될 수 있어 제거한다.
+  function sanitizeMailBodyHtml(html){
+    const tmp = document.createElement('div');
+    tmp.innerHTML = String(html || '');
+    tmp.querySelectorAll('script,style,iframe,object,embed,link,meta').forEach(el=> el.remove());
+    tmp.querySelectorAll('*').forEach(el=>{
+      Array.from(el.attributes).forEach(attr=>{
+        const name = attr.name.toLowerCase();
+        if(name.indexOf('on') === 0) el.removeAttribute(attr.name);
+        if((name === 'href' || name === 'src') && /^\s*javascript:/i.test(attr.value)) el.removeAttribute(attr.name);
+      });
+    });
+    return tmp.innerHTML;
+  }
   // §수신자 주소 오류 조사 라운드(신규) — "The recipients address is corrupted" 오류 재현
   // 조사 결과: 화면에는 정상 주소로 보여도 문자열 안에 폭이 0인 유니코드 문자(제로폭
   // 공백 U+200B 등)가 섞여 있으면 .trim()과 이메일 형식 정규식(\s 제외 규칙)을 둘 다
@@ -10532,7 +10572,16 @@ window.SHIN2_CRM_APP_INIT = function(){
             <label class="mail-tpl-enable" style="float:none; display:inline-flex; margin-bottom:10px;"><input type="checkbox" id="mailSetEnabled_${key}" ${tpl.enabled!==false?'checked':''} /> 이 메일 사용</label>
             <div class="co-form-field"><label>제목</label><input type="text" id="mailSetSubject_${key}" value="${esc(tpl.subjectTemplate)}" /></div>
             ${placeholderRow('mailSetSubject_' + key)}
-            <div class="co-form-field"><label>본문</label><textarea id="mailSetBody_${key}" rows="14">${esc(tpl.bodyTemplate)}</textarea></div>
+            <div class="co-form-field">
+              <label>본문</label>
+              <div class="mail-body-toolbar">
+                <button type="button" class="co-text-action" data-mail-body-img-add="${key}">🖼 이미지 추가</button>
+                <input type="file" id="mailBodyImgInput_${key}" accept="${(D.MAIL_ASSET_ALLOWED_EXT.inlineImage||[]).map(e=>'.'+e).join(',')}" style="display:none;" />
+                <span class="mail-settings-help" style="margin:0;">이미지를 추가하면 자동 업로드되어 커서 위치에 삽입됩니다(최대 ${mailAssetSizeLabel(D.MAIL_ASSET_MAX_CLOUD_BYTES.inlineImage)}, ${(D.MAIL_ASSET_ALLOWED_EXT.inlineImage||[]).join('/')}).</span>
+              </div>
+              <div class="mail-body-editor" id="mailSetBody_${key}" contenteditable="true" data-mail-panel-key="${key}">${mailBodyToEditorHtml(tpl.bodyTemplate)}</div>
+              <span id="mailBodyImgStatus_${key}" class="mail-asset-status"></span>
+            </div>
             ${placeholderRow('mailSetBody_' + key)}
             ${key==='documentRequest' ? `<div class="mail-settings-help">본문의 {요청서류목록} 자리에 발송 시 선택한 미등록·재요청 서류명이 자동으로 들어갑니다.</div>` : ''}
           </div>
@@ -10689,7 +10738,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       mailTemplates: { [key]: {
         enabled: document.getElementById('mailSetEnabled_' + key).checked,
         subjectTemplate: document.getElementById('mailSetSubject_' + key).value,
-        bodyTemplate: document.getElementById('mailSetBody_' + key).value,
+        bodyTemplate: sanitizeMailBodyHtml(document.getElementById('mailSetBody_' + key).innerHTML),
         attachmentDocType: attachEl ? (attachEl.value || null) : null,
         videoUrl: document.getElementById('mailSetVideo_' + key).value.trim()
       } }
@@ -10889,6 +10938,146 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(img && img.storagePath) D.deleteMailAssetFile(img.storagePath);
     });
   }
+  // §본문 이미지 첨부 라운드(신규) — 템플릿 편집 화면(mailSetBody_*)과 메일 작성창
+  // (mailComposeBody) 양쪽에서 공유하는 이미지 업로드/삽입/교체/삭제 로직. 업로드는
+  // 기존 uploadMailAssetFile(kind='inlineImage')을 그대로 재사용 — 새 Storage 경로를
+  // 만들지 않는다. templateKey는 두 화면 모두 "어느 메일 종류"인지로 버킷을 나눈다
+  // (작성창에서는 실제 보내는 mailType을 그대로 씀 — 별도 슬롯 아님).
+  function mailBodyHandleImageFile(templateKey, editor, file, opts){
+    opts = opts || {};
+    if(!file) return;
+    if(!D.isAllowedMailAssetFile('inlineImage', file)){
+      if(opts.onError) opts.onError('이미지 파일(' + (D.MAIL_ASSET_ALLOWED_EXT.inlineImage||[]).join('/') + ')만 첨부할 수 있습니다.');
+      return;
+    }
+    if(file.size > D.MAIL_ASSET_MAX_CLOUD_BYTES.inlineImage){
+      if(opts.onError) opts.onError(`이미지 용량이 너무 큽니다(최대 ${mailAssetSizeLabel(D.MAIL_ASSET_MAX_CLOUD_BYTES.inlineImage)}).`);
+      return;
+    }
+    // 업로드 중에는 자리표시자를 커서 위치에 즉시 넣는다 — execCommand('insertHTML')로
+    // 넣으면 그 시점의 커서 위치에 정확히 박히고, 이후 사용자가 다른 곳을 계속 편집해도
+    // 이 노드 자체가 그 자리를 지킨다(별도 Range 저장/복원 로직 불필요).
+    const placeholderId = 'mbimg_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8);
+    editor.focus();
+    document.execCommand('insertHTML', false, `<span class="mail-body-img-placeholder" contenteditable="false" data-mail-inline-placeholder="${placeholderId}">이미지 업로드 중… 0%</span>`);
+    editor.dispatchEvent(new Event('input', { bubbles:true }));
+    D.uploadMailAssetFile(templateKey, 'inlineImage', file, (pct)=>{
+      const ph = editor.querySelector(`[data-mail-inline-placeholder="${placeholderId}"]`);
+      if(ph) ph.textContent = `이미지 업로드 중… ${pct}%`;
+    }).then(rec=> D.getMailAssetFileURL(rec.storagePath).then(url=> ({ rec, url })))
+      .then(({ rec, url })=>{
+        const ph = editor.querySelector(`[data-mail-inline-placeholder="${placeholderId}"]`);
+        if(!ph) return; // 그 사이 사용자가 자리표시자를 직접 지웠으면 아무 것도 하지 않는다
+        const img = document.createElement('img');
+        img.src = url; img.alt = '첨부 이미지';
+        img.setAttribute('data-mail-inline-id', rec.id);
+        img.setAttribute('data-mail-inline-path', rec.storagePath);
+        ph.replaceWith(img);
+        editor.dispatchEvent(new Event('input', { bubbles:true }));
+        if(opts.onDone) opts.onDone();
+      })
+      .catch(err=>{
+        const ph = editor.querySelector(`[data-mail-inline-placeholder="${placeholderId}"]`);
+        if(ph) ph.remove();
+        editor.dispatchEvent(new Event('input', { bubbles:true }));
+        const code = err && err.code;
+        let msg = '이미지 업로드 실패';
+        if(code === 'FILE_TYPE') msg = '허용되지 않는 이미지 형식입니다.';
+        else if(code === 'SIZE_LIMIT_CLOUD') msg = '이미지 용량이 허용 범위를 초과했습니다.';
+        else if(code === 'NOT_AUTHENTICATED') msg = '이미지 업로드 실패 — 로그인 상태를 확인해주세요(또는 발송자료 Storage 규칙이 아직 적용되지 않았을 수 있습니다).';
+        else msg = '이미지 업로드 실패: ' + (err && err.message ? err.message : '알 수 없는 오류');
+        if(opts.onError) opts.onError(msg);
+      });
+  }
+  // 본문에 이미 삽입된 이미지를 클릭했을 때 뜨는 작은 "교체/삭제" 오버레이 — 화면
+  // 하나에 단 하나만 있으면 되므로(설정 화면/작성창 어느 쪽이든) 싱글턴으로 둔다.
+  let mailBodyImgOverlayEl = null;
+  function ensureMailBodyImgOverlay(){
+    if(mailBodyImgOverlayEl) return mailBodyImgOverlayEl;
+    mailBodyImgOverlayEl = document.createElement('div');
+    mailBodyImgOverlayEl.className = 'mail-body-img-overlay';
+    mailBodyImgOverlayEl.style.display = 'none';
+    mailBodyImgOverlayEl.innerHTML = `
+      <button type="button" data-mail-body-img-replace>교체</button>
+      <button type="button" class="danger" data-mail-body-img-delete>삭제</button>
+    `;
+    document.body.appendChild(mailBodyImgOverlayEl);
+    return mailBodyImgOverlayEl;
+  }
+  function hideMailBodyImgOverlay(){
+    if(mailBodyImgOverlayEl) mailBodyImgOverlayEl.style.display = 'none';
+  }
+  function showMailBodyImgOverlay(img, ctx){
+    const overlay = ensureMailBodyImgOverlay();
+    const rect = img.getBoundingClientRect();
+    overlay.style.top = (window.scrollY + rect.top + 6) + 'px';
+    overlay.style.left = (window.scrollX + rect.left + 6) + 'px';
+    overlay.style.display = 'flex';
+    overlay._targetImg = img;
+    overlay._ctx = ctx; // { key, editor, fileInput }
+  }
+  document.addEventListener('mousedown', (e)=>{
+    if(!mailBodyImgOverlayEl || mailBodyImgOverlayEl.style.display === 'none') return;
+    if(e.target.closest('.mail-body-img-overlay')) return;
+    if(e.target.tagName === 'IMG' && e.target.hasAttribute('data-mail-inline-id')) return; // 그 이미지 클릭은 별도 리스너가 처리
+    hideMailBodyImgOverlay();
+  });
+  document.addEventListener('click', (e)=>{
+    if(!mailBodyImgOverlayEl) return;
+    const replaceBtn = e.target.closest('[data-mail-body-img-replace]');
+    if(replaceBtn && mailBodyImgOverlayEl.contains(replaceBtn)){
+      const ctx = mailBodyImgOverlayEl._ctx || {};
+      const img = mailBodyImgOverlayEl._targetImg;
+      const { key, editor, fileInput } = ctx;
+      if(!img || !fileInput || !editor) { hideMailBodyImgOverlay(); return; }
+      const oldPath = img.getAttribute('data-mail-inline-path');
+      fileInput.onchange = ()=>{
+        const file = fileInput.files && fileInput.files[0];
+        fileInput.value = '';
+        fileInput.onchange = null;
+        if(!file) return;
+        const placeholderId = 'mbimg_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8);
+        const ph = document.createElement('span');
+        ph.className = 'mail-body-img-placeholder'; ph.contentEditable = 'false';
+        ph.setAttribute('data-mail-inline-placeholder', placeholderId);
+        ph.textContent = '이미지 업로드 중… 0%';
+        img.replaceWith(ph);
+        editor.dispatchEvent(new Event('input', { bubbles:true }));
+        D.uploadMailAssetFile(key, 'inlineImage', file, (pct)=>{ ph.textContent = `이미지 업로드 중… ${pct}%`; })
+          .then(rec=> D.getMailAssetFileURL(rec.storagePath).then(url=> ({ rec, url })))
+          .then(({ rec, url })=>{
+            const newImg = document.createElement('img');
+            newImg.src = url; newImg.alt = '첨부 이미지';
+            newImg.setAttribute('data-mail-inline-id', rec.id);
+            newImg.setAttribute('data-mail-inline-path', rec.storagePath);
+            ph.replaceWith(newImg);
+            editor.dispatchEvent(new Event('input', { bubbles:true }));
+            if(oldPath) D.deleteMailAssetFile(oldPath);
+          })
+          .catch(()=>{
+            // 교체 실패 시 기존 이미지를 그대로 되살린다(§요청 "실패 시 기존 파일 보존").
+            ph.replaceWith(img);
+            editor.dispatchEvent(new Event('input', { bubbles:true }));
+          });
+      };
+      fileInput.click();
+      hideMailBodyImgOverlay();
+      return;
+    }
+    const deleteBtn = e.target.closest('[data-mail-body-img-delete]');
+    if(deleteBtn && mailBodyImgOverlayEl.contains(deleteBtn)){
+      const ctx = mailBodyImgOverlayEl._ctx || {};
+      const img = mailBodyImgOverlayEl._targetImg;
+      if(img && confirm('본문에서 이 이미지를 삭제하시겠습니까?')){
+        const path = img.getAttribute('data-mail-inline-path');
+        img.remove();
+        if(ctx.editor) ctx.editor.dispatchEvent(new Event('input', { bubbles:true }));
+        if(path) D.deleteMailAssetFile(path);
+      }
+      hideMailBodyImgOverlay();
+      return;
+    }
+  });
   function bindMailSettingsView(){
     const accToggle = document.getElementById('mailAccountToggleBtn');
     if(accToggle) accToggle.addEventListener('click', ()=>{
@@ -10977,13 +11166,38 @@ window.SHIN2_CRM_APP_INIT = function(){
         const target = document.getElementById(phBtn.getAttribute('data-ph-target'));
         if(target){
           const val = phBtn.getAttribute('data-ph-value');
-          const start = target.selectionStart != null ? target.selectionStart : target.value.length;
-          const end = target.selectionEnd != null ? target.selectionEnd : target.value.length;
-          target.value = target.value.slice(0, start) + val + target.value.slice(end);
-          target.focus();
-          target.selectionStart = target.selectionEnd = start + val.length;
+          // §본문 이미지 첨부 라운드 — 본문이 textarea에서 contenteditable로 바뀌면서
+          // selectionStart/value 기반 삽입이 더 이상 안 통한다. execCommand('insertText')는
+          // contenteditable 안 현재 커서 위치에 그대로 넣어준다(제목 input은 그대로 기존
+          // 방식 유지 — isContentEditable이 아니므로 이 분기를 안 탄다).
+          if(target.isContentEditable){
+            target.focus();
+            document.execCommand('insertText', false, val);
+          } else {
+            const start = target.selectionStart != null ? target.selectionStart : target.value.length;
+            const end = target.selectionEnd != null ? target.selectionEnd : target.value.length;
+            target.value = target.value.slice(0, start) + val + target.value.slice(end);
+            target.focus();
+            target.selectionStart = target.selectionEnd = start + val.length;
+          }
           target.dispatchEvent(new Event('input', { bubbles:true }));
         }
+        return;
+      }
+      // §본문 이미지 첨부 라운드(신규) — 이미지 추가 버튼 / 본문 안 이미지 클릭.
+      const imgAddBtn = e.target.closest('[data-mail-body-img-add]');
+      if(imgAddBtn){
+        const key = imgAddBtn.getAttribute('data-mail-body-img-add');
+        const fileInput = document.getElementById('mailBodyImgInput_' + key);
+        if(fileInput) fileInput.click();
+        return;
+      }
+      const inlineImg = e.target.closest('.mail-body-editor img[data-mail-inline-id]');
+      if(inlineImg){
+        const editor = inlineImg.closest('.mail-body-editor');
+        const key = editor ? editor.getAttribute('data-mail-panel-key') : null;
+        const fileInput = key ? document.getElementById('mailBodyImgInput_' + key) : null;
+        if(editor && key && fileInput) showMailBodyImgOverlay(inlineImg, { key, editor, fileInput });
         return;
       }
       const saveBtn = e.target.closest('[id^="mailTplSaveBtn_"]');
@@ -10993,13 +11207,13 @@ window.SHIN2_CRM_APP_INIT = function(){
         const key = previewBtn.id.replace('mailPreviewBtn_','');
         const box = document.getElementById('mailPreviewBox_' + key);
         const subjectVal = document.getElementById('mailSetSubject_' + key).value;
-        const bodyVal = document.getElementById('mailSetBody_' + key).value;
+        const bodyVal = document.getElementById('mailSetBody_' + key).innerHTML;
         const s = D.loadMailSettings();
         const filledSubject = fillMailTemplate(subjectVal, MAIL_PREVIEW_SAMPLE_CO, s);
         const filledBody = fillMailTemplate(bodyVal, MAIL_PREVIEW_SAMPLE_CO, s)
-          .replace(/\{요청서류목록\}/g, '요청드리는 자료:\n- (예시) 사업자등록증');
+          .replace(/\{요청서류목록\}/g, '요청드리는 자료:<br>- (예시) 사업자등록증');
         const globalImg = D.getGlobalMailAsset().image;
-        box.innerHTML = `<div class="mail-preview-subject">${esc(filledSubject)}</div><div class="mail-preview-body">${esc(filledBody)}</div>${globalImg ? `<div class="mail-preview-global-img" id="mailPreviewGlobalImg_${key}">모든 메일 자동 포함 이미지 불러오는 중…</div>` : ''}<div class="mail-settings-help">예시 업체(${esc(MAIL_PREVIEW_SAMPLE_CO.name)})로 채운 미리보기입니다 — 실제로 발송되지 않았습니다.</div>`;
+        box.innerHTML = `<div class="mail-preview-subject">${esc(filledSubject)}</div><div class="mail-preview-body mail-preview-body-html">${sanitizeMailBodyHtml(filledBody)}</div>${globalImg ? `<div class="mail-preview-global-img" id="mailPreviewGlobalImg_${key}">모든 메일 자동 포함 이미지 불러오는 중…</div>` : ''}<div class="mail-settings-help">예시 업체(${esc(MAIL_PREVIEW_SAMPLE_CO.name)})로 채운 미리보기입니다 — 실제로 발송되지 않았습니다.</div>`;
         box.style.display = 'block';
         // §"모든 메일에 이 이미지를 꼭 첨부" 라운드(신규) — 미리보기는 실제 발송이 아니라서
         // 링크를 못 가져와도 막지 않고(§요청 [7]과 달리 이건 순수 확인용), 실패하면
@@ -11078,6 +11292,22 @@ window.SHIN2_CRM_APP_INIT = function(){
       mailAssetHandleUpload(key, kind, file);
     });
     panels.addEventListener('change', (e)=>{
+      // §본문 이미지 첨부 라운드(신규) — mailBodyImgInput_{key} 파일 입력 처리.
+      if(e.target.id && e.target.id.indexOf('mailBodyImgInput_') === 0){
+        const key = e.target.id.replace('mailBodyImgInput_', '');
+        const editor = document.getElementById('mailSetBody_' + key);
+        const file = e.target.files && e.target.files[0];
+        e.target.value = '';
+        if(editor && file){
+          mailBodyHandleImageFile(key, editor, file, {
+            onError: (msg)=>{
+              const statusEl = document.getElementById('mailBodyImgStatus_' + key);
+              if(statusEl){ statusEl.textContent = msg; statusEl.classList.add('is-err'); }
+            }
+          });
+        }
+        return;
+      }
       if(!e.target.classList.contains('mail-asset-file-input')) return;
       const id = e.target.id; // mailAssetInput_{kind}_{key}
       const m = /^mailAssetInput_([^_]+)_(.+)$/.exec(id);
@@ -11086,6 +11316,13 @@ window.SHIN2_CRM_APP_INIT = function(){
       const file = e.target.files && e.target.files[0];
       e.target.value = '';
       mailAssetHandleUpload(key, kind, file);
+    });
+    // §본문 이미지 첨부 라운드(신규) — 이미지 추가 버튼을 mousedown 시점에
+    // preventDefault해서 contenteditable 에디터의 커서/선택 영역이 그대로 유지되게
+    // 한다(리치 에디터 툴바의 표준 패턴 — 클릭으로 포커스가 버튼으로 넘어가기 전에
+    // 막아야 "지금 커서가 있던 자리"가 안 지워진다).
+    panels.addEventListener('mousedown', (e)=>{
+      if(e.target.closest('[data-mail-body-img-add]')) e.preventDefault();
     });
   }
   // renderMailTabButtonWrap: 탭 버튼 하나만 다시 그린다 — 이름 변경 저장/취소가 다른
@@ -11241,9 +11478,25 @@ window.SHIN2_CRM_APP_INIT = function(){
     // (opts.requestedDocLabels — 협약 진행관리 팝업 쪽에서 사용자가 고른 서류명 배열을
     // 그대로 넘겨준다, 여기서 새로 판정하지 않음).
     const requestedNames = Array.isArray(opts.requestedDocLabels) ? opts.requestedDocLabels : [];
-    const requestedListText = requestedNames.length ? '요청드리는 자료:\n' + requestedNames.map(n=> '- ' + n).join('\n') : '';
+    // §본문 이미지 첨부 라운드(신규) — tpl.bodyTemplate이 레거시 평문인지 새 에디터가
+    // 저장한 HTML인지를 원본(치환/자료 추가 전) 기준으로 먼저 판단한다. 판단 후에
+    // 덧붙이는 조각(요청서류목록/동영상 링크)도 같은 형식으로 맞춰야 줄바꿈이 실제로
+    // 보인다 — 나중에 합쳐진 문자열 전체를 다시 sniff하면(부록만 HTML 태그를 가진
+    // 경우) 앞부분 평문의 개행이 안 살아나는 문제가 있어, 반드시 원본만 보고 먼저
+    // 결정한다.
+    const bodyIsHtml = mailBodyIsHtml(tpl.bodyTemplate);
+    const requestedListText = requestedNames.length
+      ? (bodyIsHtml ? '요청드리는 자료:<br>' + requestedNames.map(n=> '- ' + esc(n)).join('<br>') : '요청드리는 자료:\n' + requestedNames.map(n=> '- ' + n).join('\n'))
+      : '';
     let bodyFilled = fillMailTemplate(tpl.bodyTemplate, co, s).replace(/\{요청서류목록\}/g, requestedListText);
-    if(tpl.videoUrl) bodyFilled += `\n\n관련 안내 영상: ${tpl.videoUrl}`;
+    if(tpl.videoUrl){
+      bodyFilled += bodyIsHtml
+        ? `<br><br>관련 안내 영상: <a href="${esc(tpl.videoUrl)}" target="_blank" rel="noopener">${esc(tpl.videoUrl)}</a>`
+        : `\n\n관련 안내 영상: ${tpl.videoUrl}`;
+    }
+    // 에디터에는 항상 완성된 HTML을 넣는다(레거시 평문은 escape+<br> 변환) — 이 시점
+    // 이후로는 mailComposeBody.innerHTML이 곧 발송될 최종 내용의 유일한 원본이 된다.
+    const bodyFilledHtml = sanitizeMailBodyHtml(bodyIsHtml ? bodyFilled : mailBodyPlainToHtml(bodyFilled));
     const subjectFilled = fillMailTemplate(tpl.subjectTemplate, co, s);
     const modalRoot = document.getElementById('mailComposeModalRoot');
     modalRoot.innerHTML = `
@@ -11264,7 +11517,15 @@ window.SHIN2_CRM_APP_INIT = function(){
             <div class="co-form-field"><label>받는사람</label><input type="text" id="mailComposeTo" value="${esc(co.email || '')}" placeholder="받는 이메일 주소" /></div>
             <div class="co-form-field"><label>참조(선택)</label><input type="text" id="mailComposeCc" value="" placeholder="참조 이메일(콤마로 구분)" /></div>
             <div class="co-form-field"><label>제목</label><input type="text" id="mailComposeSubject" value="${esc(subjectFilled)}" /></div>
-            <div class="co-form-field"><label>본문</label><textarea id="mailComposeBody" rows="10">${esc(bodyFilled)}</textarea></div>
+            <div class="co-form-field">
+              <label>본문</label>
+              <div class="mail-body-toolbar">
+                <button type="button" class="co-text-action" id="mailComposeImgAddBtn">🖼 이미지 추가</button>
+                <input type="file" id="mailComposeImgInput" accept="${(D.MAIL_ASSET_ALLOWED_EXT.inlineImage||[]).map(e=>'.'+e).join(',')}" style="display:none;" />
+                <span id="mailComposeImgStatus" class="mail-asset-status"></span>
+              </div>
+              <div class="mail-body-editor" id="mailComposeBody" contenteditable="true">${bodyFilledHtml}</div>
+            </div>
             <div class="mail-compose-attach">
               <div class="mail-compose-attach-title">첨부자료</div>
               ${commonDoc ? `
@@ -11311,6 +11572,32 @@ window.SHIN2_CRM_APP_INIT = function(){
     document.getElementById('mailComposeOptOut').addEventListener('change', (e)=>{
       D.updateCompany(co.id, { mailOptOut: !!e.target.checked });
     });
+    // §본문 이미지 첨부 라운드(신규) — 작성창도 설정 화면과 같은 이미지 삽입/교체/삭제
+    // 기능을 그대로 제공한다(mailBodyHandleImageFile/showMailBodyImgOverlay 공유,
+    // 로직 중복 없음). templateKey는 이 메일의 실제 mailType을 그대로 쓴다.
+    const composeImgAddBtn = document.getElementById('mailComposeImgAddBtn');
+    const composeImgInput = document.getElementById('mailComposeImgInput');
+    const composeEditor = document.getElementById('mailComposeBody');
+    if(composeImgAddBtn && composeImgInput && composeEditor){
+      composeImgAddBtn.addEventListener('mousedown', (e)=> e.preventDefault());
+      composeImgAddBtn.addEventListener('click', ()=> composeImgInput.click());
+      composeImgInput.addEventListener('change', ()=>{
+        const file = composeImgInput.files && composeImgInput.files[0];
+        composeImgInput.value = '';
+        if(file){
+          mailBodyHandleImageFile(mailType, composeEditor, file, {
+            onError: (msg)=>{
+              const st = document.getElementById('mailComposeImgStatus');
+              if(st){ st.textContent = msg; st.classList.add('is-err'); }
+            }
+          });
+        }
+      });
+      composeEditor.addEventListener('click', (e)=>{
+        const img = e.target.closest('img[data-mail-inline-id]');
+        if(img) showMailBodyImgOverlay(img, { key: mailType, editor: composeEditor, fileInput: composeImgInput });
+      });
+    }
     const sendBtn = document.getElementById('mailComposeSendBtn');
     if(questionnaireBlocked) sendBtn.disabled = true;
     // §요청 [7] 발송 전 최종 확인 — [메일 발송]을 누르면 바로 안 보내고, 종류/받는사람/
@@ -11327,7 +11614,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         from_name: document.getElementById('mailComposeFrom').value.replace(/<.*>/, '').trim(),
         reply_to: stripInvisibleChars(latestSettings.fromEmail || ''),
         subject: document.getElementById('mailComposeSubject').value.trim(),
-        message: document.getElementById('mailComposeBody').value
+        message: sanitizeMailBodyHtml(document.getElementById('mailComposeBody').innerHTML)
       };
     }
     function doSend(toEmail, ccEmails){
@@ -11360,8 +11647,11 @@ window.SHIN2_CRM_APP_INIT = function(){
         .catch(()=>{ throw Object.assign(new Error('공통 발송자료 또는 전체 공통 이미지 링크를 불러오지 못했습니다 — 로그인 상태 또는 Storage 공유 규칙을 확인해주세요.'), { code:'ASSET_LINK_FAILED' }); })
         .then(([links, globalImgUrl])=>{
           const params = buildMailSendParams(toEmail, ccEmails, latestSettings);
-          if(links.length) params.message += '\n\n' + links.map(l=> `${l.label}: ${l.url}`).join('\n');
-          if(globalImgUrl) params.message += `\n\n<img src="${globalImgUrl}" alt="" style="max-width:100%;height:auto;display:block;" />`;
+          // §본문 이미지 첨부 라운드(신규) — params.message는 이제 항상 mailComposeBody의
+          // innerHTML(진짜 HTML)이므로, 덧붙이는 링크/이미지도 <br>/<a> 형식으로 통일한다
+          // (예전 평문 시절의 \n 이어붙이기는 더 이상 맞지 않는다).
+          if(links.length) params.message += '<br><br>' + links.map(l=> `${esc(l.label)}: <a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a>`).join('<br>');
+          if(globalImgUrl) params.message += `<br><br><img src="${esc(globalImgUrl)}" alt="" style="max-width:100%;height:auto;display:block;" />`;
           emailAttempted = true;
           return loadEmailJsSdk()
             .then(emailjs=> emailjs.send(latestSettings.emailjsServiceId, latestSettings.emailjsTemplateId, params, { publicKey: latestSettings.emailjsPublicKey }))
