@@ -3678,6 +3678,16 @@ window.SHIN2_CRM_OCR = (function(){
   }
   gateEnterBtn.addEventListener('click', handleGateEnter);
   gatePasswordInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') handleGateEnter(); });
+
+  // §"이 기기 계정함 초기화" 라운드(신규) — 비밀번호가 실제 공유 Firebase 계정과 다른
+  // 채로 이 기기에 잘못 만들어졌을 때, 사람이 명시적으로 눌러야만(§메일 설정 화면의
+  // 확인창을 거친 뒤) 이 기기의 로컬 계정함/게이트 세션 표시만 지운다 — 두 키
+  // 외에는 어떤 localStorage 값도, 고객 데이터도, 첨부서류도 건드리지 않는다.
+  window.SHIN2_CRM_RESET_VAULT = function(){
+    try{ localStorage.removeItem(ACCT_KEY); }catch(e){}
+    try{ localStorage.removeItem(CRM_SESSION_KEY); }catch(e){}
+    location.reload();
+  };
 })();
 </script>
 
@@ -10783,14 +10793,39 @@ window.SHIN2_CRM_APP_INIT = function(){
     const ST = window.SHIN2_STORAGE;
     return (ST && ST.isSignedIn && ST.isSignedIn()) ? 'ready' : 'signed-out';
   }
+  // §"로그인 처리 중…"에서 멈추는 버그 조사 라운드(신규) — 실제 원인 확인: 로그인 재시도가
+  // 성공했을 때만 auth 상태가 실제로 바뀌어 onAuthStateChanged가 다시 불리고
+  // 'shin2-crm-firebase-ready'가 다시 나간다(그때만 applyMailAssetAuthGateDom이 다시
+  // 그려서 "로그인 처리 중…"이 사라진다) — 하지만 signInWithEmailAndPassword가 "실패"하면
+  // (비밀번호가 실제 공유 Firebase 계정과 다름/이메일 로그인 꺼짐/도메인 미승인 등)
+  // Firebase 쪽 currentUser는 그대로(null)라 auth 상태 자체가 안 바뀌고, 그래서
+  // onAuthStateChanged도 'shin2-crm-firebase-ready'도 다시 안 온다 — 실패는 별개 이벤트
+  // 'shin2-crm-auth-error'(module 블록의 reportAuthFailure)로만 알려지는데, 이 코드가
+  // 그 이벤트를 안 듣고 있어서 "로그인 처리 중…"이 화면에 영원히 남아있었다(§18453의
+  // 기존 문서함 안내 문구가 이미 두 이벤트를 다 듣던 것과 같은 패턴을 여기 빠뜨렸었다).
+  function mailAssetAuthErrorHint(){
+    const ST = window.SHIN2_STORAGE;
+    const err = (ST && ST.getAuthError) ? ST.getAuthError() : null;
+    if(!err) return '';
+    const code = err.code || '';
+    let hint;
+    if(code === 'auth/wrong-password' || code === 'auth/invalid-credential') hint = '비밀번호가 실제 클라우드 계정과 다릅니다 — 다른 기기에서 이미 정해 둔 비밀번호를 다시 확인해주세요.';
+    else if(code === 'auth/operation-not-allowed') hint = 'Firebase 콘솔에서 이메일/비밀번호 로그인이 꺼져 있습니다.';
+    else if(code === 'auth/network-request-failed') hint = '네트워크 문제로 로그인 요청이 실패했습니다.';
+    else if(code === 'auth/unauthorized-domain') hint = '이 사이트 도메인이 Firebase 콘솔의 승인된 도메인 목록에 없습니다.';
+    else hint = code || '알 수 없는 오류';
+    return `로그인 실패(${esc(code)}) — ${hint}`;
+  }
   function mailAssetAuthNoticeHtml(){
     const st = mailAssetAuthState();
     if(st === 'ready') return '';
     if(st === 'checking') return `<div class="mail-asset-authgate is-checking">로그인 확인 중…</div>`;
     if(st === 'unavailable') return `<div class="mail-asset-authgate is-blocked">클라우드 저장 기능을 사용할 수 없습니다(Firebase 설정 없음) — 이 화면에서는 파일을 등록할 수 없습니다.</div>`;
+    const errHint = mailAssetAuthErrorHint();
     return `<div class="mail-asset-authgate is-blocked" data-mail-authgate-idle>
-      <span>파일을 등록하려면 먼저 로그인해주세요.</span>
-      <button type="button" class="co-text-action" data-mail-asset-relogin>로그인</button>
+      <span>${errHint ? esc(errHint) : '파일을 등록하려면 먼저 로그인해주세요.'}</span>
+      <button type="button" class="co-text-action" data-mail-asset-relogin>${errHint ? '다시 로그인' : '로그인'}</button>
+      ${errHint ? `<button type="button" class="co-text-action" data-mail-vault-reset>이 기기 계정함 초기화</button>` : ''}
     </div>`;
   }
   // 잠금 표시/해제만 다시 그린다 — 탭 전체를 다시 그리면(mailTabPanelHtml 재생성) 사용자가
@@ -10809,6 +10844,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
   }
   window.addEventListener('shin2-crm-firebase-ready', ()=>{ mailAuthGateReadyEverFired = true; applyMailAssetAuthGateDom(); });
+  // §버그 수정 — 로그인 "실패"는 이 이벤트로만 온다(auth 상태가 안 바뀌므로
+  // shin2-crm-firebase-ready는 다시 안 옴). 이걸 안 듣고 있던 게 "로그인 처리 중…"이
+  // 멈춰있던 진짜 원인이었다 — 이제 실패해도 반드시 화면이 갱신되고 구체적인 오류
+  // 코드/안내가 표시된다.
+  window.addEventListener('shin2-crm-auth-error', ()=>{ applyMailAssetAuthGateDom(); });
   // 파일선택창을 열기 직전에 호출 — 로그인 확인 전/미로그인 상태면 창을 열지 않고 안내만
   // 남긴 뒤 true(막혔음)를 반환한다. statusElId가 있으면 그 자리에, 없으면 아무 데도
   // 안 남기고 화면의 authgate 안내만 다시 그린다.
@@ -10843,6 +10883,17 @@ window.SHIN2_CRM_APP_INIT = function(){
     }
     const cancelBtn = e.target.closest('[data-mail-relogin-cancel]');
     if(cancelBtn){ applyMailAssetAuthGateDom(); return; }
+    // §"이 기기 계정함이 잘못 만들어졌다면" 초기화 — 로그인 실패(비밀번호가 실제 클라우드
+    // 계정과 다름 등) 상태에서만 노출된다(mailAssetAuthNoticeHtml). 이 기기의 로컬
+    // shin2-accounts-vault/세션 표시만 지우고 새로고침한다 — 고객 데이터·업무 진행기록·
+    // 메일 발송기록·첨부서류·다른 localStorage 키는 전혀 건드리지 않는다(§ 절대 손대지
+    // 말라는 요청). 실제 클릭 여부를 사람이 확인하도록 confirm을 거친다.
+    const vaultResetBtn = e.target.closest('[data-mail-vault-reset]');
+    if(vaultResetBtn){
+      if(!confirm('이 기기에 저장된 로그인 정보만 지우고 새로고침합니다(고객 데이터·업무 기록·첨부서류는 전혀 지워지지 않습니다). 계속할까요?')) return;
+      if(window.SHIN2_CRM_RESET_VAULT) window.SHIN2_CRM_RESET_VAULT();
+      return;
+    }
     const submitBtn = e.target.closest('[data-mail-relogin-submit]');
     if(submitBtn){
       const holder = submitBtn.closest('.mail-asset-authgate');
@@ -10855,8 +10906,11 @@ window.SHIN2_CRM_APP_INIT = function(){
         submitBtn.disabled = false;
         if(!res.ok){ if(msgEl) msgEl.textContent = res.reason || '로그인 실패'; return; }
         if(msgEl) msgEl.textContent = '로그인 처리 중…';
-        // 실제 상태 전환은 onAuthStateChanged -> 'shin2-crm-firebase-ready' 이벤트로 온다
-        // (applyMailAssetAuthGateDom이 그때 다시 그림) — 여기서 임의로 ready로 넘기지 않는다.
+        // §버그 수정 — 성공하면 onAuthStateChanged -> 'shin2-crm-firebase-ready'가 다시
+        // 와서 applyMailAssetAuthGateDom이 다시 그린다. 실패하면(비밀번호가 실제 클라우드
+        // 계정과 다름 등) auth 상태 자체가 안 바뀌어 그 이벤트가 안 오므로,
+        // 'shin2-crm-auth-error'(위에서 새로 추가한 리스너)가 대신 화면을 갱신해 "로그인
+        // 처리 중…"에서 절대 멈춰있지 않게 한다.
       });
       return;
     }
