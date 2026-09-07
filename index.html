@@ -4553,6 +4553,22 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   // 폴백을 두지 않는다(공유 안 되는 로컬 사본은 이 기능의 목적—팀 공유+외부 링크 발송—에
   // 맞지 않는다). 새 규칙이 아직 적용 안 됐으면 업로드 자체가 권한 오류로 실패하며,
   // 그 실패를 그대로 호출부에 알린다(§요청 "업로드 실패 시 원인 표시").
+  // §공통 발송자료 업로드 실패 조사 라운드(신규) — 기존 경로 mailAssets/{assetKind}/
+  // {templateKey}/{id}/{file.name}는 users/{uid}/... 프리픽스가 아니라서(§첨부파일
+  // 라운드 커밋 메시지에 이미 이렇게 위험을 예고해뒀었다) 고객 서류함과 같은 Storage
+  // 규칙 대상이 아니었다 — 실제로 규칙이 이 경로를 허용하지 않으면 로그인 상태와
+  // 무관하게 업로드가 막힌다. 서류함(saveDocumentFile)과 동일하게 users/{uid}/...
+  // 아래로 옮겨서, 서류함에 이미 적용된 "로그인한 사용자만 자신의 uid 경로에 접근"
+  // 규칙을 그대로 재사용할 수 있게 한다(§storage.rules 참고, 새 mailCommonAssets
+  // 블록만 추가). 파일명에 경로 구분자 등이 섞여도 안전하도록 sanitize한다.
+  function sanitizeStorageFileName(name){
+    const raw = String(name || 'file');
+    // 경로를 깨뜨릴 수 있는 문자(슬래시·물음표·제어문자 등)만 치환하고 나머지(한글 등)는
+    // 그대로 둔다 — 지나치게 공격적으로 바꾸면 다운로드 시 원래 파일명을 알아보기
+    // 어려워지므로 최소한만 손댄다.
+    const cleaned = raw.replace(/[\/\\?#%\x00-\x1F\s]/g, '_').trim();
+    return (cleaned || 'file').slice(-180); // 너무 긴 파일명이 경로 길이 제한에 걸리지 않도록 끝부분만 유지
+  }
   function uploadMailAssetFile(templateKey, assetKind, file, onProgress){
     if(!isAllowedMailAssetFile(assetKind, file)){
       return Promise.reject(Object.assign(new Error('FILE_TYPE'), { code:'FILE_TYPE' }));
@@ -4564,14 +4580,25 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     return waitForCloudReady(4000).then(ready=>{
       const ST = window.SHIN2_STORAGE;
       if(!ready || !ST || !ST.isSignedIn || !ST.isSignedIn()){
-        return Promise.reject(Object.assign(new Error('NOT_AUTHENTICATED'), { code:'NOT_AUTHENTICATED' }));
+        // §진단 라운드 — 실패 지점을 화면에서 바로 알 수 있도록, 이 시점에 이미 알 수
+        // 있는 경로(uid가 없어도 templateKey/assetKind/파일명까지는 알 수 있다)와
+        // 로그인 상태를 오류 객체에 함께 담아 호출부(render layer)가 그대로 보여줄 수
+        // 있게 한다.
+        return Promise.reject(Object.assign(new Error('NOT_AUTHENTICATED'), {
+          code:'NOT_AUTHENTICATED',
+          diag: { signedIn:false, hasUid: !!(ST && ST.getUid && ST.getUid()), path: '(로그인 전이라 uid를 몰라 경로를 만들 수 없음)' }
+        }));
       }
+      const uid = ST.getUid();
       const id = genId('masset');
-      const path = `mailAssets/${assetKind}/${templateKey}/${id}/${file.name}`;
+      const safeFileName = sanitizeStorageFileName(file.name);
+      const path = `users/${uid}/mailCommonAssets/${templateKey}/${id}/${safeFileName}`;
       return ST.uploadFile(file, path, onProgress).then(res=> ({
         id, fileName: file.name, mimeType: file.type||'', size: file.size||0,
         storagePath: res.storagePath, uploadedAt: nowIso(), uploadedBy: currentUserLabel()
-      }));
+      })).catch(err=>{
+        throw Object.assign(err, { diag: { signedIn:true, hasUid:true, path } });
+      });
     });
   }
   function getMailAssetFileURL(storagePath){
@@ -10325,6 +10352,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         </div>
         <div class="mail-asset-progress" id="mailAssetProgress_${assetKind}_${key}" style="display:none;"></div>
         <div class="mail-asset-status" id="mailAssetStatus_${assetKind}_${key}"></div>
+        <div class="mail-diag-panel" id="mailAssetDiag_${assetKind}_${key}" style="display:none;"></div>
       </div>`;
   }
   function mailTabPanelHtml(key, tpl, asset, meta){
@@ -10516,10 +10544,69 @@ window.SHIN2_CRM_APP_INIT = function(){
     const msg = document.getElementById('mailTplSaveMsg_' + key);
     if(msg){ msg.style.display = 'inline'; setTimeout(()=>{ msg.style.display = 'none'; }, 1800); }
   }
+  // §공통 발송자료 업로드 실패 조사 라운드(신규) — "로그인 상태를 확인해주세요"라는
+  // 뭉뚱그린 문구만 보고는 실제로 어디서 막혔는지(로그인 안 됨 / Storage 준비 지연 /
+  // 규칙 거부 / 다른 이유) 알 수 없어 F12 콘솔 없이도 화면에서 바로 구분할 수 있게
+  // 진단 표를 만든다. 서류함(고객 문서) 업로드는 로그인 안 된 상태에서도 조용히
+  // 로컬 전용 모드로 폴백해(saveDocumentFile) 겉보기엔 "성공"처럼 보이는 반면, 공통
+  // 발송자료는 로컬 폴백이 없어(§첨부파일 라운드 확정) 같은 조건에서 실패가 그대로
+  // 드러난다 — 그래서 "서류함은 되는데 공통자료만 안 된다"는 증상이 실제로는 서류함도
+  // 로컬 전용으로 조용히 저장되고 있었을 가능성을 함께 보여준다(최근 서류함 업로드의
+  // localOnly 비율).
+  function buildMailAssetUploadDiagRows(err, path){
+    const ST = window.SHIN2_STORAGE;
+    const signedIn = !!(ST && ST.isSignedIn && ST.isSignedIn());
+    const hasUid = !!(ST && ST.getUid && ST.getUid());
+    const authErr = (ST && ST.getAuthError) ? ST.getAuthError() : null;
+    const diag = (err && err.diag) || {};
+    const code = (err && err.code) || '(코드 없음)';
+    let cause;
+    if(code === 'FILE_TYPE') cause = '허용되지 않는 파일 형식입니다.';
+    else if(code === 'SIZE_LIMIT_CLOUD') cause = '파일 용량이 허용 범위를 초과했습니다.';
+    else if(code === 'NOT_AUTHENTICATED'){
+      cause = signedIn
+        ? 'Storage 연결 준비가 시간 안에 끝나지 않았습니다(최대 4초 대기) — 네트워크 상태를 확인하고 다시 시도해주세요.'
+        : '로그인이 되어 있지 않습니다 — 이 자료 경로는 서류함과 달리 로그인 안 된 상태로는 저장할 수 없습니다(로컬 폴백 없음). 사이트 잠금 비밀번호로 다시 로그인해주세요.';
+    }
+    else if(code === 'storage/unauthorized') cause = '로그인은 되어 있지만, 이 업로드 경로에 대한 Storage 보안 규칙이 아직 이 경로를 허용하지 않습니다 — storage.rules에 mailCommonAssets 경로 규칙이 배포됐는지 확인해주세요.';
+    else if(code === 'storage/retry-limit-exceeded' || code === 'storage/unknown' || code === 'storage/canceled') cause = '네트워크 문제로 업로드가 반복 실패했습니다 — 다시 시도해주세요.';
+    else cause = (err && err.message) ? err.message : '알 수 없는 오류입니다.';
+    // 최근 서류함(고객 문서) 업로드가 실제로 클라우드에 올라갔는지, 조용히 로컬 전용으로
+    // 저장됐는지 — 새 문서를 만들지 않고 기존 기록만 읽어서 비교한다(§실제 고객 데이터를
+    // 테스트 목적으로 건드리지 않는다).
+    const allDocs = D.loadDocuments ? D.loadDocuments() : [];
+    const cloudDocs = allDocs.filter(d=> d.localOnly === false).length;
+    const localDocs = allDocs.filter(d=> d.localOnly === true).length;
+    const lastDoc = allDocs.slice().sort((a,b)=> (b.uploadedAt||'').localeCompare(a.uploadedAt||''))[0];
+    return [
+      ['Firebase Auth 로그인 상태', signedIn ? '로그인됨' : '로그인 안 됨'],
+      ['window.SHIN2_STORAGE 존재 여부', ST ? '있음' : '없음(Firebase 모듈이 아직 안 떴거나 로드 실패)'],
+      ['uid 존재 여부', hasUid ? '있음' : '없음'],
+      ['업로드 대상 경로', diag.path || path || '(알 수 없음)'],
+      ['Firebase 오류 코드', code],
+      ['실패 원인 안내', cause],
+      ['최근 로그인 시도 오류(있다면)', authErr ? `${authErr.code}` : '(없음)'],
+      ['서류함(고객 문서) 클라우드 업로드 건수', String(cloudDocs)],
+      ['서류함(고객 문서) 이 기기에만 저장된 건수', String(localDocs) + (localDocs > 0 ? ' — 이 기기에서는 서류함도 실제로는 클라우드에 안 올라가고 있을 수 있습니다' : '')],
+      ['가장 최근 서류함 업로드', lastDoc ? `${esc(fmtDate(lastDoc.uploadedAt))} · ${lastDoc.localOnly ? '이 기기에만 저장(로컬)' : '클라우드 저장됨'}` : '(업로드 기록 없음)']
+    ];
+  }
+  function renderMailAssetUploadDiag(key, assetKind, err, path){
+    const el = document.getElementById(`mailAssetDiag_${assetKind}_${key}`);
+    if(!el) return;
+    const rows = buildMailAssetUploadDiagRows(err, path);
+    el.style.display = 'block';
+    el.innerHTML = `
+      <div class="mail-diag-title">업로드 진단 결과 <span class="mail-diag-hint">(비밀번호·인증정보는 표시하지 않습니다)</span></div>
+      <table class="mail-diag-table">${rows.map(([k,v])=> `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join('')}</table>
+    `;
+  }
   function mailAssetHandleUpload(key, assetKind, file){
     if(!file) return;
     const statusEl = document.getElementById(`mailAssetStatus_${assetKind}_${key}`);
     const progEl = document.getElementById(`mailAssetProgress_${assetKind}_${key}`);
+    const diagEl = document.getElementById(`mailAssetDiag_${assetKind}_${key}`);
+    if(diagEl) diagEl.style.display = 'none';
     if(!D.isAllowedMailAssetFile(assetKind, file)){
       if(statusEl){ statusEl.textContent = '허용되지 않는 파일 형식입니다.'; statusEl.classList.add('is-err'); }
       return;
@@ -10545,6 +10632,8 @@ window.SHIN2_CRM_APP_INIT = function(){
         else if(code === 'NOT_AUTHENTICATED') msg = '업로드 실패 — 로그인 상태를 확인해주세요(또는 이 자료 경로에 대한 Storage 규칙이 아직 적용되지 않았을 수 있습니다).';
         else msg = '업로드 실패: ' + (err && err.message ? err.message : '알 수 없는 오류');
         if(statusEl){ statusEl.textContent = msg; statusEl.classList.add('is-err'); }
+        const diagPath = (err && err.diag && err.diag.path) || `users/{uid}/mailCommonAssets/${key}/{assetId}/${file.name}`;
+        renderMailAssetUploadDiag(key, assetKind, err, diagPath);
       });
   }
   function bindMailSettingsView(){
