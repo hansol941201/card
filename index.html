@@ -2496,6 +2496,8 @@ body.map-modal-lock{ overflow:hidden; }
 .mail-preview-box{ background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:10px; }
 .mail-preview-subject{ font-size:13px; font-weight:700; color:var(--text); margin-bottom:6px; }
 .mail-preview-body{ font-size:12.5px; color:var(--text); white-space:pre-wrap; line-height:1.5; margin-bottom:6px; }
+.mail-preview-global-img{ font-size:11.5px; color:var(--text-muted); margin-bottom:6px; }
+.mail-preview-global-img img{ max-width:100%; height:auto; border-radius:4px; border:1px solid var(--line); }
 .mail-tpl-save-bar{ display:flex; align-items:center; gap:10px; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
 .mail-dirty-note{ font-size:11.5px; color:#B5620A; }
 @media (max-width: 640px){
@@ -4507,8 +4509,12 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   // 공용 안내자료(질문서 양식/소개영상 등)이고, 서류함은 "고객에게 받은" 민감 서류
   // (사업자등록증/통장사본 등)다. 절대 서로 자동으로 가져오거나 섞지 않는다.
   const MAIL_ASSETS_KEY = 'shin2-mail-assets-v1';
-  const MAIL_ASSET_MAX_CLOUD_BYTES = { attachmentDoc: DOC_MAX_CLOUD_BYTES, video: 100 * 1024 * 1024 };
-  const MAIL_ASSET_ALLOWED_EXT = { attachmentDoc: DOC_ALLOWED_EXT, video: ['mp4','mov','webm','m4v'] };
+  // inlineImage(§본문 이미지 첨부 라운드 신규) — mailCommonAssets 버킷을 그대로 재사용
+  // (경로에 assetKind가 안 들어가므로 attachmentDoc/video와 같은 폴더를 쓰지만 id가
+  // 서로 달라 섞이지 않는다). 이메일 본문에 바로 박히는 이미지라 5MB로 더 빡빡하게
+  // 잡았다 — 메일 서비스 대부분이 전체 메일 용량을 25MB 안팎으로 제한하기 때문.
+  const MAIL_ASSET_MAX_CLOUD_BYTES = { attachmentDoc: DOC_MAX_CLOUD_BYTES, video: 100 * 1024 * 1024, inlineImage: 5 * 1024 * 1024 };
+  const MAIL_ASSET_ALLOWED_EXT = { attachmentDoc: DOC_ALLOWED_EXT, video: ['mp4','mov','webm','m4v'], inlineImage: ['jpg','jpeg','png','gif','webp'] };
   function isAllowedMailAssetFile(assetKind, file){
     const name = String((file && file.name) || '').toLowerCase();
     const dot = name.lastIndexOf('.');
@@ -4544,6 +4550,24 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     const raw = readRawMailAssets();
     const idx = raw.findIndex(r=> r && r.templateKey === '__meta__');
     const rec = Object.assign({ templateKey:'__meta__', externalShareConfirmed:false }, idx >= 0 ? raw[idx] : {}, patch, { updatedAt: nowIso() });
+    if(idx >= 0) raw[idx] = rec; else raw.push(rec);
+    writeArr(MAIL_ASSETS_KEY, raw);
+    return rec;
+  }
+  // §"모든 메일에 이 이미지를 꼭 첨부" 라운드(신규) — '__global__'도 '__meta__'와 같이
+  // 템플릿이 아닌 특수 레코드다. loadMailAssets()는 MAIL_TEMPLATE_KEYS 4개만 매핑해
+  // 돌려주므로 '__global__'은 거기 안 걸린다 — 그래서 getMailAsset/saveMailAssetPatch를
+  // 그대로 쓰지 않고 __meta__와 동일한 방식의 전용 함수를 따로 둔다(같은 배열
+  // mailAssets에 함께 저장, 새 동기화 키를 또 만들지 않음).
+  const GLOBAL_MAIL_ASSET_KEY = '__global__';
+  function getGlobalMailAsset(){
+    const rec = readRawMailAssets().find(r=> r && r.templateKey === GLOBAL_MAIL_ASSET_KEY);
+    return Object.assign({ templateKey: GLOBAL_MAIL_ASSET_KEY, image: null }, rec);
+  }
+  function saveGlobalMailAssetPatch(patch){
+    const raw = readRawMailAssets();
+    const idx = raw.findIndex(r=> r && r.templateKey === GLOBAL_MAIL_ASSET_KEY);
+    const rec = Object.assign({ templateKey: GLOBAL_MAIL_ASSET_KEY, image: null }, idx >= 0 ? raw[idx] : {}, patch, { templateKey: GLOBAL_MAIL_ASSET_KEY, updatedAt: nowIso() });
     if(idx >= 0) raw[idx] = rec; else raw.push(rec);
     writeArr(MAIL_ASSETS_KEY, raw);
     return rec;
@@ -6457,6 +6481,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     loadMailAssets, getMailAsset, saveMailAssetPatch, uploadMailAssetFile, getMailAssetFileURL,
     deleteMailAssetFile, isAllowedMailAssetFile, MAIL_ASSET_MAX_CLOUD_BYTES, MAIL_ASSET_ALLOWED_EXT,
     getMailAssetsMeta, saveMailAssetsMeta,
+    getGlobalMailAsset, saveGlobalMailAssetPatch,
     loadActivities, addActivity, updateActivityText, deleteActivity, activitiesForCompany, classifyActivity,
     loadDocuments, documentsForCompany, addDocument, updateDocumentExtracted, getBlob, renameDocument, setDocumentMemo, setDocumentVerification, deleteDocument, findDocument, migrateDocumentToCloud,
     memosFor, addMemo, updateMemo, deleteMemo,
@@ -10287,6 +10312,10 @@ window.SHIN2_CRM_APP_INIT = function(){
   // "값"만 쓸 수 있고, D 안의 상수/함수 자체는 못 씀) — 같은 4개 키를 렌더 레이어에도
   // 그대로 복제한다(값 자체는 100% 동일, 새 개념 아님).
   const MAIL_TEMPLATE_KEYS = ['questionnaire', 'firstMeeting', 'postSecondMeeting', 'documentRequest'];
+  // §"모든 메일에 이 이미지를 꼭 첨부" 라운드(신규) — 데이터 계층의 GLOBAL_MAIL_ASSET_KEY
+  // 상수와 반드시 같은 문자열이어야 한다(위 MAIL_TEMPLATE_KEYS와 같은 이유로 리터럴
+  // 그대로 복제).
+  const GLOBAL_MAIL_ASSET_KEY_RENDER = '__global__';
   // §메일 설정 탭 개편 라운드(신규) — 사용자 확정: "1차/2차/3차 메일"은 메일 발송
   // 순서를 가리키는 이름일 뿐, 실제 진행단계(1차미팅/2차미팅)와는 다른 개념이다 —
   // 혼동 방지를 위해 코드 주석에도 명시. tpl.displayName이 있으면 그걸 우선 쓰고,
@@ -10321,6 +10350,40 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 업로드하고 D.saveMailAssetPatch로 메타데이터를 저장한다(팀 공유 Firestore 동기화,
   // §데이터 계층 참고). 실제 이메일 첨부가 아니라 다운로드/시청 "링크"로 보낸다는 점을
   // 항상 문구로 명시한다(§요청 "실제 첨부인지 링크 발송인지 명확히 표시").
+  // §"모든 메일에 이 이미지를 꼭 첨부" 라운드(신규) — 사용자가 명시적으로 "예외 없이
+  // 모든 메일"이라고 확정했다. 그래서 템플릿별 on/off 스위치를 두지 않고, 여기 하나만
+  // 설정하면 questionnaire/firstMeeting/postSecondMeeting/documentRequest 4종 전부
+  // 발송 시 자동으로 본문 끝에 삽입된다(openMailComposeModal/doSend 참고). 업로드
+  // 자체는 uploadMailAssetFile을 그대로 재사용(kind='inlineImage', templateKey는
+  // 4종이 아닌 GLOBAL_MAIL_ASSET_KEY) — 새 Storage 경로/업로드 로직을 만들지 않았다.
+  function globalMailImageBoxHtml(asset){
+    const img = asset && asset.image;
+    const fileRow = img ? `
+        <div class="mail-asset-file-row">
+          <span class="mail-asset-file-name">${esc(img.fileName)}</span>
+          <span class="mail-asset-file-meta">${esc(mailAssetSizeLabel(img.size))} · ${esc(fmtDate(img.uploadedAt))}</span>
+        </div>
+        <div class="mail-asset-file-actions">
+          <button type="button" class="co-text-action" data-mail-global-img-open>미리보기/다운로드</button>
+          <button type="button" class="co-text-action" data-mail-global-img-replace>교체</button>
+          <button type="button" class="co-text-action danger" data-mail-global-img-remove>제거</button>
+        </div>
+        <div class="mail-asset-send-note">질문서/1차미팅/2차미팅/서류요청 — 모든 메일 본문 끝에 자동으로 삽입되어 발송됩니다(개별 메일에서 뺄 수 없습니다).</div>
+      ` : `<div class="mail-asset-empty">등록된 이미지가 없습니다 — 등록하면 모든 메일에 자동으로 포함됩니다.</div>`;
+    return `
+      <div class="mail-asset-box" data-mail-global-img-box>
+        <div class="mail-asset-box-head"><span>모든 메일에 자동 포함할 이미지</span></div>
+        <div class="mail-asset-limit-text">허용 형식: ${(D.MAIL_ASSET_ALLOWED_EXT.inlineImage||[]).join(', ')} · 최대 ${mailAssetSizeLabel(D.MAIL_ASSET_MAX_CLOUD_BYTES.inlineImage)}</div>
+        ${fileRow}
+        <div class="mail-asset-dropzone" data-mail-global-img-drop tabindex="0" role="button" aria-label="모든 메일에 포함할 이미지 선택 또는 드래그하여 업로드">
+          파일을 여기로 끌어다 놓거나 클릭해서 선택
+          <input type="file" class="mail-asset-file-input" id="mailGlobalImgInput" style="display:none;" accept="${(D.MAIL_ASSET_ALLOWED_EXT.inlineImage||[]).map(e=>'.'+e).join(',')}" />
+        </div>
+        <div class="mail-asset-progress" id="mailGlobalImgProgress" style="display:none;"></div>
+        <div class="mail-asset-status" id="mailGlobalImgStatus"></div>
+        <div class="mail-diag-panel" id="mailGlobalImgDiag" style="display:none;"></div>
+      </div>`;
+  }
   function mailAssetBoxHtml(key, assetKind, asset, meta){
     const rec = asset && asset[assetKind];
     const isVideo = assetKind === 'video';
@@ -10413,6 +10476,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     const assets = D.loadMailAssets();
     const assetByKey = {}; assets.forEach(a=> assetByKey[a.templateKey] = a);
     const meta = D.getMailAssetsMeta();
+    const globalAsset = D.getGlobalMailAsset();
     wrap.innerHTML = `
       <div class="workq-header-row">
         <div class="workq-header">
@@ -10443,6 +10507,7 @@ window.SHIN2_CRM_APP_INIT = function(){
             <div class="mail-settings-help">체크하지 않으면 첨부/동영상 자료 옆에 "공유 설정 필요"가 표시됩니다(실제 접근 권한을 바꾸는 스위치가 아니라, 안내 표시용입니다).</div>
             <button type="button" class="co-text-action primary" id="mailAccountSaveBtn">발송 계정 저장</button>
             <span id="mailAccountSaveMsg" class="mail-settings-save-msg" style="display:none;">저장했습니다.</span>
+            ${globalMailImageBoxHtml(globalAsset)}
           </div>
         </div>
         <div class="mail-tabs-bar" role="tablist" id="mailTabsBar">
@@ -10636,6 +10701,105 @@ window.SHIN2_CRM_APP_INIT = function(){
         renderMailAssetUploadDiag(key, assetKind, err, diagPath);
       });
   }
+  // §"모든 메일에 이 이미지를 꼭 첨부" 라운드(신규) — 위 mailAssetHandleUpload와 거의
+  // 같은 흐름이지만 템플릿별(key/assetKind)이 아니라 전역 슬롯 하나(GLOBAL_MAIL_ASSET_KEY)
+  // 라서 별도로 둔다. 업로드 실패 진단은 buildMailAssetUploadDiagRows를 그대로 재사용.
+  function refreshMailGlobalImgBox(){
+    const box = document.querySelector('[data-mail-global-img-box]');
+    if(!box) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = globalMailImageBoxHtml(D.getGlobalMailAsset());
+    box.replaceWith(tmp.firstElementChild);
+    bindMailGlobalImgBox();
+  }
+  function mailGlobalImgHandleUpload(file){
+    if(!file) return;
+    const statusEl = document.getElementById('mailGlobalImgStatus');
+    const progEl = document.getElementById('mailGlobalImgProgress');
+    const diagEl = document.getElementById('mailGlobalImgDiag');
+    if(diagEl) diagEl.style.display = 'none';
+    if(!D.isAllowedMailAssetFile('inlineImage', file)){
+      if(statusEl){ statusEl.textContent = '이미지 파일(jpg/png/gif/webp)만 등록할 수 있습니다.'; statusEl.classList.add('is-err'); }
+      return;
+    }
+    if(file.size > D.MAIL_ASSET_MAX_CLOUD_BYTES.inlineImage){
+      if(statusEl){ statusEl.textContent = `이미지 용량이 너무 큽니다(최대 ${mailAssetSizeLabel(D.MAIL_ASSET_MAX_CLOUD_BYTES.inlineImage)}).`; statusEl.classList.add('is-err'); }
+      return;
+    }
+    if(statusEl){ statusEl.textContent = ''; statusEl.classList.remove('is-err'); }
+    if(progEl){ progEl.style.display = 'block'; progEl.textContent = '업로드 중… 0%'; }
+    D.uploadMailAssetFile(GLOBAL_MAIL_ASSET_KEY_RENDER, 'inlineImage', file, (pct)=>{ if(progEl) progEl.textContent = `업로드 중… ${pct}%`; })
+      .then(rec=>{
+        D.saveGlobalMailAssetPatch({ image: rec });
+        if(progEl) progEl.style.display = 'none';
+        refreshMailGlobalImgBox();
+      })
+      .catch(err=>{
+        if(progEl) progEl.style.display = 'none';
+        const code = err && err.code;
+        let msg = '업로드 실패';
+        if(code === 'FILE_TYPE') msg = '허용되지 않는 파일 형식입니다.';
+        else if(code === 'SIZE_LIMIT_CLOUD') msg = '이미지 용량이 허용 범위를 초과했습니다.';
+        else if(code === 'NOT_AUTHENTICATED') msg = '업로드 실패 — 로그인 상태를 확인해주세요(또는 이 자료 경로에 대한 Storage 규칙이 아직 적용되지 않았을 수 있습니다).';
+        else msg = '업로드 실패: ' + (err && err.message ? err.message : '알 수 없는 오류');
+        if(statusEl){ statusEl.textContent = msg; statusEl.classList.add('is-err'); }
+        const diagPath = (err && err.diag && err.diag.path) || `users/{uid}/mailCommonAssets/${GLOBAL_MAIL_ASSET_KEY_RENDER}/{assetId}/${file.name}`;
+        const el = document.getElementById('mailGlobalImgDiag');
+        if(el){
+          const rows = buildMailAssetUploadDiagRows(err, diagPath);
+          el.style.display = 'block';
+          el.innerHTML = `
+            <div class="mail-diag-title">업로드 진단 결과 <span class="mail-diag-hint">(비밀번호·인증정보는 표시하지 않습니다)</span></div>
+            <table class="mail-diag-table">${rows.map(([k,v])=> `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join('')}</table>
+          `;
+        }
+      });
+  }
+  function bindMailGlobalImgBox(){
+    const box = document.querySelector('[data-mail-global-img-box]');
+    if(!box) return;
+    const input = document.getElementById('mailGlobalImgInput');
+    const dropzone = box.querySelector('[data-mail-global-img-drop]');
+    if(dropzone && input){
+      dropzone.addEventListener('click', ()=> input.click());
+      dropzone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropzone.classList.add('drag-over'); });
+      dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('drag-over'));
+      dropzone.addEventListener('drop', (e)=>{
+        e.preventDefault();
+        dropzone.classList.remove('drag-over');
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        mailGlobalImgHandleUpload(file);
+      });
+    }
+    if(input){
+      input.addEventListener('change', (e)=>{
+        const file = e.target.files && e.target.files[0];
+        e.target.value = '';
+        mailGlobalImgHandleUpload(file);
+      });
+    }
+    const openBtn = box.querySelector('[data-mail-global-img-open]');
+    if(openBtn) openBtn.addEventListener('click', ()=>{
+      const asset = D.getGlobalMailAsset();
+      const img = asset && asset.image;
+      if(!img) return;
+      D.getMailAssetFileURL(img.storagePath).then(url=> window.open(url, '_blank')).catch(()=>{
+        const statusEl = document.getElementById('mailGlobalImgStatus');
+        if(statusEl){ statusEl.textContent = '링크를 불러오지 못했습니다(로그인 상태 또는 Storage 규칙을 확인해주세요).'; statusEl.classList.add('is-err'); }
+      });
+    });
+    const replaceBtn = box.querySelector('[data-mail-global-img-replace]');
+    if(replaceBtn && input) replaceBtn.addEventListener('click', ()=> input.click());
+    const removeBtn = box.querySelector('[data-mail-global-img-remove]');
+    if(removeBtn) removeBtn.addEventListener('click', ()=>{
+      if(!confirm('모든 메일에 자동 포함되던 이미지를 제거하시겠습니까? 이후 발송되는 메일부터는 이미지 없이 나갑니다(이미 보낸 메일에는 영향 없음).')) return;
+      const asset = D.getGlobalMailAsset();
+      const img = asset && asset.image;
+      D.saveGlobalMailAssetPatch({ image: null });
+      refreshMailGlobalImgBox();
+      if(img && img.storagePath) D.deleteMailAssetFile(img.storagePath);
+    });
+  }
   function bindMailSettingsView(){
     const accToggle = document.getElementById('mailAccountToggleBtn');
     if(accToggle) accToggle.addEventListener('click', ()=>{
@@ -10670,6 +10834,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       const msg = document.getElementById('mailAccountSaveMsg');
       if(msg){ msg.style.display = 'inline'; setTimeout(()=>{ msg.style.display = 'none'; }, 1800); }
     });
+    bindMailGlobalImgBox();
     const tabsBar = document.getElementById('mailTabsBar');
     if(tabsBar) tabsBar.addEventListener('click', (e)=>{
       const renameBtn = e.target.closest('[data-mail-tab-rename]');
@@ -10744,8 +10909,21 @@ window.SHIN2_CRM_APP_INIT = function(){
         const filledSubject = fillMailTemplate(subjectVal, MAIL_PREVIEW_SAMPLE_CO, s);
         const filledBody = fillMailTemplate(bodyVal, MAIL_PREVIEW_SAMPLE_CO, s)
           .replace(/\{요청서류목록\}/g, '요청드리는 자료:\n- (예시) 사업자등록증');
-        box.innerHTML = `<div class="mail-preview-subject">${esc(filledSubject)}</div><div class="mail-preview-body">${esc(filledBody)}</div><div class="mail-settings-help">예시 업체(${esc(MAIL_PREVIEW_SAMPLE_CO.name)})로 채운 미리보기입니다 — 실제로 발송되지 않았습니다.</div>`;
+        const globalImg = D.getGlobalMailAsset().image;
+        box.innerHTML = `<div class="mail-preview-subject">${esc(filledSubject)}</div><div class="mail-preview-body">${esc(filledBody)}</div>${globalImg ? `<div class="mail-preview-global-img" id="mailPreviewGlobalImg_${key}">모든 메일 자동 포함 이미지 불러오는 중…</div>` : ''}<div class="mail-settings-help">예시 업체(${esc(MAIL_PREVIEW_SAMPLE_CO.name)})로 채운 미리보기입니다 — 실제로 발송되지 않았습니다.</div>`;
         box.style.display = 'block';
+        // §"모든 메일에 이 이미지를 꼭 첨부" 라운드(신규) — 미리보기는 실제 발송이 아니라서
+        // 링크를 못 가져와도 막지 않고(§요청 [7]과 달리 이건 순수 확인용), 실패하면
+        // 안내 문구만 보여준다.
+        if(globalImg){
+          D.getMailAssetFileURL(globalImg.storagePath).then(url=>{
+            const el = document.getElementById('mailPreviewGlobalImg_' + key);
+            if(el) el.innerHTML = `<img src="${esc(url)}" alt="" style="max-width:100%;height:auto;display:block;" />`;
+          }).catch(()=>{
+            const el = document.getElementById('mailPreviewGlobalImg_' + key);
+            if(el) el.textContent = '모든 메일 자동 포함 이미지를 미리 불러오지 못했습니다(로그인 상태 확인 필요) — 실제 발송 시 다시 시도합니다.';
+          });
+        }
         return;
       }
       const dropzone = e.target.closest('[data-mail-asset-drop]');
@@ -10961,6 +11139,10 @@ window.SHIN2_CRM_APP_INIT = function(){
     const mailAsset = D.getMailAsset(mailType);
     const commonDoc = mailAsset && mailAsset.attachmentDoc;
     const commonVideo = mailAsset && mailAsset.video;
+    // §"모든 메일에 이 이미지를 꼭 첨부" 라운드(신규) — 템플릿 종류와 무관하게 항상
+    // 포함된다(사용자 확정: 예외 없음). 여기서는 표시만 하고, 실제 삽입은 doSend에서
+    // commonDoc/commonVideo 링크와 같은 시점에 최신 URL을 다시 조회해서 붙인다.
+    const globalImg = D.getGlobalMailAsset().image;
     // §요청 "필수 질문서 파일이 없으면... 그대로 발송되지 않도록 차단" — questionnaire
     // 템플릿은 본문이 "첨부된 질문서를 확인해주세요" 문구를 전제하므로, 공통 자료도
     // 업체별 서류함 자료도 전혀 없으면 발송 자체를 막는다(다른 3종은 첨부가 필수라고
@@ -11011,7 +11193,8 @@ window.SHIN2_CRM_APP_INIT = function(){
                 <div class="mail-compose-attach-note">메일 본문/서류함에서 실제 첨부 발송은 EmailJS 첨부 API 확인 후 연결 예정 — 지금은 받는 분께 서류함에서 직접 전달하시거나, 파일을 별도로 첨부해 보내주세요.</div>
               ` : (!commonDoc ? `<div class="mail-compose-attach-row is-missing">${esc(docTypeLabel)}(업체 서류함) — 자료 설정 필요(서류함에 아직 업로드된 파일이 없습니다)</div>` : '')) : ''}
               ${commonVideo ? `<div class="mail-compose-attach-row">공통 동영상 · ${esc(commonVideo.fileName)} — 이메일 첨부가 아닌 시청 링크로 본문에 자동 포함되어 발송됩니다.</div>` : (tpl.videoUrl ? `<div class="mail-compose-attach-row">동영상 링크 포함됨 — 본문 끝에 자동 삽입</div>` : '')}
-              ${!commonDoc && !docTypeLabel && !commonVideo && !tpl.videoUrl ? `<div class="mail-compose-attach-row is-missing">이 템플릿에는 설정된 첨부자료가 없습니다</div>` : ''}
+              ${globalImg ? `<div class="mail-compose-attach-row">전체 공통 이미지 · ${esc(globalImg.fileName)} — 모든 메일에 자동 포함되는 이미지입니다(본문 끝에 삽입, 이 메일에서 뺄 수 없음).</div>` : ''}
+              ${!commonDoc && !docTypeLabel && !commonVideo && !tpl.videoUrl && !globalImg ? `<div class="mail-compose-attach-row is-missing">이 템플릿에는 설정된 첨부자료가 없습니다</div>` : ''}
               ${questionnaireBlocked ? `<div class="mail-compose-warn">필수 질문서 파일이 없습니다 — 메일 설정 탭에서 공통 발송자료를 먼저 등록하거나, 업체 서류함에 질문서를 올려주세요. 등록 전까지는 발송할 수 없습니다.</div>` : ''}
             </div>
             <div class="co-form-field">
@@ -11079,11 +11262,17 @@ window.SHIN2_CRM_APP_INIT = function(){
       const linkFetches = [];
       if(commonDoc) linkFetches.push(D.getMailAssetFileURL(commonDoc.storagePath).then(url=> ({ label: commonDoc.fileName + ' 다운로드', url })));
       if(commonVideo) linkFetches.push(D.getMailAssetFileURL(commonVideo.storagePath).then(url=> ({ label: '시청 링크', url })));
-      Promise.all(linkFetches)
-        .catch(()=>{ throw Object.assign(new Error('공통 발송자료 링크를 불러오지 못했습니다 — 로그인 상태 또는 Storage 공유 규칙을 확인해주세요.'), { code:'ASSET_LINK_FAILED' }); })
-        .then(links=>{
+      // §"모든 메일에 이 이미지를 꼭 첨부" 라운드(신규) — 사용자 확정: 예외 없이 모든
+      // 메일에 포함. 링크와 마찬가지로 발송 시점에 최신 URL을 다시 조회하고, 못 가져오면
+      // (로그인 끊김·규칙 미적용 등) "꼭 첨부"가 지켜질 수 없으므로 다른 첨부자료와
+      // 똑같이 발송 자체를 막는다(§요청 "링크 접근 불가능하면 발송 전 차단"과 동일 원칙).
+      const globalImgFetch = globalImg ? D.getMailAssetFileURL(globalImg.storagePath) : Promise.resolve(null);
+      Promise.all([Promise.all(linkFetches), globalImgFetch])
+        .catch(()=>{ throw Object.assign(new Error('공통 발송자료 또는 전체 공통 이미지 링크를 불러오지 못했습니다 — 로그인 상태 또는 Storage 공유 규칙을 확인해주세요.'), { code:'ASSET_LINK_FAILED' }); })
+        .then(([links, globalImgUrl])=>{
           const params = buildMailSendParams(toEmail, ccEmails, latestSettings);
           if(links.length) params.message += '\n\n' + links.map(l=> `${l.label}: ${l.url}`).join('\n');
+          if(globalImgUrl) params.message += `\n\n<img src="${globalImgUrl}" alt="" style="max-width:100%;height:auto;display:block;" />`;
           emailAttempted = true;
           return loadEmailJsSdk()
             .then(emailjs=> emailjs.send(latestSettings.emailjsServiceId, latestSettings.emailjsTemplateId, params, { publicKey: latestSettings.emailjsPublicKey }))
