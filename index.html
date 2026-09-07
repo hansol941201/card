@@ -2914,7 +2914,10 @@ table.pdf-doc-table thead{ background:var(--bg); }
             <button type="button" id="crmPartnerImportBtn" style="display:none;">협력사 데이터 업데이트</button>
             <button type="button" id="crmPourImportBtn" style="display:none;">POUR 시공실적 업데이트</button>
             <button type="button" id="crmPartnerSyncBtn">진행현황 동기화</button>
-            <button type="button" id="crmSyncDiagBtn" style="display:none;">동기화 진단(업체 1건 추적)</button>
+            <!-- §태림건설 동기화 조사 라운드(신규) — "특정 업체 1건이 왜 반영 안 되는지"
+                 실제 데이터로 직접 추적하는 기존 도구(runSyncDiagnostic, 전혀 안 바꿈)를
+                 다시 노출했다. 읽기 전용 — 저장은 전혀 하지 않는다. -->
+            <button type="button" id="crmSyncDiagBtn">동기화 진단(업체 1건 추적)</button>
             <!-- §협력업체 동기화 단순화 라운드(§요청 3/4/10) — partner-dashboard의 "협력업체
                  리스트"(internal/contractor/external, RTDB partnerList_* 9개 키 포함)만
                  가져온다. 신규 MOU 파이프라인(질문서/미팅/체결 진행 상태, mouOverrides/
