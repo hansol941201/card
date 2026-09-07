@@ -2417,7 +2417,17 @@ body.map-modal-lock{ overflow:hidden; }
 .workq-mail-btn:hover{ background:#EEF2FA; }
 .workq-mail-btn.is-sent{ color:#0F7A42; border-color:#0F7A42; }
 .workq-mail-skip{ font-size:11px; color:var(--text-muted); }
-.mail-settings-panel{ max-width:640px; }
+/* §메일 설정 2열 레이아웃 라운드(신규) — .app이 이미 1580px까지 넓은데 이 패널만
+   640px로 좁아서 넓은 화면 오른쪽이 빈 채로 남던 문제. 화면 폭에 맞춰 넓히고,
+   탭 아래 내용은 왼쪽(제목/본문 등 입력)·오른쪽(첨부/미리보기/저장) 2열 그리드로
+   나눠서 넓어진 폭을 실제로 활용한다. 발송 계정 설정·탭바는 기존처럼 전체 폭. */
+.mail-settings-panel{ max-width:1360px; width:100%; margin:0 auto; padding:0 24px; }
+.mail-template-layout{ display:grid; grid-template-columns:minmax(0,1.8fr) minmax(320px,1fr); gap:24px; align-items:start; }
+.mail-template-left, .mail-template-right{ min-width:0; }
+@media (max-width:900px){
+  .mail-settings-panel{ padding:0 12px; }
+  .mail-template-layout{ grid-template-columns:1fr; }
+}
 .mail-settings-section{ border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:14px; background:var(--surface); }
 .mail-settings-section-title{ font-size:13px; font-weight:700; color:var(--text); margin-bottom:8px; }
 .mail-settings-help{ font-size:11.5px; color:var(--text-muted); line-height:1.5; margin-bottom:10px; }
@@ -2481,7 +2491,8 @@ body.map-modal-lock{ overflow:hidden; }
 .mail-asset-progress{ font-size:11.5px; color:var(--navy); margin-top:6px; }
 .mail-asset-status{ font-size:11.5px; color:var(--text-muted); margin-top:4px; }
 .mail-asset-status.is-err{ color:#B3261E; }
-.mail-tpl-preview-row{ display:flex; align-items:center; gap:10px; margin:6px 0; }
+.mail-tpl-preview-row{ display:flex; align-items:center; gap:10px; margin:6px 0; flex-wrap:wrap; }
+.mail-tpl-preview-row .co-text-action{ white-space:nowrap; }
 .mail-preview-box{ background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:10px; }
 .mail-preview-subject{ font-size:13px; font-weight:700; color:var(--text); margin-bottom:6px; }
 .mail-preview-body{ font-size:12.5px; color:var(--text); white-space:pre-wrap; line-height:1.5; margin-bottom:6px; }
@@ -10330,31 +10341,40 @@ window.SHIN2_CRM_APP_INIT = function(){
       </div>`;
     const updatedText = tpl.updatedAt ? `마지막 저장: ${esc(fmtDate(tpl.updatedAt))} ${esc(fmtTime(tpl.updatedAt))}` : '아직 저장한 적 없음(기본값 사용 중)';
     const placeholderRow = (targetId)=> `<div class="mail-placeholder-row">${MAIL_PLACEHOLDER_BUTTONS.map(([ph,label])=> `<button type="button" class="mail-placeholder-btn" data-ph-target="${targetId}" data-ph-value="${esc(ph)}">${esc(label)}</button>`).join('')}</div>`;
+    // §메일 설정 2열 레이아웃 라운드(신규) — 탭 아래를 왼쪽(제목·본문 등 실제로 쓰는
+    // 글) / 오른쪽(첨부자료·미리보기·저장) 2열로 나눴다. 필드 id·저장/미리보기 로직은
+    // 전혀 안 바꿨고 배치만 옮겼다(§요청, 넓은 화면 오른쪽 여백 활용).
     return `
       <div class="mail-tab-panel" data-mail-panel="${esc(key)}" style="display:${mailSettingsUI.activeTab===key?'block':'none'};">
-        <label class="mail-tpl-enable" style="margin-bottom:8px;"><input type="checkbox" id="mailSetEnabled_${key}" ${tpl.enabled!==false?'checked':''} /> 이 메일 사용</label>
-        <div class="mail-tpl-timing">${esc(MAIL_TEMPLATE_TIMING_TEXT[key])}</div>
-        <div class="co-form-field"><label>제목</label><input type="text" id="mailSetSubject_${key}" value="${esc(tpl.subjectTemplate)}" /></div>
-        ${placeholderRow('mailSetSubject_' + key)}
-        <div class="co-form-field"><label>본문</label><textarea id="mailSetBody_${key}" rows="10">${esc(tpl.bodyTemplate)}</textarea></div>
-        ${placeholderRow('mailSetBody_' + key)}
-        ${key==='documentRequest' ? `<div class="mail-settings-help">본문의 {요청서류목록} 자리에 발송 시 선택한 미등록·재요청 서류명이 자동으로 들어갑니다.</div>` : ''}
-        ${attachSelectHtml}
-        <div class="mail-settings-section-title" style="margin-top:14px;">공통 발송자료</div>
-        ${mailAssetBoxHtml(key, 'attachmentDoc', asset, meta)}
-        ${mailAssetBoxHtml(key, 'video', asset, meta)}
-        <div class="co-form-field"><label>또는 기존 동영상 링크(선택, 업로드 파일이 없을 때만 사용됨)</label><input type="text" id="mailSetVideo_${key}" placeholder="https://..." value="${esc(tpl.videoUrl||'')}" /></div>
-        <div class="mail-tpl-preview-row">
-          <button type="button" class="co-text-action" id="mailPreviewBtn_${key}">미리보기</button>
-          <span class="mail-settings-help">미리보기는 예시 업체정보로만 표시되며 실제로 발송되지 않습니다.</span>
+        <div class="mail-template-layout">
+          <div class="mail-template-left">
+            <div class="mail-tpl-timing">${esc(MAIL_TEMPLATE_TIMING_TEXT[key])}</div>
+            <label class="mail-tpl-enable" style="float:none; display:inline-flex; margin-bottom:10px;"><input type="checkbox" id="mailSetEnabled_${key}" ${tpl.enabled!==false?'checked':''} /> 이 메일 사용</label>
+            <div class="co-form-field"><label>제목</label><input type="text" id="mailSetSubject_${key}" value="${esc(tpl.subjectTemplate)}" /></div>
+            ${placeholderRow('mailSetSubject_' + key)}
+            <div class="co-form-field"><label>본문</label><textarea id="mailSetBody_${key}" rows="14">${esc(tpl.bodyTemplate)}</textarea></div>
+            ${placeholderRow('mailSetBody_' + key)}
+            ${key==='documentRequest' ? `<div class="mail-settings-help">본문의 {요청서류목록} 자리에 발송 시 선택한 미등록·재요청 서류명이 자동으로 들어갑니다.</div>` : ''}
+          </div>
+          <div class="mail-template-right">
+            <div class="mail-settings-section-title">첨부자료 설정</div>
+            ${attachSelectHtml}
+            ${mailAssetBoxHtml(key, 'attachmentDoc', asset, meta)}
+            ${mailAssetBoxHtml(key, 'video', asset, meta)}
+            <div class="co-form-field"><label>또는 기존 동영상 링크(선택, 업로드 파일이 없을 때만 사용됨)</label><input type="text" id="mailSetVideo_${key}" placeholder="https://..." value="${esc(tpl.videoUrl||'')}" /></div>
+            <div class="mail-settings-updated-at">${updatedText}</div>
+            <div class="mail-tpl-preview-row">
+              <button type="button" class="co-text-action" id="mailPreviewBtn_${key}">미리보기</button>
+              <span class="mail-settings-help">미리보기는 예시 업체정보로만 표시되며 실제로 발송되지 않습니다.</span>
+            </div>
+            <div class="mail-preview-box" id="mailPreviewBox_${key}" style="display:none;"></div>
+            <div class="mail-tpl-save-bar">
+              <button type="button" class="co-text-action primary" id="mailTplSaveBtn_${key}">변경사항 저장</button>
+              <span class="mail-dirty-note" id="mailDirtyNote_${key}" style="display:none;">저장하지 않은 변경사항이 있습니다</span>
+              <span id="mailTplSaveMsg_${key}" class="mail-settings-save-msg" style="display:none;">저장했습니다.</span>
+            </div>
+          </div>
         </div>
-        <div class="mail-preview-box" id="mailPreviewBox_${key}" style="display:none;"></div>
-        <div class="mail-tpl-save-bar">
-          <button type="button" class="co-text-action primary" id="mailTplSaveBtn_${key}">변경사항 저장</button>
-          <span class="mail-dirty-note" id="mailDirtyNote_${key}" style="display:none;">저장하지 않은 변경사항이 있습니다</span>
-          <span id="mailTplSaveMsg_${key}" class="mail-settings-save-msg" style="display:none;">저장했습니다.</span>
-        </div>
-        <div class="mail-settings-updated-at">${updatedText}</div>
       </div>`;
   }
   function mailTabDisplayName(tpl, key){ return (tpl && tpl.displayName) ? tpl.displayName : MAIL_TEMPLATE_TAB_LABEL_DEFAULT[key]; }
