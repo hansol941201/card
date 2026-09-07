@@ -54,6 +54,7 @@
   }
   .gate-input:focus{ border-color:#C7CEDB; }
   .gate-error{ font-size:12px; color:#B91C1C; }
+  .gate-setup-note{ font-size:11.5px; color:var(--text-muted); max-width:280px; line-height:1.5; background:var(--bg); border-radius:8px; padding:8px 10px; }
   .gate-enter-btn{
     width:100%; max-width:260px; height:38px; font-size:13px; font-weight:600; color:#fff;
     background:var(--navy); border:none; border-radius:6px; cursor:pointer;
@@ -2829,7 +2830,11 @@ table.pdf-doc-table thead{ background:var(--bg); }
 <div class="gate-screen" id="gateScreen">
   <div class="gate-brand">한솔 고객관리</div>
   <div class="gate-desc" id="gateDesc">비밀번호를 입력해주세요</div>
+  <!-- §최초 계정함 만들기 라운드(신규) — 이 기기에 계정함(shin2-accounts-vault)이 아예
+       없을 때만 보인다(gateSetupNote/gateConfirmInput). 계정함이 있으면 기존 화면 그대로. -->
+  <div class="gate-setup-note" id="gateSetupNote" style="display:none;">이 비밀번호는 팀이 함께 쓰는 클라우드 로그인 비밀번호입니다. 다른 기기에서 이미 정해 둔 비밀번호가 있다면 그 비밀번호를 그대로 입력해주세요 — 새로 다른 값을 만들면 기존 클라우드 로그인과 어긋날 수 있습니다.</div>
   <input type="password" id="gatePasswordInput" class="gate-input" placeholder="비밀번호" autocomplete="off" />
+  <input type="password" id="gateConfirmInput" class="gate-input" placeholder="비밀번호 확인" autocomplete="off" style="display:none;" />
   <div class="gate-error" id="gateError" style="display:none;"></div>
   <button type="button" id="gateEnterBtn" class="gate-enter-btn">들어가기</button>
 </div>
@@ -3499,7 +3504,21 @@ window.SHIN2_CRM_OCR = (function(){
    브라우저 localStorage 값이라 계속 재사용한다). 계정함이 아직 없는 새 기기(=한 번도
    비밀번호를 만든 적 없음)는 더 이상 v2로 안내하지 않고 즉시 로컬 전용 모드로 앱을
    연다 — 클라우드 동기화는 계정함/로그인이 생기면 자동으로 붙는다(아래 Firebase
-   모듈의 onAuthStateChanged가 담당, 여기서 새 계정 생성 UI를 만들지 않음).
+   모듈의 onAuthStateChanged가 담당).
+   §최초 계정함 만들기 라운드(신규) — 사용자 확인: "이 사이트에서 계정함을 만든 적이
+   자체가 없다 — 클라우드 로그인이 한 번도 된 적이 없다는 뜻, 새로 계정을 만들 방법이
+   필요하다". 예전 라운드는 "새 계정 생성 UI는 만들지 않는다"고 확정했었지만, 그건
+   v2가 아직 있고 그쪽에 안내할 수 있던 시절 얘기였다 — v2가 삭제된 지금은 이 페이지가
+   유일한 진입점이라 그 결정을 이 사용자 확인으로 뒤집는다. 새 계정함이 없을 때는
+   즉시 로컬 전용으로 앱을 열지 않고, 같은 게이트 화면에서 비밀번호(+확인)를 입력받아
+   이 기기의 계정함을 새로 만든다 — 이 비밀번호가 곧 Firebase 쪽 고정 이메일
+   (HANSOL2_FIXED_EMAIL) 계정의 비밀번호로도 쓰인다(§ 아래 module 블록의
+   trySignInWithPassword — 존재하지 않는 계정이면 createUserWithEmailAndPassword로 자동
+   생성, 이미 있으면 로그인만 시도). 여러 사람이 각자 다른 비밀번호로 "최초 생성"을
+   시도해도 실제 Firebase 계정에는 맨 처음 성공한 비밀번호만 남는다 — 나중에 다른
+   비밀번호로 시도한 사람은 로컬 화면 진입은 되지만(로컬 계정함은 자기가 입력한
+   값으로 자체 검증) Storage 로그인 자체는 실패하며, 기존 진단 패널이 그 실패 사유
+   (auth/wrong-password 등)를 그대로 보여준다 — 임의로 우회하거나 숨기지 않는다.
    ========================================================================== */
 (function(){
   'use strict';
@@ -3516,15 +3535,37 @@ window.SHIN2_CRM_OCR = (function(){
     const bits = await crypto.subtle.deriveBits({ name:'PBKDF2', salt: saltBytes, iterations: PBKDF2_ITERATIONS, hash:'SHA-256' }, baseKey, 256);
     return new Uint8Array(bits);
   }
-  async function importAesKey(rawBytes){ return crypto.subtle.importKey('raw', rawBytes, { name:'AES-GCM' }, false, ['decrypt']); }
+  // §최초 계정함 만들기 라운드(신규) — 기존엔 복호화(decrypt)만 했으므로 keyUsages에
+  // 'encrypt'가 없었다. 새 계정함을 만들려면 CHECK_PLAINTEXT를 암호화해서 저장해야 해서
+  // 'encrypt'도 함께 허용한다(기존 decrypt 호출부는 그대로 동작 — usages를 늘린 것뿐,
+  // decryptStr 로직은 한 글자도 안 바꿨다).
+  async function importAesKey(rawBytes){ return crypto.subtle.importKey('raw', rawBytes, { name:'AES-GCM' }, false, ['encrypt','decrypt']); }
   async function decryptStr(key, cipherB64, ivB64){
     const iv = new Uint8Array(bufFromB64(ivB64));
     const cipherBuf = bufFromB64(cipherB64);
     const plainBuf = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, key, cipherBuf);
     return new TextDecoder().decode(plainBuf);
   }
+  async function encryptStr(key, plaintext){
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const cipherBuf = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, new TextEncoder().encode(plaintext));
+    return { cipher: b64FromBuf(cipherBuf), iv: b64FromBuf(iv.buffer) };
+  }
   function loadVaultRaw(){
     try{ const raw = localStorage.getItem(ACCT_KEY); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+  }
+  // createVaultForPassword: 이 기기에 계정함이 아예 없을 때만 쓰인다(§최초 계정함 만들기
+  // 라운드) — 새 salt를 뽑고 CHECK_PLAINTEXT를 그 비밀번호로 암호화해 저장한다. 이후
+  // 이 기기에서는 이 비밀번호로만 게이트/재로그인이 검증된다(기존 loadVaultRaw/
+  // decryptStr 검증 로직과 완전히 같은 포맷).
+  async function createVaultForPassword(pw){
+    const saltBytes = crypto.getRandomValues(new Uint8Array(16));
+    const rawBytes = await deriveRawKeyBytes(pw, saltBytes);
+    const key = await importAesKey(rawBytes);
+    const check = await encryptStr(key, CHECK_PLAINTEXT);
+    const vault = { salt: b64FromBuf(saltBytes.buffer), check };
+    try{ localStorage.setItem(ACCT_KEY, JSON.stringify(vault)); }catch(e){}
+    return vault;
   }
 
   const gateScreen = document.getElementById('gateScreen');
@@ -3573,16 +3614,24 @@ window.SHIN2_CRM_OCR = (function(){
     return { ok:true };
   };
 
-  const existing = loadVaultRaw();
-  if(!existing){
-    // 계정함이 없는 새 기기(v2를 열어본 적 없음) — v2가 삭제되었으므로 더 이상 안내할 곳이
-    // 없다. 즉시 로컬 전용 모드로 앱을 연다(새 계정 생성 UI는 만들지 않음, §v2 제거 라운드).
-    showApp();
-    return;
-  } else {
+  const gateSetupNote = document.getElementById('gateSetupNote');
+  const gateConfirmInput = document.getElementById('gateConfirmInput');
+
+  let existing = loadVaultRaw();
+  // §최초 계정함 만들기 라운드(신규) — 계정함이 없는 새 기기라도 더 이상 곧장
+  // showApp()으로 건너뛰지 않는다(예전엔 "새 계정 생성 UI는 만들지 않음"이 확정이었지만,
+  // 사용자 확인 "클라우드 로그인이 한 번도 된 적 없다 — 새로 계정을 만들 방법이
+  // 필요하다"로 뒤집었다). 대신 같은 게이트 화면을 "설정 모드"로 보여주고,
+  // handleGateEnter가 비밀번호+확인을 받아 이 기기의 계정함을 새로 만든다.
+  let isSetupMode = !existing;
+  if(existing){
     try{
       if(localStorage.getItem(CRM_SESSION_KEY) === '1'){ showApp(); return; }
     }catch(e){}
+  } else {
+    gateDesc.textContent = '이 기기에는 아직 클라우드 로그인 비밀번호가 설정되어 있지 않습니다. 비밀번호를 정해주세요.';
+    gateSetupNote.style.display = 'block';
+    gateConfirmInput.style.display = 'block';
   }
 
   async function handleGateEnter(){
@@ -3591,6 +3640,24 @@ window.SHIN2_CRM_OCR = (function(){
     if(!pw) return;
     gateEnterBtn.disabled = true;
     try{
+      if(isSetupMode){
+        // §최초 계정함 만들기 라운드(신규) — 이 기기에 계정함이 아직 없을 때만 이 분기를
+        // 탄다. 확인 입력과 다르면 오타를 그대로 계정함에 새겨버리는 걸 막기 위해 저장
+        // 전에 반드시 막는다.
+        const confirmPw = gateConfirmInput.value;
+        if(pw !== confirmPw){ showGateError('비밀번호가 서로 다릅니다. 다시 입력해주세요.'); return; }
+        if(pw.length < 4){ showGateError('비밀번호를 4자 이상 입력해주세요.'); return; }
+        await createVaultForPassword(pw);
+        existing = loadVaultRaw();
+        isSetupMode = false;
+        try{ localStorage.setItem(CRM_SESSION_KEY, '1'); }catch(e){}
+        showApp();
+        // 새로 만든 계정함의 비밀번호를 그대로 Firebase 로그인 시도에도 쓴다 — 존재하지
+        // 않는 계정이면 module 블록의 trySignInWithPassword가 자동으로
+        // createUserWithEmailAndPassword까지 시도한다(§ 위 라운드 설명 그대로).
+        window.dispatchEvent(new CustomEvent('shin2-crm-unlocked', { detail: { password: pw } }));
+        return;
+      }
       const current = loadVaultRaw();
       if(!current){ showApp(); return; }
       const saltBytes = new Uint8Array(bufFromB64(current.salt));
