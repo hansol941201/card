@@ -3009,8 +3009,6 @@ table.pdf-doc-table thead{ background:var(--bg); }
            출력. 클릭 시 열리는 모달 안에서 유형·지역·검색을 다시 선택한 뒤에만 실제
            출력 대상이 정해진다(§요청 "화면 필터와 출력 필터를 혼동하지 않게"). -->
       <button type="button" class="co-text-action" id="crmPdfExportBtn">목록 출력</button>
-      <!-- §업체 관계·협약 종료 라운드(신규) — 자회사만 보기 필터(§요청 7). -->
-      <button type="button" class="list-filter-chip" id="crmSubsidiaryOnlyBtn">★ 자회사만 보기</button>
     </div>
     <!-- §최근 실적 독립 컬럼 복원 라운드: "최근 시공"을 업체명 옆에 붙이던 걸 취소하고
          독립 컬럼(라벨은 "최근 실적"으로 변경)으로 되돌렸다(§1/§2/§3) — 협력사 컬럼에는
@@ -7241,7 +7239,6 @@ window.SHIN2_CRM_APP_INIT = function(){
   const searchInput = document.getElementById('crmSearchInput');
   const listTitle = document.getElementById('crmListTitle');
   let searchQuery = '';
-  let subsidiaryOnlyFilter = false; // §업체 관계·협약 종료 라운드(신규) — "자회사만 보기"
   let currentCompanyId = null;
   // §첫 화면 최종 수정 라운드: 필터/정렬/페이지 상태. 서버가 없는 순수 클라이언트 화면이라
   // 세 값 모두 렌더 시점에 메모리에서만 들고 있고, 별도로 저장하지 않는다(새로고침하면
@@ -7290,7 +7287,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   // (리스트 등재 co.partnerStatus==='partner' OR MOU 단계 done) 그대로다. 새 판정 로직
   // 없음 — 이미 있는 isConfirmedPartner를 그대로 재사용한다.
   const FILTER_DEFS = [
-    ['all','전체'], ['agreementInProgress','협약 진행'], ['mouDone','MOU체결'], ['agreementTerminated','협약 종료'], ['trendUp','최근흐름 상승세']
+    ['all','전체'], ['agreementInProgress','협약 진행'], ['mouDone','MOU체결'], ['agreementTerminated','협약 종료'], ['subsidiary','자회사'], ['trendUp','최근흐름 상승세']
   ];
   function getMouStage(progress){
     return progress.stages.find(s=> s.key === 'mou') || null;
@@ -7315,7 +7312,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     const mou = getMouStage(progress);
     return !!(progress.hasAny && mou && mou.state === 'done');
   }
-  function matchesFilter(co, progress, key){
+  // §자회사 탭 라운드(신규) — relationIndex는 옵션(마지막 인자, 기본값 없으면 undefined)
+  // 이다: 'subsidiary' 키 외의 기존 호출부(지도분포 등)는 그대로 relationIndex 없이 불러도
+  // 전혀 안 바뀐다(D.isSubsidiary가 relationIndex 없을 때 co.relatedCompanies로 직접
+  // 폴백하므로 하위 호환). 목록 화면(renderList)만 이미 계산해 둔 relationIndex를 넘겨서
+  // 상대 업체 쪽에서만 "자회사"로 등록해 둔 역방향 관계까지 정확히 잡는다.
+  function matchesFilter(co, progress, key, relationIndex){
     if(key === 'all') return true;
     if(key === 'partner') return isConfirmedPartner(co, progress);
     if(key === 'receivable'){
@@ -7351,6 +7353,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     // §업체 하나가 MOU 체결과 협약 종료에 동시에 중복 집계되지 않게(§요청) — 위에서 이미
     // mouDone 쪽을 뺐으므로 이 키는 종료 업체만, mouDone 쪽엔 종료 업체가 전혀 안 들어간다.
     if(key === 'agreementTerminated') return D.isAgreementTerminated(co);
+    // §자회사 탭 라운드(신규) — 기존 "★ 자회사만 보기" 토글(다른 필터와 AND로 조합되는
+    // 별도 체크박스, 그대로 유지)과 별개로, FILTER_DEFS 탭 목록에도 추가한다(§요청 "여기에
+    // 자회사 탭 따로 만들어줘"). 판정 로직은 새로 만들지 않고 이미 있는 D.isSubsidiary
+    // 그대로 재사용 — 별표(subsidiaryStarHtml)와 완전히 같은 기준이라 별표가 붙은 업체만
+    // 이 탭에 나온다.
+    if(key === 'subsidiary') return D.isSubsidiary(co, relationIndex);
     // '최근흐름 상승세' 탭 — buildRecentTrend(co)가 이미 계산해 둔 값을 그대로 재사용
     // (목록 셀/드로어와 같은 함수, 새 판정 로직 아님). state==='up'인 업체만.
     if(key === 'trendUp') return buildRecentTrend(co).state === 'up';
@@ -7686,7 +7694,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     renderRisingSection(companies);
 
     const filterCounts = {};
-    FILTER_DEFS.forEach(([key])=>{ filterCounts[key] = enriched.filter(r=> matchesFilter(r.co, r.progress, key)).length; });
+    FILTER_DEFS.forEach(([key])=>{ filterCounts[key] = enriched.filter(r=> matchesFilter(r.co, r.progress, key, relationIndex)).length; });
     // §관리필요 업체 라운드: renderList()가 이미 매번 계산해 둔 enriched(co/acts/progress)를
     // 그대로 재사용해 관리필요 목록을 한 번만 계산하고, 모달/버튼/고객카드 배너가 모두 이
     // 캐시(managementNeedCache)만 조회한다(§ "같은 계산을 여러 곳에서 반복하지 않는다").
@@ -7701,12 +7709,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     renderKpiStrip(filterCounts);
 
     const rows = enriched
-      .filter(r=> matchesFilter(r.co, r.progress, filterKey))
+      .filter(r=> matchesFilter(r.co, r.progress, filterKey, relationIndex))
       .filter(r=> matchesSearch(r.co, r.acts, searchQuery, (()=>{
         const parent = D.resolveParentCompanyDisplay(r.co, companies, relationIndex);
         return parent ? parent.name : null;
-      })()))
-      .filter(r=> !subsidiaryOnlyFilter || D.isSubsidiary(r.co, relationIndex));
+      })()));
     applySort(rows, contribIndex);
 
     const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
@@ -23038,11 +23045,6 @@ window.SHIN2_CRM_APP_INIT = function(){
   document.getElementById('crmMapDistributionBtn').addEventListener('click', openMapDistributionModal);
   document.getElementById('crmPhoneRequestBtn').addEventListener('click', openPhoneRequestModal);
   document.getElementById('crmPdfExportBtn').addEventListener('click', openPdfExportModal);
-  document.getElementById('crmSubsidiaryOnlyBtn').addEventListener('click', (e)=>{
-    subsidiaryOnlyFilter = !subsidiaryOnlyFilter;
-    e.currentTarget.classList.toggle('is-active', subsidiaryOnlyFilter);
-    renderList();
-  });
   // §업체 추가 폼 이관 라운드에서 함께 수정: addEventListener('click', openAddCompanyForm)로
   // 직접 등록하면 클릭 이벤트(MouseEvent)가 그대로 prefillName 인자로 들어가 이름칸에
   // "[object MouseEvent]"가 채워지는 기존 버그가 있었다 — 인자 없이 호출하도록 감싼다.
