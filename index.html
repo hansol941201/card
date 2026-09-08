@@ -208,6 +208,16 @@
   .relation-badge.rel-parent{ background:#E8F0FE; color:#1D4ED8; }
   .relation-badge.rel-sub{ background:#FDF1E7; color:#B45309; }
   .relation-badge.rel-affiliate{ background:#F1EEFD; color:#6D28D9; }
+  /* §업체 관계·협약 종료 라운드(신규) */
+  .co-subsidiary-star-row{ line-height:1; margin-bottom:1px; }
+  .co-subsidiary-star{ display:inline-block; font-size:11px; color:#B8860B; cursor:default; }
+  .co-subsidiary-star:focus-visible{ outline:2px solid var(--navy); outline-offset:1px; border-radius:2px; }
+  .co-former-name-sub{ font-size:10.5px; color:var(--text-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .agreement-status-badge{ flex:0 0 auto; display:inline-block; padding:1px 6px; font-size:9.5px; font-weight:700; border-radius:4px; margin-left:5px; }
+  .agreement-status-badge.is-terminated{ background:#EEF0F3; color:#5B6472; }
+  /* §협약 종료 탭 보완 라운드(신규) — .co-row 형제 엘리먼트(그리드 컬럼 구조 변경 없음). */
+  .terminated-info-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; padding:6px 14px 10px; margin-top:-2px; background:#FAFBFC; border-bottom:1px solid #e8eef5; font-size:11.5px; color:var(--text-muted); }
+  .terminated-info-item b{ font-weight:700; color:#5B6472; margin-right:4px; }
   .col-recent{ flex:1.4 1 150px; min-width:0; color:var(--text-muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .col-recent .recent-date{ color:var(--text-faint); margin-right:4px; }
   .col-yr, .col-total{ flex:0 0 62px; font-size:12.5px; color:var(--text); text-align:right; }
@@ -2931,6 +2941,9 @@ table.pdf-doc-table thead{ background:var(--bg); }
                  실제 원인(기존 업체에 distributionLists 태그가 없음)을 해결하는 가져오기.
                  매칭된 업체만, 이미 켜진 값은 그대로 두고 새로 켜지는 태그만 추가한다. -->
             <button type="button" id="crmDistListSyncBtn">공개범위 가져오기(시공사·외부용)</button>
+            <!-- §업체 관계·협약 종료 라운드(신규) — 이전 상호/자회사/협약 종료 후보를
+                 사람이 확인한 뒤에만 적용한다(자동 저장 없음). -->
+            <button type="button" id="crmRelCandBtn">업체 관계 검토</button>
           </div>
         </div>
         <!-- §전화 요청 기록 라운드(신규) — "+ 고객 등록"과 같은 줄에 배치. 처음엔 작은
@@ -2996,6 +3009,8 @@ table.pdf-doc-table thead{ background:var(--bg); }
            출력. 클릭 시 열리는 모달 안에서 유형·지역·검색을 다시 선택한 뒤에만 실제
            출력 대상이 정해진다(§요청 "화면 필터와 출력 필터를 혼동하지 않게"). -->
       <button type="button" class="co-text-action" id="crmPdfExportBtn">목록 출력</button>
+      <!-- §업체 관계·협약 종료 라운드(신규) — 자회사만 보기 필터(§요청 7). -->
+      <button type="button" class="list-filter-chip" id="crmSubsidiaryOnlyBtn">★ 자회사만 보기</button>
     </div>
     <!-- §최근 실적 독립 컬럼 복원 라운드: "최근 시공"을 업체명 옆에 붙이던 걸 취소하고
          독립 컬럼(라벨은 "최근 실적"으로 변경)으로 되돌렸다(§1/§2/§3) — 협력사 컬럼에는
@@ -3081,6 +3096,8 @@ table.pdf-doc-table thead{ background:var(--bg); }
   <div id="pdfExportModalRoot"></div>
   <!-- §고객관리 목록 출력(PDF) 후속 — "공개범위 가져오기" 전용 모달 root. -->
   <div id="distListSyncModalRoot"></div>
+  <!-- §업체 관계·협약 종료 라운드(신규) — "업체 관계 검토" 전용 모달 root. -->
+  <div id="relCandModalRoot"></div>
   <div id="sideDrawerRoot"></div>
   <div id="memoPanelRoot"></div>
   <!-- §총 매출 Popover 전환 라운드: 전용 root — sideDrawerRoot(전체 높이 오른쪽 패널,
@@ -5306,6 +5323,100 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     });
     return idx;
   }
+
+  /* ==========================================================================
+     §업체 관계·협약 종료 라운드(신규) — 이전 상호/모회사 관계/협약 종료를 기존
+     co.relatedCompanies(위 §업체명 관계표시 라운드)와 최대한 겹치지 않게 얹는다.
+     "자회사 여부/모회사"는 이미 있는 relatedCompanies(relation='모회사' 항목)를 그대로
+     읽어서 판단한다 — 새 필드를 또 만들지 않는다. 모회사 업체를 정확히 특정 못 할 때만
+     (§요청 "임의의 고객 ID에 연결하지 마") parentCompanyNameUnconfirmed(이름 문자열만)를
+     따로 둔다. 이전 상호(formerNames)와 협약 종료(agreementStatus 등)는 이 필드들
+     자체가 이 라운드 전엔 전혀 없던 개념이라 새로 추가한다. 전부 optional — 없는 기존
+     업체도 그대로 열린다(§ 하위 호환).
+     ========================================================================== */
+  function isSubsidiary(co, relationIndex){
+    const rel = relationIndex ? (relationIndex.get(co.id) || []) : (co.relatedCompanies || []).map(r=> ({ relatedCoId: r.companyId, relation: r.relation }));
+    return rel.some(r=> r.relation === '모회사');
+  }
+  // 확정된 모회사(관계 업체로 실제 연결된 경우) 우선, 없으면 이름만 저장해 둔
+  // parentCompanyNameUnconfirmed를 돌려준다. companyId가 있으면 실제로 존재하는 업체다
+  // (addCompanyRelation이 이미 존재 확인을 강제하므로).
+  function resolveParentCompanyDisplay(co, companies, relationIndex){
+    const rel = relationIndex ? (relationIndex.get(co.id) || []) : null;
+    const parentEntry = rel ? rel.find(r=> r.relation === '모회사')
+      : (co.relatedCompanies || []).find(r=> r.relation === '모회사');
+    if(parentEntry){
+      const parentId = rel ? parentEntry.relatedCoId : parentEntry.companyId;
+      const parentCo = (companies || []).find(c=> c.id === parentId);
+      if(parentCo) return { name: parentCo.name, companyId: parentCo.id, confirmed: true };
+    }
+    if(co.parentCompanyNameUnconfirmed) return { name: co.parentCompanyNameUnconfirmed, companyId: null, confirmed: false };
+    return null;
+  }
+  // formerNames: 중복/현재 이름과 동일한 값은 저장하지 않는다(§ "현재 업체명과 같은 이름은
+  // formerNames에 넣지 않음", § "중복 저장하지 않음").
+  function addFormerName(companyId, name){
+    const co = findCompany(companyId); if(!co) return null;
+    const n = String(name || '').trim();
+    if(!n) return co;
+    if(normCompanyName(n) === normCompanyName(co.name)) return co;
+    const list = Array.isArray(co.formerNames) ? co.formerNames.slice() : [];
+    if(list.some(x=> normCompanyName(x) === normCompanyName(n))) return co;
+    list.push(n);
+    return updateCompany(companyId, { formerNames: list });
+  }
+  function removeFormerName(companyId, name){
+    const co = findCompany(companyId); if(!co) return null;
+    const list = (Array.isArray(co.formerNames) ? co.formerNames : []).filter(x=> x !== name);
+    return updateCompany(companyId, { formerNames: list });
+  }
+  // §협약 종료 라운드 — "삭제가 아니라 별도의 최종 상태"(§요청 3 명시). 기존 newMou.mouDone/
+  // mouLabel/진행기록/활동기록은 절대 건드리지 않고 agreementStatus 하나만 얹는다 —
+  // buildProgressStages/computeWorkQueue 등 기존 진행단계 계산은 이 필드를 몰라도 그대로
+  // 동작한다(하위 호환). 집계에서 제외하는 쪽(§3 MOU 체결 수/탭/PDF/자동 후속업무)만 이
+  // 값을 추가로 확인하도록 새로 연결한다.
+  function isAgreementTerminated(co){ return !!(co && co.agreementStatus === 'terminated'); }
+  function terminateAgreement(companyId, opts){
+    const co = findCompany(companyId); if(!co) return null;
+    opts = opts || {};
+    const now = nowIso();
+    // §사용자 확인 정보 반영 라운드(신규) — "종료일을 모르면 오늘 날짜를 임의로 넣지 말고
+    // 빈 값으로 유지"(§요청) — endedAt 키 자체를 넘겼는지로 구분한다. 안 넘기면(기존 호출부
+    // 전부 그대로) 지금까지처럼 처리 시각을 쓰고, 명시적으로 endedAt:null을 넘긴 새 호출부만
+    // 빈 값을 그대로 유지한다(하위 호환 100% — 기존 호출부는 코드를 하나도 안 고쳤다).
+    const patch = {
+      agreementStatus: 'terminated',
+      agreementEndedAt: ('endedAt' in opts) ? (opts.endedAt || null) : now,
+      agreementEndReason: opts.reason || '',
+      agreementEndNote: opts.note || ''
+    };
+    const rec = updateCompany(companyId, patch);
+    // §종료 전후 상태를 활동기록에 남김(§요청 "보호 절차") — 기존 addActivity 재사용.
+    addActivity(companyId, `[협약 종료] ${opts.reason ? opts.reason : '사유 미기재'}${opts.note ? ' · ' + opts.note : ''}`);
+    return rec;
+  }
+  // §사용자 확인 정보 반영 라운드(신규) — "동일 업체가 하나로 확정되면 기존 ID를 유지한 채
+  // 현재 상호만 바꾸고 formerNames에 실제 기존 표기를 보존"(§요청). id/기존 활동·서류·MOU
+  // 데이터는 updateCompany가 name 필드 하나만 바꾸므로 전혀 손대지 않는다.
+  function renameCompanyKeepId(companyId, newName, opts){
+    const co = findCompany(companyId); if(!co) return null;
+    opts = opts || {};
+    const oldName = co.name;
+    const rec = updateCompany(companyId, { name: newName });
+    if(oldName && normCompanyName(oldName) !== normCompanyName(newName)) addFormerName(companyId, oldName);
+    addActivity(companyId, `[상호 변경] "${oldName}" → "${newName}"${opts.note ? ' · ' + opts.note : ''}`);
+    return rec;
+  }
+  function restoreAgreement(companyId){
+    const co = findCompany(companyId); if(!co) return null;
+    // §요청 "종료 취소 시 기존 체결 상태로 복구, 기존 체결일과 과거 기록은 그대로 유지" —
+    // agreementStatus/종료 관련 3필드만 지우고, newMou.mouDone/mouLabel 등 원본 진행데이터는
+    //애초에 이 함수가 한 번도 건드린 적이 없으므로 그대로 남아있다.
+    const rec = updateCompany(companyId, { agreementStatus: null, agreementEndedAt: null, agreementEndReason: null, agreementEndNote: null });
+    addActivity(companyId, '[협약 종료 취소] 이전 체결 상태로 복구');
+    return rec;
+  }
+
   // 고객 상태(customerStatusNote) — 영업단계(dealStage, 고정 목록)와는 다른 개념의 자유
   // 문장형 상태 메모(예: "협약 검토 (2차 미팅 예정)"). 헤더 우측 요약 박스에서만 쓰인다.
   function setCustomerStatusNote(companyId, text){ return updateCompany(companyId, { customerStatusNote: text || '' }); }
@@ -6823,6 +6934,8 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     loadLibraryDocs, findLibraryDoc,
     setLegacyBusiness, setTargetMarket, setPartnerContractor, setOtherMethods, setCustomerStatusNote,
     RELATION_TYPES, addCompanyRelation, removeCompanyRelation, buildRelationIndex,
+    isSubsidiary, resolveParentCompanyDisplay, addFormerName, removeFormerName,
+    isAgreementTerminated, terminateAgreement, restoreAgreement, renameCompanyKeepId,
     addCurrentSituation, removeCurrentSituation, addInterestField, removeInterestField,
     previewPartnerImport, applyPartnerImport,
     previewPourTrackImport, applyPourTrackImport,
@@ -7066,6 +7179,52 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(st === 'nonPartner') return '<span class="co-partner-glyph is-nonpartner" title="비협력사">×</span>';
     return '';
   }
+  // §업체 관계·협약 종료 라운드(신규) — 자회사인 업체 이름 앞에만 작은 별을 붙인다(§요청
+  // "자회사가 아닌 업체에는 별을 표시하지 않음"). title(마우스 오버)과 aria-label(스크린
+  // 리더/키보드 포커스) 둘 다 "{모회사} 자회사"로 채운다 — 단순 장식 아이콘으로 끝내지
+  // 않는다(§요청). tabindex="0"으로 키보드 포커스도 가능하게 한다.
+  function subsidiaryStarHtml(co, companies, relationIndex){
+    const parent = D.resolveParentCompanyDisplay(co, companies, relationIndex);
+    if(!parent) return '';
+    const label = `${parent.name} 자회사`;
+    return `<span class="co-subsidiary-star" tabindex="0" role="img" title="${esc(label)}" aria-label="${esc(label)}">★</span>`;
+  }
+  // 이전 상호가 있으면 업체명 아래 작은 회색 보조문구로 "구 OOO"를 보여준다(§요청 "구
+  // 상호 있음" — 여러 개면 첫 번째만 간결하게, 나머지는 고객카드에서 전부 확인).
+  function formerNameSubtextHtml(co){
+    const list = Array.isArray(co.formerNames) ? co.formerNames.filter(Boolean) : [];
+    if(!list.length) return '';
+    const extra = list.length > 1 ? ` 외 ${list.length - 1}건` : '';
+    return `<div class="co-former-name-sub" title="${esc(list.join(', '))}">구 ${esc(list[0])}${extra}</div>`;
+  }
+  // 협약 종료 배지 — 삭제처럼 보이지 않게 회색 계열로만(§요청), 붉은색은 쓰지 않는다.
+  function agreementTerminatedBadgeHtml(co){
+    if(!D.isAgreementTerminated(co)) return '';
+    return `<span class="agreement-status-badge is-terminated" title="협약 종료됨">협약 종료</span>`;
+  }
+  // §협약 종료 탭 보완 라운드(신규) — 지역/과거 MOU 체결일/협약 종료일/종료 사유/최근
+  // 활동/고객카드 보기/종료 취소(§요청 최소 표시 항목). .co-row 자체(고정 grid-template-columns)는
+  // 건드리지 않고 그 아래에 별도 정보 줄(형제 엘리먼트)로만 추가한다.
+  function terminatedInfoRowHtml(co, progress, requestHistoryIndex){
+    const mouStage = (progress && progress.stages || []).find(s=> s.key === 'mou');
+    const mouDateDisplay = (mouStage && mouStage.dateDisplay && mouStage.dateDisplay !== '—') ? mouStage.dateDisplay : '기록 없음';
+    const region = (co.partnerDashboard && co.partnerDashboard.region) || '미확인';
+    const endedDisplay = co.agreementEndedAt ? fmtDate(co.agreementEndedAt) : '미기재';
+    const reason = co.agreementEndReason || '(사유 미기재)';
+    const reqs = requestHistoryIndex ? (requestHistoryIndex.get(co.id) || []) : [];
+    const latestReq = reqs[0];
+    const lastActivityDisplay = latestReq ? `${fmtRelativeActivityDate(latestReq.createdAt)} · ${latestReq.labels.slice(0,2).join(' · ')}` : '기록 없음';
+    return `
+      <div class="terminated-info-row" data-terminated-info="${esc(co.id)}">
+        <span class="terminated-info-item"><b>지역</b> ${esc(region)}</span>
+        <span class="terminated-info-item"><b>과거 MOU 체결일</b> ${esc(mouDateDisplay)}</span>
+        <span class="terminated-info-item"><b>협약 종료일</b> ${esc(endedDisplay)}</span>
+        <span class="terminated-info-item"><b>종료 사유</b> ${esc(reason)}</span>
+        <span class="terminated-info-item"><b>최근 활동</b> ${esc(lastActivityDisplay)}</span>
+        <button type="button" class="co-text-action" data-terminated-open-card="${esc(co.id)}">고객카드 보기</button>
+        <button type="button" class="co-text-action danger" data-terminated-restore="${esc(co.id)}">종료 취소</button>
+      </div>`;
+  }
   function copyText(text, btn){
     if(!navigator.clipboard || !text) return;
     navigator.clipboard.writeText(text).then(()=>{
@@ -7082,6 +7241,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   const searchInput = document.getElementById('crmSearchInput');
   const listTitle = document.getElementById('crmListTitle');
   let searchQuery = '';
+  let subsidiaryOnlyFilter = false; // §업체 관계·협약 종료 라운드(신규) — "자회사만 보기"
   let currentCompanyId = null;
   // §첫 화면 최종 수정 라운드: 필터/정렬/페이지 상태. 서버가 없는 순수 클라이언트 화면이라
   // 세 값 모두 렌더 시점에 메모리에서만 들고 있고, 별도로 저장하지 않는다(새로고침하면
@@ -7130,7 +7290,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   // (리스트 등재 co.partnerStatus==='partner' OR MOU 단계 done) 그대로다. 새 판정 로직
   // 없음 — 이미 있는 isConfirmedPartner를 그대로 재사용한다.
   const FILTER_DEFS = [
-    ['all','전체'], ['mouDone','MOU체결'], ['trendUp','최근흐름 상승세']
+    ['all','전체'], ['agreementInProgress','협약 진행'], ['mouDone','MOU체결'], ['agreementTerminated','협약 종료'], ['trendUp','최근흐름 상승세']
   ];
   function getMouStage(progress){
     return progress.stages.find(s=> s.key === 'mou') || null;
@@ -7166,7 +7326,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 체결완료)에 해당하면 여기서 전부 빠진다 — 질문서/1차미팅/2차미팅/MOU 체결 전 진행
     // 이력만 여기 남는다.
     if(key === 'agreementInProgress'){
-      return progress.hasAny && !isConfirmedPartner(co, progress) && !isHurdleCompany(co);
+      return progress.hasAny && !isConfirmedPartner(co, progress) && !isHurdleCompany(co) && !D.isAgreementTerminated(co);
     }
     if(key === 'hurdle') return progress.hasAny && isHurdleCompany(co);
     // 매출은 발생했지만 아직 확정 협력사가 아닌 시공사. 매출 0원/자료 없음은 제외한다.
@@ -7184,7 +7344,13 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 협약체결일 필드가 비어 있어도 "MOU체결"로 봐야 한다는 뜻이다. 결국 이전 라운드에서
     // 만든 isConfirmedPartner(리스트 등재 OR MOU 단계 done)와 동일한 기준으로 되돌아간다 —
     // 새 판정 로직을 만들지 않고 이미 있는 함수를 그대로 재사용한다.
-    if(key === 'mouDone') return isConfirmedPartner(co, progress);
+    // §업체 관계·협약 종료 라운드(신규) — "협약 종료 업체는 MOU 체결 수/탭/활성 협약
+    // 필터에서 제외"(§요청 3). isConfirmedPartner 자체(과거에 실제 협력사였다는 사실)는
+    // 안 바꾸고, 이 필터 키에서만 종료 업체를 뺀다 — 과거 이력(고객 상세)은 그대로 보임.
+    if(key === 'mouDone') return isConfirmedPartner(co, progress) && !D.isAgreementTerminated(co);
+    // §업체 하나가 MOU 체결과 협약 종료에 동시에 중복 집계되지 않게(§요청) — 위에서 이미
+    // mouDone 쪽을 뺐으므로 이 키는 종료 업체만, mouDone 쪽엔 종료 업체가 전혀 안 들어간다.
+    if(key === 'agreementTerminated') return D.isAgreementTerminated(co);
     // '최근흐름 상승세' 탭 — buildRecentTrend(co)가 이미 계산해 둔 값을 그대로 재사용
     // (목록 셀/드로어와 같은 함수, 새 판정 로직 아님). state==='up'인 업체만.
     if(key === 'trendUp') return buildRecentTrend(co).state === 'up';
@@ -7459,10 +7625,18 @@ window.SHIN2_CRM_APP_INIT = function(){
     return { last: acts[0] || null, count: acts.length };
   }
 
-  function matchesSearch(co, acts, q){
+  // §업체 관계·협약 종료 라운드(신규) — parentNameHint는 선택 인자다(기존 호출부는 그대로
+  // 3개 인자만 넘겨도 정상 동작 — 하위 호환). 확정된 모회사(relatedCompanies로 실제 연결된
+  // 경우)의 실제 업체명으로도 찾을 수 있게(§요청 7 예시 "효덕산업"→샤인하우징) 호출부가
+  // 이미 만들어 둔 relationIndex에서 O(1)로 조회해 넘긴다 — 매 행마다 전체 companies를
+  // 다시 훑지 않는다(§성능 원칙).
+  function matchesSearch(co, acts, q, parentNameHint){
     if(!q) return true;
     q = q.toLowerCase();
     const hay = [co.name, co.repName, co.contactName, co.phone, co.mobile, co.address, co.bizRegNo]
+      .concat(Array.isArray(co.formerNames) ? co.formerNames : [])
+      .concat(co.parentCompanyNameUnconfirmed ? [co.parentCompanyNameUnconfirmed] : [])
+      .concat(parentNameHint ? [parentNameHint] : [])
       .concat(acts.map(a=> a.activityText)).join(' ').toLowerCase();
     return hay.includes(q);
   }
@@ -7528,7 +7702,11 @@ window.SHIN2_CRM_APP_INIT = function(){
 
     const rows = enriched
       .filter(r=> matchesFilter(r.co, r.progress, filterKey))
-      .filter(r=> matchesSearch(r.co, r.acts, searchQuery));
+      .filter(r=> matchesSearch(r.co, r.acts, searchQuery, (()=>{
+        const parent = D.resolveParentCompanyDisplay(r.co, companies, relationIndex);
+        return parent ? parent.name : null;
+      })()))
+      .filter(r=> !subsidiaryOnlyFilter || D.isSubsidiary(r.co, relationIndex));
     applySort(rows, contribIndex);
 
     const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
@@ -7736,12 +7914,21 @@ window.SHIN2_CRM_APP_INIT = function(){
             <span class="relation-badge ${relBadgeClass}">${esc(relFirst.relation)}</span>
             ${relEntries.length > 1 ? `<span class="relation-badge">+${relEntries.length - 1}</span>` : ''}
           </div>` : '';
+      const subsidiaryStar = subsidiaryStarHtml(co, companies, relationIndex);
+      // §협약 종료 탭 보완 라운드(신규) — "협약 종료" 탭에서만, 기존 .co-row 그리드 컬럼
+      // 구조(여러 반응형 breakpoint에서 열 개수가 고정돼 있음)를 건드리지 않고 행 아래에
+      // 별도 정보 줄을 덧붙인다(§요청 최소 표시 항목: 지역/과거 MOU 체결일/협약 종료일/
+      // 종료 사유/최근 활동/고객카드 보기/종료 취소).
+      const terminatedInfoHtml = (filterKey === 'agreementTerminated' && D.isAgreementTerminated(co))
+        ? terminatedInfoRowHtml(co, r.progress, requestHistoryIndex) : '';
       return `
       <div class="co-row${rowOverdueClass}${receivablePenaltyClass}" data-id="${esc(co.id)}">
         <div class="col-name">
+          ${subsidiaryStar ? `<div class="co-subsidiary-star-row">${subsidiaryStar}</div>` : ''}
           <div class="col-name-top">
-            <span class="co-name-badges">${partnerGlyphHtml(co)}<span class="co-name-text">${esc(co.name)}</span></span>
+            <span class="co-name-badges">${partnerGlyphHtml(co)}<span class="co-name-text">${esc(co.name)}</span>${agreementTerminatedBadgeHtml(co)}</span>
           </div>
+          ${formerNameSubtextHtml(co)}
           ${relationRowHtml}
         </div>
         <div class="col-request">${nameRequestCellHtml}</div>
@@ -7755,7 +7942,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         <!-- §단계 진행상황 이전 라운드: 이 컬럼은 목록에서 뺐다(업무관리 화면으로 이전,
              stageStepperHtml 변수/buildStageStepperHtml 함수는 그대로 계산돼 있다 —
              §"데이터 제거가 아니라 숨김" 관례 그대로). -->
-      </div>`;
+      </div>${terminatedInfoHtml}`;
     }).join('');
     // §실적↔매출 실제 구현 라운드: "실적↔매출" 클릭 -> 실적·매출 분석 Drawer(다른 컬럼과
     // 같은 패턴, 옛 popover 방식은 없앰). 행 클릭(고객카드 열기)으로 전파되지 않도록
@@ -7859,6 +8046,24 @@ window.SHIN2_CRM_APP_INIT = function(){
         e.stopPropagation();
         const co = D.findCompany(btn.getAttribute('data-cat-detail'));
         if(co) openConstructionDrawer(co, null);
+      });
+    });
+    // §협약 종료 탭 보완 라운드 — "고객카드 보기"/"종료 취소" 버튼(§요청). 행 클릭 전파 방지.
+    listEl.querySelectorAll('[data-terminated-open-card]').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        openCard(btn.getAttribute('data-terminated-open-card'));
+      });
+    });
+    listEl.querySelectorAll('[data-terminated-restore]').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const id = btn.getAttribute('data-terminated-restore');
+        const co = D.findCompany(id);
+        if(!co) return;
+        if(!confirm(`"${co.name}"의 협약 종료를 취소하고 이전 체결 상태로 복구할까요?\n(과거 MOU 체결일·활동기록은 그대로 유지됩니다)`)) return;
+        D.restoreAgreement(id);
+        renderList();
       });
     });
     renderPagination(totalPages);
@@ -8178,6 +8383,9 @@ window.SHIN2_CRM_APP_INIT = function(){
               <div class="cdash2-col-stack">
                 <div id="cdashTimelineCard"></div>
                 <div id="cdashInsightTagsCard"></div>
+                <!-- §업체 관계·협약 종료 라운드(신규) — 현재 상호/이전 상호/자회사·모회사/
+                     협약 종료 처리를 한 카드에 모은다. -->
+                <div id="cdashRelationsCard"></div>
               </div>
               <div id="cdashPourResultsCard"></div>
             </div>
@@ -8193,6 +8401,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     renderSummaryRow2(co);
     renderContactTimelineCard(co);
     renderInsightTagsCard(co);
+    renderCompanyRelationsCard(co);
     renderPourResultsCard(co);
     renderFooterBar(co);
 
@@ -8894,6 +9103,156 @@ window.SHIN2_CRM_APP_INIT = function(){
         renderBasicInfoCol(co);
       });
     }
+  }
+
+  /* ==========================================================================
+     §업체 관계·협약 종료 라운드(신규) — 고객 상세 팝업 "업체 관계" 카드. 위
+     renderBasicInfoCol(현재 화면에 그릴 슬롯이 없는 보존 함수, §8272 주석 참고)의
+     relatedCompanies add/remove 로직을 그대로 재사용하되, 실제로 화면에 보이는 카드
+     (#cdashRelationsCard, cdash2-body-grid 안)에 새로 담는다. 이전 상호/협약 종료는
+     이 라운드 전엔 화면 어디에도 없던 개념이라 여기서 처음 노출한다. 사용자가 언제든
+     수정·삭제할 수 있어야 한다(§요청)는 원칙대로 항상 편집 가능한 상태로 둔다(별도
+     "수정" 토글 없이 인라인 입력).
+     ========================================================================== */
+  function renderCompanyRelationsCard(co){
+    const wrap = document.getElementById('cdashRelationsCard');
+    if(!wrap) return;
+    const companies = D.loadCompanies();
+    const relationIndex = D.buildRelationIndex(companies);
+    const parent = D.resolveParentCompanyDisplay(co, companies, relationIndex);
+    const formerNames = Array.isArray(co.formerNames) ? co.formerNames : [];
+    const terminated = D.isAgreementTerminated(co);
+    const relEntries = (relationIndex.get(co.id) || []).filter(r=> companies.some(c=> c.id === r.relatedCoId));
+    const relBadgeCls = (relation)=> relation === '모회사' ? 'rel-parent' : (relation === '자회사' ? 'rel-sub' : 'rel-affiliate');
+    const relListHtml = relEntries.length
+      ? relEntries.map(r=>{
+          const rc = companies.find(c=> c.id === r.relatedCoId);
+          return `<div class="relation-row-item" style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
+            <span class="col-name-relation-name" data-relcard-open="${esc(rc.id)}">${esc(rc.name)}</span>
+            <span class="relation-badge ${relBadgeCls(r.relation)}">${esc(r.relation)}</span>
+            <button type="button" class="insight-tag-x" data-relcard-remove="${esc(rc.id)}">×</button>
+          </div>`;
+        }).join('')
+      : `<div class="cdash-field-value is-muted">등록된 관계 업체 없음</div>`;
+    const formerListHtml = formerNames.length
+      ? formerNames.map(n=> `<span class="cdash-tag">${esc(n)}<button type="button" class="chart-tag-chip-del" data-relcard-former-del="${esc(n)}" title="삭제">×</button></span>`).join('')
+      : '';
+    const agreementBlockHtml = terminated ? `
+      <div class="cdash-field-value" style="color:#B3261E;">
+        협약 종료 · ${esc(fmtDate(co.agreementEndedAt))}${co.agreementEndReason ? ' · ' + esc(co.agreementEndReason) : ''}
+        ${co.agreementEndNote ? `<div class="cdash-field-value is-muted" style="margin-top:2px;">${esc(co.agreementEndNote)}</div>` : ''}
+      </div>
+      <button type="button" class="co-text-action" id="relcardRestoreBtn" style="margin-top:6px;">협약 종료 취소</button>
+      <div id="relcardRestoreConfirm" hidden></div>
+    ` : `
+      <button type="button" class="co-text-action danger" id="relcardTerminateBtn">협약 종료 처리</button>
+      <div id="relcardTerminateForm" hidden></div>
+    `;
+    wrap.innerHTML = `
+      <div class="cdash-col-title-row"><div class="cdash-col-title">업체 관계</div></div>
+      <div class="cdash-col-body">
+        <div class="cdash-field-row"><div class="cdash-field-label">현재 상호</div><div class="cdash-field-value">${esc(co.name)}</div></div>
+        <div class="cdash-field-row" style="flex-direction:column;align-items:flex-start;gap:3px;">
+          <div class="cdash-field-label">이전 상호</div>
+          <div class="cdash-tag-wrap">${formerListHtml || '<div class="cdash-field-value is-muted">없음</div>'}</div>
+          <div class="cdash-mini-add-row" style="margin-top:2px;">
+            <input type="text" id="relcardFormerInput" placeholder="이전 상호 입력" style="flex:1;min-width:0;" />
+            <button type="button" class="co-text-action" id="relcardFormerAddBtn">+ 추가</button>
+          </div>
+        </div>
+        <div class="cdash-field-row"><div class="cdash-field-label">자회사 여부</div><div class="cdash-field-value">${D.isSubsidiary(co, relationIndex) ? '예' : '아니오'}</div></div>
+        <div class="cdash-field-row"><div class="cdash-field-label">모회사</div><div class="cdash-field-value${parent ? '' : ' is-muted'}">${parent ? esc(parent.name) + (parent.confirmed ? '' : ' (미확정 — 이름만 저장됨)') : '없음'}</div></div>
+        ${co.parentCompanyNameUnconfirmed ? `<div class="cdash-field-row"><div class="cdash-field-label"></div><button type="button" class="co-text-action" id="relcardClearParentNameBtn" style="padding:0;">미확정 모회사명 지우기</button></div>` : ''}
+        <div class="cdash-field-row" style="flex-direction:column;align-items:flex-start;gap:3px;">
+          <div class="cdash-field-label">관계 업체(본사·자회사·관계사)</div>
+          <div style="width:100%;">${relListHtml}</div>
+          <div class="cdash-mini-add-row" style="margin-top:2px;">
+            <input type="text" id="relcardRelSearchInput" list="relcardRelSearchList" placeholder="업체명 검색" style="flex:1;min-width:0;" />
+            <datalist id="relcardRelSearchList">${companies.filter(c=> c.id !== co.id).map(c=> `<option value="${esc(c.name)}"></option>`).join('')}</datalist>
+            <select id="relcardRelTypeSel">${D.RELATION_TYPES.map(t=> `<option value="${esc(t)}">${esc(t)}</option>`).join('')}</select>
+            <button type="button" class="co-text-action" id="relcardRelAddBtn">+ 연결</button>
+          </div>
+        </div>
+        <div class="cdash-field-row"><div class="cdash-field-label">협약 진행 상태</div><div class="cdash-field-value">${terminated ? '<span class="agreement-status-badge is-terminated">협약 종료</span>' : '진행 중 또는 MOU 체결'}</div></div>
+        <div class="cdash-field-row" style="flex-direction:column;align-items:flex-start;gap:3px;">${agreementBlockHtml}</div>
+      </div>
+    `;
+    wrap.querySelectorAll('[data-relcard-open]').forEach(el=> el.addEventListener('click', ()=> openCard(el.getAttribute('data-relcard-open'))));
+    wrap.querySelectorAll('[data-relcard-remove]').forEach(btn=> btn.addEventListener('click', ()=>{
+      D.removeCompanyRelation(co.id, btn.getAttribute('data-relcard-remove'));
+      renderCompanyRelationsCard(co);
+    }));
+    wrap.querySelectorAll('[data-relcard-former-del]').forEach(btn=> btn.addEventListener('click', ()=>{
+      D.removeFormerName(co.id, btn.getAttribute('data-relcard-former-del'));
+      renderCompanyRelationsCard(co);
+    }));
+    const formerAddBtn = document.getElementById('relcardFormerAddBtn');
+    if(formerAddBtn) formerAddBtn.addEventListener('click', ()=>{
+      const input = document.getElementById('relcardFormerInput');
+      const v = input.value.trim();
+      if(!v) return;
+      D.addFormerName(co.id, v);
+      renderCompanyRelationsCard(co);
+    });
+    const clearParentBtn = document.getElementById('relcardClearParentNameBtn');
+    if(clearParentBtn) clearParentBtn.addEventListener('click', ()=>{
+      D.updateCompany(co.id, { parentCompanyNameUnconfirmed: null });
+      renderCompanyRelationsCard(co);
+    });
+    const relAddBtn = document.getElementById('relcardRelAddBtn');
+    if(relAddBtn) relAddBtn.addEventListener('click', ()=>{
+      const nameInput = document.getElementById('relcardRelSearchInput');
+      const typeSel = document.getElementById('relcardRelTypeSel');
+      const name = nameInput.value.trim();
+      if(!name) return;
+      const target = companies.find(c=> c.id !== co.id && c.name === name);
+      if(!target){ alert('CRM에 등록된 정확한 업체명을 목록에서 선택해주세요.'); return; }
+      D.addCompanyRelation(co.id, target.id, typeSel.value);
+      renderCompanyRelationsCard(co);
+    });
+    // §협약 종료 처리 — 인라인 확인(§요청 "종료 버튼을 누르면 인라인 확인"), 종료일/사유/
+    // 내부 메모 입력 후에만 실제로 저장한다.
+    const terminateBtn = document.getElementById('relcardTerminateBtn');
+    if(terminateBtn) terminateBtn.addEventListener('click', ()=>{
+      const form = document.getElementById('relcardTerminateForm');
+      const today = new Date().toISOString().slice(0,10);
+      form.hidden = false;
+      form.innerHTML = `
+        <div class="stage-cancel-warn">협약을 종료 처리합니다 — 고객 데이터·과거 체결일·업무/활동 기록은 삭제되지 않고 그대로 유지됩니다.</div>
+        <div class="co-form-field"><label>종료일</label><input type="date" id="relcardEndDateInput" value="${esc(today)}" /></div>
+        <div class="co-form-field"><label>종료 사유</label><input type="text" id="relcardEndReasonInput" placeholder="예: 시공 실적 저조, 연락 두절 등" /></div>
+        <div class="co-form-field"><label>내부 메모</label><textarea id="relcardEndNoteInput"></textarea></div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="co-text-action" id="relcardTerminateCancelBtn">취소</button>
+          <button type="button" class="co-text-action danger" id="relcardTerminateOkBtn">협약 종료 확정</button>
+        </div>`;
+      document.getElementById('relcardTerminateCancelBtn').addEventListener('click', ()=>{ form.hidden = true; form.innerHTML = ''; });
+      document.getElementById('relcardTerminateOkBtn').addEventListener('click', ()=>{
+        const endedAt = document.getElementById('relcardEndDateInput').value || today;
+        const reason = document.getElementById('relcardEndReasonInput').value.trim();
+        const note = document.getElementById('relcardEndNoteInput').value.trim();
+        D.terminateAgreement(co.id, { endedAt, reason, note });
+        renderList();
+        refreshChart();
+      });
+    });
+    const restoreBtn = document.getElementById('relcardRestoreBtn');
+    if(restoreBtn) restoreBtn.addEventListener('click', ()=>{
+      const form = document.getElementById('relcardRestoreConfirm');
+      form.hidden = false;
+      form.innerHTML = `
+        <div class="stage-cancel-warn">협약 종료를 취소하고 이전 체결 상태로 복구합니다. 기존 체결일과 과거 기록은 그대로 유지됩니다.</div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="co-text-action" id="relcardRestoreCancelBtn">취소</button>
+          <button type="button" class="co-text-action primary" id="relcardRestoreOkBtn">복구 확정</button>
+        </div>`;
+      document.getElementById('relcardRestoreCancelBtn').addEventListener('click', ()=>{ form.hidden = true; form.innerHTML = ''; });
+      document.getElementById('relcardRestoreOkBtn').addEventListener('click', ()=>{
+        D.restoreAgreement(co.id);
+        renderList();
+        refreshChart();
+      });
+    });
   }
 
   // ---- §자동 요약 구조 개선 라운드: "관심 공종/제품"(추측성 라벨) → "POUR 활용현황"
@@ -9955,6 +10314,10 @@ window.SHIN2_CRM_APP_INIT = function(){
     return byKey.q.ts == null && byKey.m1.ts == null && byKey.m2.ts == null;
   }
   function buildWorkQueueItem(co, acts, progress, hasPour){
+    // §업체 관계·협약 종료 라운드(신규) — "현재 협약 업체를 대상으로 하는 자동 후속업무"
+    // 에서 협약 종료 업체를 제외한다(§요청 3). 진행단계 자체는 전혀 안 건드리고 여기
+    // 업무관리 항목 생성만 막는다 — 고객 상세에는 과거 이력이 그대로 보인다.
+    if(D.isAgreementTerminated(co)) return null;
     if(hasNoFunnelHistoryBeforeMou(progress)) return null; // 질문서/미팅 기록 없이 바로 MOU 체결된 업체는 제외
     const meeting = classifyWorkQueueMeeting(progress);
     if(meeting){
@@ -15287,6 +15650,540 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 자연히 최신값으로 그려진다 — 기존 addCompanyRelation 호출부(고객카드)도 카드
       // 자신만 다시 그리고 목록 전체를 강제로 다시 그리지 않는 것과 같은 방식이다.
       alert(`${toApply.length}건의 관계를 저장했습니다. 업체 목록 화면에서 확인해주세요(화면을 새로고침하거나 다른 화면으로 이동했다가 돌아오면 바로 보입니다).`);
+    });
+  }
+
+  /* ==========================================================================
+     §업체 관계·협약 종료 라운드(신규) — "업체 관계 검토" 화면. 위 §계열사 관계 후보
+     검토와 같은 원칙(분석만으로는 아무것도 저장 안 함, 사람이 "적용"을 눌러야만 저장)을
+     이전 상호/모회사·자회사/협약 종료 세 종류 후보에 함께 적용한다. 원본 메모·비고는
+     절대 수정/삭제하지 않고 읽기만 한다(§요청 "자동 추출 원칙").
+     ========================================================================== */
+  // 이전 상호로 오인하면 안 되는 "기존 ○○" 표현(§요청 명시 블랙리스트) — 정확히 이
+  // 단어들일 때만 걸러낸다(부분포함 아님, "기존 협약업체명단" 같은 다른 문구까지 과하게
+  // 막지 않기 위해 접두 일치로 확인).
+  const RELCAND_EXISTING_BLACKLIST = ['협약업체','고객','자료','담당자'];
+  function relcandIsBlacklistedExisting(captured){
+    const c = String(captured || '').trim();
+    return RELCAND_EXISTING_BLACKLIST.some(w=> c.startsWith(w));
+  }
+  // 후보 원문 텍스트 하나에서 "이전 상호" 후보를 뽑는다 — 여러 패턴을 시도하고, 처음
+  // 매칭되는 값 하나만 쓴다(같은 문장에서 중복 추출 방지). 회사명처럼 보이지 않는 값
+  // (너무 짧거나 공백/특수문자만)은 버린다.
+  function extractFormerNameCandidates(text){
+    const s = String(text || '');
+    const found = [];
+    const patterns = [
+      /구\)\s*([^,\n·、，\s][^,\n·、，]{0,24})/g,
+      /(?:기존|이전)\s*상호(?:명)?\s*(?:는|은|:|：)?\s*([^\s,\n·、，]{2,24})/g,
+      /상호(?:명)?\s*변경\s*(?:전|:|：)?\s*([^\s,\n·、，]{2,24})/g,
+      /명칭\s*변경\s*(?:전|:|：)?\s*([^\s,\n·、，]{2,24})/g,
+      /구\s+([가-힣A-Za-z0-9㈜()（）]{2,24})(?=\s|$|건설|이엔씨|씨엔씨)/g,
+      /기존\s+([가-힣A-Za-z0-9㈜()（）]{2,24})/g
+    ];
+    patterns.forEach(re=>{
+      let m;
+      while((m = re.exec(s))){
+        const cap = (m[1] || '').trim();
+        if(!cap || cap.length < 2) continue;
+        if(relcandIsBlacklistedExisting(cap)) continue;
+        found.push(cap);
+      }
+    });
+    return found;
+  }
+  // "○○ 자회사"/"○○ 계열사" — 앞쪽 회사명 토큰만 캡처한다(§요청 "명확하게 기록된
+  // 경우에만" — 회사명 없이 "자회사"만 단독으로 있으면 후보를 만들지 않는다, 근거가
+  // 없는 추정을 하지 않기 위함).
+  function extractSubsidiaryCandidates(text){
+    const s = String(text || '');
+    const found = [];
+    const re = /([가-힣A-Za-z0-9㈜()（）·]{2,24}?)\s*(?:의\s*)?(자회사|계열사)/g;
+    let m;
+    while((m = re.exec(s))){
+      const name = (m[1] || '').trim();
+      if(name && name.length >= 2) found.push(name);
+    }
+    return found;
+  }
+  // 협약 종료 문구 — partner-dashboard 원본에도 "협약종료" 표기가 실제로 있다(§실제
+  // 확인, 예: 한국전문건설/우리방재건설). "해지"도 같은 의미로 함께 인식한다.
+  function extractTerminationHint(text){
+    const s = String(text || '');
+    return /협약\s*(종료|해지)/.test(s);
+  }
+  const RELCAND_SOURCE_FIELDS = [
+    { key: 'note', label: '비고(note)', get: (co)=> co.note || '' },
+    { key: 'memo', label: '메모(memo)', get: (co)=> co.memo || '' },
+    { key: 'partnerDashboard.note', label: '파트너 대시보드 비고', get: (co)=> (co.partnerDashboard && co.partnerDashboard.note) || '' },
+    { key: 'newMou.note', label: '신규 MOU 메모', get: (co)=> (co.partnerDashboard && co.partnerDashboard.newMou && co.partnerDashboard.newMou.note) || '' }
+  ];
+  function buildRelationshipCandidateReport(){
+    const companies = D.loadCompanies();
+    const nameIndex = new Map();
+    companies.forEach(co=>{
+      const key = normCompanyNameForPartnerMatch(co.name);
+      if(!key) return;
+      if(!nameIndex.has(key)) nameIndex.set(key, []);
+      nameIndex.get(key).push(co);
+    });
+    const relationIndex = D.buildRelationIndex(companies);
+    const rows = [];
+    companies.forEach(co=>{
+      const acts = D.activitiesForCompany(co.id);
+      const textSources = RELCAND_SOURCE_FIELDS.map(f=> ({ label: f.label, text: f.get(co) }))
+        .concat(acts.map(a=> ({ label: '활동기록', text: a.activityText || '' })));
+      const seenFormer = new Set();
+      const seenSub = new Set();
+      let terminationFlagged = false;
+      textSources.forEach(src=>{
+        if(!src.text) return;
+        if(!D.isAgreementTerminated(co) && !terminationFlagged && extractTerminationHint(src.text)){
+          terminationFlagged = true;
+          rows.push({ type:'termination', company: co, candidateTextRaw: src.text.slice(0,80), sourceField: src.label,
+            matchType: 'candidate', note: '메모/비고에서 협약 종료 표현을 찾았습니다 — 확인 후 적용해야 실제로 종료 처리됩니다.' });
+        }
+        extractFormerNameCandidates(src.text).forEach(name=>{
+          const norm = normCompanyNameForPartnerMatch(name);
+          if(!norm || norm === normCompanyNameForPartnerMatch(co.name)) return; // 현재 이름과 같으면 후보 아님
+          if(seenFormer.has(norm)) return; // 같은 업체 안에서 중복 후보 방지
+          if((co.formerNames || []).some(x=> normCompanyNameForPartnerMatch(x) === norm)) return; // 이미 확정된 값
+          seenFormer.add(norm);
+          rows.push({ type:'formerName', company: co, candidateTextRaw: name, sourceField: src.label, matchType: 'candidate',
+            note: '이전 상호 후보 — 적용하면 formerNames에 추가되고 원본 메모는 그대로 유지됩니다.' });
+        });
+        extractSubsidiaryCandidates(src.text).forEach(parentNameRaw=>{
+          const norm = normCompanyNameForPartnerMatch(parentNameRaw);
+          if(!norm) return;
+          if(seenSub.has(norm)) return;
+          if(D.isSubsidiary(co, relationIndex)) return; // 이미 확정된 모회사가 있으면 다시 후보로 안 만듦
+          seenSub.add(norm);
+          const hits = (nameIndex.get(norm) || []).filter(c=> c.id !== co.id);
+          let matchType, matchedCompanyId = null, note;
+          if(hits.length === 1){ matchType = 'exact'; matchedCompanyId = hits[0].id; note = `정확 일치 — 적용 시 "${hits[0].name}"을(를) 모회사로 연결합니다.`; }
+          else if(hits.length > 1){ matchType = 'review'; note = `동명 후보 ${hits.length}건 — 자동 연결하지 않음(확인 필요)`; }
+          else { matchType = 'notfound'; note = '고객목록에서 정확히 일치하는 업체를 찾지 못했습니다 — 적용하면 이름만(모회사명, 미확정) 저장됩니다.'; }
+          rows.push({ type:'subsidiary', company: co, candidateTextRaw: parentNameRaw, sourceField: src.label, matchType, matchedCompanyId, note });
+        });
+      });
+    });
+    const summary = {
+      total: rows.length,
+      formerName: rows.filter(r=> r.type==='formerName').length,
+      subsidiaryExact: rows.filter(r=> r.type==='subsidiary' && r.matchType==='exact').length,
+      subsidiaryReview: rows.filter(r=> r.type==='subsidiary' && (r.matchType==='review' || r.matchType==='notfound')).length,
+      termination: rows.filter(r=> r.type==='termination').length
+    };
+    return { rows, summary };
+  }
+
+  // ================= §사용자 확인 정보 반영 라운드(신규) =================
+  // 위 buildRelationshipCandidateReport()는 메모/비고에서 "자동 추출한 후보"다. 아래
+  // 6건은 그것과 완전히 다르다 — 사용자가 대화로 직접 확정해서 알려준 지시값이라
+  // "후보"가 아니다. 다만 실제 데이터가 이 샌드박스에서 보이지 않으므로(§ 여러 차례
+  // 확인된 한계), 실제 운영 화면에서 실데이터를 대상으로 정확히 하나의 업체로 좁혀질
+  // 때만 자동으로 적용 가능하게 만들고, 미발견·복수 후보는 절대 자동으로 새 업체를
+  // 만들거나 다른 업체를 건드리지 않는다(§요청 "정확히 하나의 업체와 일치한 항목만
+  // 적용하고, 미발견·복수 후보는 건너뛰어라").
+  const USER_CONFIRMED_ITEMS = [
+    { id:'daewon', label:'더원산업개발 — 이전 상호 삼인유앤아이', kind:'rename',
+      targetNameVariants:['더원산업개발'],
+      oldNameVariants:['삼인유앤아이','삼인유엔아이','㈜삼인유엔아이','㈜삼인유앤아이','주식회사삼인유엔아이','주식회사삼인유앤아이'] },
+    { id:'shine', label:'샤인하우징 — 효덕산업 자회사', kind:'subsidiary',
+      targetNameVariants:['샤인하우징'], parentNameVariants:['효덕산업'] },
+    { id:'jeonggwang', label:'정광 — 부영 자회사', kind:'subsidiary',
+      // §요청 "부영은 이름이 짧아 모호할 수 있다" — 접두 일치만 허용하고(부영이엔씨/
+      // 부영씨엔씨 등), 그중에서도 정확히 1건일 때만 적용 가능하게 한다(아래 로직).
+      targetNameVariants:['정광'], targetFuzzyPrefix:true,
+      parentNameVariants:['부영'], parentFuzzyPrefix:true },
+    { id:'hanguk', label:'한국전문건설 — 협약 종료', kind:'termination', targetNameVariants:['한국전문건설'] },
+    { id:'apy', label:'에이피건설 — 협약 종료', kind:'termination', targetNameVariants:['에이피건설'] },
+    { id:'woori', label:'우리방재건설 — 협약 종료', kind:'termination', targetNameVariants:['우리방재건설'] }
+  ];
+  // normCompanyNameForPartnerMatch는 위 buildRelationshipCandidateReport 등 이 화면
+  // 다른 곳에서도 이미 D. 없이 직접 부르는 렌더 레이어 지역 함수라(§ 위 subsidiary 후보
+  // 판정부 참고) 여기서도 그대로 재사용한다 — 새 정규화 규칙을 따로 만들지 않는다.
+  function findCompaniesByNameVariants(companies, variants, fuzzyPrefix){
+    const normVariants = (variants || []).map(v=> normCompanyNameForPartnerMatch(v)).filter(Boolean);
+    const seen = new Set(); const out = [];
+    companies.forEach(co=>{
+      const n = normCompanyNameForPartnerMatch(co.name);
+      if(!n) return;
+      let hit = normVariants.indexOf(n) !== -1;
+      if(!hit && fuzzyPrefix) hit = normVariants.some(v=> v.length >= 2 && n.indexOf(v) === 0);
+      if(hit && !seen.has(co.id)){ seen.add(co.id); out.push(co); }
+    });
+    return out;
+  }
+  function maskBizRegNo(no){
+    const digits = String(no || '').replace(/[^0-9]/g, '');
+    if(digits.length < 6) return no ? String(no) : '(사업자번호 없음)';
+    return digits.slice(0, 3) + '-**-***' + digits.slice(-2);
+  }
+  // 한국전문건설/우리방재건설처럼 원본 note에 이미 "협약종료"가 적혀 있는 경우(§실제 확인)
+  // 그 문구를 근거로 함께 보여준다 — 새로 추정하지 않고 있는 텍스트를 그대로 인용한다.
+  function findTerminationNoteHint(co){
+    const texts = [co.note, co.memo,
+      co.partnerDashboard && co.partnerDashboard.note,
+      co.partnerDashboard && co.partnerDashboard.newMou && co.partnerDashboard.newMou.note
+    ].filter(Boolean);
+    const hit = texts.find(t=> /협약\s*(종료|해지)/.test(String(t)));
+    return hit ? String(hit).slice(0, 60) : null;
+  }
+  function buildUserConfirmedItemStatus(item, companies){
+    if(item.kind === 'rename'){
+      const targetHits = findCompaniesByNameVariants(companies, item.targetNameVariants, false);
+      const oldHits = findCompaniesByNameVariants(companies, item.oldNameVariants, false);
+      if(targetHits.length === 1){
+        const co = targetHits[0];
+        return { item, status:'already', company: co,
+          currentState:`현재 상호: ${co.name}`, afterState:'변경 없음(이미 적용됨)',
+          matchReason:`"${item.targetNameVariants[0]}" 이름으로 이미 등록되어 있습니다.` };
+      }
+      if(targetHits.length > 1){
+        return { item, status:'review', candidates: targetHits,
+          matchReason:`"${item.targetNameVariants[0]}" 이름의 업체가 ${targetHits.length}건 있어 자동 적용하지 않습니다 — 수동 확인 필요.` };
+      }
+      if(oldHits.length === 1){
+        const co = oldHits[0];
+        return { item, status:'ready', company: co,
+          currentState:`현재 상호: ${co.name}`,
+          afterState:`상호를 "${item.targetNameVariants[0]}"로 변경, 이전 상호에 "${co.name}" 보존(ID 그대로 유지)`,
+          matchReason:`이전 상호 후보("${co.name}")와 정확히 일치하는 업체 1건` };
+      }
+      if(oldHits.length > 1){
+        return { item, status:'review', candidates: oldHits,
+          matchReason:`이전 상호 후보(삼인유앤아이/삼인유엔아이 등)와 일치하는 업체가 ${oldHits.length}건 있어 자동 적용하지 않습니다 — 수동 선택 필요.` };
+      }
+      return { item, status:'notfound',
+        matchReason:'더원산업개발/삼인유앤아이(유엔아이) 계열 이름의 업체를 찾지 못했습니다.' };
+    }
+    if(item.kind === 'subsidiary'){
+      const targetHits = findCompaniesByNameVariants(companies, item.targetNameVariants, item.targetFuzzyPrefix);
+      const parentHits = findCompaniesByNameVariants(companies, item.parentNameVariants, item.parentFuzzyPrefix);
+      if(targetHits.length !== 1 || parentHits.length !== 1){
+        const parts = [];
+        if(targetHits.length === 0) parts.push(`"${item.targetNameVariants[0]}" 업체 미발견`);
+        else if(targetHits.length > 1) parts.push(`"${item.targetNameVariants[0]}" 후보 ${targetHits.length}건(확인 필요)`);
+        if(parentHits.length === 0) parts.push(`모회사 "${item.parentNameVariants[0]}" 미발견`);
+        else if(parentHits.length > 1) parts.push(`모회사 "${item.parentNameVariants[0]}" 후보 ${parentHits.length}건(확인 필요)`);
+        const allZero = targetHits.length === 0 && parentHits.length === 0;
+        return { item, status: allZero ? 'notfound' : 'review',
+          candidates: targetHits.concat(parentHits), matchReason: parts.join(', ') };
+      }
+      const co = targetHits[0], parent = parentHits[0];
+      const relationIndex = D.buildRelationIndex(companies);
+      const currentParent = D.resolveParentCompanyDisplay(co, companies, relationIndex);
+      const already = currentParent && currentParent.companyId === parent.id;
+      if(already){
+        return { item, status:'already', company: co, parent,
+          currentState:`모회사: ${parent.name}`, afterState:'변경 없음(이미 적용됨)',
+          matchReason:`"${co.name}"↔"${parent.name}" 정확 일치, 이미 연결되어 있습니다.` };
+      }
+      return { item, status:'ready', company: co, parent,
+        currentState: currentParent ? `모회사: ${currentParent.name}(${currentParent.confirmed ? '확정' : '미확정'})` : '모회사 정보 없음',
+        afterState:`모회사를 "${parent.name}"(으)로 연결(자회사로 표시), 현재 상호("${co.name}")는 그대로 유지`,
+        matchReason:`"${co.name}"↔"${parent.name}" 정확 일치 1건` };
+    }
+    // termination
+    const targetHits = findCompaniesByNameVariants(companies, item.targetNameVariants, false);
+    if(targetHits.length === 0){
+      return { item, status:'notfound',
+        matchReason:`"${item.targetNameVariants[0]}" 업체를 찾지 못했습니다 — 새로 등록하거나 다른 업체를 대신 종료 처리하지 않습니다.` };
+    }
+    if(targetHits.length > 1){
+      return { item, status:'review', candidates: targetHits,
+        matchReason:`"${item.targetNameVariants[0]}" 후보 ${targetHits.length}건 — 자동 종료 처리하지 않습니다.` };
+    }
+    const co = targetHits[0];
+    const noteHint = findTerminationNoteHint(co);
+    if(D.isAgreementTerminated(co)){
+      return { item, status:'already', company: co, noteHint,
+        currentState:'이미 협약 종료 상태', afterState:'변경 없음(이미 적용됨)',
+        matchReason:`"${co.name}" 정확 일치, 이미 협약 종료 처리되어 있습니다.` };
+    }
+    return { item, status:'ready', company: co, noteHint,
+      currentState:'협약 진행/MOU 체결 상태',
+      afterState:'협약 종료로 표시(과거 MOU 체결일·활동기록은 그대로 유지, 활성 집계에서만 제외)',
+      matchReason:`"${co.name}" 정확 일치 1건${noteHint ? ' · 기존 메모에 "협약종료" 표현 있음' : ''}` };
+  }
+  function buildUserConfirmedReport(){
+    return USER_CONFIRMED_ITEMS.map(item=> buildUserConfirmedItemStatus(item, D.loadCompanies()));
+  }
+  function applyUserConfirmedItem(row){
+    if(row.status !== 'ready') return false;
+    const item = row.item;
+    if(item.kind === 'rename'){
+      D.renameCompanyKeepId(row.company.id, item.targetNameVariants[0], { note:'사용자 확인 정보 반영' });
+    } else if(item.kind === 'subsidiary'){
+      D.addCompanyRelation(row.company.id, row.parent.id, '모회사');
+      D.addActivity(row.company.id, `[업체 관계] "${row.parent.name}"을(를) 모회사로 연결(사용자 확인)`);
+    } else if(item.kind === 'termination'){
+      // §요청 "종료일을 모르면 오늘 날짜를 임의 입력하지 말고 빈 값으로 유지" — endedAt:null을
+      // 명시적으로 넘겨 위 D.terminateAgreement가 오늘 날짜로 채우지 않게 한다.
+      D.terminateAgreement(row.company.id, {
+        endedAt: null, reason:'사용자 확인',
+        note: row.noteHint ? `기존 메모: "${row.noteHint}"` : '사용자가 지정한 협약 종료 정보(정확한 종료일은 미기재)'
+      });
+    }
+    return true;
+  }
+  function userConfirmedStatusLabel(status){
+    return { ready:'정확히 일치(적용 가능)', already:'이미 반영됨', review:'복수 후보(확인 필요)', notfound:'미발견' }[status] || status;
+  }
+  function userConfirmedFoundHtml(row){
+    if(row.status === 'ready' || row.status === 'already'){
+      const co = row.company;
+      let html = `<div>${esc(co.name)}</div><div class="stage-history-meta">ID: ${esc(co.id)}</div><div class="stage-history-meta">사업자번호: ${esc(maskBizRegNo(co.bizRegNo))}</div><div class="stage-history-meta">주소: ${esc(co.address || '(없음)')}</div>`;
+      if(row.item.kind === 'subsidiary' && row.parent) html += `<div class="stage-history-meta">모회사 후보: ${esc(row.parent.name)}(ID: ${esc(row.parent.id)})</div>`;
+      return html;
+    }
+    if(row.status === 'review'){
+      return `<div class="stage-cancel-warn" style="margin:0;">${(row.candidates || []).map(c=> `${esc(c.name)}(ID: ${esc(c.id)})`).join(', ')}</div>`;
+    }
+    return '<span class="mail-settings-help">해당 없음(찾지 못함)</span>';
+  }
+  function userConfirmedRowHtml(row, idx){
+    return `
+      <tr>
+        <td>${idx + 1}</td>
+        <td>${esc(row.item.label)}</td>
+        <td>${userConfirmedFoundHtml(row)}</td>
+        <td>${esc(row.currentState || '-')}</td>
+        <td>${esc(row.afterState || '-')}</td>
+        <td><span class="affiliate-group-badge">${esc(userConfirmedStatusLabel(row.status))}</span><div class="stage-history-meta">${esc(row.matchReason || '')}</div></td>
+        <td><button type="button" class="co-text-action primary" data-userconfirmed-apply="${esc(row.item.id)}" ${row.status !== 'ready' ? 'disabled' : ''}>적용</button></td>
+      </tr>`;
+  }
+  function userConfirmedSectionHtml(rows){
+    const readyCount = rows.filter(r=> r.status === 'ready').length;
+    return `
+      <div class="stage-edit-impact" style="margin-bottom:14px;">
+        <b>사용자 확인 정보 반영</b>
+        <div class="mail-settings-help" style="margin:6px 0 10px;">
+          아래 6건은 메모에서 자동 추출한 후보가 아니라, 사용자가 직접 확정해 알려준 정보입니다.
+          실제 데이터에서 정확히 하나의 업체로 좁혀진 항목만 "적용" 버튼이 활성화됩니다 —
+          미발견·복수 후보 항목은 건너뛰고, 새 업체를 임의로 만들거나 다른 업체를 대신
+          바꾸지 않습니다.
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="affiliate-review-table">
+            <thead><tr><th>#</th><th>사용자 지정 정보</th><th>실제 데이터에서 찾은 후보</th><th>현재 상태</th><th>적용 후 상태</th><th>일치 여부</th><th>적용</th></tr></thead>
+            <tbody>${rows.map((r,i)=> userConfirmedRowHtml(r,i)).join('')}</tbody>
+          </table>
+        </div>
+        <div class="pi-actions" style="margin-top:10px;">
+          <button type="button" class="co-text-action primary" id="userConfirmedApplyAllBtn" ${readyCount ? '' : 'disabled'}>전체 적용(${readyCount}건 · 정확히 일치한 항목만)</button>
+        </div>
+      </div>`;
+  }
+  function closeUserConfirmedConfirmModal(){
+    const el = document.getElementById('userConfirmedConfirmOverlay');
+    if(el) el.remove();
+  }
+  function openUserConfirmedApplyConfirmModal(rows){
+    const root = document.getElementById('relCandModalRoot');
+    if(!root || !rows.length) return;
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div class="pi-overlay" id="userConfirmedConfirmOverlay" style="z-index:10030;">
+        <div class="pi-panel" style="max-width:640px;" role="dialog" aria-modal="true" aria-label="사용자 확인 정보 반영 확인">
+          <div class="pi-head"><div class="pi-title">${rows.length}건 반영 확인</div></div>
+          <div class="pi-body" style="max-height:60vh; overflow-y:auto;">
+            <div class="stage-cancel-warn">
+              고객 ID는 그대로 유지되고, 기존 활동기록·서류·MOU 체결일은 전혀 지우지 않습니다.
+              업체 자체를 삭제하지 않으며, 협약 종료는 집계(MOU체결 수·협약 진행 탭)에서만
+              제외되고 "협약 종료 취소"로 언제든 되돌릴 수 있습니다.
+            </div>
+            ${rows.map(r=> `<div class="stage-history-item"><div><b>${esc(r.item.label)}</b></div><div>${esc(r.currentState || '')} → ${esc(r.afterState || '')}</div><div class="stage-history-meta">근거: ${esc(r.matchReason || '')}</div></div>`).join('')}
+          </div>
+          <div class="pi-actions">
+            <button type="button" class="co-text-action" id="userConfirmedConfirmCancelBtn">돌아가기</button>
+            <button type="button" class="co-text-action primary" id="userConfirmedConfirmOkBtn">적용</button>
+          </div>
+        </div>
+      </div>`;
+    root.appendChild(wrap.firstElementChild);
+    document.getElementById('userConfirmedConfirmCancelBtn').addEventListener('click', closeUserConfirmedConfirmModal);
+    document.getElementById('userConfirmedConfirmOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'userConfirmedConfirmOverlay') closeUserConfirmedConfirmModal(); });
+    document.getElementById('userConfirmedConfirmOkBtn').addEventListener('click', ()=>{
+      // §요청 "동일 작업을 여러 번 눌러도 중복 적용되지 않게" — 확인창을 띄운 뒤에도 그 사이
+      // 데이터가 바뀌었을 수 있으니, 실제로 적용하는 순간 다시 한번 최신 상태를 계산해 아직도
+      // 'ready'인 항목만 적용한다(이미 적용됐다면 'already'로 바뀌어 다시 적용되지 않는다).
+      let applied = 0;
+      rows.forEach(r=>{
+        const fresh = buildUserConfirmedItemStatus(r.item, D.loadCompanies());
+        if(fresh.status === 'ready'){ applyUserConfirmedItem(fresh); applied++; }
+      });
+      closeUserConfirmedConfirmModal();
+      if(relCandState){
+        relCandState.report = buildRelationshipCandidateReport();
+        relCandState.userConfirmedReport = buildUserConfirmedReport();
+        relCandState.decisions = new Map();
+        renderRelCandModal();
+      }
+      renderList();
+      if(typeof currentCompanyId !== 'undefined' && currentCompanyId && cardView.style.display === 'block') refreshChart();
+      alert(`${applied}건을 반영했습니다.`);
+    });
+  }
+
+  let relCandState = null; // { report, decisions: Map(rowIndex -> 'apply'|'ignore'), userConfirmedReport }
+  function closeRelCandModal(){
+    const el = document.getElementById('relCandModalRoot');
+    if(el) el.innerHTML = '';
+    relCandState = null;
+  }
+  function openRelCandModal(){
+    const report = buildRelationshipCandidateReport();
+    relCandState = { report, decisions: new Map(), userConfirmedReport: buildUserConfirmedReport() };
+    renderRelCandModal();
+  }
+  const RELCAND_TYPE_LABEL = { formerName: '이전 상호', subsidiary: '모회사/자회사', termination: '협약 종료' };
+  function relCandRowHtml(r, idx){
+    const decision = relCandState.decisions.get(idx) || 'ignore';
+    return `
+      <tr>
+        <td>${idx + 1}</td>
+        <td>${esc(r.company.name)}</td>
+        <td><span class="affiliate-group-badge">${esc(RELCAND_TYPE_LABEL[r.type])}</span></td>
+        <td>${esc(r.candidateTextRaw)}</td>
+        <td>${esc(r.sourceField)}</td>
+        <td class="affiliate-note-cell">${esc(r.note)}</td>
+        <td>
+          <select class="affiliate-decision-select" data-relcand-decision="${idx}">
+            <option value="apply" ${decision==='apply'?'selected':''}>적용</option>
+            <option value="ignore" ${decision==='ignore'?'selected':''}>무시</option>
+          </select>
+        </td>
+      </tr>`;
+  }
+  function renderRelCandModal(){
+    const root = document.getElementById('relCandModalRoot');
+    if(!root || !relCandState) return;
+    const { report } = relCandState;
+    const s = report.summary;
+    root.innerHTML = `
+      <div class="pi-overlay" id="relCandOverlay" style="z-index:10010;">
+        <div class="pi-panel" style="max-width:1020px; width:96vw;" role="dialog" aria-modal="true" aria-label="업체 관계 검토">
+          <div class="pi-head">
+            <div class="pi-title">업체 관계 검토</div>
+            <button type="button" class="chart-close-btn" id="relCandCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body" style="max-height:72vh; overflow-y:auto;">
+            ${userConfirmedSectionHtml(relCandState.userConfirmedReport)}
+            <div class="mail-settings-help">
+              비고·메모·신규 MOU 메모·활동기록에서 "이전 상호"/"자회사·계열사"/"협약 종료" 표현을 찾은 결과입니다.
+              원본 메모는 전혀 수정하지 않습니다 — 아래에서 "적용"으로 선택한 것만, [선택 항목 저장]을 눌러야
+              실제 고객 데이터에 반영됩니다.
+            </div>
+            <div class="stage-edit-impact">
+              <b>요약</b>
+              <ul>
+                <li>전체 후보: ${s.total}건</li>
+                <li>이전 상호 후보: ${s.formerName}건</li>
+                <li>모회사/자회사 — 정확 일치: ${s.subsidiaryExact}건 · 확인 필요: ${s.subsidiaryReview}건</li>
+                <li>협약 종료 후보: ${s.termination}건</li>
+              </ul>
+            </div>
+            ${report.rows.length ? `
+              <div style="overflow-x:auto;">
+                <table class="affiliate-review-table">
+                  <thead><tr><th>#</th><th>대상 업체</th><th>유형</th><th>원본 문구</th><th>원본 필드</th><th>비고</th><th>결정</th></tr></thead>
+                  <tbody>${report.rows.map((r,i)=> relCandRowHtml(r,i)).join('')}</tbody>
+                </table>
+              </div>
+              <div class="pi-actions" style="margin-top:12px;">
+                <button type="button" class="co-text-action" id="relCandCancelBtn">닫기</button>
+                <button type="button" class="co-text-action primary" id="relCandSaveBtn">선택 항목 저장</button>
+              </div>
+            ` : `<div class="agr-recent-item is-empty">메모·비고·활동기록에서 관계 후보를 찾지 못했습니다.</div>`}
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('relCandCloseBtn').addEventListener('click', closeRelCandModal);
+    const cancelBtn = document.getElementById('relCandCancelBtn');
+    if(cancelBtn) cancelBtn.addEventListener('click', closeRelCandModal);
+    document.getElementById('relCandOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'relCandOverlay') closeRelCandModal(); });
+    root.querySelectorAll('[data-relcand-decision]').forEach(sel=>{
+      sel.addEventListener('change', ()=>{
+        relCandState.decisions.set(Number(sel.getAttribute('data-relcand-decision')), sel.value);
+      });
+    });
+    const saveBtn = document.getElementById('relCandSaveBtn');
+    if(saveBtn) saveBtn.addEventListener('click', openRelCandSaveConfirmModal);
+    root.querySelectorAll('[data-userconfirmed-apply]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-userconfirmed-apply');
+        const row = relCandState.userConfirmedReport.find(r=> r.item.id === id);
+        if(!row || row.status !== 'ready') return;
+        openUserConfirmedApplyConfirmModal([row]);
+      });
+    });
+    const applyAllBtn = document.getElementById('userConfirmedApplyAllBtn');
+    if(applyAllBtn) applyAllBtn.addEventListener('click', ()=>{
+      const ready = relCandState.userConfirmedReport.filter(r=> r.status === 'ready');
+      if(ready.length) openUserConfirmedApplyConfirmModal(ready);
+    });
+  }
+  function closeRelCandSaveConfirmModal(){
+    const el = document.getElementById('relCandSaveConfirmOverlay');
+    if(el) el.remove();
+  }
+  function openRelCandSaveConfirmModal(){
+    const { report, decisions } = relCandState;
+    const toApply = [];
+    decisions.forEach((decision, idx)=>{
+      if(decision !== 'apply') return;
+      toApply.push(report.rows[idx]);
+    });
+    if(!toApply.length){ alert('저장할 항목이 없습니다 — "적용"으로 선택한 항목이 있어야 합니다.'); return; }
+    const root = document.getElementById('relCandModalRoot');
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div class="pi-overlay" id="relCandSaveConfirmOverlay" style="z-index:10020;">
+        <div class="pi-panel" style="max-width:640px;" role="dialog" aria-modal="true" aria-label="업체 관계 저장 확인">
+          <div class="pi-head"><div class="pi-title">${toApply.length}건 반영 확인</div></div>
+          <div class="pi-body" style="max-height:60vh; overflow-y:auto;">
+            <div class="stage-cancel-warn">아래 내용대로 실제 고객 데이터가 변경됩니다.</div>
+            ${toApply.map(r=>{
+              let desc;
+              if(r.type === 'formerName') desc = `${esc(r.company.name)} — 이전 상호에 "${esc(r.candidateTextRaw)}" 추가`;
+              else if(r.type === 'subsidiary'){
+                if(r.matchType === 'exact'){ const t = D.findCompany(r.matchedCompanyId); desc = `${esc(r.company.name)} → 모회사 "${esc(t ? t.name : r.candidateTextRaw)}"로 연결`; }
+                else desc = `${esc(r.company.name)} — 모회사명 "${esc(r.candidateTextRaw)}"만 저장(확정 연결 아님, 검토 필요로 표시)`;
+              } else desc = `${esc(r.company.name)} — 협약 종료로 처리(종료일: 오늘, 사유: 동기화 메모에서 확인)`;
+              return `<div class="stage-history-item"><div>${desc}</div><div class="stage-history-meta">원본: "${esc(r.candidateTextRaw)}"(${esc(r.sourceField)})</div></div>`;
+            }).join('')}
+          </div>
+          <div class="pi-actions">
+            <button type="button" class="co-text-action" id="relCandSaveConfirmCancelBtn">돌아가기</button>
+            <button type="button" class="co-text-action primary" id="relCandSaveConfirmOkBtn">저장</button>
+          </div>
+        </div>
+      </div>`;
+    root.appendChild(wrap.firstElementChild);
+    document.getElementById('relCandSaveConfirmCancelBtn').addEventListener('click', closeRelCandSaveConfirmModal);
+    document.getElementById('relCandSaveConfirmOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'relCandSaveConfirmOverlay') closeRelCandSaveConfirmModal(); });
+    document.getElementById('relCandSaveConfirmOkBtn').addEventListener('click', ()=>{
+      toApply.forEach(r=>{
+        if(r.type === 'formerName'){
+          D.addFormerName(r.company.id, r.candidateTextRaw);
+        } else if(r.type === 'subsidiary'){
+          if(r.matchType === 'exact' && r.matchedCompanyId){
+            D.addCompanyRelation(r.company.id, r.matchedCompanyId, '모회사');
+          } else {
+            D.updateCompany(r.company.id, { parentCompanyNameUnconfirmed: r.candidateTextRaw });
+          }
+        } else if(r.type === 'termination'){
+          D.terminateAgreement(r.company.id, { reason: '동기화 메모에서 확인', note: `원본: "${r.candidateTextRaw}"(${r.sourceField})` });
+        }
+      });
+      closeRelCandSaveConfirmModal();
+      closeRelCandModal();
+      renderList();
+      if(currentCompanyId && cardView.style.display === 'block') refreshChart();
+      alert(`${toApply.length}건을 반영했습니다.`);
     });
   }
 
@@ -22141,6 +23038,11 @@ window.SHIN2_CRM_APP_INIT = function(){
   document.getElementById('crmMapDistributionBtn').addEventListener('click', openMapDistributionModal);
   document.getElementById('crmPhoneRequestBtn').addEventListener('click', openPhoneRequestModal);
   document.getElementById('crmPdfExportBtn').addEventListener('click', openPdfExportModal);
+  document.getElementById('crmSubsidiaryOnlyBtn').addEventListener('click', (e)=>{
+    subsidiaryOnlyFilter = !subsidiaryOnlyFilter;
+    e.currentTarget.classList.toggle('is-active', subsidiaryOnlyFilter);
+    renderList();
+  });
   // §업체 추가 폼 이관 라운드에서 함께 수정: addEventListener('click', openAddCompanyForm)로
   // 직접 등록하면 클릭 이벤트(MouseEvent)가 그대로 prefillName 인자로 들어가 이름칸에
   // "[object MouseEvent]"가 채워지는 기존 버그가 있었다 — 인자 없이 호출하도록 감싼다.
@@ -22155,6 +23057,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   document.getElementById('crmPartnerListSyncBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openPartnerListSyncModal(); });
   document.getElementById('crmAffiliateReviewBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openAffiliateReviewModal(); });
   document.getElementById('crmDistListSyncBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openDistListSyncModal(); });
+  document.getElementById('crmRelCandBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openRelCandModal(); });
   function closeUpdateMenu(){ document.getElementById('crmUpdateMenu').classList.remove('is-open'); }
   document.getElementById('crmDataUpdateBtn').addEventListener('click', (e)=>{
     e.stopPropagation();
