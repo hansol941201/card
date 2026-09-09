@@ -2865,6 +2865,82 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .workq-doc-filter-row{ align-items:center; }
 .workq-doc-filter-label{ font-size:11.5px; color:var(--text-muted); font-weight:600; margin-right:4px; }
 .workq-doc-status{ font-size:11.5px; white-space:nowrap; }
+
+/* ==========================================================================
+   §UI 가독성 개선 라운드(신규) — 화면 디자인(간격·글자 크기·색상 강약·카드 정렬)만
+   조정한다. 기존 렌더링 로직·이벤트·데이터 계산·HTML 구조/클래스명은 전혀 건드리지
+   않았다(마크업은 rising-name의 title 속성과 rising-nums 안 텍스트를 감싸는 span 하나만
+   추가 — 새 문구·숫자 없이 기존 값을 그대로 감싼 것뿐이다). 이 블록은 전부 순수 CSS
+   오버라이드이고, 스타일시트 맨 끝에 추가해 기존 규칙(§전면 리디자인 라운드의 !important
+   포함)을 캐스케이드 순서로 안전하게 덮어쓴다 — 기존 규칙은 단 한 줄도 지우거나 고치지
+   않았다(§요청 "현재 화면에 있는 내용은 단 하나도 삭제하지 마세요").
+   ========================================================================== */
+
+/* 1. 상단 내비게이션 — 높이를 64px에서 52~56px 사이로 줄이고(52px 실측), 선택된 탭
+   밑줄을 파란색으로 명확하게 표시한다(§요청 "파란색 선이 명확하게"). 메뉴명/기능은
+   그대로다 — HTML은 전혀 안 건드리고 높이·색상만 조정. */
+.gnav, .gnav-inner, .gnav-menu, .gnav-menu .top-tab{ height:52px!important; }
+.gnav-menu .top-tab{ border-bottom-width:3px!important; }
+.gnav-menu .top-tab.is-active{ border-bottom-color:#4C8DFF!important; }
+
+/* 2. 고객 제목/버튼 영역 — "고객 383"을 조금 더 크고 굵게. 미등록 배지·버튼 순서/문구는
+   그대로(기존 .unreg-badge/.list-phone-btn/.list-add-btn 스타일 이미 요구사항과
+   일치해 그대로 둔다). */
+.list-title{ font-size:21px!important; font-weight:800!important; color:var(--navy)!important; }
+
+/* 3. 상단 요약 지표 — 지금은 테두리 하나를 나눠 쓰는 "한 줄 스트립"이라, 요청대로 같은
+   너비의 독립된 흰색 카드 4개처럼 보이게 각 칸에 자기 테두리·모서리·옅은 그림자를
+   준다(칸 개수/문구/숫자·클릭 동작은 전혀 안 바뀜 — renderKpiStrip 로직 그대로). */
+.kpi-strip{ background:transparent!important; border:none!important; border-radius:0!important; gap:10px!important; overflow:visible!important; }
+.kpi-item{ background:#fff!important; border:1px solid var(--line)!important; border-radius:8px!important; padding:16px 18px!important; box-shadow:0 1px 2px rgba(23,48,92,.04)!important; }
+.kpi-item:last-child{ border-right:1px solid var(--line)!important; }
+.kpi-item-value{ font-size:26px!important; color:var(--navy)!important; }
+.kpi-item.is-up .kpi-item-value{ color:var(--up)!important; }
+.kpi-item.is-warn .kpi-item-value{ color:var(--down)!important; }
+.kpi-item-label{ margin-top:2px!important; }
+
+/* 4. "올해의 고객 흐름" — 그래프 종류(카드형 2년 비교 미니 막대)는 그대로, 숫자·성장률이
+   더 잘 읽히도록 카드 내부만 정리한다. 업체명 줄 높이를 고정해 다섯 카드가 수평으로
+   맞도록 하고, 실적 변화/성장률 사이 간격은 flex+gap으로(§요청) — rising-nums 안의
+   기존 텍스트를 rising-nums-delta span으로 감싼 것 외 마크업 변경 없음. */
+.analysis-panel-rising{ padding:16px 18px 18px!important; }
+.rising-card{ display:flex!important; flex-direction:column!important; padding:13px 14px!important; }
+.rising-card-top{ height:20px!important; flex:none!important; }
+.rising-nums{ display:flex!important; align-items:baseline!important; flex-wrap:wrap!important; gap:9px!important; margin-top:3px!important; }
+.rising-nums-delta{ font-size:15px!important; font-weight:700!important; color:var(--text)!important; white-space:nowrap!important; }
+.rising-nums .rising-up{ font-size:13.5px!important; font-weight:800!important; color:var(--up)!important; margin-left:0!important; }
+.rising-minichart{ align-items:flex-end!important; }
+.rising-minibar-fill.y2024{ background:#CBD5E1!important; }
+.rising-minibar-fill.y2025{ background:var(--up)!important; }
+.rising-minibar-label{ font-size:10.5px!important; font-weight:700!important; color:var(--text-muted)!important; margin-top:3px!important; }
+
+/* 5. 필터 영역 — 칩 개수/문구/선택 색상은 이미 요청과 일치(남색 배경+흰 글씨 선택,
+   흰 배경+옅은 테두리 미선택, 관리필요 오른쪽 배치 유지) — 여백만 살짝 넉넉하게. */
+.list-filter-chip{ height:30px!important; padding:0 12px!important; font-size:12px!important; }
+
+/* 6. 검색·정렬·출력 영역 — 세 컨트롤 높이를 38~42px로 통일(검색창은 남은 공간을
+   넓게 차지하도록 flex, 정렬 select는 기존 너비 유지). "목록 출력" 버튼은 다른 버튼과
+   달리 일반 텍스트 링크 스타일(.co-text-action)을 쓰고 있어, 이 버튼(#crmPdfExportBtn)
+   에만 스코프를 좁혀 테두리 버튼으로 맞춘다 — .co-text-action은 다른 화면 곳곳에서
+   재사용되는 공용 클래스라 전역으로 바꾸지 않는다(§요청 "관련 없는 코드는 수정하지
+   마세요"). 기능/문구는 전혀 안 바꿈. */
+.list-search-row{ align-items:center!important; }
+.search-box{ flex:1 1 auto!important; }
+#crmPdfExportBtn{
+  display:inline-flex!important; align-items:center!important; height:39px!important;
+  padding:0 14px!important; font-size:12.5px!important; font-weight:600!important; color:var(--text)!important;
+  background:#fff!important; border:1px solid var(--line)!important; border-radius:8px!important; text-decoration:none!important;
+}
+#crmPdfExportBtn:hover{ background:var(--bg)!important; }
+
+/* 7. 고객 목록 표 — 열 구성은 그대로, 헤더 배경/글자색, 숫자·금액 오른쪽 정렬, 업체명
+   강조만 조정한다(§요청 "열을 삭제·합치거나 새로 만들지 마세요" — 전부 기존 col-* 클래스
+   셀렉터만 사용, 새 클래스 없음). */
+.co-table-head{ background:#F4F7FC!important; color:var(--navy)!important; font-weight:800!important; }
+.col-yr, .col-total-revenue, .col-yr-revenue{ text-align:right!important; }
+.co-row{ min-height:52px!important; }
+.co-row:hover{ background:#EFF6FF!important; }
+
 </style>
 </head>
 <body>
@@ -14938,8 +15014,8 @@ window.SHIN2_CRM_APP_INIT = function(){
         const h2025 = Math.round((it.y2025 / barMax) * 100);
         return `
         <div class="rising-card" data-id="${esc(it.co.id)}">
-          <div class="rising-card-top"><span class="rising-rank">${i+1}</span><span class="rising-name">${esc(it.co.name)}</span></div>
-          <div class="rising-nums">${it.y2024}건 → ${it.y2025}건 <span class="rising-up">${it.isNew ? '신규 증가' : '▲ ' + it.pct + '%'}</span></div>
+          <div class="rising-card-top"><span class="rising-rank">${i+1}</span><span class="rising-name" title="${esc(it.co.name)}">${esc(it.co.name)}</span></div>
+          <div class="rising-nums"><span class="rising-nums-delta">${it.y2024}건 → ${it.y2025}건</span><span class="rising-up">${it.isNew ? '신규 증가' : '▲ ' + it.pct + '%'}</span></div>
           <div class="rising-minichart">
             <div class="rising-minibar"><div class="rising-minibar-fill y2024" style="height:${h2024}%"></div><div class="rising-minibar-label">24</div></div>
             <div class="rising-minibar"><div class="rising-minibar-fill y2025" style="height:${h2025}%"></div><div class="rising-minibar-label">25</div></div>
