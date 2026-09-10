@@ -4760,6 +4760,28 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     return loadDocuments().filter(d=> d.companyId === companyId && (!type || d.documentType === type))
       .sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
   }
+  // §업무관리 탭 속도 개선 라운드(신규) — buildMemosIndex/buildActivitiesIndex(§속도 개선
+  // 2라운드)와 완전히 같은 패턴: localStorage 원본 문자열이 마지막 계산 때와 같으면 다시
+  // 파싱하지 않고 캐시된 Map을 그대로 돌려준다. 업무관리 표가 업체마다(서류 종류 수만큼
+  // 반복해) documentsForCompany를 새로 불러 DOC_KEY 전체 배열을 매번 다시 읽던 게 "업무관리
+  // 탭 느려짐"의 실제 원인 중 하나였다(§진단). 결과값·정렬 기준은 documentsForCompany와
+  // 완전히 동일(업체별로 묶어 최신순 정렬) — companyId로 조회 후 필요하면 type으로 한 번
+  // 더 거르기만 하면 되므로, 반환 형태를 그대로 documentsForCompany의 대체 인덱스로 쓸 수
+  // 있다.
+  let documentsIndexCache = { raw: undefined, map: null };
+  function buildDocumentsIndex(){
+    const raw = localStorage.getItem(DOC_KEY);
+    if(raw === documentsIndexCache.raw && documentsIndexCache.map) return documentsIndexCache.map;
+    const map = new Map();
+    loadDocuments().forEach(d=>{
+      const k = String(d.companyId);
+      if(!map.has(k)) map.set(k, []);
+      map.get(k).push(d);
+    });
+    map.forEach(list=> list.sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt)));
+    documentsIndexCache = { raw, map };
+    return map;
+  }
   function findDocument(id){ return loadDocuments().find(d=> d.id === id) || null; }
   // 공용 자료실(읽기 전용 참조, §13) — v2 SHIN2_LIBRARY와 완전히 같은 키를 읽기만 한다.
   function loadLibraryDocs(){ return readArr(LIB_KEY); }
@@ -6541,7 +6563,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     getMailAssetsMeta, saveMailAssetsMeta,
     getGlobalMailAsset, saveGlobalMailAssetPatch,
     loadActivities, addActivity, updateActivityText, deleteActivity, activitiesForCompany, classifyActivity, buildActivitiesIndex,
-    loadDocuments, documentsForCompany, addDocument, updateDocumentExtracted, getBlob, renameDocument, setDocumentMemo, setDocumentVerification, deleteDocument, findDocument, migrateDocumentToCloud,
+    loadDocuments, documentsForCompany, buildDocumentsIndex, addDocument, updateDocumentExtracted, getBlob, renameDocument, setDocumentMemo, setDocumentVerification, deleteDocument, findDocument, migrateDocumentToCloud,
     loadMemos, memosFor, addMemo, updateMemo, deleteMemo, buildMemosIndex,
     pendingActivitiesForCompany, tasksForCompany, calendarEventsForCompany, upcomingCalendarEventsForCompany,
     DEAL_STAGES, setDealStage, setAssigneeUserId, addNeed, removeNeed, dismissNeedSuggestion, addSpecialNote, removeSpecialNote, setImportant, suggestNeedFor,
@@ -10895,12 +10917,20 @@ window.SHIN2_CRM_APP_INIT = function(){
   // computeWorkQueue: companies/activities/POUR 인덱스를 매번 새로 읽기만 하는 순수 계산 —
   // 별도 저장소 없음(§14 READ-ONLY). "오래된 업체가 위로"(§9) — days가 클수록 위(내림차순),
   // 날짜 없는 업체(days===null)는 순서를 지어낼 수 없으므로 맨 아래로 보낸다.
+  // §업무관리 탭 속도 개선 라운드(신규) — 진단 결과, 업체마다(업무관리 대상 전체 활성
+  // 업체, 130개 규모) D.activitiesForCompany(co.id)를 불러 customerActivities 전체
+  // 배열을 매번 다시 JSON.parse+filter+sort 하고 있었다 — 고객관리 목록의 옛
+  // enriched 병목(§157f666)과 완전히 같은 패턴인데 업무관리 쪽은 그때 안 고쳐져 있었다.
+  // D.buildActivitiesIndex()(§속도 개선 2라운드, localStorage 원본 문자열이 안 바뀌면
+  // 캐시 재사용)를 그대로 재사용해 O(1) 조회로 바꾼다 — 결과·정렬 기준은
+  // activitiesForCompany와 동일.
   function computeWorkQueue(){
     const companies = D.loadActiveCompanies(); // §업체 삭제(휴지통) 라운드 — 업무관리에서 소프트 삭제된 업체를 뺀다(§요청 10)
     const pourLatestIndex = D.buildPourLatestIndex();
+    const activitiesIdx = D.buildActivitiesIndex();
     const list = [];
     companies.forEach(co=>{
-      const acts = D.activitiesForCompany(co.id);
+      const acts = activitiesIdx.get(String(co.id)) || [];
       const progress = buildProgressStages(co);
       const hasPour = pourLatestIndex.get(co.id) != null;
       const item = buildWorkQueueItem(co, acts, progress, hasPour);
@@ -11243,9 +11273,9 @@ window.SHIN2_CRM_APP_INIT = function(){
   const WORKQ_DOC_FILTER_DEFS = [
     ['all','전체'], ['missing','미등록 있음'], ['complete','모두 등록'], ['verified','확인 완료'], ['reRequest','재요청 필요']
   ];
-  function matchesWorkqDocFilter(companyId, key){
+  function matchesWorkqDocFilter(companyId, key, docsIndex){
     if(key === 'all') return true;
-    const summary = buildAgreementDocSummary(companyId);
+    const summary = buildAgreementDocSummary(companyId, docsIndex);
     if(key === 'missing') return summary.counts.unregistered > 0;
     if(key === 'complete') return summary.counts.unregistered === 0;
     if(key === 'verified') return summary.counts.verified === summary.total;
@@ -11279,6 +11309,16 @@ window.SHIN2_CRM_APP_INIT = function(){
     const searchHadFocus = !!(prevSearchInput && document.activeElement === prevSearchInput);
     const searchCaret = searchHadFocus ? prevSearchInput.selectionStart : null;
     const { list, counts } = computeWorkQueue();
+    // §업무관리 탭 속도 개선 라운드(신규) — 이 아래 두 필터가 진단에서 확인된 나머지 두
+    // 병목이었다: (1) 검색어가 비어 있을 때도(=대부분의 렌더링) matchesSearch에 넘길
+    // acts를 매 항목마다 D.activitiesForCompany로 새로 계산해 버렸다(matchesSearch는
+    // q가 비어 있으면 그 값을 아예 안 쓰는데도, §속도 개선 2라운드에서 고객관리 목록에
+    // 적용한 것과 같은 낭비). (2) matchesWorkqDocFilter → buildAgreementDocSummary가
+    // 업체마다(서류 종류 수만큼) DOC_KEY 전체 배열을 다시 훑었다. 둘 다 이미 있는
+    // 캐시 인덱스(D.buildActivitiesIndex/D.buildDocumentsIndex, 데이터 안 바뀌면 재사용)로
+    // 바꾼다 — 검색·서류필터 결과는 이전과 동일, 반복 전체훑기만 없앤다.
+    const activitiesIdxForSearch = D.buildActivitiesIndex();
+    const docsIdx = D.buildDocumentsIndex();
     // §15: today-line 숫자도 필터로 쓸 수 있게 workQueueFilter가 category뿐 아니라 type
     // 값(m1/m2/mou)도 받을 수 있게 한다 — 기존 category 필터 칩 로직은 그대로 두고
     // 조건만 넓힌다. §업무관리 검색창 라운드: 검색은 고객관리 목록과 완전히 같은
@@ -11293,8 +11333,8 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(workQueueFilter === 'm2') return it.type === 'm2' || it.type === 'm2Scheduled';
       return it.category === workQueueFilter || it.type === workQueueFilter;
     }))
-      .filter(it=> matchesSearch(it.co, D.activitiesForCompany(it.co.id), workQueueSearch))
-      .filter(it=> matchesWorkqDocFilter(it.co.id, workQueueDocFilter));
+      .filter(it=> matchesSearch(it.co, workQueueSearch ? (activitiesIdxForSearch.get(String(it.co.id)) || []) : [], workQueueSearch))
+      .filter(it=> matchesWorkqDocFilter(it.co.id, workQueueDocFilter, docsIdx));
     const m1Count = list.filter(it=> it.type==='m1').length;
     const m2Count = list.filter(it=> it.type==='m2').length;
     const mouCount = list.filter(it=> it.type==='mou').length;
@@ -11381,7 +11421,7 @@ window.SHIN2_CRM_APP_INIT = function(){
                 <td class="workq-days">${it.days === null ? '—' : esc(it.days) + '일'}${it.isDelayed ? '<span class="workq-delay-badge">지연</span>' : ''}</td>
                 <td><button type="button" class="workq-action-btn${isOpen ? ' is-open' : ''}" data-workq-toggle="${esc(it.co.id)}" data-workq-toggle-type="${esc(it.type)}">${esc(it.actionLabel)}</button></td>
                 <td>${mailCellHtml}</td>
-                <td class="workq-doc-status">${esc(buildAgreementDocSummary(it.co.id).text)}</td>
+                <td class="workq-doc-status">${esc(buildAgreementDocSummary(it.co.id, docsIdx).text)}</td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -13139,22 +13179,36 @@ window.SHIN2_CRM_APP_INIT = function(){
     }
     updateTopTabsUI('customer');
   }
+  // §업무관리 탭 속도 개선 라운드(신규) — 진단 결과, "화면 전환"(이전 view 숨김 + 새 view
+  // 표시 + 상단 탭 활성 표시)과 "무거운 렌더링"(renderWorkQueueView → computeWorkQueue,
+  // 업체마다 활동기록·서류·진행단계 계산)이 하나의 동기 실행 구간에 묶여 있었다 —
+  // 브라우저가 "탭이 바뀌었다"는 프레임을 한 번도 그리지 못한 채로 바로 무거운 계산에
+  // 들어가서, 클릭한 순간부터 계산이 끝날 때까지 화면이 그대로 멈춰 있는 것처럼 보였다
+  // (§요청 "화면 전환을 먼저 처리한 다음 실행"). 화면 전환(아래 4줄)은 항상 즉시 끝내고,
+  // 무거운 렌더는 브라우저가 그 전환을 한 번 그릴 시간을 준 뒤(requestAnimationFrame을
+  // 두 번 중첩 — 콜백이 "다음 그리기 직전"에 불리므로, 지금 프레임이 이미 예약돼 있을
+  // 때를 대비해 한 번 더 미뤄야 확실히 그 다음 프레임에 실행된다) 실행한다. 탭 안에서
+  // 스스로 다시 부르는 renderWorkQueueView() 호출(필터 칩·정렬 등, 이미 이 화면이 보이는
+  // 상태)은 건드리지 않았다 — 거기까지 미루면 오히려 반응이 느려 보인다.
   function showWorkQueueTab(){
     listView.style.display = 'none';
     cardView.style.display = 'none';
     document.getElementById('mailSettingsView').style.display = 'none';
     document.getElementById('workQueueView').style.display = 'block';
-    renderWorkQueueView();
     updateTopTabsUI('workqueue');
+    requestAnimationFrame(()=> requestAnimationFrame(renderWorkQueueView));
   }
   // §1차미팅 메일 자동발송 라운드(신규): 나머지 세 view와 완전히 같은 전환 패턴.
+  // §업무관리 탭 속도 개선 라운드(신규) — renderMailSettingsView 자체는 업체 반복 계산이
+  // 없어 가볍지만, 다른 두 탭과 일관되게 "화면 전환 먼저, 렌더는 다음 프레임" 원칙을
+  // 똑같이 적용한다(§요청 5 "메인 탭 클릭 후 기본 화면 표시" 전부에 적용).
   function showMailSettingsTab(){
     listView.style.display = 'none';
     cardView.style.display = 'none';
     document.getElementById('workQueueView').style.display = 'none';
     document.getElementById('mailSettingsView').style.display = 'block';
-    renderMailSettingsView();
     updateTopTabsUI('mailsettings');
+    requestAnimationFrame(()=> requestAnimationFrame(renderMailSettingsView));
   }
   function updateTopTabsUI(tab){
     const custBtn = document.getElementById('crmTabCustomer');
@@ -13637,8 +13691,14 @@ window.SHIN2_CRM_APP_INIT = function(){
   const AGREEMENT_DOC_STATUS_CLASS = { unregistered:'is-none', registered:'is-progress', verified:'is-mou', reRequest:'is-hurdle' };
   // §요청 [3] "기존 서류 데이터에 verificationStatus가 없는 경우: 파일 있으면 registered,
   // 없으면 unregistered로 간주(읽기 호환, 일괄 수정 없음)".
-  function resolveAgreementDocSlot(companyId, type){
-    const docs = D.documentsForCompany(companyId, type);
+  // §업무관리 탭 속도 개선 라운드(신규) — docsIndex(선택, D.buildDocumentsIndex()가 만든
+  // Map)를 넘기면 companyId로 한 번만 조회하고 type은 그 소수의 결과에서만 거른다(전체
+  // DOC_KEY 배열을 다시 훑지 않음). 안 넘기면(고객카드 등 단발성 호출) 기존처럼
+  // D.documentsForCompany를 그대로 호출 — 결과·정렬 기준은 완전히 동일하다.
+  function resolveAgreementDocSlot(companyId, type, docsIndex){
+    const docs = docsIndex
+      ? (docsIndex.get(String(companyId)) || []).filter(d=> !type || d.documentType === type)
+      : D.documentsForCompany(companyId, type);
     if(!docs.length) return { status:'unregistered', doc:null };
     // §고객관리 사진·서류 통합 라운드에서 발견해 함께 고친 버그 — documentsForCompany는
     // 이미 최신순(newest-first)으로 정렬해서 돌려주는데(§데이터 계층 정의 그대로) 여기서
@@ -13647,15 +13707,15 @@ window.SHIN2_CRM_APP_INIT = function(){
     const doc = docs[0];
     return { status: doc.verificationStatus || 'registered', doc };
   }
-  function buildAgreementDocChecklist(companyId){
+  function buildAgreementDocChecklist(companyId, docsIndex){
     return agreementDocTypesList().map(([type, label])=>{
-      const slot = resolveAgreementDocSlot(companyId, type);
+      const slot = resolveAgreementDocSlot(companyId, type, docsIndex);
       return { type, label: AGREEMENT_DOC_LABEL_OVERRIDE[type] || label, status: slot.status, doc: slot.doc };
     });
   }
   // 목록/필터용 요약 — 업무관리 표의 "서류 현황" 열과 필터가 재사용(§요청 [6][9]).
-  function buildAgreementDocSummary(companyId){
-    const list = buildAgreementDocChecklist(companyId);
+  function buildAgreementDocSummary(companyId, docsIndex){
+    const list = buildAgreementDocChecklist(companyId, docsIndex);
     const counts = { unregistered:0, registered:0, verified:0, reRequest:0 };
     list.forEach(it=> counts[it.status]++);
     const total = list.length;
