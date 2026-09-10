@@ -5123,6 +5123,35 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     return loadMemos().filter(m=> m.targetType==='company' && String(m.targetId)===String(companyId))
       .sort((a,b)=> (b.updatedAt||b.createdAt) - (a.updatedAt||a.createdAt));
   }
+  // §속도 개선 라운드: 목록 화면이 매번(검색 타이핑마다 포함) 보이는 업체 수만큼
+  // memosFor/activitiesForCompany를 각각 다시 불러(각 함수가 매번 전체 배열을
+  // localStorage에서 새로 JSON.parse) 반복 훑던 게 "구글시트 연동 이후 느려짐"의 실제
+  // 원인 중 하나였다(요청내역이 늘면서 이 전체 재훑기 비용도 같이 커졌기 때문) — 이미
+  // 같은 목적으로 존재하던 pourLatestIndex/requestHistoryIndex(§최근 요청 라운드, 렌더링당
+  // 한 번만 인덱스 계산)와 완전히 같은 패턴을 메모/활동에도 적용한다. 데이터나 정렬 기준은
+  // 그대로이고(원래 함수와 동일한 필터·정렬), "렌더링 한 번당 한 번만" 계산해 두고 각 행은
+  // 조회만 하도록 바꾸는 것뿐이라 화면에 보이는 값은 달라지지 않는다.
+  function buildMemosIndex(){
+    const map = new Map();
+    loadMemos().forEach(m=>{
+      if(m.targetType !== 'company') return;
+      const k = String(m.targetId);
+      if(!map.has(k)) map.set(k, []);
+      map.get(k).push(m);
+    });
+    map.forEach(list=> list.sort((a,b)=> (b.updatedAt||b.createdAt) - (a.updatedAt||a.createdAt)));
+    return map;
+  }
+  function buildActivitiesIndex(){
+    const map = new Map();
+    loadActivities().forEach(a=>{
+      const k = String(a.companyId);
+      if(!map.has(k)) map.set(k, []);
+      map.get(k).push(a);
+    });
+    map.forEach(list=> list.sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt)));
+    return map;
+  }
   function addMemo(companyId, text){
     const now = Date.now();
     const list = loadMemos();
@@ -6478,9 +6507,9 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     deleteMailAssetFile, isAllowedMailAssetFile, MAIL_ASSET_MAX_CLOUD_BYTES, MAIL_ASSET_ALLOWED_EXT,
     getMailAssetsMeta, saveMailAssetsMeta,
     getGlobalMailAsset, saveGlobalMailAssetPatch,
-    loadActivities, addActivity, updateActivityText, deleteActivity, activitiesForCompany, classifyActivity,
+    loadActivities, addActivity, updateActivityText, deleteActivity, activitiesForCompany, classifyActivity, buildActivitiesIndex,
     loadDocuments, documentsForCompany, addDocument, updateDocumentExtracted, getBlob, renameDocument, setDocumentMemo, setDocumentVerification, deleteDocument, findDocument, migrateDocumentToCloud,
-    loadMemos, memosFor, addMemo, updateMemo, deleteMemo,
+    loadMemos, memosFor, addMemo, updateMemo, deleteMemo, buildMemosIndex,
     pendingActivitiesForCompany, tasksForCompany, calendarEventsForCompany, upcomingCalendarEventsForCompany,
     DEAL_STAGES, setDealStage, setAssigneeUserId, addNeed, removeNeed, dismissNeedSuggestion, addSpecialNote, removeSpecialNote, setImportant, suggestNeedFor,
     addWhyPour, removeWhyPour, setCoreNeed, addKeyFactor, removeKeyFactor,
@@ -7784,6 +7813,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     // "최근 요청"은 여기서 딱 한 번만 인덱스로 계산해 두고 아래 각 행에서는 조회만 한다.
     const pourLatestIndex = D.buildPourLatestIndex();
     const requestHistoryIndex = D.buildRequestHistoryIndex();
+    // §속도 개선 라운드: buildRequestListItems(co)가 행마다(최대 PAGE_SIZE=15번) 각각
+    // D.memosFor/D.activitiesForCompany를 불러 전체 메모·활동 배열을 매번 새로 훑던 것을,
+    // 위 pourLatestIndex/requestHistoryIndex와 같은 패턴으로 렌더링당 한 번만 인덱스로
+    // 만들어 두고 각 행에서는 조회만 하도록 바꾼다(§7987 호출부에서 사용).
+    const requestItemsIndex = { memos: D.buildMemosIndex(), activities: D.buildActivitiesIndex() };
     // §실적↔매출 실제 구현 라운드: "실적 1건당 평균 매출" 상대 등급(상위/중간/하위 30·40·30%)은
     // 전체 업체의 분포를 알아야 계산할 수 있어서, 업체마다 다시 정렬할 수 없다 — 렌더링당
     // 한 번만 전체를 계산해 둔다(§11 "같은 공통 소스 재사용" + §성능 원칙과 동일).
@@ -7984,7 +8018,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 내용은 title 툴팁(마우스를 올리면 보임)으로만 노출한다. 클릭하면 기존 최근
       // 요청/메모 패널(openMemoPanel)이 그대로 열린다. 요청 이력이 없는 업체는 "—"만
       // 보여준다(데이터 없음을 지어내지 않음).
-      const recentRequestItems = buildRequestListItems(co);
+      const recentRequestItems = buildRequestListItems(co, requestItemsIndex);
       const latestRequestItem = recentRequestItems[0] || null;
       // §고객 요청 Google Sheets 연동(최근 요청 표시 수정 라운드) — 메모/요청자료 항목은
       // 기존 그대로 날짜만 보이고 자세한 내용은 hover(§요청과 무관, 이전 라운드의 명시적
@@ -19737,9 +19771,15 @@ window.SHIN2_CRM_APP_INIT = function(){
      "+ 요청자료 추가"로 새로 적는 항목은 자유 텍스트이므로 D.addMemo로 저장한다(메모
      저장 로직 재사용, §2). 다음 행동/전화기록 원문과는 여기서 절대 서로 변환하지 않는다.
      ========================================================================== */
-  function buildRequestListItems(co){
+  // §속도 개선 라운드: idx(선택)로 미리 만들어 둔 메모/활동 인덱스(D.buildMemosIndex/
+  // D.buildActivitiesIndex, 목록 렌더링에서 한 번만 계산)를 넘겨받으면 그걸 조회만 하고,
+  // 안 넘기면(팝업 등 단발성 호출) 기존처럼 D.memosFor/D.activitiesForCompany를 그대로
+  // 호출한다 — 결과값·정렬 기준은 완전히 동일, 목록처럼 같은 렌더링에서 여러 번(업체마다)
+  // 불리는 곳만 반복 전체훑기를 피하도록 고른 것뿐이다.
+  function buildRequestListItems(co, idx){
     const items = [];
-    D.memosFor(co.id).forEach(m=> items.push({
+    const memos = (idx && idx.memos) ? (idx.memos.get(String(co.id)) || []) : D.memosFor(co.id);
+    memos.forEach(m=> items.push({
       id: 'memo:' + m.id, kind:'memo', memoId: m.id, text: m.text,
       ts: m.updatedAt || m.createdAt, createdAtIso: new Date(m.createdAt).toISOString()
     }));
@@ -19770,7 +19810,8 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 발생일(occurredAt, 가져온 시각이 아님)을 쓴다. 읽기 전용(수정/삭제 버튼 없음,
     // reqRowHtml에서 kind==='gsheet' 분기) — 원본이 시트라 로컬에서 지워도 다음 확인
     // 때 dedupKey 기준으로 다시 채워질 뿐이라 혼동을 막기 위해서다.
-    D.activitiesForCompany(co.id).forEach(a=>{
+    const acts = (idx && idx.activities) ? (idx.activities.get(String(co.id)) || []) : D.activitiesForCompany(co.id);
+    acts.forEach(a=>{
       if(a.source !== 'google-sheets-request' || !a.occurredAt) return;
       const parts = [a.sourceTab, fmtDate(a.occurredAt)];
       if(a.siteName) parts.push(a.siteName);
@@ -22625,7 +22666,20 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(dWq) dWq.addEventListener('click', ()=>{ showWorkQueueTab(); closeDrawer(); });
     if(dMail) dMail.addEventListener('click', ()=>{ showMailSettingsTab(); closeDrawer(); });
   })();
-  searchInput.addEventListener('input', ()=>{ searchQuery = searchInput.value.trim(); currentPage = 1; renderList(); });
+  // §속도 개선 라운드: 기존엔 키 입력마다 바로 renderList()(목록 전체 재계산+DOM 재생성)를
+  // 불렀다 — 빠르게 타이핑하면 글자 수만큼 전체 재렌더링이 반복돼 느려진다. 이 input
+  // 요소 자체는 renderList()가 다시 그리지 않으므로(검색창은 목록 밖에 있음) 조합중 한글
+  // 입력이 끊기는 문제는 없고, 단순히 타이핑이 잠깐(150ms) 멈췄을 때만 실제 검색을
+  // 반영하도록 디바운스만 추가한다 — 검색 결과·동작 자체는 이전과 동일하다.
+  let searchDebounceTimer = null;
+  searchInput.addEventListener('input', ()=>{
+    const val = searchInput.value;
+    if(searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(()=>{
+      searchDebounceTimer = null;
+      searchQuery = val.trim(); currentPage = 1; renderList();
+    }, 150);
+  });
   const sortSelect = document.getElementById('crmSortSelect');
   if(sortSelect){
     sortSelect.value = sortMode;
