@@ -163,6 +163,8 @@
      여는 버튼이라 FILTER_DEFS/data-filter에는 넣지 않았다(§2). */
   .list-filter-chip.mgmt-need-chip{ margin-left:auto; color:#B91C1C; background:#FEF2F2; border-color:#FCA5A5; font-weight:700; }
   .list-filter-chip.mgmt-need-chip:hover{ background:#FEE2E2; }
+  .list-filter-chip.is-trash{ color:var(--text-muted); } /* §업체 삭제(휴지통) 라운드 — 다른 탭과 같은 칩 모양, 강조색 없이 구분만 */
+  .list-filter-chip.is-trash.is-active{ color:var(--navy); border-color:var(--navy); background:#EDF1FA; }
 
   .list-search-row{ display:flex; gap:8px; margin-bottom:8px; }
   .search-box{
@@ -2473,6 +2475,39 @@ body.map-modal-lock{ overflow:hidden; }
 .mail-compose-attach-row{ font-size:12px; color:var(--text); display:flex; justify-content:space-between; gap:8px; padding:3px 0; }
 .mail-compose-attach-row.is-missing{ color:var(--text-muted); }
 .mail-compose-attach-meta{ color:var(--text-muted); white-space:nowrap; }
+/* §업체 삭제(휴지통) 라운드(신규) */
+.deleted-co-table{ display:flex; flex-direction:column; }
+.deleted-co-head, .deleted-co-row{ display:grid; grid-template-columns:96px 1fr 1.4fr 90px; gap:10px; align-items:center; padding:9px 4px; }
+.deleted-co-head{ font-size:11px; color:var(--text-muted); font-weight:700; border-bottom:1px solid var(--line); }
+.deleted-co-row{ font-size:12.5px; color:var(--text); border-bottom:1px solid var(--line); }
+.deleted-co-row:last-child{ border-bottom:none; }
+.deleted-co-date{ color:var(--text-muted); white-space:nowrap; }
+.deleted-co-name{ font-weight:600; word-break:break-word; }
+.deleted-co-reason{ color:var(--text-muted); word-break:break-word; }
+.deleted-co-actions{ text-align:right; white-space:nowrap; }
+@media (max-width:600px){
+  .deleted-co-head{ display:none; }
+  .deleted-co-row{ grid-template-columns:1fr; gap:3px; padding:10px 4px; }
+  .deleted-co-actions{ text-align:left; }
+}
+/* §업체 삭제(휴지통) 라운드(신규) — 상세 팝업 "업체 삭제" 버튼과 확인 모달. 이 앱에는
+   진짜 붉은 배경 버튼 관례가 없어(기존 .co-text-action.danger는 hover에서만 붉어짐),
+   요청한 "빨간색 버튼"을 기존 배지류(§요청X 미등록/기한초과 배지)와 같은 옅은 빨강
+   칩 스타일로 새로 만든다. */
+.cdash-delete-co-btn{ color:#B91C1C; background:#FEF2F2; border:1px solid #FCD5D5; border-radius:8px; padding:6px 14px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; }
+.cdash-delete-co-btn:hover{ background:#FEE2E2; border-color:#FCA5A5; }
+.cdash-danger-zone{ margin-top:8px; }
+.delete-co-modal-name{ font-weight:700; font-size:14px; color:var(--text); margin-bottom:6px; }
+.delete-co-modal-note{ font-size:12.5px; color:#B91C1C; background:#FEF2F2; border:1px solid #FCD5D5; border-radius:8px; padding:8px 10px; margin-bottom:14px; }
+.delete-co-modal-field{ margin-bottom:12px; }
+.delete-co-modal-field label{ display:block; font-size:11.5px; color:var(--text-muted); margin-bottom:4px; }
+.delete-co-modal-field input, .delete-co-modal-field textarea{
+  width:100%; box-sizing:border-box; border:1px solid var(--line); border-radius:7px; padding:8px 10px; font-size:13px; font-family:inherit;
+}
+.delete-co-modal-confirm-btn{ color:#fff; background:#DC2626; border:none; border-radius:8px; padding:9px 16px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
+.delete-co-modal-confirm-btn:disabled{ background:#F3B4B4; cursor:not-allowed; }
+.delete-co-modal-cancel-btn{ color:var(--text-muted); background:transparent; border:1px solid var(--line); border-radius:8px; padding:9px 16px; font-size:13px; cursor:pointer; font-family:inherit; }
+.delete-co-modal-err{ font-size:12px; color:#B91C1C; margin-top:8px; }
 .mail-compose-attach-note{ font-size:11px; color:var(--text-muted); margin-top:4px; line-height:1.4; }
 .mail-diag-panel{ margin-top:10px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--bg); }
 .mail-diag-title{ font-size:12px; font-weight:700; color:var(--text); margin-bottom:6px; }
@@ -3182,6 +3217,9 @@ table.pdf-doc-table thead{ background:var(--bg); }
        이 화면은 브라우저 인쇄(window.print)로만 PDF를 만든다 — 외부 API 전송, Firebase
        업로드, 실제 발송 기능이 전혀 없다. -->
   <div id="pdfExportModalRoot"></div>
+  <!-- §업체 삭제(휴지통) 라운드(신규) — 고객 상세 팝업 "업체 삭제" 버튼이 여는 확인 모달
+       전용 root. 같은 .pi-overlay/.pi-panel 패턴. -->
+  <div id="deleteCompanyModalRoot"></div>
   <!-- §외부 동기화 제거 라운드(신규) — "전체 동기화"/개별 협력업체·진행현황 동기화/공개범위
        가져오기/동기화 진단/동기화 기록 보기 전용이던 모달 root들(partnerSyncModalRoot/
        syncDiagModalRoot/partnerListSyncModalRoot/distListSyncModalRoot/fullSyncModalRoot/
@@ -5580,6 +5618,34 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     return rec;
   }
 
+  // §업체 삭제(휴지통) 라운드(신규) — "완전 삭제"가 아니라 co.deletedAt/deletedBy/
+  // deleteReason 3개 필드만 기록하는 소프트 삭제(§요청 5/8). 활동·메모·서류·진행단계·
+  // 매출·시공실적은 companyId로 연결된 별도 저장소(activities/memos/documents 등)에
+  // 그대로 남아있고 이 함수가 손대는 건 companies 배열의 이 업체 레코드 한 건뿐이라,
+  // deletedAt만 지우면(restoreDeletedCompany) 전부 원래대로 돌아온다 — 별도 백업/복원
+  // 로직이 필요 없다(§요청 7).
+  function isCompanyDeleted(co){ return !!(co && co.deletedAt); }
+  function loadActiveCompanies(){ return loadCompanies().filter(co=> !co.deletedAt); }
+  function loadDeletedCompanies(){ return loadCompanies().filter(co=> !!co.deletedAt); }
+  function softDeleteCompany(companyId, reason){
+    const co = findCompany(companyId); if(!co) return null;
+    if(co.deletedAt) return co; // 이미 삭제된 업체 — 재시도로 또 처리되지 않게 그대로 반환
+    const rec = updateCompany(companyId, {
+      deletedAt: nowIso(),
+      deletedBy: currentUserLabel(),
+      deleteReason: (reason || '').trim()
+    });
+    addActivity(companyId, `[업체 삭제] ${(reason || '').trim() || '사유 미기재'}`);
+    return rec;
+  }
+  function restoreDeletedCompany(companyId){
+    const co = findCompany(companyId); if(!co) return null;
+    if(!co.deletedAt) return co;
+    const rec = updateCompany(companyId, { deletedAt: null, deletedBy: null, deleteReason: null });
+    addActivity(companyId, '[업체 복구] 삭제를 취소했습니다 — 이전 데이터가 그대로 유지됩니다.');
+    return rec;
+  }
+
   // 고객 상태(customerStatusNote) — 영업단계(dealStage, 고정 목록)와는 다른 개념의 자유
   // 문장형 상태 메모(예: "협약 검토 (2차 미팅 예정)"). 헤더 우측 요약 박스에서만 쓰인다.
   function setCustomerStatusNote(companyId, text){ return updateCompany(companyId, { customerStatusNote: text || '' }); }
@@ -6407,6 +6473,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     RELATION_TYPES, addCompanyRelation, removeCompanyRelation, buildRelationIndex,
     isSubsidiary, resolveParentCompanyDisplay, addFormerName, removeFormerName,
     isAgreementTerminated, terminateAgreement, restoreAgreement, renameCompanyKeepId,
+    isCompanyDeleted, loadActiveCompanies, loadDeletedCompanies, softDeleteCompany, restoreDeletedCompany,
     addCurrentSituation, removeCurrentSituation, addInterestField, removeInterestField,
     previewPartnerImport, applyPartnerImport,
     previewPourTrackImport, applyPourTrackImport, applyPourExcelImportRecords,
@@ -6938,6 +7005,11 @@ window.SHIN2_CRM_APP_INIT = function(){
   const FILTER_DEFS = [
     ['all','전체'], ['agreementInProgress','협약 진행'], ['mouDone','MOU체결'], ['newPartner','신규 협약사'], ['agreementTerminated','협약 종료'], ['subsidiary','이전 상호'], ['trendUp','최근흐름 상승세']
   ];
+  // §업체 삭제(휴지통) 라운드(신규) — "삭제된 업체" 탭은 위 FILTER_DEFS와 별도로 둔다.
+  // 이유: filterCounts[key]는 companies(=D.loadActiveCompanies(), 삭제된 업체가 이미
+  // 빠진 목록)를 훑어 세므로, FILTER_DEFS 안에 넣으면 항상 0건으로만 보인다(§요청 6에
+  // 어긋남). renderList가 이 값은 D.loadDeletedCompanies().length로 따로 채운다.
+  const DELETED_FILTER_DEF = ['deleted','삭제된 업체'];
   function getMouStage(progress){
     return progress.stages.find(s=> s.key === 'mou') || null;
   }
@@ -6968,6 +7040,10 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 상대 업체 쪽에서만 "자회사"로 등록해 둔 역방향 관계까지 정확히 잡는다.
   function matchesFilter(co, progress, key, relationIndex){
     if(key === 'all') return true;
+    // §업체 삭제(휴지통) 라운드(신규) — "삭제된 업체" 탭은 renderList가 별도 렌더 경로
+    // (renderDeletedCompaniesTab)로 처리하므로 이 함수를 거치는 companies에는 애초에
+    // 삭제된 업체가 없다(D.loadActiveCompanies() 기준). 그래도 방어적으로 명시한다.
+    if(key === 'deleted') return false;
     if(key === 'partner') return isConfirmedPartner(co, progress);
     if(key === 'receivable'){
       const receivable = D.getCompanyReceivable(co);
@@ -7194,8 +7270,10 @@ window.SHIN2_CRM_APP_INIT = function(){
     // §고객관리 탭 4개 재구성 라운드: 탭 좌측 아이콘 + 우측 작은 숫자 배지(.chip-count)로
     // 한 줄 컴팩트 탭 UI를 만든다(§요청 "카드형으로 과하게 크게 만들지 말 것" — 기존
     // .list-filter-chip 높이/폰트는 그대로 재사용, 새 크기 체계를 만들지 않았다).
-    wrap.innerHTML = FILTER_DEFS.map(([key,label])=>
-      `<button type="button" class="list-filter-chip${filterKey===key?' is-active':''}" data-filter="${esc(key)}">${FILTER_ICON_SVG[key]||''}<span>${esc(label)}</span><span class="chip-count">${counts[key]||0}</span></button>`
+    // §업체 삭제(휴지통) 라운드(신규) — "삭제된 업체" 탭도 같은 칩 UI/클릭 위임을 그대로
+    // 재사용한다(DELETED_FILTER_DEF만 목록 끝에 덧붙임, 새 템플릿·새 이벤트 바인딩 없음).
+    wrap.innerHTML = FILTER_DEFS.concat([DELETED_FILTER_DEF]).map(([key,label])=>
+      `<button type="button" class="list-filter-chip${filterKey===key?' is-active':''}${key==='deleted'?' is-trash':''}" data-filter="${esc(key)}">${FILTER_ICON_SVG[key]||''}<span>${esc(label)}</span><span class="chip-count">${counts[key]||0}</span></button>`
     ).join('') + `<button type="button" class="list-filter-chip mgmt-need-chip" id="mgmtNeedBtn">관리필요 ${counts.manageNeeded||0}</button>`;
     wrap.querySelectorAll('[data-filter]').forEach(btn=> btn.addEventListener('click', ()=>{
       const nextKey = btn.getAttribute('data-filter');
@@ -7346,7 +7424,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(typeof closeContribPopover === 'function') closeContribPopover();
     if(typeof closeTrendPopover === 'function') closeTrendPopover();
     if(typeof closeRequestPopover === 'function') closeRequestPopover();
-    const companies = D.loadCompanies();
+    const companies = D.loadActiveCompanies(); // §업체 삭제(휴지통) 라운드 — 소프트 삭제된 업체를 일반 목록/신규 협약사/협약 진행/MOU체결 탭에서 뺀다(§요청 10)
     listTitle.textContent = '고객 ' + companies.length;
     // §미등록 업체 관리 라운드: 별도 저장소 없이 매번 다시 계산한다(§ "등록 후" 요구사항 —
     // 사용자가 업체를 등록하면 다음 renderList()에서 자동으로 줄어든다).
@@ -7387,6 +7465,9 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 캐시(managementNeedCache)만 조회한다(§ "같은 계산을 여러 곳에서 반복하지 않는다").
     managementNeedCache = computeManagementNeedList(enriched, pourLatestIndex);
     filterCounts.manageNeeded = managementNeedCache.counts.total;
+    // §업체 삭제(휴지통) 라운드(신규) — companies가 이미 활성 업체만이라 위 FILTER_DEFS.forEach
+    // 루프로는 절대 못 세므로 따로 채운다(§요청 6 "삭제된 업체 탭").
+    filterCounts.deleted = D.loadDeletedCompanies().length;
     renderFilterChips(filterCounts);
     // §신규 협약사 탭 라운드(신규) — "90일 임박순"/"최근 체결순" 옵션은 이 탭에서만
     // 보이게 하고, 정렬 드롭다운 표시값도 현재 sortMode와 항상 맞춰 둔다(탭 클릭
@@ -7406,6 +7487,15 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 호출만 없앴다 — renderManagementTodayPanel 함수 정의와 managementNeedCache
     // 계산(관리필요 버튼/모달/고객카드 배너가 계속 씀) 자체는 그대로 둔다.
     renderKpiStrip(filterCounts);
+
+    // §업체 삭제(휴지통) 라운드(신규) — "삭제된 업체" 탭은 위에서 이미 칩/KPI 스트립까지
+    // 정상적으로 그린 뒤(다른 탭과 똑같이 계속 클릭 가능해야 하므로), 여기서부터 이어지는
+    // 무거운 7컬럼 목록 템플릿(매출/실적/MOU 등, 삭제된 업체에는 의미 없음)은 타지 않고
+    // 별도의 단순한 표(삭제일/업체명/삭제 사유/복구, §요청 6)로 갈아탄다.
+    if(filterKey === 'deleted'){
+      renderDeletedCompaniesTab();
+      return;
+    }
 
     const rows = enriched
       .filter(r=> matchesFilter(r.co, r.progress, filterKey, relationIndex))
@@ -7795,6 +7885,56 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 있는 단일 지점이다(§기존 코드 재사용 — 새 훅을 여러 곳에 흩어 넣는 대신 여기
     // 한 곳에서만 지도 팝업이 열려 있는지 확인해 갱신한다).
     if(typeof refreshMapIfOpen === 'function') refreshMapIfOpen();
+  }
+
+  // §업체 삭제(휴지통) 라운드(신규) — "삭제된 업체" 탭 전용 렌더링(§요청 6). 일반 목록의
+  // 무거운 7컬럼 템플릿(매출/실적/MOU 등)은 재사용하지 않고, 요청된 3가지 정보(삭제일/
+  // 업체명/삭제 사유)와 복구 버튼만 보여주는 단순한 표를 그린다. 소스는
+  // D.loadDeletedCompanies() 하나뿐이라 다른 탭의 집계·정렬 로직과 전혀 얽히지 않는다.
+  function renderDeletedCompaniesTab(){
+    const deleted = D.loadDeletedCompanies().slice().sort((a,b)=> new Date(b.deletedAt||0) - new Date(a.deletedAt||0));
+    renderPagination(0);
+    if(!deleted.length){
+      listEl.innerHTML = '<div class="empty-note">삭제된 업체가 없습니다.</div>';
+      return;
+    }
+    listEl.innerHTML = `
+      <div class="deleted-co-table">
+        <div class="deleted-co-head">
+          <span>삭제일</span><span>업체명</span><span>삭제 사유</span><span></span>
+        </div>
+        ${deleted.map(co=> `
+          <div class="deleted-co-row" data-deleted-co="${esc(co.id)}">
+            <span class="deleted-co-date">${esc(fmtDate(co.deletedAt))}</span>
+            <span class="deleted-co-name">${esc(co.name || '(업체명 없음)')}</span>
+            <span class="deleted-co-reason">${esc(co.deleteReason || '사유 미기재')}</span>
+            <span class="deleted-co-actions">
+              <button type="button" class="co-text-action primary" data-restore-co="${esc(co.id)}">복구</button>
+              <span class="cdash-cloud-save-status" id="restoreStatus_${esc(co.id)}"></span>
+            </span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    // §요청 7 "복구하면 기존 정보가 모두 그대로 돌아오게" — restoreDeletedCompany는
+    // deletedAt/deletedBy/deleteReason 3개 필드만 지운다(다른 함수들과 동일하게 activities/
+    // memos/documents 등은 애초에 이 기능이 한 번도 건드린 적이 없어 항상 그대로다).
+    // §요청 9 "저장 실패 시 성공으로 표시 금지" — 다른 저장 지점과 같은 패턴(confirmCloudSave
+    // 성공 후에만 재렌더링해 목록에서 빠짐, 실패하면 이 행이 그대로 남아 재시도 가능).
+    listEl.querySelectorAll('[data-restore-co]').forEach(btn=> btn.addEventListener('click', async ()=>{
+      const id = btn.getAttribute('data-restore-co');
+      const co = D.findCompany(id);
+      if(!co) return;
+      if(!confirm(`"${co.name}" 업체를 복구하시겠습니까?\n복구하면 일반 고객 목록에 다시 나타납니다.`)) return;
+      const statusEl = document.getElementById('restoreStatus_' + id);
+      btn.disabled = true;
+      D.restoreDeletedCompany(id);
+      const r = await confirmCloudSave('companies');
+      btn.disabled = false;
+      if(!r.ok){ showCloudSaveStatus(statusEl, false, r.err); return; }
+      renderDeletedCompaniesTab();
+      if(typeof refreshMapIfOpen === 'function') refreshMapIfOpen();
+    }));
   }
 
   // §팝업 전체 크기 축소 라운드 §9(접근성): Esc로 닫기 + 닫을 때 이전 포커스 위치 복구.
@@ -8235,6 +8375,9 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="cdash2-info-strip-spacer"></div>
         <button type="button" class="co-text-action" id="cdashInfoEditBtn">✎ 고객 정보 수정</button>
       </div>
+      <div class="cdash-danger-zone">
+        <button type="button" class="cdash-delete-co-btn" id="cdashDeleteCoBtn">🗑 업체 삭제</button>
+      </div>
     `;
     document.getElementById('cdashInfoEditBtn').addEventListener('click', ()=>{
       cardState.accordionOpen.info = true;
@@ -8243,6 +8386,102 @@ window.SHIN2_CRM_APP_INIT = function(){
       renderBasicInfoForm(co);
       openHeaderSection('info');
     });
+    // §업체 삭제(휴지통) 라운드(신규) — "수정 영역 아래" 빨간 버튼(§요청 1). 클릭 즉시
+    // 삭제하지 않고 확인 모달만 연다(§요청 2).
+    document.getElementById('cdashDeleteCoBtn').addEventListener('click', ()=> openDeleteCompanyModal(co.id));
+  }
+
+  /* ==========================================================================
+     §업체 삭제(휴지통) 라운드(신규) — 요청: 고객 상세 팝업에 "업체 삭제" 버튼 → 즉시
+     삭제 대신 확인 모달 → 업체명을 그대로 입력해야 [삭제 확인] 활성화(§요청 4) → 완전
+     삭제가 아니라 deletedAt/deletedBy/deleteReason만 기록하는 소프트 삭제(§요청 5/8,
+     D.softDeleteCompany). Firestore 저장이 성공한 뒤에만 카드를 닫고 목록으로 돌아간다
+     (§요청 9 "먼저 사라지거나 성공으로 표시 금지") — 다른 저장 지점들과 같은
+     confirmCloudSave 패턴, 실패하면 모달이 그대로 열려 있고 재시도할 수 있다.
+     ========================================================================== */
+  let deleteCompanyModalState = null; // { companyId, typedName, reason, saving, err }
+  function closeDeleteCompanyModal(){
+    deleteCompanyModalState = null;
+    const root = document.getElementById('deleteCompanyModalRoot');
+    if(root) root.innerHTML = '';
+  }
+  function openDeleteCompanyModal(companyId){
+    const co = D.findCompany(companyId);
+    if(!co) return;
+    deleteCompanyModalState = { companyId, typedName:'', reason:'', saving:false, err:null, applied:false };
+    renderDeleteCompanyModal();
+  }
+  function renderDeleteCompanyModal(){
+    const root = document.getElementById('deleteCompanyModalRoot');
+    if(!root) return;
+    const s = deleteCompanyModalState;
+    if(!s){ root.innerHTML = ''; return; }
+    const co = D.findCompany(s.companyId);
+    if(!co){ closeDeleteCompanyModal(); return; }
+    // §요청 4 "업체명을 직접 똑같이 입력해야 [삭제 확인] 활성화" — 공백 차이 등으로 영원히
+    // 활성화가 안 되는 걸 막기 위해 양끝 공백만 트림하고 나머지는 정확히 같아야 한다.
+    const canConfirm = s.typedName.trim() === (co.name || '').trim() && !!co.name && !s.saving;
+    root.innerHTML = `
+      <div class="pi-overlay" id="deleteCompanyOverlay">
+        <div class="pi-panel" style="max-width:440px;" role="dialog" aria-modal="true" aria-label="업체 삭제 확인">
+          <div class="pi-head">
+            <div class="pi-title">업체 삭제</div>
+            <button type="button" class="chart-close-btn" id="deleteCompanyCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body">
+            <div class="delete-co-modal-name">${esc(co.name || '(업체명 없음)')}</div>
+            <div class="delete-co-modal-note">삭제하면 일반 목록 및 업무관리에서 숨겨집니다. 완전히 지워지는 것은 아니며, "삭제된 업체" 탭에서 언제든 복구할 수 있습니다.</div>
+            <div class="delete-co-modal-field">
+              <label for="deleteCoReasonInput">삭제 사유(선택)</label>
+              <textarea id="deleteCoReasonInput" rows="2" placeholder="예: 폐업 확인, 중복 등록 등">${esc(s.reason)}</textarea>
+            </div>
+            <div class="delete-co-modal-field">
+              <label for="deleteCoNameInput">확인을 위해 업체명을 똑같이 입력해주세요</label>
+              <input type="text" id="deleteCoNameInput" value="${esc(s.typedName)}" placeholder="${esc(co.name || '')}" autocomplete="off" />
+            </div>
+            ${s.err ? `<div class="delete-co-modal-err">${esc(s.err)}</div>` : ''}
+          </div>
+          <div class="pi-actions">
+            <button type="button" class="delete-co-modal-cancel-btn" id="deleteCompanyCancelBtn">취소</button>
+            <button type="button" class="delete-co-modal-confirm-btn" id="deleteCompanyConfirmBtn" ${canConfirm ? '' : 'disabled'}>${s.saving ? '삭제 중…' : '삭제 확인'}</button>
+          </div>
+        </div>
+      </div>
+    `;
+    const close = ()=> closeDeleteCompanyModal();
+    document.getElementById('deleteCompanyCloseBtn').addEventListener('click', close);
+    document.getElementById('deleteCompanyCancelBtn').addEventListener('click', close);
+    bindSafeBackdropClose(document.getElementById('deleteCompanyOverlay'), close);
+    const nameInput = document.getElementById('deleteCoNameInput');
+    nameInput.addEventListener('input', ()=>{ s.typedName = nameInput.value; renderDeleteCompanyModal(); const el = document.getElementById('deleteCoNameInput'); if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); } });
+    document.getElementById('deleteCoReasonInput').addEventListener('input', (e)=>{ s.reason = e.target.value; });
+    document.getElementById('deleteCompanyConfirmBtn').addEventListener('click', confirmDeleteCompany);
+  }
+  // §요청 3의 "삭제 확인"을 눌렀을 때 — 로컬 반영은 이 모달 인스턴스당 한 번만(재시도
+  // 시 중복 활동기록 방지, §모든 저장 지점 재시도 중복 방지 라운드와 동일 패턴), 실패하면
+  // 모달을 닫지 않고 그대로 재시도할 수 있게 둔다(§요청 9). applied는 state 객체 안에
+  // 둬서(전역 변수 아님) 업체 A에서 실패 후 취소하고 업체 B를 삭제해도 서로 섞이지 않는다.
+  async function confirmDeleteCompany(){
+    const s = deleteCompanyModalState;
+    if(!s) return;
+    const co = D.findCompany(s.companyId);
+    if(!co) return;
+    if(s.typedName.trim() !== (co.name || '').trim()) return; // 방어적 재확인(버튼 disabled로 이미 막히지만)
+    s.saving = true; s.err = null;
+    renderDeleteCompanyModal();
+    if(!s.applied){ D.softDeleteCompany(s.companyId, s.reason); s.applied = true; }
+    const r = await confirmCloudSave('companies');
+    if(!deleteCompanyModalState){ return; } // 그 사이 모달이 닫혔으면(드물게) 더 손대지 않음
+    if(!r.ok){
+      s.saving = false;
+      s.err = cloudSaveErrorMessage(r.err);
+      renderDeleteCompanyModal();
+      return;
+    }
+    closeDeleteCompanyModal();
+    // §요청 10 "삭제된 업체는 일반 목록에서 제외" — 카드가 이 업체를 보여주고 있었으므로
+    // 그대로 두면 이미 숨겨진 업체 화면이 남는다. 목록으로 돌아가 즉시 반영을 보여준다.
+    closeChart();
   }
 
   // ---- §고객카드 전면 개선 라운드 [3] 핵심 요약 — 왼쪽 POUR 실적 카드(D.getAllPourRecordsForCompany
@@ -10200,7 +10439,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 별도 저장소 없음(§14 READ-ONLY). "오래된 업체가 위로"(§9) — days가 클수록 위(내림차순),
   // 날짜 없는 업체(days===null)는 순서를 지어낼 수 없으므로 맨 아래로 보낸다.
   function computeWorkQueue(){
-    const companies = D.loadCompanies();
+    const companies = D.loadActiveCompanies(); // §업체 삭제(휴지통) 라운드 — 업무관리에서 소프트 삭제된 업체를 뺀다(§요청 10)
     const pourLatestIndex = D.buildPourLatestIndex();
     const list = [];
     companies.forEach(co=>{
@@ -20131,7 +20370,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       hasCoords, geocodeStatus,
     };
   }
-  function buildMapCompanies(){ return D.loadCompanies().map(buildMapCompanyEntry); }
+  function buildMapCompanies(){ return D.loadActiveCompanies().map(buildMapCompanyEntry); } // §업체 삭제(휴지통) 라운드 — 지도 집계에서 소프트 삭제된 업체 제외(§요청 10)
 
   // §지도분포2: 필터/검색 상태 — 지도 팝업이 열려있는 동안에만 유지되고, 닫으면
   // 초기화된다(별도 저장 없음, 목록 화면의 filterKey/searchQuery와는 독립적인
@@ -20219,7 +20458,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 나오면 하나의 그룹(history 배열)에 합쳐진다(§7 "동일 아파트에 서로 다른 연도·공종의
   // 시공실적이 여러 개 있으면 정보카드 안에 묶어서" — 제거가 아니라 병합).
   function buildPourApartmentGroups(){
-    const companies = D.loadCompanies();
+    const companies = D.loadActiveCompanies(); // §업체 삭제(휴지통) 라운드 — 아파트 지도 집계에서도 소프트 삭제된 업체 제외(§요청 10)
     const groups = new Map();
     companies.forEach(co=>{
       let records;
