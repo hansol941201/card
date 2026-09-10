@@ -89,7 +89,11 @@
      목록 → 페이지네이션 순서로만 구성한다(§1/§2, 알림 배너류는 만들지 않는다 §25). ---------- */
   .list-toolbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
   .list-title-row{ display:flex; align-items:center; gap:8px; }
+  .list-title-row:has(.list-title-sub){ align-items:flex-start; }
   .list-title{ font-size:19px; font-weight:700; color:var(--text); }
+  /* §디자인 개편 라운드(신규) — "신규 협약사" 탭 제목 아래 부제(§요청 2-9). 다른 탭은 이
+     span이 없는 일반 텍스트 제목 그대로라 영향 없음. */
+  .list-title-sub{ display:block; margin-top:3px; font-size:12.5px; font-weight:500; color:var(--text-muted); }
   /* §미등록 업체 관리 라운드: 작은 경고 배지 — 큰 경고창 형태 금지(§요청), 평소 화면을
      방해하지 않는 인라인 텍스트+옅은 배경 정도만. */
   .unreg-badge{
@@ -268,87 +272,88 @@
   .new-partner-summary-item.is-warn .new-partner-summary-value{ color:#B91C1C; }
   .terminated-info-item.is-l3-done{ color:#1D7A46; }
   .terminated-info-item.is-l3-pending{ color:var(--text-muted); }
-  /* §신규 협약사 탭 리디자인 라운드(신규) — 정보량이 많던 기존 8컬럼 표 대신, 전환율이
-     가장 먼저 보이는 단순 화면. 전환 판정·90일 모집단 등 계산 기준은 전혀 안 바꾸고
-     화면 구성만 새로 만든다(§요청). .co-row 등 다른 탭의 그리드 구조는 건드리지 않는다 —
-     이 탭 전용 .np2-* 클래스만 새로 추가한다. */
-  .np2-hero{ display:flex; flex-wrap:wrap; align-items:center; gap:22px; padding:18px 20px; background:#fff; border:1px solid var(--line); border-radius:12px; margin-bottom:10px; }
-  .np2-hero-rate-block{ display:flex; flex-direction:column; gap:2px; }
-  /* §L2→L3 전환율 강조 라운드(신규) — "이 탭에서 가장 중요한 숫자"라는 요청대로, 숫자
-     바로 위에 그 숫자가 정확히 무엇인지(L2 → L3 전환율) 이름표를 붙인다. 글자 크기는
-     여전히 np2-hero-rate(38px)가 이 화면에서 가장 크다 — 라벨은 작고 흐리게만. */
-  .np2-hero-rate-label{ font-size:12.5px; font-weight:700; color:var(--text-muted); letter-spacing:.1px; }
-  .np2-hero-rate{ font-size:38px; font-weight:800; color:var(--navy); line-height:1.1; }
-  .np2-hero-sub{ font-size:12.5px; color:var(--text-muted); }
-  .np2-hero-stats{ display:flex; flex-wrap:wrap; gap:22px; margin-left:auto; }
-  .np2-hero-stat{ display:flex; flex-direction:column; gap:2px; min-width:74px; }
-  .np2-hero-stat-value{ font-size:21px; font-weight:750; color:var(--text); }
-  .np2-hero-stat-value.is-warn{ color:#B3261E; }
-  .np2-hero-stat-label{ font-size:11.5px; color:var(--text-muted); }
-  .np2-funnel{ display:flex; align-items:stretch; gap:8px; padding:0 20px 16px; }
-  .np2-funnel-step{ flex:1 1 0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:10px 8px; border-radius:9px; background:#F3F6FB; min-width:0; }
-  .np2-funnel-value{ font-size:17px; font-weight:750; color:var(--navy); }
-  .np2-funnel-label{ font-size:11px; color:var(--text-muted); }
-  .np2-funnel-step.is-final{ background:#E9F6EF; }
-  .np2-funnel-step.is-final .np2-funnel-value{ color:#1D7A46; }
-  .np2-funnel-arrow{ align-self:center; color:var(--text-faint); font-size:15px; flex:0 0 auto; }
-  .np2-subfilters{ display:flex; flex-wrap:wrap; gap:8px; padding:0 2px 10px; }
-  /* §관리 예정일 열 제거 라운드(신규) — 6컬럼(협력사/경과일·담당자/현재단계/다음행동/
-     관리예정일/전환가능성/상세보기, 7개였던 실제 컬럼 수)에서 "관리 예정일"을 빼고
-     "협력사" 칸 안에 업체명+요청배지+경과일·담당자를 한데 묶어 5컬럼으로 줄였다(§요청
-     5/6). 빈 자리를 억지로 채우지 않고, 남은 정보(특히 협력사 칸)가 더 넉넉하게
-     보이도록 너비를 다시 배분했다. */
-  .np2-table-head{ display:grid; grid-template-columns: minmax(230px,1.9fr) 100px 150px 100px 84px; gap:12px; padding:8px 14px; border:1px solid var(--line); border-radius:10px 10px 0 0; background:#f9fbfd; color:#4b607c; font-weight:700; font-size:11.5px; }
+  /* §신규 협약사 탭 디자인 개편 라운드(신규, §요청 2-9) — "삼성 스타일" 깔끔한 관리자
+     화면 기준으로 다시 짠다: L2→L3 전환율 카드를 가장 크게, 나머지는 협력사/최근 활동/
+     최근 요청/현재 상태/상세보기 5컬럼. 전환 판정·90일 모집단 등 계산 기준(D 레이어)은
+     전혀 안 바꾸고 화면 구성만 새로 만든다. .co-row 등 다른 탭의 그리드 구조는 건드리지
+     않는다 — 이 탭 전용 .np2-* 클래스만 쓴다. */
+  .np2-hero{ display:flex; flex-wrap:wrap; align-items:center; gap:22px; padding:20px 22px; background:linear-gradient(135deg,#0b3978,var(--navy)); border-radius:12px; margin-bottom:10px; }
+  .np2-hero-rate-block{ display:flex; flex-direction:column; gap:3px; }
+  /* §L2→L3 전환율 강조 — "이 탭에서 가장 중요한 숫자"라는 요청대로, 진한 남색 카드
+     안에서 가장 크게(48px) 보여준다(§요청 3). 아래 progress bar가 같은 비율을 다시
+     보여준다(새 계산 없이 summary.rate 그대로). */
+  .np2-hero-rate-label{ font-size:12.5px; font-weight:700; color:rgba(255,255,255,.72); letter-spacing:.2px; }
+  .np2-hero-rate{ font-size:48px; font-weight:800; color:#fff; line-height:1.05; }
+  .np2-hero-sub{ font-size:12.5px; color:rgba(255,255,255,.78); }
+  .np2-hero-bar{ margin-top:8px; width:180px; max-width:100%; height:6px; border-radius:999px; background:rgba(255,255,255,.2); overflow:hidden; }
+  .np2-hero-bar-fill{ height:100%; border-radius:999px; background:#fff; }
+  .np2-hero-stats{ display:flex; flex-wrap:wrap; gap:16px; margin-left:auto; }
+  .np2-hero-stat{ display:flex; flex-direction:column; gap:2px; min-width:88px; padding:12px 16px; border-radius:10px; background:rgba(255,255,255,.1); }
+  .np2-hero-stat-value{ font-size:22px; font-weight:750; color:#fff; }
+  .np2-hero-stat-value.is-warn{ color:#FFB4A8; }
+  .np2-hero-stat-label{ font-size:11.5px; color:rgba(255,255,255,.72); }
+  .np2-subfilters{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:12px 2px 10px; }
+  /* §요청 4/5 — 필터는 전체/관리 필요/진행 중/현장등록 4개만 기본 노출(NEW_PARTNER_SUBFILTERS
+     그대로), 선택된 것만 다크 네이비, 나머지는 흰 배경+옅은 테두리(.list-filter-chip
+     공용 스타일 그대로 재사용 — 의미 없는 색 추가 없음). */
+  /* §요청 2-9 5컬럼 — 협력사 / 최근 활동 / 최근 요청 / 현재 상태 / 상세보기. "전환
+     가능성"/"다음 행동"/"다음 관리 예정일" 컬럼은 화면에서 완전히 뺐다(계산 자체는
+     그대로, §확인 목록 참고) — 빈 자리는 새 무관한 내용을 채우지 않고 협력사/최근요청/
+     현재상태 폭을 넉넉히 늘리는 데만 쓴다. */
+  .np2-table-head{ display:grid; grid-template-columns: minmax(230px,1.9fr) 108px 168px 104px 84px; gap:14px; padding:10px 14px; border:1px solid var(--line); border-radius:10px 10px 0 0; background:#f9fbfd; color:#4b607c; font-weight:700; font-size:11.5px; }
   .np2-list{ background:#fff; border:1px solid var(--line); border-top:0; border-radius:0 0 10px 10px; overflow:hidden; }
-  .np2-row{ display:grid; grid-template-columns: minmax(230px,1.9fr) 100px 150px 100px 84px; gap:12px; align-items:center; padding:10px 14px; border-bottom:1px solid #e8eef5; font-size:12.5px; cursor:pointer; background:none; border-left:0; border-right:0; border-top:0; width:100%; text-align:left; font-family:inherit; color:inherit; }
+  .np2-row{ display:grid; grid-template-columns: minmax(230px,1.9fr) 108px 168px 104px 84px; gap:14px; align-items:center; padding:12px 14px; border-bottom:1px solid #e8eef5; font-size:12.5px; cursor:pointer; background:none; border-left:0; border-right:0; border-top:0; width:100%; text-align:left; font-family:inherit; color:inherit; }
   .np2-row:hover{ background:#f7fbff; }
   .np2-row:last-child{ border-bottom:0; }
   .np2-col-company{ display:flex; flex-direction:column; gap:3px; min-width:0; }
   .np2-col-name-line{ display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; min-width:0; }
   .np2-col-name{ font-weight:750; color:#142945; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  /* §업체명 옆 요청 종류 표시 라운드(신규) — 색상 여러 개를 쓰지 말고 한 가지 남색
-     계열로 통일해 달라는 요청(§요청 3) — 배지 색은 이 하나뿐이다. */
+  /* §업체명 옆 요청 종류 배지 — 남색 계열 한 가지 색만(§요청 5). 요청이 없는 업체는
+     이 span 자체를 렌더링하지 않는다("요청 없음" 문구도 표시 안 함, §요청 5). */
   .np2-req-badge{ display:inline-flex; align-items:center; padding:1px 7px; border-radius:999px; font-size:11px; font-weight:650; background:#EEF2FA; color:var(--navy); white-space:nowrap; }
-  .np2-req-none{ font-size:11px; color:var(--text-faint); }
   .np2-col-elapsed{ color:var(--text-muted); font-size:12px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .np2-col-elapsed .np2-assignee{ color:var(--text-faint); }
+  .np2-col-activity{ color:var(--text); font-size:12.5px; min-width:0; }
+  .np2-col-lastreq{ display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .np2-col-lastreq-type{ color:var(--text); font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .np2-col-lastreq-date{ color:var(--text-faint); font-size:11px; }
+  .np2-col-lastreq.is-empty .np2-col-lastreq-type{ color:var(--text-faint); }
   .np2-state-badge{ display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px; font-size:11.5px; font-weight:700; white-space:nowrap; }
   .np2-state-badge.st-converted{ background:#E6F4EA; color:#1D7A46; }
   .np2-state-badge.st-needsAttention{ background:#FDECEC; color:#B3261E; }
   .np2-state-badge.st-requested{ background:#E6F0FD; color:#1B4FA6; }
   .np2-state-badge.st-none{ background:#F1F3F6; color:var(--text-muted); }
-  .np2-col-next{ color:var(--text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .np2-col-likelihood{ font-size:12px; color:var(--text-muted); }
   .np2-col-detail-btn{ font-family:inherit; font-size:11.5px; color:var(--navy); background:#fff; border:1px solid var(--line); border-radius:6px; padding:4px 8px; cursor:pointer; justify-self:end; }
   .np2-col-detail-btn:hover{ background:var(--bg); }
   .np2-field-label{ display:none; font-weight:600; color:var(--text-faint); margin-right:4px; }
   .np2-empty{ padding:26px 14px; text-align:center; color:var(--text-muted); font-size:13px; background:#fff; border:1px solid var(--line); border-radius:10px; }
-  /* §모바일 전환 흐름 겹침 수정 라운드(신규) — #crmList가 다른 탭과 공유하는
+  /* §모바일 전환 흐름 겹침 수정 라운드 — #crmList가 다른 탭과 공유하는
      ".co-list{min-width:1220px!important}"(좁은 화면에서 옛 8컬럼 표를 가로 스크롤로
      보여주려는 의도적 규칙, §전면 리디자인 라운드)를 이 탭(.np2-active가 붙어 있을
      때만)에서는 취소한다 — 이 화면은 가로 스크롤이 아니라 세로로 쌓이게 만든 것이라
      원래도 그 min-width가 필요 없었다. id+class 선택자라 .co-list 단독 선택자보다
      항상 우선한다(둘 다 !important라도 특정도가 더 높은 쪽이 이긴다). */
   #crmList.np2-active{ min-width:0 !important; }
+  /* §디자인 개편 라운드(신규) — .co-table-head는 다른 전역 레이어에서
+     display:grid!important로 재선언돼 있어(§3061 근처) 보통의 [hidden] 처리로는 안
+     가려진다. id 선택자로 그 !important보다 우선하게 만든다(§renderList의
+     crmCoTableHeadEl.hidden 토글과 짝). */
+  #crmCoTableHead[hidden]{ display:none !important; }
   @media (max-width: 640px){
-    .np2-hero{ flex-direction:column; align-items:flex-start; gap:12px; }
-    .np2-hero-stats{ margin-left:0; width:100%; justify-content:space-between; gap:14px; }
-    .np2-funnel{ flex-direction:column; gap:6px; padding:0 14px 14px; }
-    .np2-funnel-arrow{ align-self:center; transform:rotate(90deg); }
-    /* §모바일 전환 흐름 겹침 수정(신규) — .np2-funnel을 세로 배치로 바꾸면 축이
-       바뀌어(가로->세로) 각 단계 상자에 준 인라인 flex(원래 "가로 폭"을 건수 비율로
-       나누려고 준 값, §renderNewPartnerTab funnelFlex)가 이제 "세로 높이"로 해석돼
-       버려 글자가 들어갈 공간이 거의 0으로 찌부러졌다(실제 화면 확인으로 발견 — 값은
-       있는데 안 보이던 원인). 세로 배치에서는 굳이 비율을 줄 필요가 없으니 인라인
-       스타일을 무시하고 셋 다 같은 높이로 고정한다. */
-    .np2-funnel-step{ flex:none !important; width:100%; padding:10px 12px; }
+    .np2-hero{ flex-direction:column; align-items:flex-start; gap:14px; padding:18px; }
+    .np2-hero-stats{ margin-left:0; width:100%; justify-content:space-between; gap:10px; }
+    .np2-hero-stat{ flex:1 1 0; min-width:0; padding:10px 12px; }
     .np2-table-head{ display:none; }
     .np2-list{ background:none; border:0; border-radius:0; }
-    .np2-row{ grid-template-columns:none; display:flex; flex-direction:column; align-items:flex-start; gap:5px; padding:13px 14px; background:#fff; border:1px solid var(--line); border-radius:10px; margin-bottom:8px; }
+    /* §요청 11 모바일 카드 필드 순서 — 업체명+최근요청배지 / 협약후경과일·담당자 /
+       최근활동 / 최근요청 / 현재상태 / 상세보기. DOM 순서를 그대로 stack하면 이 순서가
+       된다(§renderNewPartnerTab의 마크업 순서 그대로 재사용, 모바일 전용 재배치 없음). */
+    .np2-row{ grid-template-columns:none; display:flex; flex-direction:column; align-items:flex-start; gap:6px; padding:14px; background:#fff; border:1px solid var(--line); border-radius:10px; margin-bottom:8px; }
     .np2-row:hover{ background:#fff; }
     .np2-col-company{ width:100%; }
     .np2-col-name{ font-size:14.5px; white-space:normal; }
-    .np2-col-detail-btn{ justify-self:auto; align-self:flex-end; }
+    .np2-col-activity, .np2-col-lastreq{ width:100%; }
+    .np2-col-detail-btn{ justify-self:auto; align-self:stretch; text-align:center; padding:9px 8px; }
     .np2-field-label{ display:inline; }
   }
   .col-recent{ flex:1.4 1 150px; min-width:0; color:var(--text-muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -2998,11 +3003,12 @@ table.pdf-doc-table thead{ background:var(--bg); }
    않았다(§요청 "현재 화면에 있는 내용은 단 하나도 삭제하지 마세요").
    ========================================================================== */
 
-/* 1. 상단 내비게이션 — 높이를 64px에서 52~56px 사이로 줄이고(52px 실측), 선택된 탭
-   밑줄을 파란색으로 명확하게 표시한다(§요청 "파란색 선이 명확하게"). 메뉴명/기능은
-   그대로다 — HTML은 전혀 안 건드리고 높이·색상만 조정. */
-.gnav, .gnav-inner, .gnav-menu, .gnav-menu .top-tab{ height:52px!important; }
-.gnav-menu .top-tab{ border-bottom-width:3px!important; }
+/* 1. 상단 내비게이션 — §디자인 개편 라운드(신규, §요청 1): "답답하지 않게" 더 줄여
+   달라는 요청대로 52px에서 46px로 한 번 더 낮췄다. 선택된 탭은 얇은 파란 밑줄 하나로만
+   구분(다른 배경색/테두리 없음, §요청 "메뉴 항목마다 여러 배경색/테두리 금지"). 메뉴명/
+   기능/권한은 그대로다 — HTML은 전혀 안 건드리고 높이·색상만 조정. */
+.gnav, .gnav-inner, .gnav-menu, .gnav-menu .top-tab{ height:46px!important; }
+.gnav-menu .top-tab{ border-bottom-width:2px!important; border-color:transparent!important; background:transparent!important; }
 .gnav-menu .top-tab.is-active{ border-bottom-color:#4C8DFF!important; }
 
 /* 2. 고객 제목/버튼 영역 — "고객 383"을 조금 더 크고 굵게. 미등록 배지·버튼 순서/문구는
@@ -3253,6 +3259,10 @@ table.pdf-doc-table thead{ background:var(--bg); }
              평소엔 숨겨 둔다(renderList에서 filterKey에 따라 hidden 토글). -->
         <option value="newPartnerUrgent" id="crmSortOptNewUrgent" hidden>90일 임박순</option>
         <option value="newPartnerRecent" id="crmSortOptNewRecent" hidden>최근 체결순</option>
+        <!-- §디자인 개편 라운드(신규) — "정렬 select 최근 활동순을 검색창 오른쪽에 배치"
+             (§요청 2-9). 새 정렬 기준을 만들지 않고, 이미 각 행에 있는 r.summary.createdAt
+             (최근 활동 컬럼과 같은 값)를 그대로 내림차순 정렬만 한다. -->
+        <option value="newPartnerActivity" id="crmSortOptNewActivity" hidden>최근 활동순</option>
       </select>
       <!-- §고객관리 목록 출력(PDF) 라운드(신규) — 내부용/시공사 발송용/외부 발송용 3종
            출력. 클릭 시 열리는 모달 안에서 유형·지역·검색을 다시 선택한 뒤에만 실제
@@ -3270,7 +3280,7 @@ table.pdf-doc-table thead{ background:var(--bg); }
          호출부는 지우지 않았다) — 그 자리에 "단계 진행상황"(4단계 stepper)과 "다음
          행동"(1개만 표시)을 새로 추가했다(§2/§7). 최종 컬럼 순서: 협력사/최근 실적/총
          실적/최근 요청/총 매출/2026 매출/실적↔매출/최근 흐름/단계 진행상황/다음 행동. -->
-    <div class="co-table-head">
+    <div class="co-table-head" id="crmCoTableHead">
       <div class="col-name">협력사</div>
       <div class="col-request">최근 요청</div>
       <div class="col-pour">최근 실적</div>
@@ -6940,6 +6950,20 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(d.getFullYear() === now.getFullYear()) return p(d.getMonth()+1) + '.' + p(d.getDate());
     return d.getFullYear() + '.' + p(d.getMonth()+1) + '.' + p(d.getDate());
   }
+  // §신규 협약사 화면 재구성 라운드(신규) — "최근 활동" 목록 컬럼 전용(§요청 2-9 "오늘/3일
+  // 전/14일 전"). fmtRelativeActivityDate(오늘/어제/MM.DD)와는 목적이 달라 새 함수로 둔다 —
+  // 정확한 날짜는 상세보기(newPartnerInfoRowHtml)에서 fmtDate로 따로 보여준다.
+  function fmtDaysAgo(iso){
+    if(!iso) return '—';
+    const d = new Date(iso);
+    if(isNaN(d)) return '—';
+    const now = new Date();
+    const startOfDay = x=> new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const diffDays = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
+    if(diffDays <= 0) return '오늘';
+    if(diffDays === 1) return '어제';
+    return diffDays + '일 전';
+  }
   // 협력사 여부 표시(§파트너 대시보드 연동 준비, 신규) — dealStage(협약 진행 단계)와는 다른
   // 별개 개념이다. v2/index.html 업체관리와 동일한 규칙(값은 shin2-companies-staging의
   // co.partnerStatus를 그대로 읽기만 하고, CRM 쪽에 별도로 복제 저장하지 않는다):
@@ -7030,11 +7054,12 @@ window.SHIN2_CRM_APP_INIT = function(){
   function newPartnerInfoRowHtml(co, r){
     const p = resolveEffectiveMouDate(co);
     const days = daysSinceMouSeoul(co);
-    const band = days != null ? resolveNewPartnerBand(days) : null;
     const mouDisplay = p ? p.display : '—';
     const elapsedDisplay = days != null ? fmtNewPartnerElapsed(days) : '—';
     const assignee = co.assigneeUserId ? '사용자 ' + co.assigneeUserId : '미지정';
-    const lastActivityDisplay = r.summary ? fmtRelativeActivityDate(r.summary.createdAt) : '기록 없음';
+    // §디자인 개편 라운드 — 상세보기에는 "정확한 날짜"만(§요청 2-9, 목록의 상대 날짜와
+    // 역할 분리). r.summary는 renderList()가 이미 계산해 둔 값 그대로 재사용.
+    const lastActivityDisplay = r.summary ? fmtDate(r.summary.createdAt) : '기록 없음';
     // §고객 요청 Google Sheets 연동 라운드 — computeL2L3Conversion은 "최초 요청일/종류"를
     // 위해 그대로 재사용(전환 판정 계산 자체는 안 바꿈). §성능 요구 — r.acts(이미
     // requestItemsIndex.activities에서 조회해 둔 값)를 그대로 필터링만 할 뿐,
@@ -7047,7 +7072,6 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="np2-detail-line">
           <span class="terminated-info-item"><b>협약 체결일</b> ${esc(mouDisplay)}</span>
           <span class="terminated-info-item"><b>경과일</b> ${esc(elapsedDisplay)}</span>
-          ${band ? `<span class="new-partner-band-badge band-${esc(band.key)}">${esc(band.label)}</span>` : ''}
           <span class="terminated-info-item"><b>담당자</b> ${esc(assignee)}</span>
         </div>
         <div class="np2-detail-line">
@@ -7496,14 +7520,17 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 편이 자연스럽다는 판단, 새로고침하면 초기화됨은 다른 화면 상태와 동일).
   let newPartnerSubFilter = 'all';
   const newPartnerExpanded = new Set();
-  // §요청 6 "기존 세부 필터는 삭제하지 말고 더보기 안으로" — 이 탭 전용 정렬 드롭다운
-  // 옵션이었던 "90일 임박순"/"최근 체결순"(§신규 협약사 탭 라운드에서 만든
-  // crmSortOptNewUrgent/crmSortOptNewRecent)을 지우지 않고, 접힌 "더보기" 안 두 칩으로
-  // 옮긴다. urgent(기본값)는 이미 기본 정렬(관리 필요 우선 → 경과일 많은 순)과 같은
-  // 의도라 그대로 쓰고, recent만 방향을 뒤집어(경과일 적은 = 최근 체결) 재사용한다 — 새
-  // 정렬 기준을 만들지 않는다.
+  // §디자인 개편 라운드(신규) — "90일 임박순"/"최근 체결순"/새로 추가된 "최근 활동순"
+  // 3가지를, 이 탭에서만 보이는 검색창 옆 정렬 select(crmSortSelect의 newPartner* 옵션,
+  // §renderList의 syncNewPartnerSortOptions)로 고른다. urgent(기본값)는 기본 정렬(관리
+  // 필요 우선 → 경과일 많은 순)과 같은 의도라 그대로 쓰고, recent는 방향만 뒤집어(경과일
+  // 적은 = 최근 체결) 재사용한다 — 새 정렬 기준을 만들지 않는다.
   let newPartnerSortMode = 'urgent';
-  let newPartnerMoreOpen = false;
+  // §디자인 개편 라운드(신규) — 검색창 옆 정렬 select(crmSortSelect)가 렌더 함수 밖(전역
+  // change 리스너)에서도 이 탭을 가벼운 경로로 다시 그릴 수 있게, renderNewPartnerTab이
+  // 매번 받는 enriched 인자를 그대로 저장해 둔다(§성능 — renderList() 전체 재계산 없이
+  // 정렬만 바꿈).
+  let lastNewPartnerEnriched = null;
   const PAGE_SIZE = 15;
   // §고객 성향 미니 팝업 라운드 — 목록 [고객 성향] 클릭 시 뜨는 작은 popover 상태.
   // DISPLAY ONLY(§10) — 여기엔 co.customerInsight 등 실제 데이터를 절대 담지 않고, 지금
@@ -7972,6 +7999,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 영향 주지 않도록 renderNewPartnerTab에서만 클래스를 붙이고, 그 외 모든 렌더링
     // 경로(여기, renderList 시작 지점)에서는 항상 지운 상태로 시작한다.
     listEl.classList.remove('np2-active');
+    // §디자인 개편 라운드(신규) — 일반 7컬럼 표 헤더(co-table-head, listEl 밖의 정적
+    // 엘리먼트)는 "삭제된 업체"/"신규 협약사" 탭처럼 그 7컬럼 표를 아예 안 쓰는 화면에서는
+    // 지금까지도 계속 보이고 있었다(다른 화면 구조/컬럼은 전혀 안 바꿈, 표시 여부만 토글).
+    const coTableHeadEl = document.getElementById('crmCoTableHead');
+    if(coTableHeadEl) coTableHeadEl.hidden = (filterKey === 'deleted' || filterKey === 'newPartner');
     const companies = D.loadActiveCompanies(); // §업체 삭제(휴지통) 라운드 — 소프트 삭제된 업체를 일반 목록/신규 협약사/협약 진행/MOU체결 탭에서 뺀다(§요청 10)
     listTitle.textContent = '고객 ' + companies.length;
     // §미등록 업체 관리 라운드: 별도 저장소 없이 매번 다시 계산한다(§ "등록 후" 요구사항 —
@@ -8033,19 +8065,27 @@ window.SHIN2_CRM_APP_INIT = function(){
     // §신규 협약사 탭 라운드(신규) — "90일 임박순"/"최근 체결순" 옵션은 이 탭에서만
     // 보이게 하고, 정렬 드롭다운 표시값도 현재 sortMode와 항상 맞춰 둔다(탭 클릭
     // 핸들러가 sortMode를 바꿔도 <select> DOM은 별도 갱신이 필요하므로).
+    // §디자인 개편 라운드(신규) — 예전엔 이 탭에서 드롭다운 자체를 숨기고 "더보기" 칩으로
+    // 따로 정렬했다. 이번 요청(§요청 2-9 "정렬 select를 검색창 오른쪽에 배치")대로 같은
+    // 드롭다운(crmSortSelect, 검색창 바로 옆에 이미 있음)을 이 탭에서도 그대로 쓰도록
+    // 바꾼다 — 새 검색창/새 위치를 만들지 않는다. 이 탭에서는 일반 6개 옵션을 숨기고
+    // newPartner 전용 3개 옵션만 보여준다(반대 탭에서는 그 반대).
     (function syncNewPartnerSortOptions(){
       const sel = document.getElementById('crmSortSelect');
       if(!sel) return;
-      const optU = document.getElementById('crmSortOptNewUrgent');
-      const optR = document.getElementById('crmSortOptNewRecent');
-      if(optU) optU.hidden = filterKey !== 'newPartner';
-      if(optR) optR.hidden = filterKey !== 'newPartner';
-      if(sel.value !== sortMode) sel.value = sortMode;
-      // §신규 협약사 탭 리디자인 라운드 — 새 화면은 자체 정렬(관리 필요/급한 순서 우선,
-      // §아래 renderNewPartnerTab)을 쓰고 이 드롭다운을 쓰지 않는다. 드롭다운 자체를
-      // 숨겨 "안 쓰는 정렬 옵션"이 남아 헷갈리지 않게 한다(값 자체는 그대로 둬서 다른
-      // 탭으로 돌아가면 원래 정렬이 그대로 적용된다).
-      sel.hidden = filterKey === 'newPartner';
+      const npOptIds = ['crmSortOptNewUrgent','crmSortOptNewRecent','crmSortOptNewActivity'];
+      const isNP = filterKey === 'newPartner';
+      Array.from(sel.options).forEach(opt=>{
+        const isNpOpt = npOptIds.includes(opt.id);
+        opt.hidden = isNP ? !isNpOpt : isNpOpt;
+      });
+      if(isNP){
+        const npValue = { urgent:'newPartnerUrgent', recent:'newPartnerRecent', activity:'newPartnerActivity' }[newPartnerSortMode] || 'newPartnerUrgent';
+        if(sel.value !== npValue) sel.value = npValue;
+      } else if(sel.value !== sortMode){
+        sel.value = sortMode;
+      }
+      sel.hidden = false;
     })();
     // §전면 리디자인 라운드(신규) — "KPI 요약 바"는 여기서 이미 계산된 filterCounts를
     // 그대로 다시 보여줄 뿐 새 판정/집계를 전혀 만들지 않는다(§ "임의의 숫자를
@@ -8495,34 +8535,14 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(conv.firstRequestAt) return { stateKey:'requested', stateLabel:'요청 발생', bucket:'inProgress' };
     return { stateKey:'none', stateLabel:'활동 없음', bucket:'inProgress' };
   }
-  // "다음 행동"(§요청 5) — 실제 계산된 신호(전환 여부/90일 임박/관리필요 유형/요청 존재/
-  // 담당자 지정 여부)만으로 결정한다. 그 어떤 신호도 없으면(이제 막 협약한 초기 업체 등)
-  // 임의로 확정하지 않고 "확인 필요"(또는 담당자 자체가 없으면 "담당자 지정 필요")로
-  // 남긴다(§요청 "정확히 판단할 수 없는 경우 확인 필요로 표시").
-  function newPartnerNextAction(co, state, need, band){
-    if(state.stateKey === 'converted') return '관계 유지';
-    if(band && band.key === 'urgent' && !need) return '90일 임박 관리';
-    if(need){
-      if(need.type === 'firstActivity') return '첫 요청 안내';
-      if(need.type === 'l2Stall') return '결과 확인 연락';
-      if(need.type === 'reuse') return '재사용 지원 제안';
-    }
-    if(state.stateKey === 'requested') return '결과 확인 연락';
-    return co.assigneeUserId ? '확인 필요' : '담당자 지정 필요';
-  }
-  // §문구/화면구성 정리 라운드(신규) — "관리 예정일 또는 긴급 상태" 열 자체를 이 탭에서
-  // 완전히 없애 달라는 요청(§요청 5)에 따라 newPartnerDueOrUrgent는 삭제했다.
-  // fmtNextManageDate/관리 예정일 데이터·계산 자체(D 레이어, 다른 탭·고객카드가 계속
-  // 쓰는 값)는 전혀 건드리지 않았다 — 이 화면에서 그 값을 더 이상 안 꺼내 쓸 뿐이다.
-  // "전환 가능성"(§요청 3) — 별도의 새 예측 점수를 만들지 않고, 위에서 이미 계산한 상태
-  // 그대로를 재해석해 보여준다(요청이 들어온 업체=유력, 관리가 필요한 업체=불확실, 아직
-  // 아무 신호도 없는 업체=확인 필요) — 근거 없는 확률/점수를 지어내지 않는다.
-  function newPartnerLikelihood(state, need){
-    if(state.stateKey === 'converted') return '현장등록';
-    if(state.stateKey === 'requested' && !need) return '전환 유력';
-    if(need) return '전환 불확실';
-    return '확인 필요';
-  }
+  // §디자인 개편 라운드(신규) — "다음 행동"/"전환 가능성" 컬럼은 이 탭 화면에서 완전히
+  // 제거했다(§요청 2-9). newPartnerNextAction/newPartnerLikelihood 두 함수는 이 탭에서만
+  // 쓰이던 함수라(다른 화면에서 호출하는 곳이 없음을 확인) 화면에서 숨기는 수준이 아니라
+  // 함수 자체를 지웠다 — 판정에 쓰인 원본 데이터(need/band/conv 등)는 전혀 건드리지
+  // 않았고, 여전히 상태 분류(classifyNewPartnerRow)·상단 요약(computeNewPartnerConversionSummary)
+  // 계산에 그대로 쓰인다.
+  // fmtNextManageDate/"다음 관리 예정일" 데이터·계산 자체(D 레이어, 다른 탭·고객카드가
+  // 계속 쓰는 값)는 전혀 건드리지 않았다 — 이 화면에서 그 값을 더 이상 안 꺼내 쓸 뿐이다.
   // §업체명 옆 요청 종류 표시 라운드(신규) — 업체명을 보는 즉시 최근 요청/활동 종류를
   // 알 수 있게(§요청 3), 이미 있는 데이터만 읽어 가장 최근 1건의 종류를 뽑는다. 새
   // 저장소·새 판정을 만들지 않는다:
@@ -8549,7 +8569,9 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
     if(!items.length) return null;
     items.sort((a,b)=> b.ts - a.ts);
-    return { label: items[0].label, extra: items.length - 1 };
+    // ts도 함께 돌려준다 — "최근 요청" 컬럼(§신규 협약사 화면 재구성 라운드)이 같은
+    // 최신 1건의 날짜를 다시 계산하지 않고 이 값을 그대로 쓴다(새 조회 없음, §성능).
+    return { label: items[0].label, extra: items.length - 1, ts: items[0].ts || null };
   }
   const NEW_PARTNER_SUBFILTERS = [
     ['all','전체'], ['needsAttention','관리 필요'], ['inProgress','진행 중'], ['converted','현장등록']
@@ -8560,6 +8582,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 시작하지만, 이 탭이 실제로 켜질 때만 다시 붙인다(§CSS의 #crmList.np2-active 규칙
     // 참고).
     listEl.classList.add('np2-active');
+    // §디자인 개편 라운드 — 검색창 옆 정렬 select가 이 함수 밖(전역 change 리스너)에서도
+    // 가벼운 경로로 다시 그릴 수 있게 인자를 저장해 둔다(§성능, renderList() 전체 재계산 없음).
+    lastNewPartnerEnriched = enriched;
+    // §요청 2-9 제목/부제 — 다른 탭은 그대로 "고객 N"(renderList()가 매번 먼저 그 값으로
+    // 지워 두므로 탭을 벗어나면 자동 복원됨), 이 탭만 고정 문구로 덮어쓴다.
+    listTitle.innerHTML = `신규 협약사<span class="list-title-sub">L2에서 L3까지, 현장등록 전환 현황을 확인합니다.</span>`;
     const enrichedById = new Map(enriched.map(r=> [r.co.id, r]));
     // 전환율 계산 기준은 기존 computeNewPartnerConversionSummary() 그대로 재사용한다
     // (§요청 "임의로 새로운 기준을 만들지 마세요"). rows에 업체별 conv가 이미 한 번씩만
@@ -8574,12 +8602,11 @@ window.SHIN2_CRM_APP_INIT = function(){
       const band = days != null ? resolveNewPartnerBand(days) : null;
       const need = findManagementNeedForCompany(co.id); // 이미 renderList()가 한 번만 계산해 둔 managementNeedCache 조회뿐
       const state = classifyNewPartnerRow(conv, need, band);
-      return {
-        co, conv, r, p, days, band, need, state,
-        nextAction: newPartnerNextAction(co, state, need, band),
-        likelihood: newPartnerLikelihood(state, need),
-        reqBadge: newPartnerLatestRequestBadge(co, r),
-      };
+      // §요청 2-9 — "다음 행동"/"전환 가능성"/"다음 관리 예정일"은 이 화면에서 완전히
+      // 뺐다(newPartnerNextAction/newPartnerLikelihood 함수 자체도 삭제, 다른 화면 호출
+      // 없음을 확인). reqBadge는 이제 ts(최근 요청 시각)도 함께 돌려준다(§성능 — 같은
+      // 계산을 "최근 요청" 컬럼에서 다시 하지 않는다).
+      return { co, conv, r, p, days, band, need, state, reqBadge: newPartnerLatestRequestBadge(co, r) };
     });
     // 전환 흐름(§요청 2) — "요청 발생"은 전환 여부와 무관하게 구글시트 요청이 1건이라도
     // 있는 업체 수(conv.firstRequestAt, 이미 계산된 값 그대로 재사용). 전환 완료는 항상
@@ -8590,55 +8617,61 @@ window.SHIN2_CRM_APP_INIT = function(){
     const needsAttentionCount = items.filter(it=> it.state.bucket === 'needsAttention').length;
     const inProgressCount = items.filter(it=> it.state.bucket === 'inProgress').length;
 
-    // 검색(§요청 6 "업체명과 담당자") — 새 검색창을 만들지 않고 메인 검색창의 searchQuery를
-    // 그대로 쓴다(이미 120ms 디바운스가 적용돼 있음, §검색창 반응 라운드 — 그대로 유지).
+    // 검색(§요청 2-9 "업체명/담당자/활동내용/요청 종류") — 새 검색창을 만들지 않고 메인
+    // 검색창의 searchQuery를 그대로 쓴다(이미 120ms 디바운스 적용, §검색창 반응 라운드 —
+    // 그대로 유지). matchesSearch()가 이미 하는 업체명/활동내용(a.activityText) 검색을
+    // 재사용하고, 담당자·요청 종류만 이 탭에서 추가로 비교한다 — 둘 다 이미 items에
+    // 캐시돼 있는 값(co.assigneeUserId/it.reqBadge.label)만 볼 뿐, 새 전체 배열 재스캔은
+    // 없다(§성능 요구).
     const q = (searchQuery || '').trim().toLowerCase();
     const searched = q ? items.filter(it=>{
-      const nameHit = String(it.co.name || '').toLowerCase().includes(q);
+      if(matchesSearch(it.co, it.r ? it.r.acts : [], q)) return true;
       const assigneeText = it.co.assigneeUserId ? ('사용자 ' + it.co.assigneeUserId).toLowerCase() : '';
-      return nameHit || assigneeText.includes(q);
+      if(assigneeText.includes(q)) return true;
+      return it.reqBadge ? it.reqBadge.label.toLowerCase().includes(q) : false;
     }) : items;
 
     const filtered = newPartnerSubFilter === 'all' ? searched : searched.filter(it=> it.state.bucket === newPartnerSubFilter);
-    // 정렬 — 관리가 급한 업체를 가장 먼저, 그다음 경과일 순(§더보기의 "90일 임박순"/
-    // "최근 체결순" 그대로 재사용 — urgent=경과일 많은 순, recent=경과일 적은 순으로
-    // 방향만 뒤집는다), 마지막은 이름순. 새 판정을 만드는 게 아니라 위에서 이미 계산해
-    // 둔 상태만 정렬 기준으로 쓴다.
+    // 정렬 — 기본은 관리가 급한 업체를 가장 먼저, 그다음 경과일 순(90일 임박순/최근
+    // 체결순, urgent=경과일 많은 순, recent=경과일 적은 순). "최근 활동순"(§요청 2-9,
+    // 검색창 옆 select에 추가된 새 옵션)은 상태 구분 없이 가장 최근 활동(it.r.summary.
+    // createdAt, 이미 계산돼 있는 값) 내림차순으로만 본다 — 새 판정을 만들지 않는다.
     const bucketOrder = { needsAttention:0, inProgress:1, converted:2 };
     const daysDir = newPartnerSortMode === 'recent' ? 1 : -1;
-    filtered.sort((a,b)=>{
-      const oa = bucketOrder[a.state.bucket], ob = bucketOrder[b.state.bucket];
-      if(oa !== ob) return oa - ob;
-      const da = a.days == null ? -1 : a.days, db = b.days == null ? -1 : b.days;
-      if(da !== db) return daysDir * (db - da);
-      return String(a.co.name || '').localeCompare(String(b.co.name || ''), 'ko');
-    });
+    if(newPartnerSortMode === 'activity'){
+      filtered.sort((a,b)=>{
+        const ta = (a.r && a.r.summary) ? new Date(a.r.summary.createdAt).getTime() : -Infinity;
+        const tb = (b.r && b.r.summary) ? new Date(b.r.summary.createdAt).getTime() : -Infinity;
+        if(ta !== tb) return tb - ta;
+        return String(a.co.name || '').localeCompare(String(b.co.name || ''), 'ko');
+      });
+    } else {
+      filtered.sort((a,b)=>{
+        const oa = bucketOrder[a.state.bucket], ob = bucketOrder[b.state.bucket];
+        if(oa !== ob) return oa - ob;
+        const da = a.days == null ? -1 : a.days, db = b.days == null ? -1 : b.days;
+        if(da !== db) return daysDir * (db - da);
+        return String(a.co.name || '').localeCompare(String(b.co.name || ''), 'ko');
+      });
+    }
 
     const reviewCount = gsheetImportState.reviewItems.length;
-    const maxFunnel = summary.total || 1;
-    // "단계가 진행될수록 영역이 줄어드는 형태"(§요청 2) — 각 단계 상자의 flex-grow를
-    // 실제 건수 비율로 준다(0건이어도 완전히 안 보이지 않게 최소값만 둠).
-    const funnelFlex = v=> Math.max(0.32, v / maxFunnel).toFixed(2);
+    const rateNum = Number(summary.rate) || 0;
     const heroHtml = `
       <div class="np2-hero">
         <div class="np2-hero-rate-block">
           <div class="np2-hero-rate-label">L2 → L3 전환율</div>
           <div class="np2-hero-rate">${esc(summary.rate)}%</div>
           <div class="np2-hero-sub">신규 협약사 ${esc(summary.total)}곳 중 ${esc(summary.converted)}곳 현장등록</div>
+          <div class="np2-hero-bar"><div class="np2-hero-bar-fill" style="width:${Math.max(0,Math.min(100,rateNum))}%;"></div></div>
         </div>
         <div class="np2-hero-stats">
-          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(summary.converted)}</span><span class="np2-hero-stat-label">현장등록</span></div>
-          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(inProgressCount)}</span><span class="np2-hero-stat-label">전환 진행 중</span></div>
-          <div class="np2-hero-stat"><span class="np2-hero-stat-value${needsAttentionCount ? ' is-warn' : ''}">${esc(needsAttentionCount)}</span><span class="np2-hero-stat-label">관리 필요</span></div>
+          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(summary.total)}</span><span class="np2-hero-stat-label">신규협약 · 최근 90일</span></div>
+          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(requestedCount)}</span><span class="np2-hero-stat-label">요청발생 · 전환 진행 중</span></div>
+          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(summary.converted)}</span><span class="np2-hero-stat-label">현장등록 · L3 전환</span></div>
+          ${needsAttentionCount ? `<div class="np2-hero-stat"><span class="np2-hero-stat-value is-warn">${esc(needsAttentionCount)}</span><span class="np2-hero-stat-label">관리 필요</span></div>` : ''}
           ${reviewCount ? `<button type="button" class="np2-hero-stat" id="newPartnerGsheetReviewLink"><span class="np2-hero-stat-value is-warn">${esc(reviewCount)}</span><span class="np2-hero-stat-label">Google Sheets 확인 필요</span></button>` : ''}
         </div>
-      </div>
-      <div class="np2-funnel">
-        <div class="np2-funnel-step" style="flex:${funnelFlex(summary.total)} 1 0;"><span class="np2-funnel-value">${esc(summary.total)}</span><span class="np2-funnel-label">신규 협약</span></div>
-        <span class="np2-funnel-arrow">→</span>
-        <div class="np2-funnel-step" style="flex:${funnelFlex(requestedCount)} 1 0;"><span class="np2-funnel-value">${esc(requestedCount)}</span><span class="np2-funnel-label">요청 발생</span></div>
-        <span class="np2-funnel-arrow">→</span>
-        <div class="np2-funnel-step is-final" style="flex:${funnelFlex(summary.converted)} 1 0;"><span class="np2-funnel-value">${esc(summary.converted)}</span><span class="np2-funnel-label">현장등록</span></div>
       </div>
       ${gsheetImportState.lastError ? `<div class="np2-empty" style="margin-bottom:10px;">${esc(gsheetImportState.lastError)}</div>` : ''}
       <div class="np2-subfilters">
@@ -8646,14 +8679,7 @@ window.SHIN2_CRM_APP_INIT = function(){
           const cnt = key === 'all' ? items.length : (key === 'converted' ? summary.converted : (key === 'needsAttention' ? needsAttentionCount : inProgressCount));
           return `<button type="button" class="list-filter-chip${newPartnerSubFilter===key?' is-active':''}" data-np-subfilter="${esc(key)}">${esc(label)} ${esc(cnt)}</button>`;
         }).join('')}
-        <button type="button" class="list-filter-chip" id="newPartnerMoreBtn" style="margin-left:auto;">더보기 ${newPartnerMoreOpen ? '▴' : '▾'}</button>
-      </div>
-      ${newPartnerMoreOpen ? `
-      <div class="np2-subfilters" style="padding-top:0;">
-        <span class="np2-field-label" style="display:inline;color:var(--text-muted);align-self:center;">정렬</span>
-        <button type="button" class="list-filter-chip${newPartnerSortMode==='urgent'?' is-active':''}" data-np-sort="urgent">90일 임박순</button>
-        <button type="button" class="list-filter-chip${newPartnerSortMode==='recent'?' is-active':''}" data-np-sort="recent">최근 체결순</button>
-      </div>` : ''}`;
+      </div>`;
 
     // §성능 요구 9 — 서브필터를 바꿀 때만(자주 누르지 않는 조작) 이 함수를 다시 부른다.
     // enriched는 renderList()가 이미 만들어 둔 값을 클로저로 그대로 재사용할 뿐, 여기서
@@ -8663,15 +8689,6 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(reviewBtn) reviewBtn.addEventListener('click', openGsheetReviewModal);
       listEl.querySelectorAll('[data-np-subfilter]').forEach(btn=> btn.addEventListener('click', ()=>{
         newPartnerSubFilter = btn.getAttribute('data-np-subfilter');
-        renderNewPartnerTab(enriched);
-      }));
-      const moreBtn = document.getElementById('newPartnerMoreBtn');
-      if(moreBtn) moreBtn.addEventListener('click', ()=>{
-        newPartnerMoreOpen = !newPartnerMoreOpen;
-        renderNewPartnerTab(enriched);
-      });
-      listEl.querySelectorAll('[data-np-sort]').forEach(btn=> btn.addEventListener('click', ()=>{
-        newPartnerSortMode = btn.getAttribute('data-np-sort');
         renderNewPartnerTab(enriched);
       }));
     }
@@ -8684,18 +8701,29 @@ window.SHIN2_CRM_APP_INIT = function(){
 
     listEl.innerHTML = heroHtml + `
       <div class="np2-table-head">
-        <span>협력사</span><span>현재 단계</span><span>다음 행동</span><span>전환 가능성</span><span></span>
+        <span>협력사</span><span>최근 활동</span><span>최근 요청</span><span>현재 상태</span><span></span>
       </div>
       <div class="np2-list">
         ${filtered.map(it=>{
-          const elapsedText = it.days != null ? fmtNewPartnerElapsed(it.days) : '—';
+          // §요청 2-9 "협약 후 86일 · 담당자 미지정" — fmtNewPartnerElapsed는 상세보기의
+          // "D+N/체결 당일" 표기용이라 그대로 두고, 이 줄 전용으로 days만 따로 문구를
+          // 만든다(같은 days 값, 새 계산 없음).
+          const elapsedText = it.days != null ? `협약 후 ${it.days}일` : '협약일 미확인';
           const assigneeText = it.co.assigneeUserId ? '사용자 ' + it.co.assigneeUserId : '미지정';
           const expanded = newPartnerExpanded.has(it.co.id);
-          // §업체명 옆 요청 종류 표시 라운드 — 실제 요청 데이터가 없으면 억지로 문구를
-          // 만들지 않고 옅은 글씨의 "요청 없음"만 보여준다(§요청 3).
+          // §요청 2-9 "업체명 옆 요청 종류 배지" — 요청이 없는 업체는 배지 자체를 렌더링
+          // 안 함("요청 없음" 문구도 표시 금지).
           const reqBadgeHtml = it.reqBadge
             ? `<span class="np2-req-badge">[${esc(it.reqBadge.label)}]${it.reqBadge.extra > 0 ? ` 외 ${esc(it.reqBadge.extra)}건` : ''}</span>`
-            : `<span class="np2-req-none">요청 없음</span>`;
+            : '';
+          // §요청 2-9 "최근 활동" — 사람이 읽기 쉬운 상대 날짜(오늘/3일 전/14일 전), 정확한
+          // 날짜는 상세보기(newPartnerInfoRowHtml)에서만.
+          const activityText = it.r && it.r.summary ? fmtDaysAgo(it.r.summary.createdAt) : '—';
+          // §요청 2-9 "최근 요청" — 종류 + 날짜, 값이 없으면 "데이터 없음"/"요청 없음"
+          // 대신 "—"(reqBadge와 같은 원본을 재사용, 새 조회 없음).
+          const lastReqHtml = it.reqBadge
+            ? `<span class="np2-col-lastreq-type">${esc(it.reqBadge.label)}</span><span class="np2-col-lastreq-date">${it.reqBadge.ts ? esc(fmtDate(it.reqBadge.ts)) : ''}</span>`
+            : `<span class="np2-col-lastreq-type">—</span>`;
           return `
           <div class="np2-row" data-np-row="${esc(it.co.id)}" role="button" tabindex="0">
             <span class="np2-col-company">
@@ -8703,11 +8731,11 @@ window.SHIN2_CRM_APP_INIT = function(){
                 <span class="np2-col-name">${esc(it.co.name || '(업체명 없음)')}</span>
                 ${reqBadgeHtml}
               </span>
-              <span class="np2-col-elapsed">${esc(elapsedText)} · <span class="np2-assignee">${esc(assigneeText)}</span></span>
+              <span class="np2-col-elapsed">${esc(elapsedText)} · <span class="np2-assignee">담당자 ${esc(assigneeText)}</span></span>
             </span>
-            <span><span class="np2-state-badge st-${esc(it.state.stateKey)}">${esc(it.state.stateLabel)}</span></span>
-            <span class="np2-col-next"><span class="np2-field-label">다음 행동</span>${esc(it.nextAction)}</span>
-            <span class="np2-col-likelihood"><span class="np2-field-label">전환 가능성</span>${esc(it.likelihood)}</span>
+            <span class="np2-col-activity"><span class="np2-field-label">최근 활동</span>${esc(activityText)}</span>
+            <span class="np2-col-lastreq${it.reqBadge ? '' : ' is-empty'}"><span class="np2-field-label">최근 요청</span>${lastReqHtml}</span>
+            <span><span class="np2-field-label">현재 상태</span><span class="np2-state-badge st-${esc(it.state.stateKey)}">${esc(it.state.stateLabel)}</span></span>
             <button type="button" class="np2-col-detail-btn" data-np-toggle="${esc(it.co.id)}">${expanded ? '접기' : '상세 보기'}</button>
           </div>
           <div class="np2-detail" data-np-detail="${esc(it.co.id)}" ${expanded ? '' : 'hidden'}>${expanded && it.r ? newPartnerInfoRowHtml(it.co, it.r) : ''}</div>
@@ -23194,7 +23222,22 @@ window.SHIN2_CRM_APP_INIT = function(){
   const sortSelect = document.getElementById('crmSortSelect');
   if(sortSelect){
     sortSelect.value = sortMode;
-    sortSelect.addEventListener('change', ()=>{ sortMode = sortSelect.value; currentPage = 1; renderList(); updateTotalRevenueSortArrow(); });
+    sortSelect.addEventListener('change', ()=>{
+      const v = sortSelect.value;
+      // §디자인 개편 라운드(신규) — "신규 협약사" 탭 전용 3개 옵션이면 이 탭만의 정렬
+      // 상태(newPartnerSortMode)만 바꾸고, 전체 목록 재계산(renderList)이 아니라
+      // renderNewPartnerTab만 다시 부른다(§성능 요구 — 필터/정렬 클릭이 300개 업체
+      // 전체를 다시 훑지 않게). lastNewPartnerEnriched는 renderNewPartnerTab이 매번
+      // 자기 인자를 저장해 둔 캐시일 뿐, 별도로 다시 계산하지 않는다.
+      const NP_SORT_MAP = { newPartnerUrgent:'urgent', newPartnerRecent:'recent', newPartnerActivity:'activity' };
+      if(NP_SORT_MAP[v]){
+        newPartnerSortMode = NP_SORT_MAP[v];
+        if(typeof lastNewPartnerEnriched !== 'undefined' && lastNewPartnerEnriched){ renderNewPartnerTab(lastNewPartnerEnriched); return; }
+        renderList();
+        return;
+      }
+      sortMode = v; currentPage = 1; renderList(); updateTotalRevenueSortArrow();
+    });
   }
   // §업체명 왼쪽 금액 이동 라운드 §6 → §정렬 드롭다운 정리 라운드: "총 매출" 헤더 클릭 ->
   // 내림차순/오름차순 토글 정렬. 드롭다운의 "총 매출순"과 같은 sortMode('totalRevDesc')를
