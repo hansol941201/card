@@ -22719,8 +22719,13 @@ window.SHIN2_CRM_APP_INIT = function(){
   // §속도 개선 라운드: 기존엔 키 입력마다 바로 renderList()(목록 전체 재계산+DOM 재생성)를
   // 불렀다 — 빠르게 타이핑하면 글자 수만큼 전체 재렌더링이 반복돼 느려진다. 이 input
   // 요소 자체는 renderList()가 다시 그리지 않으므로(검색창은 목록 밖에 있음) 조합중 한글
-  // 입력이 끊기는 문제는 없고, 단순히 타이핑이 잠깐(150ms) 멈췄을 때만 실제 검색을
-  // 반영하도록 디바운스만 추가한다 — 검색 결과·동작 자체는 이전과 동일하다.
+  // 입력이 끊기는 문제는 없고, 단순히 타이핑이 잠깐 멈췄을 때만 실제 검색을 반영하도록
+  // 디바운스만 추가한다 — 검색 결과·동작 자체는 이전과 동일하다.
+  // §검색창 즉각 반응 라운드(신규) — 디바운스는 setTimeout(val=>{...}, 120)뿐이라 입력한
+  // 글자 자체(input.value)는 이 코드와 무관하게 브라우저가 매 키 입력마다 즉시 화면에
+  // 그린다(디바운스는 오직 "검색 결과 재계산·목록 재렌더링" 호출 시점만 늦춘다) — 요청한
+  // "글자는 즉시 표시, 결과만 지연 후 갱신"이 원래 구조 그대로다. 값만 150ms→120ms로
+  // 살짝 줄였다(§요청, 결과·동작은 동일 — 반영까지 걸리는 대기시간만 단축).
   let searchDebounceTimer = null;
   searchInput.addEventListener('input', ()=>{
     const val = searchInput.value;
@@ -22728,7 +22733,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     searchDebounceTimer = setTimeout(()=>{
       searchDebounceTimer = null;
       searchQuery = val.trim(); currentPage = 1; renderList();
-    }, 150);
+    }, 120);
   });
   const sortSelect = document.getElementById('crmSortSelect');
   if(sortSelect){
