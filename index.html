@@ -167,13 +167,25 @@
   .list-filter-chip.is-trash.is-active{ color:var(--navy); border-color:var(--navy); background:#EDF1FA; }
 
   .list-search-row{ display:flex; gap:8px; margin-bottom:8px; }
+  /* §검색창 클릭 영역 수정 라운드 — 겉보기엔 넓은 검색창인데 실제로 포커스가 잡히는 건
+     input 자기 글자 높이만큼의 아주 좁은 영역뿐이었다(§요청). 원인: align-items:center로
+     교차축(세로)을 "내용 높이만큼만"으로 바꿔놔서, flex:1이 채우는 건 가로 너비뿐이고
+     input의 실제 세로 크기는 컨테이너 높이(38px)보다 훨씬 작게 렌더링되고 있었다 — 그
+     좁은 실제 input 박스 바깥(위/아래 여백, 아이콘, 좌우 padding)을 클릭하면 label이 아닌
+     그냥 div였으므로 아무 일도 안 일어났다. cursor:text로 "여기 어디든 입력 가능"임을
+     보여주고, input을 height:100%로 세로 꽉 채워 실제 클릭 가능 영역 자체를 넓힌다(§확인
+     1/2/5). 태그를 <label>로 바꾸는 것(마크업 쪽)과 합쳐지면 아이콘·좌우 padding까지
+     포함한 박스 전체가 클릭 가능해진다(§확인 3/4 — 새 JS 이벤트 없이 표준 label 클릭 시
+     연결된 input 포커스 동작만으로 해결).
+  */
   .search-box{
     display:flex; align-items:center; gap:8px; height:38px; padding:0 12px;
     background:var(--surface); border:1px solid var(--line); border-radius:6px; flex:1; min-width:0;
+    cursor:text; box-sizing:border-box;
   }
   .search-box:focus-within{ border-color:var(--text-faint); }
   .search-box svg{ flex:none; color:var(--text-muted); }
-  .search-box input{ flex:1; min-width:0; border:none; outline:none; font-size:13.5px; color:var(--text); background:transparent; }
+  .search-box input{ flex:1; min-width:0; height:100%; box-sizing:border-box; border:none; outline:none; font-size:13.5px; color:var(--text); background:transparent; cursor:text; }
   .search-box input::placeholder{ color:var(--text-faint); }
   .list-sort-select{
     height:38px; padding:0 10px; font-size:13px; color:var(--text); background:var(--surface);
@@ -3127,10 +3139,14 @@ table.pdf-doc-table thead{ background:var(--bg); }
     </div>
     <div class="list-filter-row" id="crmFilterRow"></div>
     <div class="list-search-row">
-      <div class="search-box">
+      <!-- §검색창 클릭 영역 수정 라운드 — div였을 때는 아이콘·좌우 padding·input 세로 여백을
+           클릭해도 아무 반응이 없었다. label로 바꾸면 새 JS 이벤트 없이도 "label 영역 클릭
+           -> 그 안의 input에 포커스"라는 표준 브라우저 동작만으로 박스 전체가 클릭 가능해진다
+           (§확인 4 "CSS/label 구조만으로 해결되면 불필요한 이벤트 추가 안 함"). -->
+      <label class="search-box">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <input type="text" id="crmSearchInput" placeholder="업체명 / 담당자 / 활동내용 검색" />
-      </div>
+      </label>
       <!-- §정렬 드롭다운 정리 라운드: "전체 실적순"(pour, 옛 co.pourTrackRecords 상태값
            기준)/"최근 1년 매출순"(revenue, co.partnerDashboard.gradeSales 단일 스냅샷
            기준)은 메인 테이블에 더 이상 없는 옛 용어라 드롭다운에서 뺐다(계산 코드 자체는
@@ -11320,10 +11336,12 @@ window.SHIN2_CRM_APP_INIT = function(){
         </div>
       </div>
       <div class="list-search-row workq-search-row">
-        <div class="search-box">
+        <!-- §검색창 클릭 영역 수정 라운드 — 고객목록 검색창과 완전히 같은 구조/문제라 같은
+             방식(label)으로 맞춘다. -->
+        <label class="search-box">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input type="text" id="workqSearchInput" placeholder="업체명 / 담당자 / 활동내용 검색" value="${esc(workQueueSearch)}" />
-        </div>
+        </label>
       </div>
       <div class="workq-filter-row" id="workqFilterRow">
         ${WORKQ_FILTER_DEFS.map(([key,label])=> `<button type="button" class="list-filter-chip${workQueueFilter===key?' is-active':''}" data-workq-filter="${esc(key)}">${esc(label)} ${esc(counts[key]||0)}</button>`).join('')}
