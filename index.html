@@ -368,9 +368,9 @@
   .total-revenue-sort-arrow{ font-size:9px; }
   /* §2026 매출/자재판매/미수금 라운드: 2026 매출 셀(클릭 가능) + 업체명 옆 미수금 인라인
      배지(§15 "행 전체를 빨간색으로 칠하지 마세요" — 작은 배지만). */
-  .revenue-cell-btn{ background:none; border:none; padding:0; font:inherit; color:inherit; cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px; }
+  .revenue-cell-btn{ background:none; border:none; padding:0; font:inherit; color:inherit; cursor:pointer; }
   /* §최근 실적 독립 컬럼 복원 라운드: "1년 실적" 클릭 -> 1년 실적 Drawer(§7 새로 추가). */
-  .yr-cell-btn{ background:none; border:none; padding:0; font:inherit; color:inherit; cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px; }
+  .yr-cell-btn{ background:none; border:none; padding:0; font:inherit; color:inherit; cursor:pointer; }
   .receivable-inline-badge{
     display:inline-flex; align-items:center; height:18px; padding:0 6px; margin-left:2px; font-size:10.5px; font-weight:700;
     color:#B91C1C; background:#FEF2F2; border:1px solid #FCD5D5; border-radius:9px; cursor:pointer; font-family:inherit; white-space:nowrap;
@@ -494,7 +494,7 @@
   .cat-dist-row:last-child{ border-bottom:none; }
   .cat-dist-name{ font-size:13px; font-weight:600; color:var(--text); }
   .cat-dist-count{ font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; }
-  .cat-cell{ background:none; border:none; padding:0; font:inherit; color:inherit; cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px; }
+  .cat-cell{ background:none; border:none; padding:0; font:inherit; color:inherit; cursor:pointer; }
   /* §시공실적 Drawer 통합 라운드: "최근 실적"/"주요 공종" Drawer를 하나로 합친 화면 전용
      스타일 — 그래프/차트/아이콘/과한 색 없이 칩(공종+건수)과 3열 표(연도/현장명/공종)만
      쓴다(§3 "아주 단순하고 깔끔하게"). */
@@ -508,7 +508,7 @@
   /* §관리필요 업체 라운드 §6 — 한 업체당 한 줄 표. cdash-pour-table(고객카드 POUR 표)과
      같은 표 스타일을 재사용하고, 셀 내용에 필요한 최소한의 텍스트/버튼 스타일만 추가한다. */
   .mgmt-need-table td{ vertical-align:top; }
-  .mgmt-need-co-link{ background:none; border:none; padding:0; font:inherit; font-weight:700; color:var(--navy); cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px; }
+  .mgmt-need-co-link{ background:none; border:none; padding:0; font:inherit; font-weight:700; color:var(--navy); cursor:pointer; }
   .mgmt-need-co-link:hover{ text-decoration-style:solid; }
   .mgmt-need-reason{ font-weight:700; color:#B91C1C; }
   .mgmt-need-reason-detail{ font-size:11px; color:var(--text-muted); margin-top:2px; }
@@ -546,8 +546,8 @@
   .workq-task-card-num{ font-size:26px; font-weight:800; line-height:1.15; color:var(--navy); font-variant-numeric:tabular-nums; }
   .workq-task-card-num.is-zero{ color:var(--text-muted); }
   .workq-task-card-num.c-navy{ color:var(--navy); }
-  .workq-task-card-num.c-orange{ color:#C2540A; }
-  .workq-task-card-num.c-green{ color:#1E7A3D; }
+  .workq-task-card-num.c-orange{ color:var(--orange, #C2670A); }
+  .workq-task-card-num.c-green{ color:var(--green, #079455); }
   .workq-task-card-unit{ font-size:12px; font-weight:700; margin-left:2px; }
   .workq-task-card-label{ font-size:13.5px; font-weight:700; color:var(--navy); }
   .workq-task-card-stage{ font-size:11px; font-weight:600; color:var(--text-muted); }
@@ -560,16 +560,16 @@
   .workq-table td{ padding:7px 10px; border-bottom:1px solid #EEF1F5; vertical-align:top; color:var(--text); }
   .workq-table tr:last-child td{ border-bottom:none; }
   .workq-table tr:hover td{ background:#F7FBFF; }
-  .workq-co-link{ background:none; border:none; padding:0; font:inherit; font-weight:700; color:var(--navy); cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px; }
+  .workq-co-link{ background:none; border:none; padding:0; font:inherit; font-weight:700; color:var(--navy); cursor:pointer; }
   .workq-co-link:hover{ text-decoration-style:solid; }
   /* §단계 진행상황 이전 라운드 — 고객관리 목록에서 옮겨온 4단계 stepper 칸. 너무 넓게
      늘어나지 않도록 폭만 제한(.stage-stepper 자체 스타일은 그대로 재사용). */
   .workq-stage-progress{ width:150px; min-width:130px; }
   .workq-reason{ color:var(--text-muted); font-size:12px; }
   .workq-days{ white-space:nowrap; font-variant-numeric:tabular-nums; }
-  .workq-delay-badge{ display:inline-block; font-size:10px; font-weight:700; color:#B45309; background:#FFF3E0; border-radius:4px; padding:1px 5px; margin-left:5px; }
+  .workq-delay-badge{ display:inline-block; font-size:10px; font-weight:700; color:var(--orange, #C2670A); background:var(--orange-bg, #FFF7ED); border-radius:4px; padding:1px 5px; margin-left:5px; }
   .workq-empty{ padding:24px; text-align:center; color:var(--text-muted); font-size:13px; background:#fff; border:1px solid var(--line); border-radius:8px; }
-  .workq-today-line .workq-today-link{ background:none; border:none; padding:0; font:inherit; font-weight:700; color:var(--navy); cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px; }
+  .workq-today-line .workq-today-link{ background:none; border:none; padding:0; font:inherit; font-weight:700; color:var(--navy); cursor:pointer; }
   .workq-today-line .workq-today-link:hover{ text-decoration-style:solid; }
 
   /* §업무관리 실행형 UI 라운드 §2/§21 — "해야 할 일"을 텍스트에서 실행 버튼으로. 네이비=실행,
@@ -2331,9 +2331,15 @@ html,body{background:#F7F9FC;font-size:13px}
 
 @media(max-width:1100px){.app{padding-left:14px;padding-right:14px}.co-table-head,.co-row{grid-template-columns:140px 110px 145px 50px 135px 74px 74px 90px 62px!important}.rising-grid{grid-template-columns:repeat(5,minmax(160px,1fr))!important}.rising-section{overflow-x:auto}.co-table-head,.co-list{min-width:1060px}.co-list{overflow:visible}#listView{overflow-x:auto}}
 @media(max-width:760px){.app{padding:14px 10px 32px}.topbar{margin-bottom:12px}.rising-grid{grid-template-columns:repeat(5,165px)!important}.list-search-row{flex-direction:row!important;min-width:430px}.list-sort-select{width:auto!important}.co-table-head,.co-list{min-width:1060px}.co-row{grid-template-columns:140px 110px 145px 50px 135px 74px 74px 90px 62px!important}}
+/* §디자인 개편 2라운드(신규) — 위 min-width:430px는 #listView가 같은 폭에서
+   overflow-x:auto(§1180px 블록)로 가로 스크롤을 흡수하는 고객관리 목록 전용 의도였다.
+   업무관리(.workq-search-row)는 그 스크롤 컨테이너가 없어 이 min-width가 그대로
+   문서 전체 가로 스크롤로 새어나갔다(§실측 380px에서 확인) — 검색창 자체는 원래도
+   430px가 필요 없으므로, 이 화면에서만 min-width를 취소한다. */
+@media(max-width:760px){ .workq-search-row{ min-width:0!important; } }
 
 /* HANSOL CRM corporate visual override */
-:root{--navy:#082f67;--blue:#0b5bd3;--bg:#f4f7fb;--line:#dfe7f1;--text:#13243e;--green:#079455}
+:root{--navy:#082f67;--blue:#0b5bd3;--bg:#f4f7fb;--line:#dfe7f1;--text:#13243e;--green:#079455;--orange:#C2670A;--orange-bg:#FFF7ED;--danger:#B3261E;--danger-bg:#FDECEC;--radius-card:10px;--radius-ctrl:8px}
 html,body{background:radial-gradient(circle at 75% -10%,rgba(11,91,211,.055),transparent 28%),var(--bg)!important;color:var(--text)!important}body{font-family:Pretendard,"Noto Sans KR","Malgun Gothic",Arial,sans-serif!important;letter-spacing:-.015em}.app{max-width:1580px!important;margin:0 auto!important;padding:24px 30px 48px!important}.brand{color:var(--navy)!important;font-size:25px!important;font-weight:800!important}.brand-wrap{display:flex!important;align-items:center!important;gap:10px!important}.brand-logo{display:block!important;height:30px!important;width:auto!important}.list-add-btn{background:linear-gradient(180deg,#0b3978,#082f67)!important;border:0!important;border-radius:7px!important;box-shadow:0 4px 12px rgba(8,47,103,.16)!important}.rising-section{background:#fff!important;border:1px solid var(--line)!important;border-radius:12px!important;padding:14px 16px 15px!important;box-shadow:0 3px 14px rgba(23,48,92,.055)!important}.rising-grid{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:12px!important}.rising-card{border:1px solid #e1e8f1!important;background:linear-gradient(180deg,#fff,#fbfdff)!important;border-radius:10px!important;padding:12px 13px 10px!important;box-shadow:0 2px 8px rgba(22,44,78,.045)!important}.rising-rank{background:var(--navy)!important;color:#fff!important;border-radius:5px!important}.rising-up{color:var(--green)!important;font-weight:800!important}.rising-bar{height:4px!important;background:#edf2f7!important}.rising-bar-fill{background:linear-gradient(90deg,#079455,#12b76a)!important}.list-filter-chip{border:1px solid #dce5ef!important;background:#fff!important;border-radius:7px!important;font-weight:650!important}.list-filter-chip.is-active{background:var(--navy)!important;color:#fff!important;border-color:var(--navy)!important}.list-search-row{background:#fff!important;border:1px solid var(--line)!important;border-radius:11px!important;padding:10px!important;box-shadow:0 2px 8px rgba(22,44,78,.035)!important}.search-box,.list-sort-select{height:39px!important;border:1px solid #dce5ef!important;border-radius:8px!important;background:#fff!important}.co-table-head,.co-row{display:grid!important;grid-template-columns:minmax(180px,1fr) 150px 175px 68px 185px 92px 92px 140px 82px!important;gap:12px!important;align-items:center!important}.co-table-head{margin-top:12px!important;padding:10px 14px!important;border:1px solid var(--line)!important;border-radius:10px 10px 0 0!important;background:#f9fbfd!important;color:#4b607c!important;font-weight:750!important}.co-list{background:#fff!important;border:1px solid var(--line)!important;border-top:0!important;border-radius:0 0 10px 10px!important;overflow:hidden!important}.co-row{min-height:50px!important;padding:6px 14px!important;border-bottom:1px solid #e8eef5!important;align-items:center!important}.co-row:hover{background:#f7fbff!important;box-shadow:inset 3px 0 0 var(--blue)!important}.col-name{font-weight:800!important;color:#142945!important}.col-yr{color:#0866df!important;font-weight:800!important;font-size:13px!important}.col-total,.col-revenue,.col-yr-revenue,.col-total-revenue{color:#172d4d!important;font-weight:750!important}.grade-badge{border-radius:5px!important;font-weight:800!important}.contrib-cell{border-radius:7px!important;padding:6px 9px!important;background:transparent!important;border-color:transparent!important}.list-pagination .active{background:var(--navy)!important;color:#fff!important}.coin-icon,.money-icon,[class*="coin-icon"],[class*="money-icon"]{display:none!important}#cardView .card-header,#cardView .detail-header{background:linear-gradient(135deg,#082f67,#123f7c)!important;border-radius:11px!important}@media(max-width:1180px){.app{padding:18px 16px 40px!important}.rising-section{overflow-x:auto!important}.rising-grid{grid-template-columns:repeat(5,190px)!important}.co-table-head,.co-list{min-width:1220px!important}#listView{overflow-x:auto!important}}
 
 /* ==========================================================================
@@ -2659,8 +2665,8 @@ body.map-modal-lock{ overflow:hidden; }
 .mail-asset-box{ border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:10px; background:#fff; }
 .mail-asset-box-head{ display:flex; justify-content:space-between; align-items:center; font-size:12.5px; font-weight:700; color:var(--text); margin-bottom:4px; }
 .mail-asset-share-badge{ font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:9px; }
-.mail-asset-share-badge.is-ok{ background:#E9F6EF; color:#0F7A42; }
-.mail-asset-share-badge.is-warn{ background:#FDF3E4; color:#B5620A; }
+.mail-asset-share-badge.is-ok{ background:#E9F6EF; color:var(--green, #079455); }
+.mail-asset-share-badge.is-warn{ background:var(--orange-bg, #FFF7ED); color:var(--orange, #C2670A); }
 .mail-asset-limit-text{ font-size:11px; color:var(--text-muted); margin-bottom:6px; }
 .mail-asset-file-row{ display:flex; justify-content:space-between; font-size:12.5px; color:var(--text); margin-bottom:4px; }
 .mail-asset-file-meta{ color:var(--text-muted); }
@@ -7137,7 +7143,8 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(!el) return;
     if(ok){ el.textContent = ''; return; }
     el.textContent = cloudSaveErrorMessage(err);
-    el.style.color = '#B3261E';
+    // §디자인 개편 2라운드 — 값은 그대로(#B3261E), 전역 오류 토큰(--danger)으로만 참조.
+    el.style.color = 'var(--danger, #B3261E)';
   }
 
   const listEl = document.getElementById('crmList');
