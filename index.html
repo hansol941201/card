@@ -5131,7 +5131,19 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   // 한 번만 인덱스 계산)와 완전히 같은 패턴을 메모/활동에도 적용한다. 데이터나 정렬 기준은
   // 그대로이고(원래 함수와 동일한 필터·정렬), "렌더링 한 번당 한 번만" 계산해 두고 각 행은
   // 조회만 하도록 바꾸는 것뿐이라 화면에 보이는 값은 달라지지 않는다.
+  // §속도 개선 2라운드: renderList()가 탭 전환·재검색 등으로 자주 다시 불려도, 그 사이
+  // 메모/활동 데이터가 실제로는 바뀌지 않은 경우가 많다(저장은 로컬 쓰기 경로(writeArr)
+  // 뿐 아니라 다른 기기의 변경을 받는 Firestore onSnapshot도 localStorage를 직접
+  // 갱신하므로, "저장 함수를 호출한 횟수"로는 완벽히 추적할 수 없다 — §확인). 그래서
+  // "호출한 함수 수를 센다" 대신 "localStorage에 실제로 들어있는 원본 문자열이 마지막
+  // 계산 때와 같은가"로 판단한다 — 문자열이 같으면(=== 비교, 두 경로 중 어느 쪽이 썼든
+  // 실제로 바뀌었으면 반드시 문자열도 달라진다) 다시 읽고 만드는 대신 마지막에 만들어
+  // 둔 Map을 그대로 돌려준다. 인덱스는 읽기 전용으로만 쓰이므로(값을 바꾸는 곳 없음)
+  // 재사용해도 안전하고, 결과값은 매번 새로 계산했을 때와 완전히 동일하다.
+  let memosIndexCache = { raw: undefined, map: null };
   function buildMemosIndex(){
+    const raw = localStorage.getItem(MEMO_KEY);
+    if(raw === memosIndexCache.raw && memosIndexCache.map) return memosIndexCache.map;
     const map = new Map();
     loadMemos().forEach(m=>{
       if(m.targetType !== 'company') return;
@@ -5140,9 +5152,13 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
       map.get(k).push(m);
     });
     map.forEach(list=> list.sort((a,b)=> (b.updatedAt||b.createdAt) - (a.updatedAt||a.createdAt)));
+    memosIndexCache = { raw, map };
     return map;
   }
+  let activitiesIndexCache = { raw: undefined, map: null };
   function buildActivitiesIndex(){
+    const raw = localStorage.getItem(ACT_KEY);
+    if(raw === activitiesIndexCache.raw && activitiesIndexCache.map) return activitiesIndexCache.map;
     const map = new Map();
     loadActivities().forEach(a=>{
       const k = String(a.companyId);
@@ -5150,6 +5166,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
       map.get(k).push(a);
     });
     map.forEach(list=> list.sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt)));
+    activitiesIndexCache = { raw, map };
     return map;
   }
   function addMemo(companyId, text){
@@ -7828,8 +7845,16 @@ window.SHIN2_CRM_APP_INIT = function(){
     const companiesById = new Map(companies.map(c=> [c.id, c]));
     // 파생 데이터는 매번 다시 계산만 한다(§26 — companyId 기준 실제 POUR/진행 데이터에서
     // 집계, 회사명 텍스트로 새 데이터를 만들지 않음. 별도 저장 없음).
+    // §속도 개선 2라운드: 여기가 실제 최대 병목이었다 — companies.map()은 "보이는 15건"이
+    // 아니라 필터링 전 전체 업체(예: 300건) 전부를 돈다. 그런데 각 반복마다
+    // D.activitiesForCompany(co.id)를 불러 customerActivities 전체 배열을 매번 다시
+    // JSON.parse+filter+sort 했다(300개 업체 × 활동 1,800건 규모면 이 한 줄이 renderList
+    // 전체 시간의 대부분을 차지했다, §프로파일링 결과). requestItemsIndex.activities가
+    // 이미 "업체별로 미리 묶어 정렬해 둔" 같은 데이터라서(D.buildActivitiesIndex,
+    // activitiesForCompany와 동일한 필터·정렬 기준) 그대로 조회만 하면 결과는 완전히
+    // 같고 반복 재훑기만 없앨 수 있다.
     const enriched = companies.map(co=>{
-      const acts = D.activitiesForCompany(co.id);
+      const acts = requestItemsIndex.activities.get(String(co.id)) || [];
       const progress = buildProgressStages(co);
       const pourCount = (co.pourTrackRecords || []).length;
       return { co, acts, summary: acts[0] || null, progress, pourCount };
@@ -7879,12 +7904,19 @@ window.SHIN2_CRM_APP_INIT = function(){
       return;
     }
 
+    // §속도 개선 2라운드: matchesSearch(co, acts, q, parentNameHint)는 q가 비어있으면
+    // parentNameHint를 아예 쓰지 않고 바로 true를 반환하는데(§7867 "if(!q) return true"),
+    // 예전 코드는 검색어가 없을 때도(=대부분의 렌더링, 탭 전환·필터 클릭 등) 매 행마다
+    // D.resolveParentCompanyDisplay(모회사 조회, companies 배열 선형 탐색 포함)를 미리
+    // 계산해 그 결과를 버렸다 — 검색 중일 때만 실제로 필요한 값이므로, 검색어가 있을
+    // 때만 계산하도록 좁혔다(결과·동작은 이전과 동일, 검색 안 할 때의 불필요한 계산만
+    // 없앰).
     const rows = enriched
       .filter(r=> matchesFilter(r.co, r.progress, filterKey, relationIndex))
-      .filter(r=> matchesSearch(r.co, r.acts, searchQuery, (()=>{
+      .filter(r=> matchesSearch(r.co, r.acts, searchQuery, searchQuery ? (()=>{
         const parent = D.resolveParentCompanyDisplay(r.co, companies, relationIndex);
         return parent ? parent.name : null;
-      })()));
+      })() : null));
     applySort(rows, contribIndex);
 
     // §신규 협약사 탭 라운드 → §고객 요청 Google Sheets 연동 라운드 — 탭 상단 집계(§요청
