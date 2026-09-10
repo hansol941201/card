@@ -245,6 +245,13 @@
   .new-partner-summary-value{ font-size:16px; font-weight:700; color:var(--text); }
   .new-partner-summary-item.is-muted .new-partner-summary-value{ font-size:12.5px; font-weight:650; color:var(--text-muted); }
   .new-partner-summary-label{ font-size:11px; color:var(--text-muted); }
+  /* §고객 요청 Google Sheets 연동 라운드(신규) — "확인 필요" 카드를 버튼으로 쓴다(브라우저
+     기본 버튼 스타일을 지우고 기존 .new-partner-summary-item과 똑같이 보이게, 색만 경고색). */
+  button.new-partner-summary-item{ font-family:inherit; cursor:pointer; text-align:left; }
+  .new-partner-summary-item.is-warn{ background:#FEF2F2; border-color:#FCD5D5; }
+  .new-partner-summary-item.is-warn .new-partner-summary-value{ color:#B91C1C; }
+  .terminated-info-item.is-l3-done{ color:#1D7A46; }
+  .terminated-info-item.is-l3-pending{ color:var(--text-muted); }
   .col-recent{ flex:1.4 1 150px; min-width:0; color:var(--text-muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .col-recent .recent-date{ color:var(--text-faint); margin-right:4px; }
   .col-yr, .col-total{ flex:0 0 62px; font-size:12.5px; color:var(--text); text-align:right; }
@@ -3072,6 +3079,10 @@ table.pdf-doc-table thead{ background:var(--bg); }
                  그대로 읽어 이 기기 localStorage와 나란히 비교만 한다. 자동 저장은
                  전혀 하지 않고, 사람이 항목을 직접 선택했을 때만 Firestore에 반영한다. -->
             <button type="button" id="crmLocalCloudDiagBtn">로컬-클라우드 비교</button>
+            <!-- §고객 요청 Google Sheets 연동 라운드(신규) — 시트 업체명이 고객관리카드
+                 업체와 자동으로(정확히 1건) 매칭 안 된 행을 사람이 직접 연결하는 화면.
+                 자동 생성·자동 연결은 절대 하지 않는다(§요청). -->
+            <button type="button" id="crmGsheetReviewBtn">Google Sheets 확인 필요 <span id="crmGsheetReviewCount"></span></button>
           </div>
         </div>
         <!-- §전화 요청 기록 라운드(신규) — "+ 고객 등록"과 같은 줄에 배치. 처음엔 작은
@@ -3220,6 +3231,12 @@ table.pdf-doc-table thead{ background:var(--bg); }
   <!-- §업체 삭제(휴지통) 라운드(신규) — 고객 상세 팝업 "업체 삭제" 버튼이 여는 확인 모달
        전용 root. 같은 .pi-overlay/.pi-panel 패턴. -->
   <div id="deleteCompanyModalRoot"></div>
+  <!-- §고객 요청 Google Sheets 연동 라운드(신규) — "신규 협약사" 탭의 [요청 전체 보기]
+       버튼이 여는 전용 root. 같은 .pi-overlay/.pi-panel 패턴. -->
+  <div id="gsheetReqListModalRoot"></div>
+  <!-- §고객 요청 Google Sheets 연동 라운드(신규) — "확인 필요" 목록(업체명이 매칭 안 되거나
+       복수 후보인 시트 행) 전용 root. -->
+  <div id="gsheetReviewModalRoot"></div>
   <!-- §외부 동기화 제거 라운드(신규) — "전체 동기화"/개별 협력업체·진행현황 동기화/공개범위
        가져오기/동기화 진단/동기화 기록 보기 전용이던 모달 root들(partnerSyncModalRoot/
        syncDiagModalRoot/partnerListSyncModalRoot/distListSyncModalRoot/fullSyncModalRoot/
@@ -6837,6 +6854,14 @@ window.SHIN2_CRM_APP_INIT = function(){
     const stageLabel = (r.progress && r.progress.hasAny) ? r.progress.stages[r.progress.currentIdx].label : '—';
     const lastActivityDisplay = r.summary ? fmtRelativeActivityDate(r.summary.createdAt) : '기록 없음';
     const nextManageDisplay = (p && days != null) ? fmtNextManageDate(p.ts, days) : '—';
+    // §고객 요청 Google Sheets 연동 라운드 — "요청 발생 구글 시트 연동 후 집계 예정"
+    // 자리를 실제 계산값으로 채운다(§요청 "최초 요청일/종류, 전환 완료 또는 미전환,
+    // 요청 전체 보기"). computeL2L3Conversion/등록된 sheets 활동 건수는 전부 이미 저장된
+    // customerActivities(source==='google-sheets-request')를 읽기만 할 뿐, 여기서 진행
+    // 단계를 임의로 바꾸지 않는다(§요청 "기존 진행단계 값을 임의로 덮어쓰지 말 것").
+    const conv = computeL2L3Conversion(co);
+    const firstReqDisplay = conv.firstRequestAt ? (fmtDate(conv.firstRequestAt) + (conv.firstRequestTab ? ' · ' + conv.firstRequestTab : '')) : '요청 없음';
+    const gsheetReqCount = D.activitiesForCompany(co.id).filter(a=> a.source === 'google-sheets-request').length;
     return `
       <div class="new-partner-info-row" data-new-partner-info="${esc(co.id)}">
         <span class="terminated-info-item"><b>협약 체결일</b> ${esc(mouDisplay)}</span>
@@ -6845,7 +6870,9 @@ window.SHIN2_CRM_APP_INIT = function(){
         <span class="terminated-info-item"><b>담당자</b> ${esc(assignee)}</span>
         <span class="terminated-info-item"><b>현재 진행 단계</b> ${esc(stageLabel)}</span>
         <span class="terminated-info-item"><b>최근 활동일</b> ${esc(lastActivityDisplay)}</span>
-        <span class="terminated-info-item is-muted" title="컨설팅 내역서 요청/PT 요청/현장 등록/전화·자료 요청은 추후 구글 시트 연동으로 자동 집계될 예정입니다."><b>요청 발생</b> 구글 시트 연동 후 집계 예정</span>
+        <span class="terminated-info-item"><b>최초 요청</b> ${esc(firstReqDisplay)}</span>
+        <span class="terminated-info-item ${conv.converted ? 'is-l3-done' : 'is-l3-pending'}"><b>전환 상태</b> ${conv.converted ? 'L2→L3 전환 완료' : '미전환'}</span>
+        ${gsheetReqCount ? `<button type="button" class="co-text-action" data-gsheet-req-all="${esc(co.id)}">요청 전체 보기(${gsheetReqCount})</button>` : ''}
         <span class="terminated-info-item"><b>다음 관리 예정일</b> ${esc(nextManageDisplay)}</span>
         <button type="button" class="co-text-action" data-terminated-open-card="${esc(co.id)}">고객카드 보기</button>
       </div>`;
@@ -6956,6 +6983,294 @@ window.SHIN2_CRM_APP_INIT = function(){
     cloudBootErrorMessage = '고객정보를 불러오지 못했습니다.';
     if(!D.loadCompanies().length) renderList();
   }, CLOUD_BOOT_TIMEOUT_MS);
+
+  /* ==========================================================================
+     §고객 요청 Google Sheets 연동 라운드 — 지도·시공실적·시공 아파트와는 완전히 별개다
+     (이 블록은 그 화면·데이터를 전혀 참조하지 않는다, §요청 "지도 관련 데이터·화면·함수는
+     절대 수정하지 않는다"). 목적은 딱 둘: ①고객 최신 요청 기록을 기존 customerActivities에
+     추가 ②신규 협약사 90일 L2→L3 전환율 계산.
+
+     읽기 전용 접근 방식: 이 저장소는 서버가 없는 정적 GitHub Pages라(§조사, 이미 보고함)
+     API 키 없이 시트를 읽으려면 gviz(Google Visualization API) 쿼리 엔드포인트를 JSONP
+     (<script> 태그, responseHandler 콜백)로 불러야 한다 — 이건 Google이 공식 문서화한
+     교차출처 소비 방법이고(개발자 도구 네트워크 탭에도 그대로 보이는 평범한 GET), 쓰기
+     기능 자체가 아예 없다(스크립트 태그로는 읽기만 가능 — §요청 "절대 쓰거나 수정하지
+     않는다"가 구조적으로 보장됨). 시트 공유 설정(링크 공개)은 사용자가 직접 했고, 이
+     코드는 공유 설정을 전혀 건드리지 않는다(§요청).
+
+     데이터 계층 함수(findSheetRequestActivityByDedupKey/addSheetRequestActivity/
+     markSheetRequestActivityChanged/addSheetReqAlias/removeSheetReqAlias/
+     findCompanyBySheetReqAlias)는 이전 라운드에서 이미 만들어져 있던 것을 그대로
+     재사용한다(§요청 6 "새 중복 저장소를 만들지 마" — customerActivities/companies
+     배열에 필드만 추가하는 기존 설계 그대로) — 여기서는 그 위에 실제 수집·매칭·연동
+     오케스트레이션만 새로 만든다.
+     ========================================================================== */
+  const GSHEET_ID = '1gRPRcxpWD-svZq7KfnS5FAugAtQNPq24J5Jml9SSE-s';
+  // §요청 — 딱 이 5개 탭만. 나머지(여정_최종/업체가입현황/시트6/공법설명회/컨설팅요청/
+  // 발행이력 등)는 중복 방지를 위해 절대 읽지 않는다 — 이 배열에 없으면 코드가 아예
+  // fetch하지 않으므로(아래 for 루프가 이 배열만 순회) 구조적으로 보장된다.
+  const GSHEET_TABS = [
+    { tab:'기술자문문의',     companyCol:'협력사명', dateCol:'접수일자', idCol:'문의ID(시스템)' },
+    { tab:'컨설팅요청_통합',  companyCol:'업체',     dateCol:'등록일자', idCol:'문의ID(시스템)' },
+    { tab:'샘플카달로그요청', companyCol:'업체',     dateCol:'접수일시', idCol:'문의ID' }, // §요청: "카달로그" 철자 그대로
+    { tab:'공법설명회이력',   companyCol:'시공사',   dateCol:'등록일',   idCol:'문의ID(시스템)' }, // §요청: 반드시 등록일(요청일 아님)
+    { tab:'기타문의답변현황', companyCol:'업체명',   dateCol:'등록일',   idCol:'문서ID(시스템)' }
+  ];
+  // §요청 "전화번호, 이메일, 담당자 이름은 가져오거나 저장하지 말 것" — 업체/발생일/ID
+  // 컬럼을 뺀 나머지 중에서도 이 패턴에 걸리는 헤더는 내용 요약(coreContent)에서 제외한다.
+  const GSHEET_EXCLUDED_HEADER_RE = /전화|휴대폰|휴대전화|연락처|이메일|e-?mail|담당자/i;
+
+  function gsheetCellToText(cell){
+    if(!cell) return '';
+    if(cell.v == null && cell.f == null) return '';
+    const v = (cell.f != null && cell.f !== '') ? cell.f : cell.v;
+    return String(v == null ? '' : v).trim();
+  }
+  // gviz JSON의 날짜 셀은 v가 "Date(2026,0,15)" 형태(월은 0부터) 문자열로 온다 — 그대로
+  // 파싱하고, 텍스트로 저장된 날짜 컬럼(v가 이미 "2026-01-15" 같은 일반 문자열인 경우)도
+  // 대비해 일반 날짜 패턴도 함께 받아들인다. 못 읽으면 null(§요청 "확인 필요"로 보낸다).
+  function parseGsheetDateRaw(raw){
+    if(!raw) return null;
+    const s = String(raw).trim();
+    const m1 = /^Date\((\d+),(\d+),(\d+)/.exec(s);
+    if(m1) return new Date(parseInt(m1[1],10), parseInt(m1[2],10), parseInt(m1[3],10)).getTime();
+    const m2 = /(\d{4})[.\-\/년]\s*(\d{1,2})[.\-\/월]\s*(\d{1,2})/.exec(s);
+    if(m2) return new Date(parseInt(m2[1],10), parseInt(m2[2],10)-1, parseInt(m2[3],10)).getTime();
+    return null;
+  }
+  function parseGsheetDateCell(cell){
+    if(!cell) return null;
+    return parseGsheetDateRaw(cell.v) != null ? parseGsheetDateRaw(cell.v) : parseGsheetDateRaw(cell.f);
+  }
+  // gviz 쿼리 결과를 JSONP(<script> 태그)로 받는다 — API 키 없이, 쓰기 기능 없이, 읽기
+  // 전용 GET 하나로 끝난다. 콜백 이름은 매 호출 유일하게 만들어 동시에 여러 탭을 불러도
+  // 서로 덮어쓰지 않게 하고, 다 쓰면 콜백/스크립트 태그를 정리한다.
+  let gsheetJsonpSeq = 0;
+  function fetchGSheetTabJSONP(tabName, timeoutMs){
+    return new Promise((resolve, reject)=>{
+      const cbName = '__gsheetCb' + (++gsheetJsonpSeq) + '_' + Date.now();
+      const url = 'https://docs.google.com/spreadsheets/d/' + GSHEET_ID + '/gviz/tq?sheet='
+        + encodeURIComponent(tabName) + '&tqx=out:json;responseHandler:' + cbName;
+      let done = false;
+      const script = document.createElement('script');
+      function cleanup(){ clearTimeout(timer); try{ delete window[cbName]; }catch(e){ window[cbName] = undefined; } if(script.parentNode) script.parentNode.removeChild(script); }
+      const timer = setTimeout(()=>{ if(done) return; done = true; cleanup(); reject(new Error('TIMEOUT')); }, timeoutMs || 12000);
+      window[cbName] = function(payload){
+        if(done) return; done = true; cleanup();
+        if(!payload || payload.status === 'error') { reject(new Error('SHEET_ERROR')); return; }
+        resolve(payload.table || null);
+      };
+      script.onerror = ()=>{ if(done) return; done = true; cleanup(); reject(new Error('SCRIPT_LOAD_FAILED')); };
+      script.src = url;
+      document.head.appendChild(script);
+    });
+  }
+  function gsheetRowToObj(cols, row){
+    const obj = {};
+    (row.c || []).forEach((cell, i)=>{
+      const label = (cols[i] && (cols[i].label || cols[i].id)) || ('col' + i);
+      obj[label] = gsheetCellToText(cell);
+    });
+    return obj;
+  }
+  // §신규 협약사 90일 전환 계산 — resolveEffectiveMouDate/getSeoulTodayDateOnly는 기존
+  // "신규 협약사" 탭 판정 로직(아래에 이미 정의됨, 같은 스코프라 호출 순서 문제 없음)을
+  // 그대로 재사용한다 — 새 날짜 계산을 만들지 않는다.
+  function computeL2L3Conversion(co){
+    const mou = resolveEffectiveMouDate(co);
+    if(!mou) return { hasMouDate:false, converted:false, firstRequestAt:null, firstRequestTab:null };
+    const acts = D.activitiesForCompany(co.id).filter(a=> a.source === 'google-sheets-request' && a.occurredAt);
+    let firstOverall = null, firstConverting = null;
+    acts.forEach(a=>{
+      const occ = new Date(a.occurredAt).getTime();
+      if(!firstOverall || occ < new Date(firstOverall.occurredAt).getTime()) firstOverall = a;
+      const days = Math.round((occ - mou.ts) / 86400000);
+      if(days < 0 || days > 89) return; // §요청: 협약 전/90일 이상은 전환 계산 제외(최근 기록엔 남음)
+      if(!firstConverting || occ < new Date(firstConverting.occurredAt).getTime()) firstConverting = a;
+    });
+    return {
+      hasMouDate: true, converted: !!firstConverting,
+      firstRequestAt: firstOverall ? firstOverall.occurredAt : null, // 참고용(협약 전후 무관 전체 최초 요청)
+      firstRequestTab: firstOverall ? firstOverall.sourceTab : null,
+      convertingRequestAt: firstConverting ? firstConverting.occurredAt : null
+    };
+  }
+  // §신규 협약사 요약 — 요청하신 "현재 신규 협약사 수/L2→L3 전환 업체 수/전환율"을 한
+  // 번에 계산한다. isNewPartnerCompany(아래 정의, 이미 삭제·종료 업체를 뺀 판정)를 그대로
+  // 재사용 — 새 모집단 판정을 만들지 않는다.
+  function computeNewPartnerConversionSummary(){
+    const pool = D.loadActiveCompanies().filter(isNewPartnerCompany);
+    let convertedCount = 0;
+    const rows = pool.map(co=>{
+      const conv = computeL2L3Conversion(co);
+      if(conv.converted) convertedCount++;
+      return { co, conv };
+    });
+    const rate = pool.length ? Math.round((convertedCount / pool.length) * 1000) / 10 : 0;
+    return { total: pool.length, converted: convertedCount, rate, rows };
+  }
+
+  let gsheetImportState = { ran:false, running:false, lastError:null, reviewItems:[] };
+  // 확인 필요 항목에서 사용자가 기존 업체를 직접 고르면: 별칭을 저장하고(§요청, 재사용
+  // 가능한 연결), 그 업체명으로 대기 중이던 확인 필요 행들을 즉시 다시 반영 시도한다 —
+  // 새로고침을 기다리지 않아도 된다(§요청 "이후 같은 시트 업체명은 같은 고객에게 연결").
+  async function resolveGsheetReviewCompany(rawCompanyName, companyId){
+    const normName = D.normCompanyName(rawCompanyName);
+    D.addSheetReqAlias(companyId, normName);
+    const pending = gsheetImportState.reviewItems.filter(x=> x.dedupKey && D.normCompanyName(x.rawCompanyName) === normName);
+    let addedCount = 0;
+    pending.forEach(item=>{
+      if(D.findSheetRequestActivityByDedupKey(item.dedupKey)) return; // 이미 다른 경로로 반영됨
+      D.addSheetRequestActivity({
+        companyId, activityText: item.displayText, originalText: item.displayText,
+        category: item.tab, _dedupKey: item.dedupKey, sourceTab: item.tab,
+        sourceUniqueId: item.uniqueId, occurredAt: new Date(item.occurredTs).toISOString()
+      });
+      addedCount++;
+    });
+    const results = [confirmCloudSave('companies')];
+    if(addedCount) results.push(confirmCloudSave('customerActivities'));
+    const all = await Promise.all(results);
+    const failed = all.find(r=> !r.ok);
+    if(failed) return { ok:false, err: failed.err };
+    gsheetImportState.reviewItems = gsheetImportState.reviewItems.filter(x=> !(x.dedupKey && D.normCompanyName(x.rawCompanyName) === normName));
+    renderList();
+    return { ok:true, addedCount };
+  }
+  // §요청 "접속할 때마다 한 번만 자동 확인 / 실행 중 중복 호출 방지 / 수동 동기화·반복
+  // 확인은 만들지 않는다 — 새로고침하면 다시 확인" — ran/running 두 플래그로 이 함수는
+  // 페이지 로드당 정확히 한 번만 실제로 동작한다(여러 트리거 경로가 동시에 불러도 안전).
+  async function runGoogleSheetsImportOnce(){
+    if(gsheetImportState.ran || gsheetImportState.running) return;
+    gsheetImportState.running = true;
+    const review = [];
+    let addedCount = 0;
+    const fetchErrorTabs = [];
+    try{
+      const companies = D.loadCompanies(); // §매칭은 삭제 여부와 무관 — 소프트 삭제된 업체도 자기 요청 기록은 유지(§요청 12 데이터 보존)
+      const nameIndex = new Map(); // normName -> Set(companyId) — 정확히 1건일 때만 자동 연결(§요청)
+      function indexName(co, raw){
+        const n = D.normCompanyName(raw);
+        if(!n) return;
+        if(!nameIndex.has(n)) nameIndex.set(n, new Set());
+        nameIndex.get(n).add(co.id);
+      }
+      companies.forEach(co=>{
+        indexName(co, co.name);
+        (co.formerNames || []).forEach(fn=> indexName(co, fn));
+      });
+      const todayTs = getSeoulTodayDateOnly();
+
+      for(const cfg of GSHEET_TABS){
+        let table;
+        try{ table = await fetchGSheetTabJSONP(cfg.tab); }
+        catch(err){ fetchErrorTabs.push(cfg.tab); continue; } // §요청: 실패해도 나머지 탭/기존 데이터는 그대로
+        if(!table || !Array.isArray(table.rows) || !Array.isArray(table.cols)) continue;
+        const cols = table.cols;
+        const companyColIdx = cols.findIndex(c=> (c.label || c.id) === cfg.companyCol);
+        const dateColIdx = cols.findIndex(c=> (c.label || c.id) === cfg.dateCol);
+        const idColIdx = cols.findIndex(c=> (c.label || c.id) === cfg.idCol);
+
+        table.rows.forEach(row=>{
+          if(!row || !row.c) return;
+          const obj = gsheetRowToObj(cols, row);
+          const rawCompanyName = companyColIdx >= 0 ? gsheetCellToText(row.c[companyColIdx]) : '';
+          const uniqueId = idColIdx >= 0 ? gsheetCellToText(row.c[idColIdx]) : '';
+          const occurredTs = dateColIdx >= 0 ? parseGsheetDateCell(row.c[dateColIdx]) : null;
+
+          // §요청 "고유번호가 없는 행은 자동 반영하지 말고 확인 필요로"
+          if(!uniqueId){ review.push({ tab:cfg.tab, reason:'고유번호 없음', rawCompanyName, raw:obj }); return; }
+          const dedupKey = cfg.tab + '::' + uniqueId; // §요청: 출처 탭명 + 고유번호
+          if(D.findSheetRequestActivityByDedupKey(dedupKey)) return; // §요청: 중복 재반영 금지 — 이미 반영됨
+
+          if(!rawCompanyName){ review.push({ tab:cfg.tab, reason:'업체명 없음', rawCompanyName:'', raw:obj, dedupKey }); return; }
+          if(occurredTs == null){ review.push({ tab:cfg.tab, reason:'발생일 해석 불가', rawCompanyName, raw:obj, dedupKey }); return; }
+          if(occurredTs > todayTs) return; // §요청: 미래 날짜는 이번엔 건너뜀(다음 실행에서 다시 평가, 확인 필요 아님)
+
+          let companyId = null;
+          const aliasHit = D.findCompanyBySheetReqAlias(D.normCompanyName(rawCompanyName), companies);
+          if(aliasHit){
+            companyId = aliasHit.id;
+          } else {
+            const hits = nameIndex.get(D.normCompanyName(rawCompanyName));
+            if(hits && hits.size === 1){ companyId = Array.from(hits)[0]; }
+            else {
+              // §요청: 미발견 또는 복수 후보는 자동 연결·생성 금지 — 확인 필요로만
+              review.push({ tab:cfg.tab, reason: (hits && hits.size > 1) ? '복수 후보' : '업체 못 찾음', rawCompanyName, raw:obj, dedupKey, uniqueId, occurredTs, displayText:null });
+              return;
+            }
+          }
+
+          // §요청 "업체명/업체 주소/현장명/발생일/요청 종류/문의ID와 필요한 상태 정보만" —
+          // 업체/날짜/ID 컬럼과 연락처류 컬럼을 뺀 나머지만 요약 텍스트로 남긴다.
+          const contentParts = [];
+          cols.forEach((c,i)=>{
+            const label = c.label || c.id;
+            if(!label || i === companyColIdx || i === dateColIdx || i === idColIdx) return;
+            if(GSHEET_EXCLUDED_HEADER_RE.test(label)) return;
+            const v = gsheetCellToText(row.c[i]);
+            if(v) contentParts.push(label + ': ' + v);
+          });
+          const displayText = `[${cfg.tab}] ${contentParts.join(' · ') || '(내용 없음)'}`;
+
+          D.addSheetRequestActivity({
+            companyId, activityText: displayText, originalText: displayText, category: cfg.tab,
+            _dedupKey: dedupKey, sourceTab: cfg.tab, sourceUniqueId: uniqueId,
+            occurredAt: new Date(occurredTs).toISOString()
+          });
+          addedCount++;
+        });
+      }
+
+      // review 항목에도 나중에 즉시-재반영(resolveGsheetReviewCompany)에 쓸 수 있게
+      // displayText를 채워둔다(고유번호/발생일이 정상인 "업체 못 찾음/복수 후보"만 해당,
+      // 아래 map에서 raw로부터 다시 구성한다).
+      gsheetImportState.reviewItems = review.map(item=>{
+        if(item.displayText !== null && item.displayText !== undefined) return item;
+        if(!item.raw) return item;
+        const cfg = GSHEET_TABS.find(c=> c.tab === item.tab);
+        if(!cfg) return item;
+        const parts = Object.keys(item.raw)
+          .filter(label=> label !== cfg.companyCol && label !== cfg.dateCol && label !== cfg.idCol && !GSHEET_EXCLUDED_HEADER_RE.test(label) && item.raw[label])
+          .map(label=> label + ': ' + item.raw[label]);
+        item.displayText = `[${item.tab}] ${parts.join(' · ') || '(내용 없음)'}`;
+        return item;
+      });
+      gsheetImportState.lastError = fetchErrorTabs.length ? ('일부 탭을 확인하지 못했습니다(' + fetchErrorTabs.join(', ') + ') — 기존 데이터는 그대로입니다.') : null;
+
+      if(addedCount > 0){
+        const r = await confirmCloudSave('customerActivities');
+        if(!r.ok){
+          gsheetImportState.lastError = '가져온 요청을 저장하지 못했습니다 — 기존 데이터는 그대로입니다. 새로고침하면 다시 시도합니다.';
+        }
+      }
+    }catch(err){
+      gsheetImportState.lastError = 'Google Sheets 확인 중 오류가 발생했습니다 — 기존 고객정보는 그대로입니다.';
+      console.warn('[CRM/Sheets] 가져오기 실패', err);
+    }finally{
+      gsheetImportState.running = false;
+      gsheetImportState.ran = true;
+      updateGsheetReviewCountBadge();
+      if(filterKey === 'newPartner') renderList();
+    }
+  }
+  // §요청 "로그인·고객정보 로딩 완료 후 접속마다 1회" — 두 경로 모두 같은 idempotent
+  // 함수를 부르므로 어느 쪽이 먼저 오든, 둘 다 오든 정확히 한 번만 실행된다(§요청 "중복
+  // 호출 방지"). ①companies 클라우드 데이터가 실제로 도착한 시점(가장 정확한 신호)
+  // ②그 이벤트가 안 올 수도 있는 경우(신규 계정이라 클라우드에 업체가 0건이면 변경이
+  // 없어 이벤트 자체가 안 뜸)를 대비한 안전망 — cloudBootState가 준비된 뒤 잠깐 기다렸다가
+  // 한 번 더 시도.
+  window.addEventListener('shin2-crm-cloud-update', (e)=>{
+    if(e && e.detail && e.detail.key === 'companies') runGoogleSheetsImportOnce();
+  });
+  (function scheduleGsheetImportFallback(){
+    const check = ()=>{
+      if(cloudBootState === 'ready'){ setTimeout(()=> runGoogleSheetsImportOnce(), 1500); return; }
+      if(cloudBootState === 'loading') setTimeout(check, 500);
+    };
+    check();
+  })();
+
   // §첫 화면 최종 수정 라운드: 필터/정렬/페이지 상태. 서버가 없는 순수 클라이언트 화면이라
   // 세 값 모두 렌더 시점에 메모리에서만 들고 있고, 별도로 저장하지 않는다(새로고침하면
   // 기본값 "전체/POUR 실적순/1페이지"로 돌아간다 — 스펙 §3 기본 정렬 유지).
@@ -7505,15 +7820,18 @@ window.SHIN2_CRM_APP_INIT = function(){
       })()));
     applySort(rows, contribIndex);
 
-    // §신규 협약사 탭 라운드 → §요청 발생 UI 보류 라운드(신규) — 탭 상단 집계(§요청 5).
-    // 검색창 필터와 무관하게 "탭 전체" 기준(filterCounts.newPartner, 위에서 이미 계산됨)
-    // 으로 보여준다. 요청 발생/전환율은 사용자 확정에 따라 별도 구글 시트 연동 이후에만
-    // 집계할 예정이라 임의 계산하지 않고(§요청 3), 새 체크박스·입력칸도 만들지 않으며
-    // (§요청 1), 간결한 안내 문구 한 줄만 보여준다(§요청 4).
+    // §신규 협약사 탭 라운드 → §고객 요청 Google Sheets 연동 라운드 — 탭 상단 집계(§요청
+    // 5/13). filterCounts.newPartner(검색과 무관한 탭 전체 기준)는 그대로 두고, "요청
+    // 발생 · 전환율" 자리를 실제 computeNewPartnerConversionSummary() 결과로 채운다 —
+    // 이 값은 90일 모집단(isNewPartnerCompany, 삭제·종료 제외)과 completely 같은 기준.
+    const gsheetSummary = computeNewPartnerConversionSummary();
     const newPartnerSummaryHtml = filterKey === 'newPartner' ? `
       <div class="new-partner-summary-bar">
         <div class="new-partner-summary-item"><span class="new-partner-summary-value">${esc(filterCounts.newPartner || 0)}</span><span class="new-partner-summary-label">신규 협약사 전체</span></div>
-        <div class="new-partner-summary-item is-muted new-partner-summary-notice"><span class="new-partner-summary-value">구글 시트 연동 후 집계 예정</span><span class="new-partner-summary-label">요청 발생 · 전환율</span></div>
+        <div class="new-partner-summary-item"><span class="new-partner-summary-value">${esc(gsheetSummary.converted)}</span><span class="new-partner-summary-label">L2→L3 전환 업체</span></div>
+        <div class="new-partner-summary-item"><span class="new-partner-summary-value">${esc(gsheetSummary.rate)}%</span><span class="new-partner-summary-label">전환율</span></div>
+        ${gsheetImportState.reviewItems.length ? `<button type="button" class="new-partner-summary-item is-warn" id="newPartnerGsheetReviewLink"><span class="new-partner-summary-value">${esc(gsheetImportState.reviewItems.length)}</span><span class="new-partner-summary-label">Google Sheets 확인 필요</span></button>` : ''}
+        ${gsheetImportState.lastError ? `<div class="new-partner-summary-item is-muted new-partner-summary-notice">${esc(gsheetImportState.lastError)}</div>` : ''}
       </div>
     ` : '';
 
@@ -7536,6 +7854,8 @@ window.SHIN2_CRM_APP_INIT = function(){
       listEl.innerHTML = newPartnerSummaryHtml + emptyNoteHtml;
       const retryBtn = document.getElementById('cloudBootRetryBtn');
       if(retryBtn) retryBtn.addEventListener('click', ()=> location.reload());
+      const gsheetReviewLink = document.getElementById('newPartnerGsheetReviewLink');
+      if(gsheetReviewLink) gsheetReviewLink.addEventListener('click', openGsheetReviewModal);
       renderPagination(0);
       return;
     }
@@ -7865,6 +8185,15 @@ window.SHIN2_CRM_APP_INIT = function(){
         openCard(btn.getAttribute('data-terminated-open-card'));
       });
     });
+    // §고객 요청 Google Sheets 연동 라운드(신규) — "신규 협약사" 탭의 [요청 전체 보기].
+    listEl.querySelectorAll('[data-gsheet-req-all]').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        openGsheetReqListModal(btn.getAttribute('data-gsheet-req-all'));
+      });
+    });
+    const gsheetReviewLinkMain = document.getElementById('newPartnerGsheetReviewLink');
+    if(gsheetReviewLinkMain) gsheetReviewLinkMain.addEventListener('click', openGsheetReviewModal);
     listEl.querySelectorAll('[data-terminated-restore]').forEach(btn=>{
       btn.addEventListener('click', (e)=>{
         e.stopPropagation();
@@ -15637,6 +15966,129 @@ window.SHIN2_CRM_APP_INIT = function(){
      일괄 덮어쓰기·삭제·병합은 금지").
      ========================================================================== */
   let localCloudDiagState = null;
+  /* ==========================================================================
+     §고객 요청 Google Sheets 연동 라운드(신규) — "요청 전체 보기" 팝업. 이미 저장된
+     customerActivities(source==='google-sheets-request')를 읽기만 한다 — 새 계산·저장
+     없음.
+     ========================================================================== */
+  function closeGsheetReqListModal(){
+    const root = document.getElementById('gsheetReqListModalRoot');
+    if(root) root.innerHTML = '';
+  }
+  function openGsheetReqListModal(companyId){
+    const co = D.findCompany(companyId);
+    if(!co) return;
+    const root = document.getElementById('gsheetReqListModalRoot');
+    if(!root) return;
+    const acts = D.activitiesForCompany(companyId).filter(a=> a.source === 'google-sheets-request');
+    root.innerHTML = `
+      <div class="pi-overlay" id="gsheetReqListOverlay">
+        <div class="pi-panel" style="max-width:560px;max-height:80vh;" role="dialog" aria-modal="true" aria-label="${esc(co.name)} 요청 전체 보기">
+          <div class="pi-head">
+            <div class="pi-title">${esc(co.name)} — 요청 전체 보기(${acts.length})</div>
+            <button type="button" class="chart-close-btn" id="gsheetReqListCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body" style="overflow-y:auto;">
+            ${acts.length ? acts.map(a=> `
+              <div class="local-cloud-diag-row" style="align-items:flex-start;flex-direction:column;gap:2px;">
+                <div><b>${esc(fmtDate(a.occurredAt || a.createdAt))}</b> · ${esc(a.sourceTab || '')}${a.sourceUniqueId ? ' · ' + esc(a.sourceUniqueId) : ''}</div>
+                <div>${esc(a.activityText || a.originalText || '')}</div>
+              </div>
+            `).join('') : `<div class="local-cloud-diag-empty">요청 기록이 없습니다.</div>`}
+          </div>
+          <div class="pi-actions">
+            <button type="button" class="co-text-action" id="gsheetReqListCloseBtn2">닫기</button>
+          </div>
+        </div>
+      </div>`;
+    const close = ()=> closeGsheetReqListModal();
+    document.getElementById('gsheetReqListCloseBtn').addEventListener('click', close);
+    document.getElementById('gsheetReqListCloseBtn2').addEventListener('click', close);
+    bindSafeBackdropClose(document.getElementById('gsheetReqListOverlay'), close);
+  }
+
+  /* ==========================================================================
+     §고객 요청 Google Sheets 연동 라운드(신규) — "확인 필요" 목록. runGoogleSheetsImportOnce
+     가 매 접속마다 채워 두는 gsheetImportState.reviewItems를 그대로 보여줄 뿐 — 이 화면
+     자체는 아무것도 자동으로 연결·생성하지 않는다(§요청 "자동 연결·자동 생성 금지").
+     업체를 직접 골라 [이 업체로 연결]을 눌러야만 resolveGsheetReviewCompany가 실행된다.
+     ========================================================================== */
+  function closeGsheetReviewModal(){
+    const root = document.getElementById('gsheetReviewModalRoot');
+    if(root) root.innerHTML = '';
+  }
+  function openGsheetReviewModal(){
+    renderGsheetReviewModal();
+  }
+  function updateGsheetReviewCountBadge(){
+    const el = document.getElementById('crmGsheetReviewCount');
+    if(!el) return;
+    const n = gsheetImportState.reviewItems.length;
+    el.textContent = n ? ('(' + n + ')') : '';
+  }
+  function renderGsheetReviewModal(){
+    const root = document.getElementById('gsheetReviewModalRoot');
+    if(!root) return;
+    const items = gsheetImportState.reviewItems || [];
+    // 같은 업체명(정규화 기준)으로 여러 건이 있을 수 있어 업체명별로 묶어 보여준다.
+    const groups = new Map();
+    items.forEach(it=>{
+      const key = it.rawCompanyName ? D.normCompanyName(it.rawCompanyName) : ('__nokey__' + Math.random());
+      if(!groups.has(key)) groups.set(key, { rawCompanyName: it.rawCompanyName, items: [] });
+      groups.get(key).items.push(it);
+    });
+    const companies = D.loadCompanies();
+    const optionsHtml = companies.slice().sort((a,b)=> (a.name||'').localeCompare(b.name||'', 'ko')).map(c=> `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+    const body = !items.length ? `<div class="local-cloud-diag-empty">확인이 필요한 항목이 없습니다.</div>` :
+      Array.from(groups.values()).map((g, gi)=> `
+        <div class="local-cloud-diag-section">
+          <div class="local-cloud-diag-title">${esc(g.rawCompanyName || '(업체명 없음)')} — ${g.items.length}건</div>
+          ${g.items.map(it=> `<div class="local-cloud-diag-row">${esc(it.tab)} · ${esc(it.reason)}${it.uniqueId ? ' · ' + esc(it.uniqueId) : ''}</div>`).join('')}
+          ${g.rawCompanyName ? `
+            <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+              <select id="gsheetReviewSelect_${gi}" style="flex:1;min-width:0;">
+                <option value="">기존 업체 선택…</option>
+                ${optionsHtml}
+              </select>
+              <button type="button" class="co-text-action primary" data-gsheet-review-link="${esc(gi)}" data-gsheet-review-name="${esc(g.rawCompanyName)}">이 업체로 연결</button>
+              <span class="cdash-cloud-save-status" id="gsheetReviewStatus_${gi}"></span>
+            </div>` : `<div class="local-cloud-diag-note">업체명이 비어 있어 연결할 수 없습니다 — 시트 원본을 확인해주세요.</div>`}
+        </div>
+      `).join('');
+    root.innerHTML = `
+      <div class="pi-overlay" id="gsheetReviewOverlay">
+        <div class="pi-panel" style="max-width:640px;max-height:82vh;" role="dialog" aria-modal="true" aria-label="Google Sheets 확인 필요">
+          <div class="pi-head">
+            <div class="pi-title">Google Sheets 확인 필요(${items.length})</div>
+            <button type="button" class="chart-close-btn" id="gsheetReviewCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-note" style="padding:0 16px;">이름이 비슷하다는 이유로 자동으로 연결하지 않습니다 — 기존 업체를 직접 골라야만 연결됩니다.${gsheetImportState.lastError ? `<div class="delete-co-modal-err" style="margin-top:6px;">${esc(gsheetImportState.lastError)}</div>` : ''}</div>
+          <div class="pi-body" style="overflow-y:auto;">${body}</div>
+          <div class="pi-actions">
+            <button type="button" class="co-text-action" id="gsheetReviewCloseBtn2">닫기</button>
+          </div>
+        </div>
+      </div>`;
+    const close = ()=> closeGsheetReviewModal();
+    document.getElementById('gsheetReviewCloseBtn').addEventListener('click', close);
+    document.getElementById('gsheetReviewCloseBtn2').addEventListener('click', close);
+    bindSafeBackdropClose(document.getElementById('gsheetReviewOverlay'), close);
+    root.querySelectorAll('[data-gsheet-review-link]').forEach(btn=> btn.addEventListener('click', async ()=>{
+      const gi = btn.getAttribute('data-gsheet-review-link');
+      const rawName = btn.getAttribute('data-gsheet-review-name');
+      const sel = document.getElementById('gsheetReviewSelect_' + gi);
+      const statusEl = document.getElementById('gsheetReviewStatus_' + gi);
+      const companyId = sel ? sel.value : '';
+      if(!companyId){ showCloudSaveStatus(statusEl, false, { message:'업체를 먼저 선택해주세요.' }); return; }
+      btn.disabled = true;
+      const r = await resolveGsheetReviewCompany(rawName, companyId);
+      btn.disabled = false;
+      if(!r.ok){ showCloudSaveStatus(statusEl, false, r.err); return; }
+      updateGsheetReviewCountBadge();
+      renderGsheetReviewModal();
+    }));
+  }
+
   function closeLocalCloudDiagModal(){
     localCloudDiagState = null;
     const root = document.getElementById('localCloudDiagModalRoot');
@@ -22031,6 +22483,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     else if(window.SHIN2_CRM_SHOW_GATE) window.SHIN2_CRM_SHOW_GATE(); // Firebase 모듈이 아직 준비 안 됐으면 화면만이라도 되돌린다
   });
   document.getElementById('crmLocalCloudDiagBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openLocalCloudDiagModal(); });
+  document.getElementById('crmGsheetReviewBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openGsheetReviewModal(); });
   function closeUpdateMenu(){ document.getElementById('crmUpdateMenu').classList.remove('is-open'); }
   document.getElementById('crmDataUpdateBtn').addEventListener('click', (e)=>{
     e.stopPropagation();
