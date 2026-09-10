@@ -242,7 +242,11 @@
   .terminated-info-item.is-muted{ color:var(--text-faint); font-style:italic; }
   /* §신규 협약사 탭 라운드(신규) — .terminated-info-row와 완전히 같은 레이아웃(행 아래
      보조 정보 줄), .co-row 그리드 컬럼 구조는 안 건드림. */
-  .new-partner-info-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; padding:6px 14px 10px; margin-top:-2px; background:#FAFBFC; border-bottom:1px solid #e8eef5; font-size:11.5px; color:var(--text-muted); }
+  .new-partner-info-row{ display:flex; flex-direction:column; gap:8px; padding:10px 14px 12px; margin-top:-2px; background:#FAFBFC; border-bottom:1px solid #e8eef5; font-size:11.5px; color:var(--text-muted); }
+  /* §신규 협약사 상세정보 정리 라운드 — 항목이 줄어서 한 줄에 다 넣을 수 있지만,
+     "너무 붙어 보이지 않게 2줄 이내로" 요청대로 두 줄로 나눠 각 줄 안에서만 넉넉한
+     간격을 준다. */
+  .np2-detail-line{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 18px; }
   /* 색상만으로 구분하지 않고 글자 뱃지도 함께 표시(§요청 3). */
   .new-partner-band-badge{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; }
   .new-partner-band-badge.band-early{ background:#E6F4EA; color:#1E7B34; }
@@ -270,6 +274,10 @@
      이 탭 전용 .np2-* 클래스만 새로 추가한다. */
   .np2-hero{ display:flex; flex-wrap:wrap; align-items:center; gap:22px; padding:18px 20px; background:#fff; border:1px solid var(--line); border-radius:12px; margin-bottom:10px; }
   .np2-hero-rate-block{ display:flex; flex-direction:column; gap:2px; }
+  /* §L2→L3 전환율 강조 라운드(신규) — "이 탭에서 가장 중요한 숫자"라는 요청대로, 숫자
+     바로 위에 그 숫자가 정확히 무엇인지(L2 → L3 전환율) 이름표를 붙인다. 글자 크기는
+     여전히 np2-hero-rate(38px)가 이 화면에서 가장 크다 — 라벨은 작고 흐리게만. */
+  .np2-hero-rate-label{ font-size:12.5px; font-weight:700; color:var(--text-muted); letter-spacing:.1px; }
   .np2-hero-rate{ font-size:38px; font-weight:800; color:var(--navy); line-height:1.1; }
   .np2-hero-sub{ font-size:12.5px; color:var(--text-muted); }
   .np2-hero-stats{ display:flex; flex-wrap:wrap; gap:22px; margin-left:auto; }
@@ -285,12 +293,23 @@
   .np2-funnel-step.is-final .np2-funnel-value{ color:#1D7A46; }
   .np2-funnel-arrow{ align-self:center; color:var(--text-faint); font-size:15px; flex:0 0 auto; }
   .np2-subfilters{ display:flex; flex-wrap:wrap; gap:8px; padding:0 2px 10px; }
-  .np2-table-head{ display:grid; grid-template-columns: minmax(150px,1.5fr) 130px 96px 150px 118px 88px 74px; gap:10px; padding:8px 14px; border:1px solid var(--line); border-radius:10px 10px 0 0; background:#f9fbfd; color:#4b607c; font-weight:700; font-size:11.5px; }
+  /* §관리 예정일 열 제거 라운드(신규) — 6컬럼(협력사/경과일·담당자/현재단계/다음행동/
+     관리예정일/전환가능성/상세보기, 7개였던 실제 컬럼 수)에서 "관리 예정일"을 빼고
+     "협력사" 칸 안에 업체명+요청배지+경과일·담당자를 한데 묶어 5컬럼으로 줄였다(§요청
+     5/6). 빈 자리를 억지로 채우지 않고, 남은 정보(특히 협력사 칸)가 더 넉넉하게
+     보이도록 너비를 다시 배분했다. */
+  .np2-table-head{ display:grid; grid-template-columns: minmax(230px,1.9fr) 100px 150px 100px 84px; gap:12px; padding:8px 14px; border:1px solid var(--line); border-radius:10px 10px 0 0; background:#f9fbfd; color:#4b607c; font-weight:700; font-size:11.5px; }
   .np2-list{ background:#fff; border:1px solid var(--line); border-top:0; border-radius:0 0 10px 10px; overflow:hidden; }
-  .np2-row{ display:grid; grid-template-columns: minmax(150px,1.5fr) 130px 96px 150px 118px 88px 74px; gap:10px; align-items:center; padding:9px 14px; border-bottom:1px solid #e8eef5; font-size:12.5px; cursor:pointer; background:none; border-left:0; border-right:0; border-top:0; width:100%; text-align:left; font-family:inherit; color:inherit; }
+  .np2-row{ display:grid; grid-template-columns: minmax(230px,1.9fr) 100px 150px 100px 84px; gap:12px; align-items:center; padding:10px 14px; border-bottom:1px solid #e8eef5; font-size:12.5px; cursor:pointer; background:none; border-left:0; border-right:0; border-top:0; width:100%; text-align:left; font-family:inherit; color:inherit; }
   .np2-row:hover{ background:#f7fbff; }
   .np2-row:last-child{ border-bottom:0; }
+  .np2-col-company{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .np2-col-name-line{ display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; min-width:0; }
   .np2-col-name{ font-weight:750; color:#142945; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* §업체명 옆 요청 종류 표시 라운드(신규) — 색상 여러 개를 쓰지 말고 한 가지 남색
+     계열로 통일해 달라는 요청(§요청 3) — 배지 색은 이 하나뿐이다. */
+  .np2-req-badge{ display:inline-flex; align-items:center; padding:1px 7px; border-radius:999px; font-size:11px; font-weight:650; background:#EEF2FA; color:var(--navy); white-space:nowrap; }
+  .np2-req-none{ font-size:11px; color:var(--text-faint); }
   .np2-col-elapsed{ color:var(--text-muted); font-size:12px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .np2-col-elapsed .np2-assignee{ color:var(--text-faint); }
   .np2-state-badge{ display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px; font-size:11.5px; font-weight:700; white-space:nowrap; }
@@ -299,22 +318,35 @@
   .np2-state-badge.st-requested{ background:#E6F0FD; color:#1B4FA6; }
   .np2-state-badge.st-none{ background:#F1F3F6; color:var(--text-muted); }
   .np2-col-next{ color:var(--text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .np2-col-due{ color:var(--text-muted); font-size:12px; }
-  .np2-col-due.is-urgent{ color:#B3261E; font-weight:700; }
   .np2-col-likelihood{ font-size:12px; color:var(--text-muted); }
   .np2-col-detail-btn{ font-family:inherit; font-size:11.5px; color:var(--navy); background:#fff; border:1px solid var(--line); border-radius:6px; padding:4px 8px; cursor:pointer; justify-self:end; }
   .np2-col-detail-btn:hover{ background:var(--bg); }
   .np2-field-label{ display:none; font-weight:600; color:var(--text-faint); margin-right:4px; }
   .np2-empty{ padding:26px 14px; text-align:center; color:var(--text-muted); font-size:13px; background:#fff; border:1px solid var(--line); border-radius:10px; }
+  /* §모바일 전환 흐름 겹침 수정 라운드(신규) — #crmList가 다른 탭과 공유하는
+     ".co-list{min-width:1220px!important}"(좁은 화면에서 옛 8컬럼 표를 가로 스크롤로
+     보여주려는 의도적 규칙, §전면 리디자인 라운드)를 이 탭(.np2-active가 붙어 있을
+     때만)에서는 취소한다 — 이 화면은 가로 스크롤이 아니라 세로로 쌓이게 만든 것이라
+     원래도 그 min-width가 필요 없었다. id+class 선택자라 .co-list 단독 선택자보다
+     항상 우선한다(둘 다 !important라도 특정도가 더 높은 쪽이 이긴다). */
+  #crmList.np2-active{ min-width:0 !important; }
   @media (max-width: 640px){
     .np2-hero{ flex-direction:column; align-items:flex-start; gap:12px; }
     .np2-hero-stats{ margin-left:0; width:100%; justify-content:space-between; gap:14px; }
     .np2-funnel{ flex-direction:column; gap:6px; padding:0 14px 14px; }
     .np2-funnel-arrow{ align-self:center; transform:rotate(90deg); }
+    /* §모바일 전환 흐름 겹침 수정(신규) — .np2-funnel을 세로 배치로 바꾸면 축이
+       바뀌어(가로->세로) 각 단계 상자에 준 인라인 flex(원래 "가로 폭"을 건수 비율로
+       나누려고 준 값, §renderNewPartnerTab funnelFlex)가 이제 "세로 높이"로 해석돼
+       버려 글자가 들어갈 공간이 거의 0으로 찌부러졌다(실제 화면 확인으로 발견 — 값은
+       있는데 안 보이던 원인). 세로 배치에서는 굳이 비율을 줄 필요가 없으니 인라인
+       스타일을 무시하고 셋 다 같은 높이로 고정한다. */
+    .np2-funnel-step{ flex:none !important; width:100%; padding:10px 12px; }
     .np2-table-head{ display:none; }
     .np2-list{ background:none; border:0; border-radius:0; }
     .np2-row{ grid-template-columns:none; display:flex; flex-direction:column; align-items:flex-start; gap:5px; padding:13px 14px; background:#fff; border:1px solid var(--line); border-radius:10px; margin-bottom:8px; }
     .np2-row:hover{ background:#fff; }
+    .np2-col-company{ width:100%; }
     .np2-col-name{ font-size:14.5px; white-space:normal; }
     .np2-col-detail-btn{ justify-self:auto; align-self:flex-end; }
     .np2-field-label{ display:inline; }
@@ -6988,6 +7020,13 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 예정이라(§요청 1~4), 지금 단계에서는 체크박스·입력칸·저장 필드를 새로 만들지 않고,
   // requestedMaterials/활동기록을 억지로 요청 데이터로 변환하지도 않으며, 여부·전환율을
   // 임의 계산하지도 않는다 — "구글 시트 연동 후 집계 예정" 문구만 보여준다.
+  // §신규 협약사 상세정보 정리 라운드(신규) — 이 함수는 이제 신규 협약사 탭의 "상세
+  // 보기"에서만 쓰인다(§신규 협약사 탭 리디자인 라운드 이후 다른 호출부 없음, §확인).
+  // 사용자 요청대로 "현재 진행 단계"/"전환 상태"/"다음 관리 예정일" 세 항목을 화면
+  // 표시에서만 뺐다 — 계산 자체(진행단계/전환판정/관리예정일)는 그대로 두고 이 함수가
+  // 그 값을 더 이상 안 꺼내 쓸 뿐이라, 데이터·다른 화면(고객카드 등)에는 전혀 영향이
+  // 없다. 두 줄로 나눠 항목 사이 간격을 넉넉히 둔다(§요청 "한 줄에 너무 많이 붙이지
+  // 말고 2줄 이내로").
   function newPartnerInfoRowHtml(co, r){
     const p = resolveEffectiveMouDate(co);
     const days = daysSinceMouSeoul(co);
@@ -6995,30 +7034,28 @@ window.SHIN2_CRM_APP_INIT = function(){
     const mouDisplay = p ? p.display : '—';
     const elapsedDisplay = days != null ? fmtNewPartnerElapsed(days) : '—';
     const assignee = co.assigneeUserId ? '사용자 ' + co.assigneeUserId : '미지정';
-    const stageLabel = (r.progress && r.progress.hasAny) ? r.progress.stages[r.progress.currentIdx].label : '—';
     const lastActivityDisplay = r.summary ? fmtRelativeActivityDate(r.summary.createdAt) : '기록 없음';
-    const nextManageDisplay = (p && days != null) ? fmtNextManageDate(p.ts, days) : '—';
-    // §고객 요청 Google Sheets 연동 라운드 — "요청 발생 구글 시트 연동 후 집계 예정"
-    // 자리를 실제 계산값으로 채운다(§요청 "최초 요청일/종류, 전환 완료 또는 미전환,
-    // 요청 전체 보기"). computeL2L3Conversion/등록된 sheets 활동 건수는 전부 이미 저장된
-    // customerActivities(source==='google-sheets-request')를 읽기만 할 뿐, 여기서 진행
-    // 단계를 임의로 바꾸지 않는다(§요청 "기존 진행단계 값을 임의로 덮어쓰지 말 것").
+    // §고객 요청 Google Sheets 연동 라운드 — computeL2L3Conversion은 "최초 요청일/종류"를
+    // 위해 그대로 재사용(전환 판정 계산 자체는 안 바꿈). §성능 요구 — r.acts(이미
+    // requestItemsIndex.activities에서 조회해 둔 값)를 그대로 필터링만 할 뿐,
+    // D.activitiesForCompany로 전체 배열을 다시 읽지 않는다.
     const conv = computeL2L3Conversion(co);
     const firstReqDisplay = conv.firstRequestAt ? (fmtDate(conv.firstRequestAt) + (conv.firstRequestTab ? ' · ' + conv.firstRequestTab : '')) : '요청 없음';
-    const gsheetReqCount = D.activitiesForCompany(co.id).filter(a=> a.source === 'google-sheets-request').length;
+    const gsheetReqCount = (r.acts || []).filter(a=> a.source === 'google-sheets-request').length;
     return `
       <div class="new-partner-info-row" data-new-partner-info="${esc(co.id)}">
-        <span class="terminated-info-item"><b>협약 체결일</b> ${esc(mouDisplay)}</span>
-        <span class="terminated-info-item"><b>경과일</b> ${esc(elapsedDisplay)}</span>
-        ${band ? `<span class="new-partner-band-badge band-${esc(band.key)}">${esc(band.label)}</span>` : ''}
-        <span class="terminated-info-item"><b>담당자</b> ${esc(assignee)}</span>
-        <span class="terminated-info-item"><b>현재 진행 단계</b> ${esc(stageLabel)}</span>
-        <span class="terminated-info-item"><b>최근 활동일</b> ${esc(lastActivityDisplay)}</span>
-        <span class="terminated-info-item"><b>최초 요청</b> ${esc(firstReqDisplay)}</span>
-        <span class="terminated-info-item ${conv.converted ? 'is-l3-done' : 'is-l3-pending'}"><b>전환 상태</b> ${conv.converted ? 'L2→L3 전환 완료' : '미전환'}</span>
-        ${gsheetReqCount ? `<button type="button" class="co-text-action" data-gsheet-req-all="${esc(co.id)}">요청 전체 보기(${gsheetReqCount})</button>` : ''}
-        <span class="terminated-info-item"><b>다음 관리 예정일</b> ${esc(nextManageDisplay)}</span>
-        <button type="button" class="co-text-action" data-terminated-open-card="${esc(co.id)}">고객카드 보기</button>
+        <div class="np2-detail-line">
+          <span class="terminated-info-item"><b>협약 체결일</b> ${esc(mouDisplay)}</span>
+          <span class="terminated-info-item"><b>경과일</b> ${esc(elapsedDisplay)}</span>
+          ${band ? `<span class="new-partner-band-badge band-${esc(band.key)}">${esc(band.label)}</span>` : ''}
+          <span class="terminated-info-item"><b>담당자</b> ${esc(assignee)}</span>
+        </div>
+        <div class="np2-detail-line">
+          <span class="terminated-info-item"><b>최근 활동일</b> ${esc(lastActivityDisplay)}</span>
+          <span class="terminated-info-item"><b>최초 요청</b> ${esc(firstReqDisplay)}</span>
+          ${gsheetReqCount ? `<button type="button" class="co-text-action" data-gsheet-req-all="${esc(co.id)}">요청 전체 보기(${gsheetReqCount})</button>` : ''}
+          <button type="button" class="co-text-action" data-terminated-open-card="${esc(co.id)}">고객카드 보기</button>
+        </div>
       </div>`;
   }
   function copyText(text, btn){
@@ -7926,6 +7963,15 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(typeof closeContribPopover === 'function') closeContribPopover();
     if(typeof closeTrendPopover === 'function') closeTrendPopover();
     if(typeof closeRequestPopover === 'function') closeRequestPopover();
+    // §모바일 전환 흐름 겹침 수정 라운드(신규) — #crmList는 class="co-list"를 공유해서
+    // 쓰는데, 좁은 화면(≤1180px)에서 기존 8컬럼 표를 위해 ".co-list{min-width:1220px}"
+    // (가로 스크롤로 보게 하는 의도적 규칙, §전면 리디자인 라운드)가 걸려 있다. 신규
+    // 협약사 탭(.np2-*)은 원래 그 표를 안 쓰고 화면 폭에 맞춰 세로로 쌓이게 만들었는데,
+    // 이 min-width가 그대로 상속돼 실제 내용이 1220px 폭으로 그려지고 화면엔 왼쪽
+    // 380px만 보여 글자가 잘려 빈 상자처럼 보였다(§실제 스크린샷으로 발견). 다른 탭에
+    // 영향 주지 않도록 renderNewPartnerTab에서만 클래스를 붙이고, 그 외 모든 렌더링
+    // 경로(여기, renderList 시작 지점)에서는 항상 지운 상태로 시작한다.
+    listEl.classList.remove('np2-active');
     const companies = D.loadActiveCompanies(); // §업체 삭제(휴지통) 라운드 — 소프트 삭제된 업체를 일반 목록/신규 협약사/협약 진행/MOU체결 탭에서 뺀다(§요청 10)
     listTitle.textContent = '고객 ' + companies.length;
     // §미등록 업체 관리 라운드: 별도 저장소 없이 매번 다시 계산한다(§ "등록 후" 요구사항 —
@@ -8434,13 +8480,17 @@ window.SHIN2_CRM_APP_INIT = function(){
      만들지 않고 그대로 재사용한다 — 이 구획은 그 결과를 어떻게 4가지 상태/다음 행동으로
      분류해 보여줄지만 새로 정의한다.
      ========================================================================== */
-  // "현재 단계"는 정확히 4개 라벨만 쓴다(§요청 4) — 우선순위: 전환 완료 > 관리 필요(관리
+  // "현재 단계"는 정확히 4개 라벨만 쓴다(§요청 4) — 우선순위: 현장등록 > 관리 필요(관리
   // 필요 판정이 있거나 90일 임박) > 요청 발생(구글시트 요청 1건 이상) > 활동 없음.
-  // 전환 완료를 가장 먼저 보는 이유: "전환 완료" 필터·상단 통계 숫자가 항상
-  // computeNewPartnerConversionSummary().converted와 정확히 같아야 하기 때문(§요청
-  // "실제 데이터로 전환율과 각 단계 숫자가 일치하는지 확인") — 다른 조건과 절대 안 겹치게.
+  // §문구 정리 라운드(신규) — "전환 완료"라는 문구를 이 탭 화면 전체에서 "현장등록"으로
+  // 바꿔 달라는 요청에 따라 stateLabel 텍스트만 바꿨다. stateKey('converted')·판정
+  // 기준(conv.converted, computeL2L3Conversion)·bucket 값은 그대로다 — 내부 데이터 키나
+  // L2/L3 판정 로직은 이름조차 건드리지 않았다(§요청 "화면에 표시되는 문구만 안전하게
+  // 변경"). "현장등록"을 가장 먼저 보는 이유는 이전과 동일: "현장등록" 필터·상단 통계
+  // 숫자가 항상 computeNewPartnerConversionSummary().converted와 정확히 같아야 하기
+  // 때문 — 다른 조건과 절대 안 겹치게.
   function classifyNewPartnerRow(conv, need, band){
-    if(conv.converted) return { stateKey:'converted', stateLabel:'전환 완료', bucket:'converted' };
+    if(conv.converted) return { stateKey:'converted', stateLabel:'현장등록', bucket:'converted' };
     if(need || (band && band.key === 'urgent')) return { stateKey:'needsAttention', stateLabel:'관리 필요', bucket:'needsAttention' };
     if(conv.firstRequestAt) return { stateKey:'requested', stateLabel:'요청 발생', bucket:'inProgress' };
     return { stateKey:'none', stateLabel:'활동 없음', bucket:'inProgress' };
@@ -8460,31 +8510,56 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(state.stateKey === 'requested') return '결과 확인 연락';
     return co.assigneeUserId ? '확인 필요' : '담당자 지정 필요';
   }
-  // "관리 예정일 또는 긴급 상태"(§요청 5) — 이미 관리 필요로 판정됐으면(=기한이 이미
-  // 지났다는 뜻, classifyManagementNeed 자체가 "N일 이상 경과"를 조건으로 함) "오늘 관리
-  // 필요"로, 90일 임박 구간이면 "90일 임박"으로 강조한다. 둘 다 아니면 기존
-  // fmtNextManageDate(다음 관리 구간 시작일, 이미 있는 계산)를 그대로 보여준다.
-  function newPartnerDueOrUrgent(state, need, band, p, days){
-    if(state.stateKey === 'converted') return { text:'—', urgent:false };
-    if(need) return { text:'오늘 관리 필요', urgent:true };
-    if(band && band.key === 'urgent') return { text:'90일 임박', urgent:true };
-    if(p && days != null) return { text: fmtNextManageDate(p.ts, days), urgent:false };
-    return { text:'—', urgent:false };
-  }
+  // §문구/화면구성 정리 라운드(신규) — "관리 예정일 또는 긴급 상태" 열 자체를 이 탭에서
+  // 완전히 없애 달라는 요청(§요청 5)에 따라 newPartnerDueOrUrgent는 삭제했다.
+  // fmtNextManageDate/관리 예정일 데이터·계산 자체(D 레이어, 다른 탭·고객카드가 계속
+  // 쓰는 값)는 전혀 건드리지 않았다 — 이 화면에서 그 값을 더 이상 안 꺼내 쓸 뿐이다.
   // "전환 가능성"(§요청 3) — 별도의 새 예측 점수를 만들지 않고, 위에서 이미 계산한 상태
   // 그대로를 재해석해 보여준다(요청이 들어온 업체=유력, 관리가 필요한 업체=불확실, 아직
   // 아무 신호도 없는 업체=확인 필요) — 근거 없는 확률/점수를 지어내지 않는다.
   function newPartnerLikelihood(state, need){
-    if(state.stateKey === 'converted') return '전환 완료';
+    if(state.stateKey === 'converted') return '현장등록';
     if(state.stateKey === 'requested' && !need) return '전환 유력';
     if(need) return '전환 불확실';
     return '확인 필요';
   }
+  // §업체명 옆 요청 종류 표시 라운드(신규) — 업체명을 보는 즉시 최근 요청/활동 종류를
+  // 알 수 있게(§요청 3), 이미 있는 데이터만 읽어 가장 최근 1건의 종류를 뽑는다. 새
+  // 저장소·새 판정을 만들지 않는다:
+  //  - 구글시트 유래 요청(customerActivities, source==='google-sheets-request')은 실제
+  //    저장된 sourceTab(예: "기술자문문의")을 그대로 쓴다 — 지어낸 이름 없음.
+  //  - co.requestedMaterials(기존 요청자료 배열)는 materialType + "요청"으로 표시
+  //    (기존 다른 화면의 "○○ 요청자료 처리"/"○○ 요청" 표기와 같은 형태).
+  //  - 메모(memos)는 자유 텍스트라 "요청 종류" 분류에 넣지 않는다(§요청 "요청 종류"는
+  //    실제 요청 데이터 기준 — 메모는 요청이 아님).
+  // §성능 요구 8/9 — r.acts는 이미 requestItemsIndex.activities에서 업체별로 조회해 둔
+  // 배열을 그대로 받는 것이라(§renderNewPartnerTab 호출부), 여기서 D.activitiesForCompany로
+  // customerActivities 전체를 다시 읽지 않는다.
+  function newPartnerLatestRequestBadge(co, r){
+    const items = [];
+    (r && r.acts ? r.acts : []).forEach(a=>{
+      if(a.source === 'google-sheets-request' && a.occurredAt && a.sourceTab){
+        items.push({ label: a.sourceTab, ts: new Date(a.occurredAt).getTime() });
+      }
+    });
+    (co.requestedMaterials || []).forEach(m=>{
+      if(!m.materialType) return;
+      const ts = m.createdAt ? new Date(m.createdAt).getTime() : 0;
+      items.push({ label: m.materialType + ' 요청', ts: isNaN(ts) ? 0 : ts });
+    });
+    if(!items.length) return null;
+    items.sort((a,b)=> b.ts - a.ts);
+    return { label: items[0].label, extra: items.length - 1 };
+  }
   const NEW_PARTNER_SUBFILTERS = [
-    ['all','전체'], ['needsAttention','관리 필요'], ['inProgress','진행 중'], ['converted','전환 완료']
+    ['all','전체'], ['needsAttention','관리 필요'], ['inProgress','진행 중'], ['converted','현장등록']
   ];
   function renderNewPartnerTab(enriched){
     renderPagination(0);
+    // §모바일 전환 흐름 겹침 수정 라운드 — 위 renderList()가 이미 지워 둔 상태에서
+    // 시작하지만, 이 탭이 실제로 켜질 때만 다시 붙인다(§CSS의 #crmList.np2-active 규칙
+    // 참고).
+    listEl.classList.add('np2-active');
     const enrichedById = new Map(enriched.map(r=> [r.co.id, r]));
     // 전환율 계산 기준은 기존 computeNewPartnerConversionSummary() 그대로 재사용한다
     // (§요청 "임의로 새로운 기준을 만들지 마세요"). rows에 업체별 conv가 이미 한 번씩만
@@ -8502,8 +8577,8 @@ window.SHIN2_CRM_APP_INIT = function(){
       return {
         co, conv, r, p, days, band, need, state,
         nextAction: newPartnerNextAction(co, state, need, band),
-        due: newPartnerDueOrUrgent(state, need, band, p, days),
         likelihood: newPartnerLikelihood(state, need),
+        reqBadge: newPartnerLatestRequestBadge(co, r),
       };
     });
     // 전환 흐름(§요청 2) — "요청 발생"은 전환 여부와 무관하게 구글시트 요청이 1건이라도
@@ -8547,11 +8622,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     const heroHtml = `
       <div class="np2-hero">
         <div class="np2-hero-rate-block">
+          <div class="np2-hero-rate-label">L2 → L3 전환율</div>
           <div class="np2-hero-rate">${esc(summary.rate)}%</div>
-          <div class="np2-hero-sub">신규 협약사 ${esc(summary.total)}곳 중 ${esc(summary.converted)}곳 전환 완료</div>
+          <div class="np2-hero-sub">신규 협약사 ${esc(summary.total)}곳 중 ${esc(summary.converted)}곳 현장등록</div>
         </div>
         <div class="np2-hero-stats">
-          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(summary.converted)}</span><span class="np2-hero-stat-label">전환 완료</span></div>
+          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(summary.converted)}</span><span class="np2-hero-stat-label">현장등록</span></div>
           <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(inProgressCount)}</span><span class="np2-hero-stat-label">전환 진행 중</span></div>
           <div class="np2-hero-stat"><span class="np2-hero-stat-value${needsAttentionCount ? ' is-warn' : ''}">${esc(needsAttentionCount)}</span><span class="np2-hero-stat-label">관리 필요</span></div>
           ${reviewCount ? `<button type="button" class="np2-hero-stat" id="newPartnerGsheetReviewLink"><span class="np2-hero-stat-value is-warn">${esc(reviewCount)}</span><span class="np2-hero-stat-label">Google Sheets 확인 필요</span></button>` : ''}
@@ -8562,7 +8638,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         <span class="np2-funnel-arrow">→</span>
         <div class="np2-funnel-step" style="flex:${funnelFlex(requestedCount)} 1 0;"><span class="np2-funnel-value">${esc(requestedCount)}</span><span class="np2-funnel-label">요청 발생</span></div>
         <span class="np2-funnel-arrow">→</span>
-        <div class="np2-funnel-step is-final" style="flex:${funnelFlex(summary.converted)} 1 0;"><span class="np2-funnel-value">${esc(summary.converted)}</span><span class="np2-funnel-label">전환 완료</span></div>
+        <div class="np2-funnel-step is-final" style="flex:${funnelFlex(summary.converted)} 1 0;"><span class="np2-funnel-value">${esc(summary.converted)}</span><span class="np2-funnel-label">현장등록</span></div>
       </div>
       ${gsheetImportState.lastError ? `<div class="np2-empty" style="margin-bottom:10px;">${esc(gsheetImportState.lastError)}</div>` : ''}
       <div class="np2-subfilters">
@@ -8608,20 +8684,29 @@ window.SHIN2_CRM_APP_INIT = function(){
 
     listEl.innerHTML = heroHtml + `
       <div class="np2-table-head">
-        <span>협력사</span><span>경과일 · 담당자</span><span>현재 단계</span><span>다음 행동</span><span>관리 예정일</span><span>전환 가능성</span><span></span>
+        <span>협력사</span><span>현재 단계</span><span>다음 행동</span><span>전환 가능성</span><span></span>
       </div>
       <div class="np2-list">
         ${filtered.map(it=>{
           const elapsedText = it.days != null ? fmtNewPartnerElapsed(it.days) : '—';
           const assigneeText = it.co.assigneeUserId ? '사용자 ' + it.co.assigneeUserId : '미지정';
           const expanded = newPartnerExpanded.has(it.co.id);
+          // §업체명 옆 요청 종류 표시 라운드 — 실제 요청 데이터가 없으면 억지로 문구를
+          // 만들지 않고 옅은 글씨의 "요청 없음"만 보여준다(§요청 3).
+          const reqBadgeHtml = it.reqBadge
+            ? `<span class="np2-req-badge">[${esc(it.reqBadge.label)}]${it.reqBadge.extra > 0 ? ` 외 ${esc(it.reqBadge.extra)}건` : ''}</span>`
+            : `<span class="np2-req-none">요청 없음</span>`;
           return `
           <div class="np2-row" data-np-row="${esc(it.co.id)}" role="button" tabindex="0">
-            <span class="np2-col-name">${esc(it.co.name || '(업체명 없음)')}</span>
-            <span class="np2-col-elapsed">${esc(elapsedText)} · <span class="np2-assignee">${esc(assigneeText)}</span></span>
+            <span class="np2-col-company">
+              <span class="np2-col-name-line">
+                <span class="np2-col-name">${esc(it.co.name || '(업체명 없음)')}</span>
+                ${reqBadgeHtml}
+              </span>
+              <span class="np2-col-elapsed">${esc(elapsedText)} · <span class="np2-assignee">${esc(assigneeText)}</span></span>
+            </span>
             <span><span class="np2-state-badge st-${esc(it.state.stateKey)}">${esc(it.state.stateLabel)}</span></span>
             <span class="np2-col-next"><span class="np2-field-label">다음 행동</span>${esc(it.nextAction)}</span>
-            <span class="np2-col-due${it.due.urgent ? ' is-urgent' : ''}"><span class="np2-field-label">관리 예정일</span>${esc(it.due.text)}</span>
             <span class="np2-col-likelihood"><span class="np2-field-label">전환 가능성</span>${esc(it.likelihood)}</span>
             <button type="button" class="np2-col-detail-btn" data-np-toggle="${esc(it.co.id)}">${expanded ? '접기' : '상세 보기'}</button>
           </div>
