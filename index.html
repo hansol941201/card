@@ -264,6 +264,61 @@
   .new-partner-summary-item.is-warn .new-partner-summary-value{ color:#B91C1C; }
   .terminated-info-item.is-l3-done{ color:#1D7A46; }
   .terminated-info-item.is-l3-pending{ color:var(--text-muted); }
+  /* §신규 협약사 탭 리디자인 라운드(신규) — 정보량이 많던 기존 8컬럼 표 대신, 전환율이
+     가장 먼저 보이는 단순 화면. 전환 판정·90일 모집단 등 계산 기준은 전혀 안 바꾸고
+     화면 구성만 새로 만든다(§요청). .co-row 등 다른 탭의 그리드 구조는 건드리지 않는다 —
+     이 탭 전용 .np2-* 클래스만 새로 추가한다. */
+  .np2-hero{ display:flex; flex-wrap:wrap; align-items:center; gap:22px; padding:18px 20px; background:#fff; border:1px solid var(--line); border-radius:12px; margin-bottom:10px; }
+  .np2-hero-rate-block{ display:flex; flex-direction:column; gap:2px; }
+  .np2-hero-rate{ font-size:38px; font-weight:800; color:var(--navy); line-height:1.1; }
+  .np2-hero-sub{ font-size:12.5px; color:var(--text-muted); }
+  .np2-hero-stats{ display:flex; flex-wrap:wrap; gap:22px; margin-left:auto; }
+  .np2-hero-stat{ display:flex; flex-direction:column; gap:2px; min-width:74px; }
+  .np2-hero-stat-value{ font-size:21px; font-weight:750; color:var(--text); }
+  .np2-hero-stat-value.is-warn{ color:#B3261E; }
+  .np2-hero-stat-label{ font-size:11.5px; color:var(--text-muted); }
+  .np2-funnel{ display:flex; align-items:stretch; gap:8px; padding:0 20px 16px; }
+  .np2-funnel-step{ flex:1 1 0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:10px 8px; border-radius:9px; background:#F3F6FB; min-width:0; }
+  .np2-funnel-value{ font-size:17px; font-weight:750; color:var(--navy); }
+  .np2-funnel-label{ font-size:11px; color:var(--text-muted); }
+  .np2-funnel-step.is-final{ background:#E9F6EF; }
+  .np2-funnel-step.is-final .np2-funnel-value{ color:#1D7A46; }
+  .np2-funnel-arrow{ align-self:center; color:var(--text-faint); font-size:15px; flex:0 0 auto; }
+  .np2-subfilters{ display:flex; flex-wrap:wrap; gap:8px; padding:0 2px 10px; }
+  .np2-table-head{ display:grid; grid-template-columns: minmax(150px,1.5fr) 130px 96px 150px 118px 88px 74px; gap:10px; padding:8px 14px; border:1px solid var(--line); border-radius:10px 10px 0 0; background:#f9fbfd; color:#4b607c; font-weight:700; font-size:11.5px; }
+  .np2-list{ background:#fff; border:1px solid var(--line); border-top:0; border-radius:0 0 10px 10px; overflow:hidden; }
+  .np2-row{ display:grid; grid-template-columns: minmax(150px,1.5fr) 130px 96px 150px 118px 88px 74px; gap:10px; align-items:center; padding:9px 14px; border-bottom:1px solid #e8eef5; font-size:12.5px; cursor:pointer; background:none; border-left:0; border-right:0; border-top:0; width:100%; text-align:left; font-family:inherit; color:inherit; }
+  .np2-row:hover{ background:#f7fbff; }
+  .np2-row:last-child{ border-bottom:0; }
+  .np2-col-name{ font-weight:750; color:#142945; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .np2-col-elapsed{ color:var(--text-muted); font-size:12px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .np2-col-elapsed .np2-assignee{ color:var(--text-faint); }
+  .np2-state-badge{ display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px; font-size:11.5px; font-weight:700; white-space:nowrap; }
+  .np2-state-badge.st-converted{ background:#E6F4EA; color:#1D7A46; }
+  .np2-state-badge.st-needsAttention{ background:#FDECEC; color:#B3261E; }
+  .np2-state-badge.st-requested{ background:#E6F0FD; color:#1B4FA6; }
+  .np2-state-badge.st-none{ background:#F1F3F6; color:var(--text-muted); }
+  .np2-col-next{ color:var(--text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .np2-col-due{ color:var(--text-muted); font-size:12px; }
+  .np2-col-due.is-urgent{ color:#B3261E; font-weight:700; }
+  .np2-col-likelihood{ font-size:12px; color:var(--text-muted); }
+  .np2-col-detail-btn{ font-family:inherit; font-size:11.5px; color:var(--navy); background:#fff; border:1px solid var(--line); border-radius:6px; padding:4px 8px; cursor:pointer; justify-self:end; }
+  .np2-col-detail-btn:hover{ background:var(--bg); }
+  .np2-field-label{ display:none; font-weight:600; color:var(--text-faint); margin-right:4px; }
+  .np2-empty{ padding:26px 14px; text-align:center; color:var(--text-muted); font-size:13px; background:#fff; border:1px solid var(--line); border-radius:10px; }
+  @media (max-width: 640px){
+    .np2-hero{ flex-direction:column; align-items:flex-start; gap:12px; }
+    .np2-hero-stats{ margin-left:0; width:100%; justify-content:space-between; gap:14px; }
+    .np2-funnel{ flex-direction:column; gap:6px; padding:0 14px 14px; }
+    .np2-funnel-arrow{ align-self:center; transform:rotate(90deg); }
+    .np2-table-head{ display:none; }
+    .np2-list{ background:none; border:0; border-radius:0; }
+    .np2-row{ grid-template-columns:none; display:flex; flex-direction:column; align-items:flex-start; gap:5px; padding:13px 14px; background:#fff; border:1px solid var(--line); border-radius:10px; margin-bottom:8px; }
+    .np2-row:hover{ background:#fff; }
+    .np2-col-name{ font-size:14.5px; white-space:normal; }
+    .np2-col-detail-btn{ justify-self:auto; align-self:flex-end; }
+    .np2-field-label{ display:inline; }
+  }
   .col-recent{ flex:1.4 1 150px; min-width:0; color:var(--text-muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .col-recent .recent-date{ color:var(--text-faint); margin-right:4px; }
   .col-yr, .col-total{ flex:0 0 62px; font-size:12.5px; color:var(--text); text-align:right; }
@@ -7397,6 +7452,21 @@ window.SHIN2_CRM_APP_INIT = function(){
   // fresh-match 소스)으로 바꿨다 — 드롭다운 첫 옵션과 실제 초기 정렬이 일치하게 한다.
   let sortMode = 'yearPour';
   let currentPage = 1;
+  // §신규 협약사 탭 리디자인 라운드(신규) — 이 탭 안에서만 쓰는 보조 필터(전체/관리
+  // 필요/진행 중/전환 완료, §요청 6)와 "상세 보기"로 펼친 업체 id 집합. 다른 탭의
+  // filterKey/currentPage와는 별개 상태라 새로 둔다 — 탭을 벗어나도 값은 유지된다
+  // (다시 신규 협약사 탭으로 돌아왔을 때 펼쳐둔 상태/골라둔 보조 필터가 그대로 남는
+  // 편이 자연스럽다는 판단, 새로고침하면 초기화됨은 다른 화면 상태와 동일).
+  let newPartnerSubFilter = 'all';
+  const newPartnerExpanded = new Set();
+  // §요청 6 "기존 세부 필터는 삭제하지 말고 더보기 안으로" — 이 탭 전용 정렬 드롭다운
+  // 옵션이었던 "90일 임박순"/"최근 체결순"(§신규 협약사 탭 라운드에서 만든
+  // crmSortOptNewUrgent/crmSortOptNewRecent)을 지우지 않고, 접힌 "더보기" 안 두 칩으로
+  // 옮긴다. urgent(기본값)는 이미 기본 정렬(관리 필요 우선 → 경과일 많은 순)과 같은
+  // 의도라 그대로 쓰고, recent만 방향을 뒤집어(경과일 적은 = 최근 체결) 재사용한다 — 새
+  // 정렬 기준을 만들지 않는다.
+  let newPartnerSortMode = 'urgent';
+  let newPartnerMoreOpen = false;
   const PAGE_SIZE = 15;
   // §고객 성향 미니 팝업 라운드 — 목록 [고객 성향] 클릭 시 뜨는 작은 popover 상태.
   // DISPLAY ONLY(§10) — 여기엔 co.customerInsight 등 실제 데이터를 절대 담지 않고, 지금
@@ -7925,6 +7995,11 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(optU) optU.hidden = filterKey !== 'newPartner';
       if(optR) optR.hidden = filterKey !== 'newPartner';
       if(sel.value !== sortMode) sel.value = sortMode;
+      // §신규 협약사 탭 리디자인 라운드 — 새 화면은 자체 정렬(관리 필요/급한 순서 우선,
+      // §아래 renderNewPartnerTab)을 쓰고 이 드롭다운을 쓰지 않는다. 드롭다운 자체를
+      // 숨겨 "안 쓰는 정렬 옵션"이 남아 헷갈리지 않게 한다(값 자체는 그대로 둬서 다른
+      // 탭으로 돌아가면 원래 정렬이 그대로 적용된다).
+      sel.hidden = filterKey === 'newPartner';
     })();
     // §전면 리디자인 라운드(신규) — "KPI 요약 바"는 여기서 이미 계산된 filterCounts를
     // 그대로 다시 보여줄 뿐 새 판정/집계를 전혀 만들지 않는다(§ "임의의 숫자를
@@ -7939,6 +8014,13 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 별도의 단순한 표(삭제일/업체명/삭제 사유/복구, §요청 6)로 갈아탄다.
     if(filterKey === 'deleted'){
       renderDeletedCompaniesTab();
+      return;
+    }
+    // §신규 협약사 탭 리디자인 라운드(신규) — "삭제된 업체" 탭과 같은 이유로(§7976 주석
+    // 그대로 적용) 무거운 7컬럼 목록 템플릿을 타지 않고 전환율 중심의 단순 화면으로
+    // 갈아탄다. 계산 기준(전환 판정/90일 모집단)은 전혀 안 바꾸고 화면만 새로 만든다.
+    if(filterKey === 'newPartner'){
+      renderNewPartnerTab(enriched);
       return;
     }
 
@@ -7957,25 +8039,6 @@ window.SHIN2_CRM_APP_INIT = function(){
       })() : null));
     applySort(rows, contribIndex);
 
-    // §신규 협약사 탭 라운드 → §고객 요청 Google Sheets 연동 라운드 — 탭 상단 집계(§요청
-    // 5/13). filterCounts.newPartner(검색과 무관한 탭 전체 기준)는 그대로 두고, "요청
-    // 발생 · 전환율" 자리를 실제 computeNewPartnerConversionSummary() 결과로 채운다 —
-    // 이 값은 90일 모집단(isNewPartnerCompany, 삭제·종료 제외)과 completely 같은 기준.
-    // §성능 수정(렉 제보) — 이 계산은 filterKey==='newPartner'일 때만 필요한데, 탭과
-    // 무관하게 renderList()가 불릴 때마다(검색어 입력 등 포함) 매번 돌고 있었다 — 신규
-    // 협약사·활동기록이 많을수록 체감 지연이 커지는 원인이었다. 다른 탭에서는 아예
-    // 계산하지 않는다(§ 결과 자체는 이전과 동일, 계산 타이밍만 필요할 때로 좁힘).
-    const gsheetSummary = filterKey === 'newPartner' ? computeNewPartnerConversionSummary() : null;
-    const newPartnerSummaryHtml = filterKey === 'newPartner' ? `
-      <div class="new-partner-summary-bar">
-        <div class="new-partner-summary-item"><span class="new-partner-summary-value">${esc(filterCounts.newPartner || 0)}</span><span class="new-partner-summary-label">신규 협약사 전체</span></div>
-        <div class="new-partner-summary-item"><span class="new-partner-summary-value">${esc(gsheetSummary.converted)}</span><span class="new-partner-summary-label">L2→L3 전환 업체</span></div>
-        <div class="new-partner-summary-item"><span class="new-partner-summary-value">${esc(gsheetSummary.rate)}%</span><span class="new-partner-summary-label">전환율</span></div>
-        ${gsheetImportState.reviewItems.length ? `<button type="button" class="new-partner-summary-item is-warn" id="newPartnerGsheetReviewLink"><span class="new-partner-summary-value">${esc(gsheetImportState.reviewItems.length)}</span><span class="new-partner-summary-label">Google Sheets 확인 필요</span></button>` : ''}
-        ${gsheetImportState.lastError ? `<div class="new-partner-summary-item is-muted new-partner-summary-notice">${esc(gsheetImportState.lastError)}</div>` : ''}
-      </div>
-    ` : '';
-
     const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
     if(currentPage > totalPages) currentPage = totalPages;
     const pageRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -7992,11 +8055,9 @@ window.SHIN2_CRM_APP_INIT = function(){
       } else {
         emptyNoteHtml = `<div class="empty-note">${companies.length===0 ? '등록된 고객이 없습니다.' : '검색 결과가 없습니다.'}</div>`;
       }
-      listEl.innerHTML = newPartnerSummaryHtml + emptyNoteHtml;
+      listEl.innerHTML = emptyNoteHtml;
       const retryBtn = document.getElementById('cloudBootRetryBtn');
       if(retryBtn) retryBtn.addEventListener('click', ()=> location.reload());
-      const gsheetReviewLink = document.getElementById('newPartnerGsheetReviewLink');
-      if(gsheetReviewLink) gsheetReviewLink.addEventListener('click', openGsheetReviewModal);
       renderPagination(0);
       return;
     }
@@ -8008,7 +8069,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 목록에서 뺐지만 계산 함수(buildRecentPourActivity/getTotalPourCount/
     // getTotalRevenue)는 그대로 두고 부르지 않을 뿐이다 — 상세 고객관리카드(renderChart의
     // 글랜스행·POUR 시공실적 섹션)에서 그대로 볼 수 있다(§4/§18, 데이터 삭제 아님).
-    listEl.innerHTML = newPartnerSummaryHtml + pageRows.map(r=>{
+    listEl.innerHTML = pageRows.map(r=>{
       const co = r.co;
       // §등급 제거/2025년 매출 반영 라운드: 등급 배지를 없애고 그 자리에 2025년 매출을
       // 표시했었다(§1/§2). getCompanyGrade()/GRADE_LABEL/GRADE_BADGE_CLASS 함수 자체는
@@ -8199,10 +8260,10 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 종료 사유/최근 활동/고객카드 보기/종료 취소).
       const terminatedInfoHtml = (filterKey === 'agreementTerminated' && D.isAgreementTerminated(co))
         ? terminatedInfoRowHtml(co, r.progress, requestHistoryIndex) : '';
-      // §신규 협약사 탭 라운드(신규) — "협약 종료" 탭의 terminatedInfoRowHtml과 완전히
-      // 같은 패턴(행 아래 별도 정보 줄, 기존 .co-row 그리드 컬럼 구조는 안 건드림).
-      const newPartnerInfoHtml = (filterKey === 'newPartner' && isNewPartnerCompany(co))
-        ? newPartnerInfoRowHtml(co, r) : '';
+      // §신규 협약사 탭 리디자인 라운드 — filterKey==='newPartner'는 이제 이 일반 7컬럼
+      // 표까지 오지 않고(§renderNewPartnerTab으로 먼저 분기·return) newPartnerInfoRowHtml은
+      // 그 함수의 "상세 보기" 펼침 내용으로 그대로 재사용된다 — 여기서는 더 이상 부를
+      // 필요가 없어 이 한 줄만 정리한다(newPartnerInfoRowHtml 함수 자체는 그대로 둠).
       return `
       <div class="co-row${rowOverdueClass}${receivablePenaltyClass}" data-id="${esc(co.id)}">
         <div class="col-name">
@@ -8222,7 +8283,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         <!-- §단계 진행상황 이전 라운드: 이 컬럼은 목록에서 뺐다(업무관리 화면으로 이전,
              stageStepperHtml 변수/buildStageStepperHtml 함수는 그대로 계산돼 있다 —
              §"데이터 제거가 아니라 숨김" 관례 그대로). -->
-      </div>${terminatedInfoHtml}${newPartnerInfoHtml}`;
+      </div>${terminatedInfoHtml}`;
     }).join('');
     // §실적↔매출 실제 구현 라운드: "실적↔매출" 클릭 -> 실적·매출 분석 Drawer(다른 컬럼과
     // 같은 패턴, 옛 popover 방식은 없앰). 행 클릭(고객카드 열기)으로 전파되지 않도록
@@ -8364,6 +8425,256 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 있는 단일 지점이다(§기존 코드 재사용 — 새 훅을 여러 곳에 흩어 넣는 대신 여기
     // 한 곳에서만 지도 팝업이 열려 있는지 확인해 갱신한다).
     if(typeof refreshMapIfOpen === 'function') refreshMapIfOpen();
+  }
+
+  /* ==========================================================================
+     §신규 협약사 탭 리디자인 라운드(신규) — "전환율이 가장 먼저 보이는" 단순 화면(§요청).
+     전환 판정 기준(computeL2L3Conversion/isNewPartnerCompany/90일 모집단, 위에 이미
+     정의됨)과 관리 필요 판정 기준(classifyManagementNeed, 위에 이미 정의됨)은 전혀 새로
+     만들지 않고 그대로 재사용한다 — 이 구획은 그 결과를 어떻게 4가지 상태/다음 행동으로
+     분류해 보여줄지만 새로 정의한다.
+     ========================================================================== */
+  // "현재 단계"는 정확히 4개 라벨만 쓴다(§요청 4) — 우선순위: 전환 완료 > 관리 필요(관리
+  // 필요 판정이 있거나 90일 임박) > 요청 발생(구글시트 요청 1건 이상) > 활동 없음.
+  // 전환 완료를 가장 먼저 보는 이유: "전환 완료" 필터·상단 통계 숫자가 항상
+  // computeNewPartnerConversionSummary().converted와 정확히 같아야 하기 때문(§요청
+  // "실제 데이터로 전환율과 각 단계 숫자가 일치하는지 확인") — 다른 조건과 절대 안 겹치게.
+  function classifyNewPartnerRow(conv, need, band){
+    if(conv.converted) return { stateKey:'converted', stateLabel:'전환 완료', bucket:'converted' };
+    if(need || (band && band.key === 'urgent')) return { stateKey:'needsAttention', stateLabel:'관리 필요', bucket:'needsAttention' };
+    if(conv.firstRequestAt) return { stateKey:'requested', stateLabel:'요청 발생', bucket:'inProgress' };
+    return { stateKey:'none', stateLabel:'활동 없음', bucket:'inProgress' };
+  }
+  // "다음 행동"(§요청 5) — 실제 계산된 신호(전환 여부/90일 임박/관리필요 유형/요청 존재/
+  // 담당자 지정 여부)만으로 결정한다. 그 어떤 신호도 없으면(이제 막 협약한 초기 업체 등)
+  // 임의로 확정하지 않고 "확인 필요"(또는 담당자 자체가 없으면 "담당자 지정 필요")로
+  // 남긴다(§요청 "정확히 판단할 수 없는 경우 확인 필요로 표시").
+  function newPartnerNextAction(co, state, need, band){
+    if(state.stateKey === 'converted') return '관계 유지';
+    if(band && band.key === 'urgent' && !need) return '90일 임박 관리';
+    if(need){
+      if(need.type === 'firstActivity') return '첫 요청 안내';
+      if(need.type === 'l2Stall') return '결과 확인 연락';
+      if(need.type === 'reuse') return '재사용 지원 제안';
+    }
+    if(state.stateKey === 'requested') return '결과 확인 연락';
+    return co.assigneeUserId ? '확인 필요' : '담당자 지정 필요';
+  }
+  // "관리 예정일 또는 긴급 상태"(§요청 5) — 이미 관리 필요로 판정됐으면(=기한이 이미
+  // 지났다는 뜻, classifyManagementNeed 자체가 "N일 이상 경과"를 조건으로 함) "오늘 관리
+  // 필요"로, 90일 임박 구간이면 "90일 임박"으로 강조한다. 둘 다 아니면 기존
+  // fmtNextManageDate(다음 관리 구간 시작일, 이미 있는 계산)를 그대로 보여준다.
+  function newPartnerDueOrUrgent(state, need, band, p, days){
+    if(state.stateKey === 'converted') return { text:'—', urgent:false };
+    if(need) return { text:'오늘 관리 필요', urgent:true };
+    if(band && band.key === 'urgent') return { text:'90일 임박', urgent:true };
+    if(p && days != null) return { text: fmtNextManageDate(p.ts, days), urgent:false };
+    return { text:'—', urgent:false };
+  }
+  // "전환 가능성"(§요청 3) — 별도의 새 예측 점수를 만들지 않고, 위에서 이미 계산한 상태
+  // 그대로를 재해석해 보여준다(요청이 들어온 업체=유력, 관리가 필요한 업체=불확실, 아직
+  // 아무 신호도 없는 업체=확인 필요) — 근거 없는 확률/점수를 지어내지 않는다.
+  function newPartnerLikelihood(state, need){
+    if(state.stateKey === 'converted') return '전환 완료';
+    if(state.stateKey === 'requested' && !need) return '전환 유력';
+    if(need) return '전환 불확실';
+    return '확인 필요';
+  }
+  const NEW_PARTNER_SUBFILTERS = [
+    ['all','전체'], ['needsAttention','관리 필요'], ['inProgress','진행 중'], ['converted','전환 완료']
+  ];
+  function renderNewPartnerTab(enriched){
+    renderPagination(0);
+    const enrichedById = new Map(enriched.map(r=> [r.co.id, r]));
+    // 전환율 계산 기준은 기존 computeNewPartnerConversionSummary() 그대로 재사용한다
+    // (§요청 "임의로 새로운 기준을 만들지 마세요"). rows에 업체별 conv가 이미 한 번씩만
+    // 계산돼 있어(내부에서 customerActivities를 딱 한 번만 읽어 companyId별로 미리 묶어
+    // 둠, §7181 근처 기존 주석 그대로) 아래에서 D.activitiesForCompany를 반복 호출하지
+    // 않는다(§성능 요구 9).
+    const summary = computeNewPartnerConversionSummary();
+    const items = summary.rows.map(({ co, conv })=>{
+      const r = enrichedById.get(co.id);
+      const p = resolveEffectiveMouDate(co);
+      const days = daysSinceMouSeoul(co);
+      const band = days != null ? resolveNewPartnerBand(days) : null;
+      const need = findManagementNeedForCompany(co.id); // 이미 renderList()가 한 번만 계산해 둔 managementNeedCache 조회뿐
+      const state = classifyNewPartnerRow(conv, need, band);
+      return {
+        co, conv, r, p, days, band, need, state,
+        nextAction: newPartnerNextAction(co, state, need, band),
+        due: newPartnerDueOrUrgent(state, need, band, p, days),
+        likelihood: newPartnerLikelihood(state, need),
+      };
+    });
+    // 전환 흐름(§요청 2) — "요청 발생"은 전환 여부와 무관하게 구글시트 요청이 1건이라도
+    // 있는 업체 수(conv.firstRequestAt, 이미 계산된 값 그대로 재사용). 전환 완료는 항상
+    // 그 부분집합이다 — 전환되려면 반드시 90일 이내의 유효한 요청이 있어야 하고, 그
+    // 요청은 항상 firstRequestAt 계산에도 포함되므로(computeL2L3Conversion 참고) "15 →
+    // 8 → 3"처럼 항상 줄어드는 형태가 실제 데이터로도 보장된다.
+    const requestedCount = items.filter(it=> it.conv.firstRequestAt != null).length;
+    const needsAttentionCount = items.filter(it=> it.state.bucket === 'needsAttention').length;
+    const inProgressCount = items.filter(it=> it.state.bucket === 'inProgress').length;
+
+    // 검색(§요청 6 "업체명과 담당자") — 새 검색창을 만들지 않고 메인 검색창의 searchQuery를
+    // 그대로 쓴다(이미 120ms 디바운스가 적용돼 있음, §검색창 반응 라운드 — 그대로 유지).
+    const q = (searchQuery || '').trim().toLowerCase();
+    const searched = q ? items.filter(it=>{
+      const nameHit = String(it.co.name || '').toLowerCase().includes(q);
+      const assigneeText = it.co.assigneeUserId ? ('사용자 ' + it.co.assigneeUserId).toLowerCase() : '';
+      return nameHit || assigneeText.includes(q);
+    }) : items;
+
+    const filtered = newPartnerSubFilter === 'all' ? searched : searched.filter(it=> it.state.bucket === newPartnerSubFilter);
+    // 정렬 — 관리가 급한 업체를 가장 먼저, 그다음 경과일 순(§더보기의 "90일 임박순"/
+    // "최근 체결순" 그대로 재사용 — urgent=경과일 많은 순, recent=경과일 적은 순으로
+    // 방향만 뒤집는다), 마지막은 이름순. 새 판정을 만드는 게 아니라 위에서 이미 계산해
+    // 둔 상태만 정렬 기준으로 쓴다.
+    const bucketOrder = { needsAttention:0, inProgress:1, converted:2 };
+    const daysDir = newPartnerSortMode === 'recent' ? 1 : -1;
+    filtered.sort((a,b)=>{
+      const oa = bucketOrder[a.state.bucket], ob = bucketOrder[b.state.bucket];
+      if(oa !== ob) return oa - ob;
+      const da = a.days == null ? -1 : a.days, db = b.days == null ? -1 : b.days;
+      if(da !== db) return daysDir * (db - da);
+      return String(a.co.name || '').localeCompare(String(b.co.name || ''), 'ko');
+    });
+
+    const reviewCount = gsheetImportState.reviewItems.length;
+    const maxFunnel = summary.total || 1;
+    // "단계가 진행될수록 영역이 줄어드는 형태"(§요청 2) — 각 단계 상자의 flex-grow를
+    // 실제 건수 비율로 준다(0건이어도 완전히 안 보이지 않게 최소값만 둠).
+    const funnelFlex = v=> Math.max(0.32, v / maxFunnel).toFixed(2);
+    const heroHtml = `
+      <div class="np2-hero">
+        <div class="np2-hero-rate-block">
+          <div class="np2-hero-rate">${esc(summary.rate)}%</div>
+          <div class="np2-hero-sub">신규 협약사 ${esc(summary.total)}곳 중 ${esc(summary.converted)}곳 전환 완료</div>
+        </div>
+        <div class="np2-hero-stats">
+          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(summary.converted)}</span><span class="np2-hero-stat-label">전환 완료</span></div>
+          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(inProgressCount)}</span><span class="np2-hero-stat-label">전환 진행 중</span></div>
+          <div class="np2-hero-stat"><span class="np2-hero-stat-value${needsAttentionCount ? ' is-warn' : ''}">${esc(needsAttentionCount)}</span><span class="np2-hero-stat-label">관리 필요</span></div>
+          ${reviewCount ? `<button type="button" class="np2-hero-stat" id="newPartnerGsheetReviewLink"><span class="np2-hero-stat-value is-warn">${esc(reviewCount)}</span><span class="np2-hero-stat-label">Google Sheets 확인 필요</span></button>` : ''}
+        </div>
+      </div>
+      <div class="np2-funnel">
+        <div class="np2-funnel-step" style="flex:${funnelFlex(summary.total)} 1 0;"><span class="np2-funnel-value">${esc(summary.total)}</span><span class="np2-funnel-label">신규 협약</span></div>
+        <span class="np2-funnel-arrow">→</span>
+        <div class="np2-funnel-step" style="flex:${funnelFlex(requestedCount)} 1 0;"><span class="np2-funnel-value">${esc(requestedCount)}</span><span class="np2-funnel-label">요청 발생</span></div>
+        <span class="np2-funnel-arrow">→</span>
+        <div class="np2-funnel-step is-final" style="flex:${funnelFlex(summary.converted)} 1 0;"><span class="np2-funnel-value">${esc(summary.converted)}</span><span class="np2-funnel-label">전환 완료</span></div>
+      </div>
+      ${gsheetImportState.lastError ? `<div class="np2-empty" style="margin-bottom:10px;">${esc(gsheetImportState.lastError)}</div>` : ''}
+      <div class="np2-subfilters">
+        ${NEW_PARTNER_SUBFILTERS.map(([key,label])=>{
+          const cnt = key === 'all' ? items.length : (key === 'converted' ? summary.converted : (key === 'needsAttention' ? needsAttentionCount : inProgressCount));
+          return `<button type="button" class="list-filter-chip${newPartnerSubFilter===key?' is-active':''}" data-np-subfilter="${esc(key)}">${esc(label)} ${esc(cnt)}</button>`;
+        }).join('')}
+        <button type="button" class="list-filter-chip" id="newPartnerMoreBtn" style="margin-left:auto;">더보기 ${newPartnerMoreOpen ? '▴' : '▾'}</button>
+      </div>
+      ${newPartnerMoreOpen ? `
+      <div class="np2-subfilters" style="padding-top:0;">
+        <span class="np2-field-label" style="display:inline;color:var(--text-muted);align-self:center;">정렬</span>
+        <button type="button" class="list-filter-chip${newPartnerSortMode==='urgent'?' is-active':''}" data-np-sort="urgent">90일 임박순</button>
+        <button type="button" class="list-filter-chip${newPartnerSortMode==='recent'?' is-active':''}" data-np-sort="recent">최근 체결순</button>
+      </div>` : ''}`;
+
+    // §성능 요구 9 — 서브필터를 바꿀 때만(자주 누르지 않는 조작) 이 함수를 다시 부른다.
+    // enriched는 renderList()가 이미 만들어 둔 값을 클로저로 그대로 재사용할 뿐, 여기서
+    // 다시 만들지 않는다 — 전체 300개 업체를 다시 훑는 renderList()는 전혀 부르지 않는다.
+    function bindHeroAndSubfilters(){
+      const reviewBtn = document.getElementById('newPartnerGsheetReviewLink');
+      if(reviewBtn) reviewBtn.addEventListener('click', openGsheetReviewModal);
+      listEl.querySelectorAll('[data-np-subfilter]').forEach(btn=> btn.addEventListener('click', ()=>{
+        newPartnerSubFilter = btn.getAttribute('data-np-subfilter');
+        renderNewPartnerTab(enriched);
+      }));
+      const moreBtn = document.getElementById('newPartnerMoreBtn');
+      if(moreBtn) moreBtn.addEventListener('click', ()=>{
+        newPartnerMoreOpen = !newPartnerMoreOpen;
+        renderNewPartnerTab(enriched);
+      });
+      listEl.querySelectorAll('[data-np-sort]').forEach(btn=> btn.addEventListener('click', ()=>{
+        newPartnerSortMode = btn.getAttribute('data-np-sort');
+        renderNewPartnerTab(enriched);
+      }));
+    }
+
+    if(!filtered.length){
+      listEl.innerHTML = heroHtml + `<div class="np2-empty">${esc(items.length ? '조건에 맞는 업체가 없습니다.' : '신규 협약사가 없습니다.')}</div>`;
+      bindHeroAndSubfilters();
+      return;
+    }
+
+    listEl.innerHTML = heroHtml + `
+      <div class="np2-table-head">
+        <span>협력사</span><span>경과일 · 담당자</span><span>현재 단계</span><span>다음 행동</span><span>관리 예정일</span><span>전환 가능성</span><span></span>
+      </div>
+      <div class="np2-list">
+        ${filtered.map(it=>{
+          const elapsedText = it.days != null ? fmtNewPartnerElapsed(it.days) : '—';
+          const assigneeText = it.co.assigneeUserId ? '사용자 ' + it.co.assigneeUserId : '미지정';
+          const expanded = newPartnerExpanded.has(it.co.id);
+          return `
+          <div class="np2-row" data-np-row="${esc(it.co.id)}" role="button" tabindex="0">
+            <span class="np2-col-name">${esc(it.co.name || '(업체명 없음)')}</span>
+            <span class="np2-col-elapsed">${esc(elapsedText)} · <span class="np2-assignee">${esc(assigneeText)}</span></span>
+            <span><span class="np2-state-badge st-${esc(it.state.stateKey)}">${esc(it.state.stateLabel)}</span></span>
+            <span class="np2-col-next"><span class="np2-field-label">다음 행동</span>${esc(it.nextAction)}</span>
+            <span class="np2-col-due${it.due.urgent ? ' is-urgent' : ''}"><span class="np2-field-label">관리 예정일</span>${esc(it.due.text)}</span>
+            <span class="np2-col-likelihood"><span class="np2-field-label">전환 가능성</span>${esc(it.likelihood)}</span>
+            <button type="button" class="np2-col-detail-btn" data-np-toggle="${esc(it.co.id)}">${expanded ? '접기' : '상세 보기'}</button>
+          </div>
+          <div class="np2-detail" data-np-detail="${esc(it.co.id)}" ${expanded ? '' : 'hidden'}>${expanded && it.r ? newPartnerInfoRowHtml(it.co, it.r) : ''}</div>
+          `;
+        }).join('')}
+      </div>`;
+
+    bindHeroAndSubfilters();
+
+    // 상세 보기 토글 — renderList()도, renderNewPartnerTab()도 다시 부르지 않고(§요청 9
+    // "필터 클릭과 검색 시 불필요한 전체 재계산 방지") 딱 이 업체의 detail 칸만 채우고
+    // 보이기/숨기기만 한다. 처음 펼칠 때만 newPartnerInfoRowHtml(co,r)을 호출해 DOM을
+    // 만든다 — 접혀 있는 나머지 업체는 이 무거운 문자열을 아예 만들지 않는다(§요청 3
+    // "펼칠 때만 필요한 DOM을 표시하거나 생성").
+    function toggleDetail(id){
+      const detailEl = listEl.querySelector(`[data-np-detail="${CSS.escape(id)}"]`);
+      const btn = listEl.querySelector(`[data-np-toggle="${CSS.escape(id)}"]`);
+      if(!detailEl) return;
+      const willExpand = detailEl.hidden;
+      if(willExpand){
+        if(!detailEl.innerHTML){
+          const it = filtered.find(x=> x.co.id === id);
+          if(it && it.r) detailEl.innerHTML = newPartnerInfoRowHtml(it.co, it.r);
+        }
+        detailEl.hidden = false;
+        newPartnerExpanded.add(id);
+        if(btn) btn.textContent = '접기';
+        // 방금 만든 새 DOM이라 아직 리스너가 없다 — 이 detail 안에서만 바인딩한다(§요청 9,
+        // 목록 전체를 다시 훑지 않음).
+        detailEl.querySelectorAll('[data-terminated-open-card]').forEach(b=> b.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          openCard(b.getAttribute('data-terminated-open-card'));
+        }));
+        detailEl.querySelectorAll('[data-gsheet-req-all]').forEach(b=> b.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          openGsheetReqListModal(b.getAttribute('data-gsheet-req-all'));
+        }));
+      } else {
+        detailEl.hidden = true;
+        newPartnerExpanded.delete(id);
+        if(btn) btn.textContent = '상세 보기';
+      }
+    }
+    listEl.querySelectorAll('[data-np-toggle]').forEach(btn=> btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      toggleDetail(btn.getAttribute('data-np-toggle'));
+    }));
+    listEl.querySelectorAll('[data-np-row]').forEach(rowEl=>{
+      const id = rowEl.getAttribute('data-np-row');
+      rowEl.addEventListener('click', ()=> toggleDetail(id));
+      rowEl.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggleDetail(id); } });
+    });
   }
 
   // §업체 삭제(휴지통) 라운드(신규) — "삭제된 업체" 탭 전용 렌더링(§요청 6). 일반 목록의
