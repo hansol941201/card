@@ -551,6 +551,11 @@
      또렷하게 보이도록 조정. */
   .request-cell-date-only .request-date{ color:var(--text); font-size:12px; font-weight:600; }
   .request-cell-date-only:hover .request-date{ text-decoration:underline; color:var(--navy); }
+  /* §고객 요청 Google Sheets 연동(최근 요청 표시 수정 라운드) — "요청 종류 · 요청일 ·
+     현장명"을 한 줄로, 칸(.col-request 150px)을 넘으면 말줄임(전체 내용은 title 툴팁으로
+     그대로 볼 수 있음, 위 request-cell-date-only와 같은 원칙). */
+  .request-gsheet-text{ display:block; font-size:11.5px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .request-cell-gsheet:hover .request-gsheet-text{ text-decoration:underline; color:var(--navy); }
   /* §고객 성향 컬럼 라운드 — "최근 요청" 컬럼 자리를 대체한다(.col-request/.request-cell은
      그대로 남겨둔다, 고객카드의 "최근 요청/고객 메모"는 이 클래스와 무관하게 계속 동작).
      행 높이를 넘지 않도록 grade-badge와 같은 작은 중립 회색 배지 스타일을 재사용한다(§11
@@ -7009,11 +7014,16 @@ window.SHIN2_CRM_APP_INIT = function(){
   // §요청 — 딱 이 5개 탭만. 나머지(여정_최종/업체가입현황/시트6/공법설명회/컨설팅요청/
   // 발행이력 등)는 중복 방지를 위해 절대 읽지 않는다 — 이 배열에 없으면 코드가 아예
   // fetch하지 않으므로(아래 for 루프가 이 배열만 순회) 구조적으로 보장된다.
+  // §요청(최근 요청 표시 수정 라운드) — "요청 종류 · 요청일 · 현장명"으로 간단히
+  // 보여주려면 현장명을 별도 필드로 들고 있어야 한다(그동안은 요약 텍스트 안에 묻혀
+  // 있어 다시 파싱해야 했다). siteNameCol이 있는 3개 탭(현장명 컬럼이 실제로 존재)만
+  // 채우고, 샘플카달로그요청/기타문의답변현황은 원래 그 컬럼이 없어 비워둔다(지어내지
+  // 않음).
   const GSHEET_TABS = [
-    { tab:'기술자문문의',     companyCol:'협력사명', dateCol:'접수일자', idCol:'문의ID(시스템)' },
-    { tab:'컨설팅요청_통합',  companyCol:'업체',     dateCol:'등록일자', idCol:'문의ID(시스템)' },
+    { tab:'기술자문문의',     companyCol:'협력사명', dateCol:'접수일자', idCol:'문의ID(시스템)', siteNameCol:'현장명' },
+    { tab:'컨설팅요청_통합',  companyCol:'업체',     dateCol:'등록일자', idCol:'문의ID(시스템)', siteNameCol:'현장명' },
     { tab:'샘플카달로그요청', companyCol:'업체',     dateCol:'접수일시', idCol:'문의ID' }, // §요청: "카달로그" 철자 그대로
-    { tab:'공법설명회이력',   companyCol:'시공사',   dateCol:'등록일',   idCol:'문의ID(시스템)' }, // §요청: 반드시 등록일(요청일 아님)
+    { tab:'공법설명회이력',   companyCol:'시공사',   dateCol:'등록일',   idCol:'문의ID(시스템)', siteNameCol:'현장명' }, // §요청: 반드시 등록일(요청일 아님)
     { tab:'기타문의답변현황', companyCol:'업체명',   dateCol:'등록일',   idCol:'문서ID(시스템)' }
   ];
   // §요청 "전화번호, 이메일, 담당자 이름은 가져오거나 저장하지 말 것" — 업체/발생일/ID
@@ -7139,7 +7149,8 @@ window.SHIN2_CRM_APP_INIT = function(){
       D.addSheetRequestActivity({
         companyId, activityText: item.displayText, originalText: item.displayText,
         category: item.tab, _dedupKey: item.dedupKey, sourceTab: item.tab,
-        sourceUniqueId: item.uniqueId, occurredAt: new Date(item.occurredTs).toISOString()
+        sourceUniqueId: item.uniqueId, occurredAt: new Date(item.occurredTs).toISOString(),
+        siteName: item.siteName || ''
       });
       addedCount++;
     });
@@ -7185,6 +7196,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         const companyColIdx = cols.findIndex(c=> (c.label || c.id) === cfg.companyCol);
         const dateColIdx = cols.findIndex(c=> (c.label || c.id) === cfg.dateCol);
         const idColIdx = cols.findIndex(c=> (c.label || c.id) === cfg.idCol);
+        const siteNameColIdx = cfg.siteNameCol ? cols.findIndex(c=> (c.label || c.id) === cfg.siteNameCol) : -1;
 
         table.rows.forEach(row=>{
           if(!row || !row.c) return;
@@ -7192,6 +7204,7 @@ window.SHIN2_CRM_APP_INIT = function(){
           const rawCompanyName = companyColIdx >= 0 ? gsheetCellToText(row.c[companyColIdx]) : '';
           const uniqueId = idColIdx >= 0 ? gsheetCellToText(row.c[idColIdx]) : '';
           const occurredTs = dateColIdx >= 0 ? parseGsheetDateCell(row.c[dateColIdx]) : null;
+          const siteName = siteNameColIdx >= 0 ? gsheetCellToText(row.c[siteNameColIdx]) : '';
 
           // §요청 "고유번호가 없는 행은 자동 반영하지 말고 확인 필요로"
           if(!uniqueId){ review.push({ tab:cfg.tab, reason:'고유번호 없음', rawCompanyName, raw:obj }); return; }
@@ -7211,7 +7224,7 @@ window.SHIN2_CRM_APP_INIT = function(){
             if(hits && hits.size === 1){ companyId = Array.from(hits)[0]; }
             else {
               // §요청: 미발견 또는 복수 후보는 자동 연결·생성 금지 — 확인 필요로만
-              review.push({ tab:cfg.tab, reason: (hits && hits.size > 1) ? '복수 후보' : '업체 못 찾음', rawCompanyName, raw:obj, dedupKey, uniqueId, occurredTs, displayText:null });
+              review.push({ tab:cfg.tab, reason: (hits && hits.size > 1) ? '복수 후보' : '업체 못 찾음', rawCompanyName, raw:obj, dedupKey, uniqueId, occurredTs, siteName, displayText:null });
               return;
             }
           }
@@ -7231,7 +7244,7 @@ window.SHIN2_CRM_APP_INIT = function(){
           D.addSheetRequestActivity({
             companyId, activityText: displayText, originalText: displayText, category: cfg.tab,
             _dedupKey: dedupKey, sourceTab: cfg.tab, sourceUniqueId: uniqueId,
-            occurredAt: new Date(occurredTs).toISOString()
+            occurredAt: new Date(occurredTs).toISOString(), siteName
           });
           addedCount++;
         });
@@ -7266,7 +7279,12 @@ window.SHIN2_CRM_APP_INIT = function(){
       gsheetImportState.running = false;
       gsheetImportState.ran = true;
       updateGsheetReviewCountBadge();
-      if(filterKey === 'newPartner') renderList();
+      // §최근 요청 표시 수정 라운드 — 예전엔 "신규 협약사" 탭에서만 이 결과를 썼어서 그
+      // 탭일 때만 다시 그렸는데, 이제 "최근 요청" 열이 모든 탭에서 이 데이터를 쓰므로
+      // (§요청 "신규 협약사 여부와 관계없이 반영") 탭과 무관하게 항상 다시 그려야 화면에
+      // 반영된다 — 안 그러면 목록은 계속 가져오기 전 상태로 남아있다(§조사로 확인된
+      // 두 번째 원인).
+      renderList();
     }
   }
   // §요청 "로그인·고객정보 로딩 완료 후 접속마다 1회" — 두 경로 모두 같은 idempotent
@@ -7968,10 +7986,19 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 보여준다(데이터 없음을 지어내지 않음).
       const recentRequestItems = buildRequestListItems(co);
       const latestRequestItem = recentRequestItems[0] || null;
+      // §고객 요청 Google Sheets 연동(최근 요청 표시 수정 라운드) — 메모/요청자료 항목은
+      // 기존 그대로 날짜만 보이고 자세한 내용은 hover(§요청과 무관, 이전 라운드의 명시적
+      // 결정 — 건드리지 않음). Google Sheets 요청만 요청하신 대로 "요청 종류 · 요청일 ·
+      // 현장명"을 셀에 바로 짧게 보여준다(그 값 자체가 이미 buildRequestListItems가 만든
+      // it.text 그대로 — 여기서 새로 조합하지 않음).
       const nameRequestCellHtml = latestRequestItem
-        ? `<button type="button" class="request-cell request-cell-date-only" data-name-request-detail="${esc(co.id)}" title="${esc(latestRequestItem.text)}">
-            <span class="request-date">${esc(fmtDate(latestRequestItem.createdAtIso))}</span>
-          </button>`
+        ? (latestRequestItem.kind === 'gsheet'
+          ? `<button type="button" class="request-cell request-cell-gsheet" data-name-request-detail="${esc(co.id)}" title="${esc(latestRequestItem.text)}">
+              <span class="request-gsheet-text">${esc(latestRequestItem.text)}</span>
+            </button>`
+          : `<button type="button" class="request-cell request-cell-date-only" data-name-request-detail="${esc(co.id)}" title="${esc(latestRequestItem.text)}">
+              <span class="request-date">${esc(fmtDate(latestRequestItem.createdAtIso))}</span>
+            </button>`)
         : `<button type="button" class="request-cell" data-name-request-detail="${esc(co.id)}"><span class="data-none">—</span></button>`;
       // §고객 성향 컬럼 라운드 §2/§6: 목록에는 co.customerInsight(별도 신규 필드,
       // 기존 salesTendency/reactions와 무관 — §10 "기존 필드와 충돌하지 않는 별도 구조")의
@@ -19732,6 +19759,26 @@ window.SHIN2_CRM_APP_INIT = function(){
         ts: earliest.createdAt, createdAtIso: earliest.createdAt
       });
     });
+    // §고객 요청 Google Sheets 연동(최근 요청 표시 수정 라운드) — §조사 결과: 이 함수가
+    // "최근 요청" 열의 실제 데이터 소스인데(§8083 .col-request가 이 함수 결과를 그대로
+    // 씀) memos/requestedMaterials 두 가지만 보고 있어서, customerActivities에 이미 정상
+    // 저장돼 있던 Google Sheets 요청이 여기 안 들어와 화면에서만 빠졌던 것이었다(저장
+    // 자체는 항상 신규 협약사 여부와 무관하게 성공하고 있었음 — D.addSheetRequestActivity
+    // 호출부 어디에도 isNewPartnerCompany 같은 조건이 없다, §확인). 그래서 세 번째
+    // 소스로 그대로 합치기만 한다 — 신규 저장소도, 신규 판정 로직도 만들지 않는다.
+    // "요청 종류 · 요청일 · 현장명"(§요청) — 요청 종류는 출처 탭명, 요청일은 실제
+    // 발생일(occurredAt, 가져온 시각이 아님)을 쓴다. 읽기 전용(수정/삭제 버튼 없음,
+    // reqRowHtml에서 kind==='gsheet' 분기) — 원본이 시트라 로컬에서 지워도 다음 확인
+    // 때 dedupKey 기준으로 다시 채워질 뿐이라 혼동을 막기 위해서다.
+    D.activitiesForCompany(co.id).forEach(a=>{
+      if(a.source !== 'google-sheets-request' || !a.occurredAt) return;
+      const parts = [a.sourceTab, fmtDate(a.occurredAt)];
+      if(a.siteName) parts.push(a.siteName);
+      items.push({
+        id: 'gsheet:' + a.id, kind:'gsheet', text: parts.join(' · '),
+        ts: a.occurredAt, createdAtIso: a.occurredAt
+      });
+    });
     items.sort((a,b)=> new Date(b.ts) - new Date(a.ts));
     return items;
   }
@@ -19788,6 +19835,8 @@ window.SHIN2_CRM_APP_INIT = function(){
         </div>
       </div>`;
     }
+    // §고객 요청 Google Sheets 연동(최근 요청 표시 수정 라운드) — kind==='gsheet'는
+    // 수정/삭제 버튼을 아예 보여주지 않는다(§ 읽기 전용, buildRequestListItems 주석 참고).
     return `<div class="req-row" data-req-id="${esc(it.id)}">
       <div class="req-row-meta">${esc(dateLabel)}</div>
       <div class="req-row-text">${esc(it.text)}</div>
@@ -19795,7 +19844,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         ${it.kind === 'memo' ? `<button type="button" class="cdash-mini-edit" data-memo-edit="${esc(it.memoId)}">수정</button>` : ''}
         ${it.kind === 'memo'
           ? `<button type="button" class="cdash-mini-edit" data-memo-del="${esc(it.memoId)}">삭제</button>`
-          : `<button type="button" class="cdash-mini-edit" data-material-del="${esc(it.id)}">삭제</button>`}
+          : it.kind === 'gsheet' ? '' : `<button type="button" class="cdash-mini-edit" data-material-del="${esc(it.id)}">삭제</button>`}
       </div>
     </div>`;
   }
