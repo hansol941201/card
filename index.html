@@ -7770,22 +7770,28 @@ window.SHIN2_CRM_APP_INIT = function(){
     return base;
   }
 
-  // mouTs 기준으로 reqs(그 업체의 sheetRequests, requestDate 내림차순) 중 0~N-1일 이내
-  // 첫 요청을 찾는다. computeL2L3Conversion(위)과 완전히 같은 규칙(협약 전 요청/N일 초과
-  // 요청은 전환에서 제외, 협약 전후 무관 전체 최초 요청도 참고용으로 함께 반환)을 N만
-  // 바꿔 그대로 재사용한 것 — 새 "현장등록 감지" 로직이 아니다.
+  // mouTs 기준으로 reqs(그 업체의 sheetRequests, requestDate 내림차순) 중 -N~N-1일 이내
+  // 첫 요청을 찾는다. computeL3TechAdviceWindow(§조기전환 라운드, 아래)와 같은 symmetric
+  // window 규칙을 그대로 재사용한 것 — 이 탭(L2→L3 전환관리)의 "운영 개선 비교"/드릴다운
+  // 모달에서도 협약 전 조기전환 문의가 더 이상 "—"로 숨겨지지 않고 최초 요청일에 잡히게
+  // 하기 위함(§요청 "모달도 동일 로직"). isEarly는 표시용 플래그일 뿐 firstConverting이
+  // 잡히면(협약 전이어도) 전환 신호로는 이미 포함된다.
   function npCmpComputeCompanyWindow(mouTs, reqs, N){
-    let firstOverall = null, firstConverting = null;
+    let firstOverall = null, firstConverting = null, isEarly = false;
+    const backLimit = l2l3EarlyConversionBackLimitDays(N);
     reqs.forEach(r=>{
       if(!r.requestDate) return;
       const occ = new Date(r.requestDate).getTime();
       if(isNaN(occ)) return;
       if(!firstOverall || occ < new Date(firstOverall.requestDate).getTime()) firstOverall = r;
       const days = Math.round((occ - mouTs) / 86400000);
-      if(days < 0 || days > N - 1) return; // 협약 전/N일 초과 요청은 전환에 포함하지 않음(§요청 "테스트 9/10")
-      if(!firstConverting || occ < new Date(firstConverting.requestDate).getTime()) firstConverting = r;
+      if(days < backLimit || days > N - 1) return; // §조기전환 라운드 — 협약 -N일 이전, N일 초과 요청만 전환에서 제외
+      if(!firstConverting || occ < new Date(firstConverting.requestDate).getTime()){
+        firstConverting = r;
+        isEarly = days < 0;
+      }
     });
-    return { firstOverall, firstConverting };
+    return { firstOverall, firstConverting, isEarly };
   }
 
   // §요청 3 관찰 완료/진행 중 판정 — "조기 전환"은 실제 캘린더 N일이 지났는지와 무관하게
@@ -7805,16 +7811,22 @@ window.SHIN2_CRM_APP_INIT = function(){
     const base = buildNpCmpAnalysisBase();
     const groups = { A: [], B: [] };
     base.rows.forEach(row=>{
-      const { firstConverting } = npCmpComputeCompanyWindow(row.mouTs, row.reqs, N);
+      const { firstConverting, isEarly } = npCmpComputeCompanyWindow(row.mouTs, row.reqs, N);
       // ⚠ 위 헤더 주석의 데이터 한계 그대로: 현재 시트 데이터로는 "현장등록"만 따로
       // 구분할 방법이 없어 platformConverted/l3Converted가 같은 신호를 쓴다. 두 값을
       // 하나의 변수로 합치지 않고 각자 계산해 둔다 — 나중에 시트에 현장등록 전용 컬럼이
       // 생기면 l3Converted 쪽만 그 신호로 바꾸면 된다.
       const platformConverted = !!firstConverting;
       const l3Converted = !!firstConverting;
-      const status = npCmpClassifyStatus(row.mouTs, base.todayTs, N, platformConverted);
+      let status = npCmpClassifyStatus(row.mouTs, base.todayTs, N, platformConverted);
+      // §조기전환 라운드 — 협약 "전" 문의로 전환된 경우, 기존 'early_converted'(캘린더
+      // N일이 아직 안 지나 조기 관찰완료된 것)와 의미가 다르므로 별도 status 값을 쓴다.
+      // observedList 판정은 여전히 "status !== 'in_progress'"만 보므로(아래 summarize),
+      // 이 값도 그대로 분모(관찰 완료)에 포함된다 — 이미 결과가 확정된 것이니 캘린더
+      // 경과와 무관하게 항상 관찰 완료로 본다는 기존 원칙(§9791 근처) 그대로.
+      if(platformConverted && isEarly) status = 'pre_mou_converted';
       groups[row.group].push({
-        co: row.co, mouTs: row.mouTs, status, platformConverted, l3Converted,
+        co: row.co, mouTs: row.mouTs, status, platformConverted, l3Converted, isEarly: !!isEarly,
         firstRequestAt: firstConverting ? firstConverting.requestDate : null,
         firstRequestType: firstConverting ? (firstConverting.requestType || firstConverting.sourceSheet || '') : null,
         daysToFirstRequest: firstConverting ? Math.round((new Date(firstConverting.requestDate).getTime() - row.mouTs) / 86400000) : null
@@ -8485,14 +8497,22 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 기존 필터 칩(#crmFilterRow)/관리필요 버튼과 완전히 같은 동작(filterKey 갱신 또는
   // openManagementNeedModal)을 그대로 호출한다 — "실제 기능이 없으면 클릭 가능하게
   // 만들지 말 것" 원칙에 따라, 이미 실제로 연결 가능한 4개이므로 전부 클릭 가능하게 뒀다.
+  // §L2→L3 전환율 KPI 카드 교체 라운드(신규, §요청 1/2) — "관리 필요 59" 카드를 없애고
+  // "L2→L3 전환율" 카드로 바꾼다. 기존 "관리 필요"(classifyManagementNeed 기준)는 이
+  // 카드에서만 빠질 뿐 managementNeedCache/openManagementNeedModal/업무관리 쪽 데이터·
+  // 로직은 전혀 안 건드린다(§요청 7, 업무관리에서 계속 확인 가능). 전환율 숫자는 새로
+  // 계산하지 않고 L2→L3 전환관리 탭이 쓰는 computeL2L3ManageAnalysis(위, §요청과 동일한
+  // 기본 기간 npCmpPeriodDays)를 그대로 재사용한다 — base/N이 그대로면 캐시를 반환하므로
+  // (바로 위 l2l3ManageAnalysisCache 주석 참고) 검색·필터 클릭마다 매번 재스캔되지 않는다.
   function renderKpiStrip(counts){
     const wrap = document.getElementById('crmKpiStrip');
     if(!wrap) return;
+    const l2l3 = computeL2L3ManageAnalysis(npCmpPeriodDays);
     const items = [
       { key:'all', label:'전체 고객', value: counts.all || 0, cls:'' },
       { key:'mouDone', label:'MOU 체결', value: counts.mouDone || 0, cls:'' },
       { key:'trendUp', label:'상승 업체', value: counts.trendUp || 0, cls:'is-up' },
-      { key:'manageNeeded', label:'관리 필요', value: counts.manageNeeded || 0, cls:'is-warn' }
+      { key:'l2l3Manage', label:'L2→L3 전환율', value: `${l2l3.rate}%`, cls: l2l3.rate < 50 ? 'is-warn' : '' }
     ];
     wrap.innerHTML = items.map(it=> `
       <button type="button" class="kpi-item ${it.cls}" data-kpi="${esc(it.key)}">
@@ -8501,7 +8521,6 @@ window.SHIN2_CRM_APP_INIT = function(){
       </button>`).join('');
     wrap.querySelectorAll('[data-kpi]').forEach(btn=> btn.addEventListener('click', ()=>{
       const key = btn.getAttribute('data-kpi');
-      if(key === 'manageNeeded'){ openManagementNeedModal(); return; }
       filterKey = key;
       currentPage = 1;
       renderList();
@@ -9263,6 +9282,10 @@ window.SHIN2_CRM_APP_INIT = function(){
   let npCmpInfoOpen = false;
   let lastNpCmpAnalysis = null; // 드릴다운 모달이 재계산 없이 참조할 수 있게 마지막 렌더 결과를 들고 있는다(DISPLAY ONLY 캐시)
   function fmtNpCmpStatus(status){
+    // §조기전환 라운드 — 'pre_mou_converted'(협약 전 문의로 전환)는 기존 'early_converted'
+    // (캘린더 N일이 아직 안 지나 조기 관찰완료된 것, 협약 전/후와 무관)와 뜻이 다르므로
+    // 라벨을 구분한다 — 기존 'early_converted' 문구는 그대로 둔다(다른 화면 문구 유지).
+    if(status === 'pre_mou_converted') return '조기전환(협약 전 문의)';
     if(status === 'complete_converted') return '관찰완료 · 전환';
     if(status === 'early_converted') return '조기전환(관찰완료)';
     if(status === 'complete_not_converted') return '관찰완료 · 미전환';
@@ -9486,20 +9509,39 @@ window.SHIN2_CRM_APP_INIT = function(){
      별도 기준(§요청 8)을 쓰므로, 두 번째 판정 로직을 새로 만든다(기존 함수에 파라미터를
      추가해 기본 동작을 바꾸는 대신, 별도 함수로 분리하는 쪽이 다른 호출부에 안전하다).
      ========================================================================== */
-  // mouTs 기준 0~N-1일 이내 첫 기술자문문의를 찾는다(§요청 9/12 "협약 전/관찰기간
-  // 초과는 전환 아님"). techReqs는 이미 sourceSheet==='기술자문문의'로만 걸러진 배열
-  // (아래 buildL2L3AnalysisBase가 만든다) — 여기서 종류를 다시 판정하지 않는다.
+  // §조기전환(pre-MOU 기술자문문의 포함) 라운드(신규) — 1차미팅→2차미팅→MOU 협상
+  // 과정에서 MOU 체결 "전"에 이미 기술자문문의(현장등록)가 발생하는 실제 케이스(해원건설
+  // 등)가 있다는 사용자 확인(§요청 "조기전환으로 해줘. 그리고 조기전환도 전환율에
+  // 포함시켜줘")에 따라, 협약 전 문의도 "조기전환"으로 전환 신호에 포함한다. 단 무제한
+  // lookback(옵션 A)은 몇 년 전의 무관한 문의까지 "전환"으로 잘못 세는 위험이 있어,
+  // forward window(0~N-1일)와 대칭인 symmetric window(옵션 B, -N~N-1일)로 되돌아보는
+  // 구간을 제한한다 — 이 경계는 아래 L2L3_EARLY_CONVERSION_BACK_WINDOW_MULTIPLIER 상수
+  // 하나로만 조정한다(다른 곳에 매직넘버로 흩어두지 않음). 사용자가 무제한 lookback을
+  // 원하면 이 상수를 Infinity로 바꾸면 된다.
+  const L2L3_EARLY_CONVERSION_BACK_WINDOW_MULTIPLIER = 1; // 1 = forward window(N일)와 대칭인 -N일까지 허용
+  function l2l3EarlyConversionBackLimitDays(N){
+    return -N * L2L3_EARLY_CONVERSION_BACK_WINDOW_MULTIPLIER; // 예: N=90 → -90일까지(경계 포함), -91일은 제외
+  }
+  // mouTs 기준 -N~N-1일(§조기전환 라운드, 위 상수로 뒤쪽 경계 결정) 이내 "최초" 기술자문
+  // 문의를 찾는다. techReqs는 이미 sourceSheet==='기술자문문의'로만 걸러진 배열(아래
+  // buildL2L3AnalysisBase가 만든다) — 여기서 종류를 다시 판정하지 않는다. 같은 업체에
+  // 협약 전/후 문의가 둘 다 있으면 "전체 중 가장 이른 것"이 최초 요청일이 된다(기존
+  // "earliest wins" 규칙 그대로, 협약 전 후보도 이제 함께 비교 대상에 들어감).
   function computeL3TechAdviceWindow(mouTs, techReqs, N){
-    let firstConverting = null;
+    let firstConverting = null, isEarly = false;
+    const backLimit = l2l3EarlyConversionBackLimitDays(N);
     techReqs.forEach(r=>{
       if(!r.requestDate) return;
       const occ = new Date(r.requestDate).getTime();
       if(isNaN(occ)) return;
       const days = Math.round((occ - mouTs) / 86400000);
-      if(days < 0 || days > N - 1) return; // §요청 9/12 — 협약 전, N일 초과 문의는 전환 아님
-      if(!firstConverting || occ < new Date(firstConverting.requestDate).getTime()) firstConverting = r;
+      if(days < backLimit || days > N - 1) return; // §조기전환 라운드 — 협약 -N일 이전, N일 초과 문의만 전환 아님
+      if(!firstConverting || occ < new Date(firstConverting.requestDate).getTime()){
+        firstConverting = r;
+        isEarly = days < 0; // 협약 "전" 문의면 조기전환
+      }
     });
-    return firstConverting; // §요청 13 — 여러 건이어도 항상 최초 1건만
+    return firstConverting ? { req: firstConverting, isEarly } : null; // §요청 13 — 여러 건이어도 항상 최초 1건만
   }
   // §요청 9/10/11 — 조기 전환(캘린더 N일이 안 지나도 이미 문의가 있으면)은 항상 "전환
   // 완료"로 본다(npCmpClassifyStatus와 같은 원칙). 전환이 안 됐을 때만 관찰기간(N일)이
@@ -9543,14 +9585,27 @@ window.SHIN2_CRM_APP_INIT = function(){
     l2l3AnalysisCache = { coRaw, reqRaw, base };
     return base;
   }
+  // §KPI 카드 교체 라운드(신규) — 상단 KPI 요약 바가 이제 매 renderList() 호출(검색
+  // 키입력·필터 클릭·페이지 이동 포함, §요청 "매 렌더마다 전체 재스캔 금지")마다 이
+  // 함수를 부르게 되므로, base(buildL2L3AnalysisBase, 이미 캐시됨)가 그대로고 N도
+  // 그대로면 재계산 없이 직전 결과를 그대로 돌려준다. base가 바뀌거나(데이터 변경)
+  // N이 바뀔 때(기간 선택)만 실제로 다시 map/forEach를 돈다 — L2→L3 전환관리 탭이
+  // 보여주는 숫자와 항상 같은 캐시를 공유하므로 두 화면의 값이 어긋날 일도 없다.
+  let l2l3ManageAnalysisCache = { base: null, N: null, result: null };
   function computeL2L3ManageAnalysis(N){
     const base = buildL2L3AnalysisBase();
+    if(l2l3ManageAnalysisCache.base === base && l2l3ManageAnalysisCache.N === N){
+      return l2l3ManageAnalysisCache.result;
+    }
     const rows = base.rows.map(row=>{
-      const firstConverting = computeL3TechAdviceWindow(row.mouTs, row.techReqs, N);
-      const converted = !!firstConverting;
+      const match = computeL3TechAdviceWindow(row.mouTs, row.techReqs, N);
+      const converted = !!match;
       const bucket = classifyL3TechAdviceBucket(row.mouTs, base.todayTs, N, converted);
       const days = Math.round((base.todayTs - row.mouTs) / 86400000);
-      return { co: row.co, mouTs: row.mouTs, days, converted, bucket, firstAdviceAt: firstConverting ? firstConverting.requestDate : null };
+      // §조기전환 라운드 — isEarly(협약 전 문의)는 전환/미전환 판정과 무관하게 표시용
+      // 플래그로만 쓴다. bucket은 여전히 'converted'이므로 전환율 분자·전환완료 서브탭
+      // 카운트에는 이미 그대로 포함된다(아래 converted/observedCount 계산 변경 없음).
+      return { co: row.co, mouTs: row.mouTs, days, converted, bucket, firstAdviceAt: match ? match.req.requestDate : null, isEarly: match ? match.isEarly : false };
     });
     const converted = rows.filter(r=> r.bucket === 'converted');
     const observing = rows.filter(r=> r.bucket === 'observing');
@@ -9559,7 +9614,9 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 분모/분자 어디에도 넣지 않는다.
     const observedCount = converted.length + needsAttention.length;
     const rate = observedCount ? Math.round((converted.length / observedCount) * 1000) / 10 : 0;
-    return { N, todayTs: base.todayTs, rows, converted, observing, needsAttention, observedCount, rate, total: rows.length };
+    const result = { N, todayTs: base.todayTs, rows, converted, observing, needsAttention, observedCount, rate, total: rows.length };
+    l2l3ManageAnalysisCache = { base, N, result };
+    return result;
   }
   const L2L3_SUBFILTERS = [
     ['all','전체'], ['converted','전환 완료'], ['observing','관찰 중'], ['needsAttention','관리 필요']
@@ -9646,13 +9703,19 @@ window.SHIN2_CRM_APP_INIT = function(){
         ${filtered.map(it=>{
           const elapsedText = it.days != null ? `${it.days}일` : '—';
           const adviceText = it.firstAdviceAt ? fmtDate(it.firstAdviceAt) : '—';
+          // §조기전환 라운드 — 협약 전 문의는 같은 "전환 완료" 배지 색(st-converted)을
+          // 그대로 쓰되(§요청 "새 색을 만들지 말 것"), 라벨 텍스트와 날짜 옆 작은 태그로만
+          // 구분한다. 기존 np2-req-badge 스타일(§313 근처, 이미 다른 곳에서 쓰는 중립
+          // 태그)을 재사용한다 — 새 CSS 클래스를 만들지 않는다.
+          const earlyTagHtml = it.isEarly ? ` <span class="np2-req-badge">조기전환</span>` : '';
+          const stateLabel = (it.bucket === 'converted' && it.isEarly) ? '전환 완료(조기)' : L2L3_BUCKET_LABEL[it.bucket];
           return `
           <div class="np2-row" data-l2l3-row="${esc(it.co.id)}" role="button" tabindex="0">
             <span class="np2-col-company"><span class="np2-col-name-line"><span class="np2-col-name">${esc(it.co.name || '(업체명 없음)')}</span></span></span>
             <span><span class="np2-field-label">협약 체결일</span>${esc(fmtDate(it.mouTs))}</span>
             <span><span class="np2-field-label">협약 후 경과일</span>${esc(elapsedText)}</span>
-            <span><span class="np2-field-label">기술자문문의 발생일</span>${esc(adviceText)}</span>
-            <span><span class="np2-field-label">현재 상태</span><span class="np2-state-badge ${esc(L2L3_BUCKET_BADGE_CLASS[it.bucket])}">${esc(L2L3_BUCKET_LABEL[it.bucket])}</span></span>
+            <span><span class="np2-field-label">기술자문문의 발생일</span>${esc(adviceText)}${earlyTagHtml}</span>
+            <span><span class="np2-field-label">현재 상태</span><span class="np2-state-badge ${esc(L2L3_BUCKET_BADGE_CLASS[it.bucket])}">${esc(stateLabel)}</span></span>
           </div>`;
         }).join('')}
       </div>`;
