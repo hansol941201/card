@@ -356,6 +356,43 @@
     .np2-col-detail-btn{ justify-self:auto; align-self:stretch; text-align:center; padding:9px 8px; }
     .np2-field-label{ display:inline; }
   }
+  /* §운영 개선 효과 비교 라운드(신규) — "신규 협약사" 탭 전용 A/B 기간 비교 카드.
+     새 색/새 컴포넌트 언어를 만들지 않고 기존 .np2-*/.list-filter-chip 톤(흰 배경+네이비
+     강조)만 재사용한다. 접두사만 npcmp-로 분리해 기존 np2- 클래스와 절대 충돌하지 않게. */
+  .npcmp-section{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px 18px; margin-bottom:12px; }
+  .npcmp-head{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
+  .npcmp-title-wrap{ display:flex; align-items:center; gap:6px; }
+  .npcmp-title{ font-size:14.5px; font-weight:800; color:var(--text); }
+  .npcmp-info-btn{ display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; border:1px solid var(--line); background:#f4f7fb; color:var(--text-muted); font-size:11px; font-weight:700; cursor:pointer; padding:0; line-height:1; }
+  .npcmp-info-btn:hover{ background:var(--bg); }
+  .npcmp-info-pop{ margin:0 0 12px; padding:10px 12px; background:#f4f7fb; border:1px solid var(--line); border-radius:8px; font-size:12px; color:var(--text-muted); line-height:1.55; }
+  .npcmp-period-group{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .npcmp-period-label{ font-size:12px; color:var(--text-muted); margin-right:2px; }
+  .npcmp-table-wrap{ overflow-x:auto; }
+  .npcmp-table{ width:100%; border-collapse:collapse; min-width:620px; font-size:12.5px; }
+  .npcmp-table th, .npcmp-table td{ padding:10px 10px; border-bottom:1px solid #e8eef5; text-align:right; white-space:nowrap; }
+  .npcmp-table th:first-child, .npcmp-table td:first-child{ text-align:left; }
+  .npcmp-table thead th{ color:#4b607c; font-weight:700; font-size:11.5px; background:#f9fbfd; border-bottom:1px solid var(--line); }
+  .npcmp-table tbody tr:last-child td{ border-bottom:0; }
+  .npcmp-group-name{ font-weight:750; color:#142945; }
+  .npcmp-num-btn{ font-family:inherit; font:inherit; background:none; border:0; padding:0; color:var(--blue); font-weight:700; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+  .npcmp-num-btn:hover{ color:var(--navy); }
+  .npcmp-num-btn:disabled{ color:var(--text-faint); text-decoration:none; cursor:default; }
+  .npcmp-sample{ color:var(--text-faint); font-size:10.5px; font-weight:500; margin-left:3px; }
+  .npcmp-inprogress-note{ color:var(--text-faint); font-size:10.5px; display:block; margin-top:1px; }
+  .npcmp-callouts{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-top:14px; }
+  .npcmp-callout{ background:linear-gradient(135deg,#0b3978,var(--navy)); border-radius:10px; padding:14px 16px; color:#fff; }
+  .npcmp-callout-label{ font-size:11.5px; font-weight:700; color:rgba(255,255,255,.75); margin-bottom:4px; }
+  .npcmp-callout-rate{ font-size:20px; font-weight:800; }
+  .npcmp-callout-rate .npcmp-arrow{ color:rgba(255,255,255,.6); font-weight:600; margin:0 4px; }
+  .npcmp-callout-delta{ font-size:13px; font-weight:800; color:#8FE3B0; margin-top:4px; }
+  .npcmp-callout-relative{ font-size:10.5px; color:rgba(255,255,255,.68); margin-top:2px; }
+  .npcmp-excluded-note{ margin-top:10px; font-size:11px; color:var(--text-faint); }
+  .npcmp-excluded-note button{ font-family:inherit; font:inherit; background:none; border:0; padding:0; color:var(--blue); text-decoration:underline; cursor:pointer; }
+  @media (max-width:640px){
+    .npcmp-callouts{ grid-template-columns:1fr; }
+    .npcmp-table{ min-width:560px; }
+  }
   .col-recent{ flex:1.4 1 150px; min-width:0; color:var(--text-muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .col-recent .recent-date{ color:var(--text-faint); margin-right:4px; }
   .col-yr, .col-total{ flex:0 0 62px; font-size:12.5px; color:var(--text); text-align:right; }
@@ -3361,6 +3398,10 @@ table.pdf-doc-table thead{ background:var(--bg); }
   <!-- §고객 요청 Google Sheets 연동 라운드(신규) — "확인 필요" 목록(업체명이 매칭 안 되거나
        복수 후보인 시트 행) 전용 root. -->
   <div id="gsheetReviewModalRoot"></div>
+  <!-- §운영 개선 효과 비교 라운드(신규) — "신규 협약사" 탭의 플랫폼 초기 운영 vs 7월
+       개선 이후 비교 표에서 숫자를 클릭했을 때 여는 업체 드릴다운 전용 root. 같은
+       .pi-overlay/.pi-panel 패턴. -->
+  <div id="npCmpDrillModalRoot"></div>
   <!-- §외부 동기화 제거 라운드(신규) — "전체 동기화"/개별 협력업체·진행현황 동기화/공개범위
        가져오기/동기화 진단/동기화 기록 보기 전용이던 모달 root들(partnerSyncModalRoot/
        syncDiagModalRoot/partnerListSyncModalRoot/distListSyncModalRoot/fullSyncModalRoot/
@@ -7548,6 +7589,163 @@ window.SHIN2_CRM_APP_INIT = function(){
     return { total: pool.length, converted: convertedCount, rate, rows };
   }
 
+  /* ==========================================================================
+     §운영 개선 효과 비교 라운드(신규) — "플랫폼 초기 운영 vs 7월 개선 이후" 전환율 비교.
+     "신규 협약사" 탭(위 computeNewPartnerConversionSummary/computeL2L3Conversion) 계산과
+     완전히 별개인 새 화면 구획이지만, 데이터 소스와 핵심 판정 규칙(sheetRequests 컬렉션,
+     "협약 후 0~N-1일 이내 요청 1건 이상 = 전환")은 그대로 재사용한다 — 두 번째 매칭
+     로직이나 두 번째 "현장등록 감지" 로직을 새로 만들지 않는다(§요청 "재정의 금지").
+
+     ⚠ 데이터 한계(§요청 1 진단 결과, 화면에도 그대로 노출) — GSHEET_TABS(위, 5개 탭)에는
+     "현장등록"만 따로 구분하는 요청 종류가 없다. 기존 "신규 협약사" 탭이 "현장등록"이라고
+     표시하는 상태(classifyNewPartnerRow)도 실제로는 computeL2L3Conversion.converted, 즉
+     "협약 후 90일 이내 첫 플랫폼 요청 발생"과 동일한 신호다. 그래서 아래 1차 전환(플랫폼
+     요청 발생)과 최종 전환(L3/현장등록)은 현재 데이터로는 항상 같은 값이 나온다 — 이건
+     이 코드가 둘을 잘못 계산해서가 아니라, 원본 시트에 "현장등록"을 구분할 데이터 자체가
+     없기 때문이다. 두 지표를 하나로 합치지 않고 각각 별도로 계산·표시하되(§요청 2 "do not
+     conflate"), 이 한계는 UI에도 안내 문구로 명시한다.
+     ========================================================================== */
+  const NPCMP_B_START_TS = new Date(2026,6,1).getTime(); // 2026-07-01 00:00 로컬 달력일 — B그룹(7월 개선 이후) 시작
+  const NPCMP_A_END_TS = new Date(2026,5,30).getTime(); // 2026-06-30 00:00 로컬 달력일 — A그룹(플랫폼 초기 운영) 끝(포함)
+  const NPCMP_PERIODS = [30, 60, 90];
+
+  // 구글시트 sheetRequests 전체에서 "실제 최초 요청 기록일"(달력일, 시간 없음)을 찾는다.
+  // 시트가 언제 만들어졌는지/이 코드를 언제 작성했는지와 무관하게, 저장된 요청 문서 중
+  // requestDate가 가장 오래된 것 하나만 본다(§요청 1 "구글시트 최초 실제 기록일").
+  function npCmpFindEarliestRequestDateOnly(sheetReqsByCompany){
+    let earliestTs = null;
+    sheetReqsByCompany.forEach(list=>{
+      list.forEach(r=>{
+        if(!r.requestDate) return;
+        const ts = new Date(r.requestDate).getTime();
+        if(isNaN(ts)) return;
+        if(earliestTs == null || ts < earliestTs) earliestTs = ts;
+      });
+    });
+    if(earliestTs == null) return null;
+    const d = new Date(earliestTs);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  }
+
+  // §성능(§요청 10) — companies/sheetRequests의 localStorage 원문이 바뀌지 않았으면
+  // (buildSheetRequestsIndex와 같은 raw-캐시 원칙) 업체 400~수천 곳을 다시 훑지 않고
+  // 이전에 만든 base를 그대로 돌려준다. N(30/60/90) 선택이 바뀔 때는 이 base를 그대로
+  // 재사용하고 computeNpCmpAnalysis만 다시 부른다 — 새 구글시트/Firestore 조회가 전혀
+  // 없다(§요청 10 "period 전환 시 새 fetch 금지"). 계산은 "신규 협약사" 탭이 실제로
+  // 렌더될 때만 일어나는 지연 계산이다(아래 renderNpCmpSection 호출부 참고, §요청 10
+  // "탭 전환 속도 저하 없음").
+  let npCmpAnalysisCache = { coRaw: undefined, reqRaw: undefined, base: null };
+  function buildNpCmpAnalysisBase(){
+    const coRaw = localStorage.getItem(CO_KEY);
+    const reqRaw = localStorage.getItem(SHEETREQ_CACHE_KEY);
+    if(coRaw === npCmpAnalysisCache.coRaw && reqRaw === npCmpAnalysisCache.reqRaw && npCmpAnalysisCache.base){
+      return npCmpAnalysisCache.base;
+    }
+    const companies = D.loadActiveCompanies(); // §요청 7 매칭 — sheetRequests는 이미 companyId가 붙은 문서만 담는
+    // 컬렉션(위 §5445 근처 주석 참고, ingest 시점에 D.normCompanyName으로 정규화 매칭 완료) —
+    // 여기서 업체명을 다시 정규화해 매칭하지 않는다(두 번째 매칭 로직 금지, §요청 7).
+    const sheetReqsByCompany = D.buildSheetRequestsIndex();
+    const todayTs = getSeoulTodayDateOnly();
+    const earliestReqDateOnly = npCmpFindEarliestRequestDateOnly(sheetReqsByCompany);
+
+    let noMouCount = 0, futureMouCount = 0, prePlatformExcludedCount = 0;
+    const rows = []; // {co, mouTs, group, reqs} — companyId -> 값 하나로만 존재(중복 없음)
+    companies.forEach(co=>{
+      const mou = resolveEffectiveMouDate(co);
+      if(!mou){ noMouCount++; return; } // §요청 1 "협약일 데이터가 없는 업체 수"
+      if(mou.ts > todayTs){ futureMouCount++; return; } // 미래 협약일은 분석 대상 아님(이상치 방어, isNewPartnerCompany와 같은 원칙)
+      let group = null;
+      if(earliestReqDateOnly != null && mou.ts < earliestReqDateOnly){
+        prePlatformExcludedCount++; // §요청 "pre-platform 그룹을 만들지 마세요" — A/B 어디에도 넣지 않고 완전히 제외
+      } else if(mou.ts <= NPCMP_A_END_TS){
+        group = 'A'; // 플랫폼 초기 운영: 최초 실제 기록일 ~ 2026-06-30
+      } else if(mou.ts >= NPCMP_B_START_TS){
+        group = 'B'; // 7월 개선 이후: 2026-07-01 ~
+      }
+      if(!group) return;
+      rows.push({ co, mouTs: mou.ts, group, reqs: sheetReqsByCompany.get(String(co.id)) || [] });
+    });
+
+    const base = {
+      rows, todayTs, earliestReqDateOnly,
+      noMouCount, futureMouCount, prePlatformExcludedCount,
+      // §요청 7-5 "매칭 확인 필요" — 이 분석 범위와 무관하게 이미 존재하는 gsheetImportState.reviewItems
+      // (업체명이 아예 매칭 안 됐거나 복수 후보인 시트 행, §7551 근처)를 그대로 노출만 한다 — 새 큐를 만들지 않음.
+      unmatchedReviewCount: (gsheetImportState.reviewItems || []).length,
+      unmatchedReviewCompanyNames: Array.from(new Set((gsheetImportState.reviewItems || []).map(it=> it.rawCompanyName).filter(Boolean)))
+    };
+    npCmpAnalysisCache = { coRaw, reqRaw, base };
+    return base;
+  }
+
+  // mouTs 기준으로 reqs(그 업체의 sheetRequests, requestDate 내림차순) 중 0~N-1일 이내
+  // 첫 요청을 찾는다. computeL2L3Conversion(위)과 완전히 같은 규칙(협약 전 요청/N일 초과
+  // 요청은 전환에서 제외, 협약 전후 무관 전체 최초 요청도 참고용으로 함께 반환)을 N만
+  // 바꿔 그대로 재사용한 것 — 새 "현장등록 감지" 로직이 아니다.
+  function npCmpComputeCompanyWindow(mouTs, reqs, N){
+    let firstOverall = null, firstConverting = null;
+    reqs.forEach(r=>{
+      if(!r.requestDate) return;
+      const occ = new Date(r.requestDate).getTime();
+      if(isNaN(occ)) return;
+      if(!firstOverall || occ < new Date(firstOverall.requestDate).getTime()) firstOverall = r;
+      const days = Math.round((occ - mouTs) / 86400000);
+      if(days < 0 || days > N - 1) return; // 협약 전/N일 초과 요청은 전환에 포함하지 않음(§요청 "테스트 9/10")
+      if(!firstConverting || occ < new Date(firstConverting.requestDate).getTime()) firstConverting = r;
+    });
+    return { firstOverall, firstConverting };
+  }
+
+  // §요청 3 관찰 완료/진행 중 판정 — "조기 전환"은 실제 캘린더 N일이 지났는지와 무관하게
+  // 이미 결과가 확정된 것이므로 항상 "관찰 완료"로 취급한다(§요청 "조기 전환도 관찰
+  // 완료+전환으로 — 진행 중으로 이중 분류 금지"). 전환되지 않은 경우에만 캘린더 N일
+  // 경과 여부(mouTs+N일 <= 오늘)로 관찰 완료/진행 중을 가른다.
+  function npCmpClassifyStatus(mouTs, todayTs, N, converted){
+    if(converted) return (mouTs + N * 86400000) <= todayTs ? 'complete_converted' : 'early_converted';
+    return (mouTs + N * 86400000) <= todayTs ? 'complete_not_converted' : 'in_progress';
+  }
+
+  // base.rows(이미 한 번만 만들어 둔 회사별 Map 대응 배열)를 선택된 N일 기준으로 훑어
+  // A/B 그룹별 1차 전환(플랫폼 요청 발생)·최종 전환(L3, computeL2L3Conversion과 동일 판정)
+  // 집계를 만든다. §성능 — localStorage/구글시트 재조회가 전혀 없고, base.rows 한 번만
+  // 순회한다(업체 하나당 자기 sheetRequests만 봄, 전체 재스캔 없음).
+  function computeNpCmpAnalysis(N){
+    const base = buildNpCmpAnalysisBase();
+    const groups = { A: [], B: [] };
+    base.rows.forEach(row=>{
+      const { firstConverting } = npCmpComputeCompanyWindow(row.mouTs, row.reqs, N);
+      // ⚠ 위 헤더 주석의 데이터 한계 그대로: 현재 시트 데이터로는 "현장등록"만 따로
+      // 구분할 방법이 없어 platformConverted/l3Converted가 같은 신호를 쓴다. 두 값을
+      // 하나의 변수로 합치지 않고 각자 계산해 둔다 — 나중에 시트에 현장등록 전용 컬럼이
+      // 생기면 l3Converted 쪽만 그 신호로 바꾸면 된다.
+      const platformConverted = !!firstConverting;
+      const l3Converted = !!firstConverting;
+      const status = npCmpClassifyStatus(row.mouTs, base.todayTs, N, platformConverted);
+      groups[row.group].push({
+        co: row.co, mouTs: row.mouTs, status, platformConverted, l3Converted,
+        firstRequestAt: firstConverting ? firstConverting.requestDate : null,
+        firstRequestType: firstConverting ? (firstConverting.requestType || firstConverting.sourceSheet || '') : null,
+        daysToFirstRequest: firstConverting ? Math.round((new Date(firstConverting.requestDate).getTime() - row.mouTs) / 86400000) : null
+      });
+    });
+    function summarize(list){
+      const inProgressList = list.filter(it=> it.status === 'in_progress');
+      const observedList = list.filter(it=> it.status !== 'in_progress'); // 관찰 완료(조기 전환 포함) — 확정 전환율의 유일한 분모
+      const platformConvertedList = observedList.filter(it=> it.platformConverted);
+      const l3ConvertedList = observedList.filter(it=> it.l3Converted);
+      return {
+        total: list.length, list,
+        observedList, inProgressList,
+        observedCount: observedList.length, inProgressCount: inProgressList.length,
+        platformConvertedList, platformConvertedCount: platformConvertedList.length,
+        platformRate: observedList.length ? Math.round((platformConvertedList.length / observedList.length) * 1000) / 10 : null,
+        l3ConvertedList, l3ConvertedCount: l3ConvertedList.length,
+        l3Rate: observedList.length ? Math.round((l3ConvertedList.length / observedList.length) * 1000) / 10 : null
+      };
+    }
+    return { N, base, A: summarize(groups.A), B: summarize(groups.B) };
+  }
+
   let gsheetImportState = { ran:false, running:false, lastError:null, saveError:null, reviewItems:[], lastSavedCount:0, lastMatchedCount:0, lastLinkNote:null };
   // 확인 필요 항목에서 사용자가 기존 업체를 직접 고르면: 별칭을 저장하고(§요청, 재사용
   // 가능한 연결), 그 업체명(원본 sourceCompanyName)으로 대기 중이던 확인 필요 행 "전부"에
@@ -7787,6 +7985,14 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 필요 우선 → 경과일 많은 순)과 같은 의도라 그대로 쓰고, recent는 방향만 뒤집어(경과일
   // 적은 = 최근 체결) 재사용한다 — 새 정렬 기준을 만들지 않는다.
   let newPartnerSortMode = 'urgent';
+  // §운영 개선 효과 비교 라운드(신규) — "플랫폼 초기 운영 vs 7월 개선 이후" 비교 표의
+  // 협약 후 N일 선택값(30/60/90, 기본 90). 신규 협약사 탭 안에서만 쓰는 상태라 다른
+  // 탭 필터와 분리해 둔다(§요청 5). 값이 바뀌어도 buildNpCmpAnalysisBase()가 만든 캐시는
+  // 그대로 재사용하고 computeNpCmpAnalysis(N)만 다시 부른다 — 새 조회 없음(§요청 10).
+  let npCmpPeriodDays = 90;
+  // §운영 개선 효과 비교 라운드(신규) — 비교 표 숫자를 클릭했을 때 여는 드릴다운 모달이
+  // "어느 그룹·어느 지표"를 보여주고 있는지만 기억한다(DISPLAY ONLY, 새 데이터 없음).
+  let npCmpDrillState = null;
   // §디자인 개편 라운드(신규) — 검색창 옆 정렬 select(crmSortSelect)가 렌더 함수 밖(전역
   // change 리스너)에서도 이 탭을 가벼운 경로로 다시 그릴 수 있게, renderNewPartnerTab이
   // 매번 받는 enriched 인자를 그대로 저장해 둔다(§성능 — renderList() 전체 재계산 없이
@@ -8880,6 +9086,233 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 최신 1건의 날짜를 다시 계산하지 않고 이 값을 그대로 쓴다(새 조회 없음, §성능).
     return { label: items[0].label, extra: items.length - 1, ts: items[0].ts || null };
   }
+  /* ==========================================================================
+     §운영 개선 효과 비교 라운드(신규) — 위 computeNpCmpAnalysis(N)의 결과를 "신규 협약사"
+     탭 안에 표/콜아웃/드릴다운으로 보여준다. 계산 자체(A/B 분류, 전환 판정)는 전혀 여기서
+     하지 않고 위 데이터 레이어 함수만 부른다 — 이 구획은 순수 렌더링/바인딩만 담당.
+     §요청 10 "지연 계산" — renderNewPartnerTab이 실제로 이 탭을 그릴 때만(heroHtml 조립
+     시점) computeNpCmpAnalysis를 부른다. 앱 부팅/다른 탭 렌더링 경로에서는 전혀 호출되지
+     않는다.
+     ========================================================================== */
+  let npCmpInfoOpen = false;
+  let lastNpCmpAnalysis = null; // 드릴다운 모달이 재계산 없이 참조할 수 있게 마지막 렌더 결과를 들고 있는다(DISPLAY ONLY 캐시)
+  function fmtNpCmpStatus(status){
+    if(status === 'complete_converted') return '관찰완료 · 전환';
+    if(status === 'early_converted') return '조기전환(관찰완료)';
+    if(status === 'complete_not_converted') return '관찰완료 · 미전환';
+    return '진행 중';
+  }
+  function fmtNpCmpRate(rate){ return rate == null ? '—' : (rate + '%'); }
+  // 표/콜아웃에서 숫자를 클릭했을 때 드릴다운 모달을 채울 (그룹,지표) 조합 정의.
+  // list는 항상 lastNpCmpAnalysis[group][listKey] 배열(업체별 계산 결과, 위 computeNpCmpAnalysis
+  // 참고) — 여기서 새로 필터링/재계산하지 않는다.
+  function npCmpDrillList(group, metric){
+    if(!lastNpCmpAnalysis) return [];
+    const g = lastNpCmpAnalysis[group];
+    if(!g) return [];
+    if(metric === 'total') return g.list;
+    if(metric === 'observed') return g.observedList;
+    if(metric === 'inProgress') return g.inProgressList;
+    if(metric === 'platform') return g.platformConvertedList;
+    if(metric === 'l3') return g.l3ConvertedList;
+    return [];
+  }
+  const NPCMP_METRIC_LABEL = {
+    total:'신규 협약', observed:'관찰 완료', inProgress:'진행 중',
+    platform:'플랫폼 요청 발생', l3:'현장등록(L3 전환)'
+  };
+  const NPCMP_GROUP_LABEL = { A:'플랫폼 초기 운영', B:'7월 개선 이후' };
+  function closeNpCmpDrillModal(){
+    const root = document.getElementById('npCmpDrillModalRoot');
+    if(root) root.innerHTML = '';
+  }
+  // §요청 6 드릴다운 — 각 행은 업체명/협약일/그룹/최초 플랫폼 요청일/최초 요청 종류/
+  // 현장등록일/협약후 최초요청까지 걸린 일수/협약후 현장등록까지 걸린 일수/관찰완료·진행중
+  // 상태를 보여주고, 기존 "고객카드 보기"(data-terminated-open-card와 동일한 openCard(id))로
+  // 이동한다 — 새 고객 카드 연결 방식을 만들지 않는다.
+  function openNpCmpDrillModal(group, metric){
+    const root = document.getElementById('npCmpDrillModalRoot');
+    if(!root) return;
+    const list = npCmpDrillList(group, metric);
+    const N = lastNpCmpAnalysis ? lastNpCmpAnalysis.N : npCmpPeriodDays;
+    const title = `${NPCMP_GROUP_LABEL[group] || group} — ${NPCMP_METRIC_LABEL[metric] || metric} (${list.length}곳, 협약 후 ${N}일 기준)`;
+    root.innerHTML = `
+      <div class="pi-overlay" id="npCmpDrillOverlay">
+        <div class="pi-panel" style="max-width:860px;max-height:84vh;" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+          <div class="pi-head">
+            <div class="pi-title">${esc(title)}</div>
+            <button type="button" class="chart-close-btn" id="npCmpDrillCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body" style="overflow-y:auto;">
+            ${!list.length ? `<div class="local-cloud-diag-empty">해당하는 업체가 없습니다.</div>` : `
+            <div style="overflow-x:auto;">
+            <table class="npcmp-table" style="min-width:760px;">
+              <thead><tr>
+                <th>업체명</th><th>그룹</th><th>협약일</th><th>최초 요청일</th><th>최초 요청 종류</th>
+                <th>현장등록일</th><th>협약→최초요청(일)</th><th>협약→현장등록(일)</th><th>상태</th>
+              </tr></thead>
+              <tbody>
+                ${list.map(it=> `
+                  <tr>
+                    <td style="text-align:left;"><button type="button" class="npcmp-num-btn" data-npcmp-open-card="${esc(it.co.id)}">${esc(it.co.name || '(업체명 없음)')}</button></td>
+                    <td style="text-align:left;">${esc(NPCMP_GROUP_LABEL[group] || group)}</td>
+                    <td>${esc(fmtDate(it.mouTs))}</td>
+                    <td>${it.firstRequestAt ? esc(fmtDate(it.firstRequestAt)) : '—'}</td>
+                    <td style="text-align:left;">${it.firstRequestType ? esc(it.firstRequestType) : '—'}</td>
+                    <td>${it.l3Converted && it.firstRequestAt ? esc(fmtDate(it.firstRequestAt)) : '—'}</td>
+                    <td>${it.daysToFirstRequest != null ? esc(it.daysToFirstRequest) : '—'}</td>
+                    <td>${it.l3Converted && it.daysToFirstRequest != null ? esc(it.daysToFirstRequest) : '—'}</td>
+                    <td style="text-align:left;">${esc(fmtNpCmpStatus(it.status))}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            </div>
+            <div class="npcmp-info-pop" style="margin-top:12px;">현장등록일은 원본 구글시트에 "현장등록"만 따로 구분하는 요청 종류가 없어, 현재는 최초 플랫폼 요청일과 같은 값을 씁니다(데이터 한계, §진단 참고).</div>
+            `}
+          </div>
+          <div class="pi-actions">
+            <button type="button" class="co-text-action" id="npCmpDrillCloseBtn2">닫기</button>
+          </div>
+        </div>
+      </div>`;
+    const close = ()=> closeNpCmpDrillModal();
+    document.getElementById('npCmpDrillCloseBtn').addEventListener('click', close);
+    document.getElementById('npCmpDrillCloseBtn2').addEventListener('click', close);
+    root.querySelectorAll('[data-npcmp-open-card]').forEach(btn=> btn.addEventListener('click', ()=>{
+      close();
+      openCard(btn.getAttribute('data-npcmp-open-card'));
+    }));
+    bindSafeBackdropClose(document.getElementById('npCmpDrillOverlay'), close);
+  }
+  // 매칭 확인 필요/협약일 없음처럼 "고객카드로 연결되는 업체 목록"이 아니라 원문 텍스트만
+  // 보여주면 되는 제외 사유용 간단 모달(§요청 7-5 "제외 건수·업체명 노출").
+  function openNpCmpExcludedModal(title, names){
+    const root = document.getElementById('npCmpDrillModalRoot');
+    if(!root) return;
+    root.innerHTML = `
+      <div class="pi-overlay" id="npCmpDrillOverlay">
+        <div class="pi-panel" style="max-width:520px;max-height:80vh;" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+          <div class="pi-head">
+            <div class="pi-title">${esc(title)}</div>
+            <button type="button" class="chart-close-btn" id="npCmpDrillCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body" style="overflow-y:auto;">
+            ${!names.length ? `<div class="local-cloud-diag-empty">해당하는 항목이 없습니다.</div>` :
+              `<div class="local-cloud-diag-row" style="flex-direction:column;align-items:flex-start;gap:6px;">${names.map(n=> `<div>${esc(n)}</div>`).join('')}</div>`}
+          </div>
+          <div class="pi-actions">
+            <button type="button" class="co-text-action" id="npCmpDrillCloseBtn2">닫기</button>
+          </div>
+        </div>
+      </div>`;
+    const close = ()=> closeNpCmpDrillModal();
+    document.getElementById('npCmpDrillCloseBtn').addEventListener('click', close);
+    document.getElementById('npCmpDrillCloseBtn2').addEventListener('click', close);
+    bindSafeBackdropClose(document.getElementById('npCmpDrillOverlay'), close);
+  }
+  // §요청 4 표 + 콜아웃 HTML. computeNpCmpAnalysis(npCmpPeriodDays)를 여기서 한 번만 부르고
+  // (§성능, base는 캐시 재사용) 결과를 lastNpCmpAnalysis에 저장해 드릴다운이 재사용한다.
+  function renderNpCmpSectionHtml(){
+    const analysis = computeNpCmpAnalysis(npCmpPeriodDays);
+    lastNpCmpAnalysis = analysis;
+    const { A, B, base } = analysis;
+    const earliestLabel = base.earliestReqDateOnly != null ? fmtDate(base.earliestReqDateOnly) : '기록 없음';
+    function numBtn(group, metric, count){
+      const disabled = count === 0;
+      return `<button type="button" class="npcmp-num-btn"${disabled ? ' disabled' : ''} data-npcmp-drill="${esc(group)}:${esc(metric)}">${esc(count)}</button>`;
+    }
+    function rowHtml(group, g){
+      return `
+        <tr>
+          <td><span class="npcmp-group-name">${esc(NPCMP_GROUP_LABEL[group])}</span></td>
+          <td>${numBtn(group,'total',g.total)}</td>
+          <td>${numBtn(group,'observed',g.observedCount)}${g.inProgressCount ? `<span class="npcmp-inprogress-note">진행 중 ${numBtn(group,'inProgress',g.inProgressCount)}곳</span>` : ''}</td>
+          <td>${numBtn(group,'platform',g.platformConvertedCount)}</td>
+          <td>${esc(fmtNpCmpRate(g.platformRate))}<span class="npcmp-sample">표본 ${esc(g.observedCount)}곳</span></td>
+          <td>${numBtn(group,'l3',g.l3ConvertedCount)}</td>
+          <td>${esc(fmtNpCmpRate(g.l3Rate))}<span class="npcmp-sample">표본 ${esc(g.observedCount)}곳</span></td>
+        </tr>`;
+    }
+    function deltaBlock(label, rateA, rateB){
+      const pctPoint = (rateA != null && rateB != null) ? Math.round((rateB - rateA) * 10) / 10 : null;
+      const relative = (rateA != null && rateB != null && rateA > 0) ? Math.round(((rateB - rateA) / rateA) * 1000) / 10 : null;
+      return `
+        <div class="npcmp-callout">
+          <div class="npcmp-callout-label">${esc(label)}</div>
+          <div class="npcmp-callout-rate">${esc(fmtNpCmpRate(rateA))}<span class="npcmp-arrow">→</span>${esc(fmtNpCmpRate(rateB))}</div>
+          <div class="npcmp-callout-delta">${pctPoint == null ? '변화 계산 불가(표본 없음)' : (pctPoint >= 0 ? '+' : '') + pctPoint + '%p ' + (pctPoint >= 0 ? '상승' : '하락')}</div>
+          ${relative != null ? `<div class="npcmp-callout-relative">참고(상대 변화): 약 ${Math.abs(relative)}% ${relative >= 0 ? '증가' : '감소'}</div>` : ''}
+        </div>`;
+    }
+    const excludedNoteParts = [];
+    if(base.prePlatformExcludedCount) excludedNoteParts.push(`플랫폼 이전 협약(비교 대상 아님) ${base.prePlatformExcludedCount}곳`);
+    if(base.noMouCount) excludedNoteParts.push(`협약일 데이터 없음 ${base.noMouCount}곳`);
+    if(base.futureMouCount) excludedNoteParts.push(`협약일이 미래 ${base.futureMouCount}곳`);
+    const excludedNoteHtml = excludedNoteParts.length
+      ? `<div class="npcmp-excluded-note">A/B 비교에서 제외됨 — ${esc(excludedNoteParts.join(' · '))}</div>` : '';
+    const reviewNoteHtml = base.unmatchedReviewCount
+      ? `<div class="npcmp-excluded-note">업체 매칭 확인 필요(이 분석 범위 밖) ${esc(base.unmatchedReviewCount)}건 — <button type="button" id="npCmpReviewListBtn">업체명 보기</button></div>` : '';
+    return `
+      <div class="npcmp-section" id="npCmpSection">
+        <div class="npcmp-head">
+          <div class="npcmp-title-wrap">
+            <span class="npcmp-title">운영 개선 효과 — 플랫폼 초기 운영 vs 7월 개선 이후</span>
+            <button type="button" class="npcmp-info-btn" id="npCmpInfoBtn" aria-label="설명 보기">?</button>
+          </div>
+          <div class="npcmp-period-group">
+            <span class="npcmp-period-label">협약 후</span>
+            ${NPCMP_PERIODS.map(p=> `<button type="button" class="list-filter-chip${npCmpPeriodDays===p?' is-active':''}" data-npcmp-period="${p}">${p}일</button>`).join('')}
+          </div>
+        </div>
+        ${npCmpInfoOpen ? `<div class="npcmp-info-pop">
+          플랫폼 초기 운영 그룹(A)은 구글시트에 실제 요청 기록이 처음 남은 날(${esc(earliestLabel)})부터 2026-06-30까지 협약을 맺은 업체, 7월 개선 이후 그룹(B)은 2026-07-01 이후 협약을 맺은 업체입니다. "관찰 완료"는 협약일로부터 선택한 일수(${esc(npCmpPeriodDays)}일)가 지났거나, 그 전에 이미 전환된 경우입니다 — 아직 ${esc(npCmpPeriodDays)}일이 지나지 않았고 전환도 안 된 업체("진행 중")는 전환율 분모에 포함하지 않습니다. 여기서 말하는 전환율은 관찰된 변화일 뿐이며, 특정 원인(예: 메일 개편) 때문이라고 단정하지 않습니다.
+        </div>` : ''}
+        <div class="npcmp-table-wrap">
+          <table class="npcmp-table">
+            <thead><tr>
+              <th>구분</th><th>신규 협약</th><th>${esc(npCmpPeriodDays)}일 관찰 완료</th><th>플랫폼 요청</th><th>플랫폼 이용 전환율</th><th>현장등록</th><th>L3 전환율</th>
+            </tr></thead>
+            <tbody>
+              ${rowHtml('A', A)}
+              ${rowHtml('B', B)}
+            </tbody>
+          </table>
+        </div>
+        <div class="npcmp-callouts">
+          ${deltaBlock('플랫폼 이용 전환율', A.platformRate, B.platformRate)}
+          ${deltaBlock('L3 현장등록 전환율', A.l3Rate, B.l3Rate)}
+        </div>
+        ${excludedNoteHtml}
+        ${reviewNoteHtml}
+        <div class="npcmp-info-pop" style="margin-top:10px;">
+          데이터 한계: 원본 구글시트에는 "현장등록"만 따로 구분하는 요청 종류가 없어, 위 "현장등록/L3 전환율"은 현재 "플랫폼 이용 전환율"과 같은 신호(협약 후 첫 플랫폼 요청)로 계산됩니다. 시트에 현장등록 전용 기록이 추가되면 두 지표가 서로 달라집니다.
+        </div>
+      </div>`;
+  }
+  // renderNpCmpSectionHtml()이 만든 DOM에 이벤트를 건다 — bindHeroAndSubfilters()가 매번
+  // 함께 부른다(§요청 5 기간 선택/§요청 6 드릴다운 클릭 모두 이 안에서만 동작).
+  function bindNpCmpSection(){
+    const infoBtn = document.getElementById('npCmpInfoBtn');
+    if(infoBtn) infoBtn.addEventListener('click', ()=>{
+      npCmpInfoOpen = !npCmpInfoOpen;
+      renderNewPartnerTab(lastNewPartnerEnriched);
+    });
+    listEl.querySelectorAll('[data-npcmp-period]').forEach(btn=> btn.addEventListener('click', ()=>{
+      const p = parseInt(btn.getAttribute('data-npcmp-period'), 10);
+      if(!NPCMP_PERIODS.includes(p) || p === npCmpPeriodDays) return;
+      npCmpPeriodDays = p; // §요청 10 — 재조회 없이 computeNpCmpAnalysis(N)만 다시 부른다(renderNewPartnerTab 재호출은 이미 로드된 데이터만 재계산)
+      renderNewPartnerTab(lastNewPartnerEnriched);
+    }));
+    listEl.querySelectorAll('[data-npcmp-drill]').forEach(btn=> btn.addEventListener('click', ()=>{
+      const [group, metric] = btn.getAttribute('data-npcmp-drill').split(':');
+      openNpCmpDrillModal(group, metric);
+    }));
+    const reviewBtn = document.getElementById('npCmpReviewListBtn');
+    if(reviewBtn) reviewBtn.addEventListener('click', ()=>{
+      openNpCmpExcludedModal('업체 매칭 확인 필요', (lastNpCmpAnalysis ? lastNpCmpAnalysis.base.unmatchedReviewCompanyNames : []));
+    });
+  }
   const NEW_PARTNER_SUBFILTERS = [
     ['all','전체'], ['needsAttention','관리 필요'], ['inProgress','진행 중'], ['converted','현장등록']
   ];
@@ -8986,7 +9419,8 @@ window.SHIN2_CRM_APP_INIT = function(){
           const cnt = key === 'all' ? items.length : (key === 'converted' ? summary.converted : (key === 'needsAttention' ? needsAttentionCount : inProgressCount));
           return `<button type="button" class="list-filter-chip${newPartnerSubFilter===key?' is-active':''}" data-np-subfilter="${esc(key)}">${esc(label)} ${esc(cnt)}</button>`;
         }).join('')}
-      </div>`;
+      </div>
+      ${renderNpCmpSectionHtml()}`;
 
     // §성능 요구 9 — 서브필터를 바꿀 때만(자주 누르지 않는 조작) 이 함수를 다시 부른다.
     // enriched는 renderList()가 이미 만들어 둔 값을 클로저로 그대로 재사용할 뿐, 여기서
@@ -8998,6 +9432,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         newPartnerSubFilter = btn.getAttribute('data-np-subfilter');
         renderNewPartnerTab(enriched);
       }));
+      bindNpCmpSection();
     }
 
     if(!filtered.length){
