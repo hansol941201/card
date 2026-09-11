@@ -7687,8 +7687,13 @@ window.SHIN2_CRM_APP_INIT = function(){
      없기 때문이다. 두 지표를 하나로 합치지 않고 각각 별도로 계산·표시하되(§요청 2 "do not
      conflate"), 이 한계는 UI에도 안내 문구로 명시한다.
      ========================================================================== */
-  const NPCMP_B_START_TS = new Date(2026,6,1).getTime(); // 2026-07-01 00:00 로컬 달력일 — B그룹(7월 개선 이후) 시작
-  const NPCMP_A_END_TS = new Date(2026,5,30).getTime(); // 2026-06-30 00:00 로컬 달력일 — A그룹(플랫폼 초기 운영) 끝(포함)
+  // §전환 범위 확대 라운드(신규) — "질문지 변경 기준일" 재확인에 따라 A/B 그룹 경계를
+  // 완전히 새 고정일로 교체한다(§요청 "5월 20일부터 질문지 변경 기준일(2026-07-22)
+  // 직전까지" = A그룹, "2026-07-22부터" = B그룹). 예전처럼 "구글시트 최초 실제 기록일"에
+  // A그룹 시작을 묶지 않는다 — A그룹 시작점도 이제 2026-05-20 고정값이다.
+  const NPCMP_A_START_TS = new Date(2026,4,20).getTime(); // 2026-05-20 00:00 로컬 달력일 — A그룹(개선 전) 시작(포함)
+  const NPCMP_B_START_TS = new Date(2026,6,22).getTime(); // 2026-07-22 00:00 로컬 달력일 — B그룹(개선 후) 시작(포함)
+  const NPCMP_A_END_TS = NPCMP_B_START_TS - 86400000; // 2026-07-21 00:00 — A그룹 끝(포함, B 시작 전날)
   const NPCMP_PERIODS = [30, 60, 90];
 
   // 구글시트 sheetRequests 전체에서 "실제 최초 요청 기록일"(달력일, 시간 없음)을 찾는다.
@@ -7738,6 +7743,9 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 여기서 업체명을 다시 정규화해 매칭하지 않는다(두 번째 매칭 로직 금지, §요청 7).
     const sheetReqsByCompany = D.buildSheetRequestsIndex();
     const todayTs = getSeoulTodayDateOnly();
+    // §전환 범위 확대 라운드 — earliestReqDateOnly는 더 이상 A그룹 시작 경계로 쓰지
+    // 않는다(A그룹 시작은 이제 NPCMP_A_START_TS 고정값). 정보 문구(구글시트 최초 기록일
+    // 참고용 표시)에서만 계속 쓰므로 계산 자체는 남겨둔다.
     const earliestReqDateOnly = npCmpFindEarliestRequestDateOnly(sheetReqsByCompany);
 
     let noMouCount = 0, futureMouCount = 0, prePlatformExcludedCount = 0;
@@ -7747,12 +7755,12 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(!mou){ noMouCount++; return; } // §요청 1 "협약일 데이터가 없는 업체 수"
       if(mou.ts > todayTs){ futureMouCount++; return; } // 미래 협약일은 분석 대상 아님(이상치 방어, isNewPartnerCompany와 같은 원칙)
       let group = null;
-      if(earliestReqDateOnly != null && mou.ts < earliestReqDateOnly){
-        prePlatformExcludedCount++; // §요청 "pre-platform 그룹을 만들지 마세요" — A/B 어디에도 넣지 않고 완전히 제외
+      if(mou.ts < NPCMP_A_START_TS){
+        prePlatformExcludedCount++; // §전환 범위 확대 라운드 — 이제 "2026-05-20 이전 협약"이 A/B 어디에도 안 들어가는 사유
       } else if(mou.ts <= NPCMP_A_END_TS){
-        group = 'A'; // 플랫폼 초기 운영: 최초 실제 기록일 ~ 2026-06-30
+        group = 'A'; // 개선 전: 2026-05-20 ~ 2026-07-21(질문지 변경 기준일 직전)
       } else if(mou.ts >= NPCMP_B_START_TS){
-        group = 'B'; // 7월 개선 이후: 2026-07-01 ~
+        group = 'B'; // 개선 후: 2026-07-22(질문지 변경 기준일) ~
       }
       if(!group) return;
       rows.push({ co, mouTs: mou.ts, group, reqs: sheetReqsByCompany.get(String(co.id)) || [] });
@@ -9435,7 +9443,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         </div>`;
     }
     const excludedNoteParts = [];
-    if(base.prePlatformExcludedCount) excludedNoteParts.push(`플랫폼 이전 협약(비교 대상 아님) ${base.prePlatformExcludedCount}곳`);
+    if(base.prePlatformExcludedCount) excludedNoteParts.push(`2026-05-20 이전 협약(비교 대상 아님) ${base.prePlatformExcludedCount}곳`);
     if(base.noMouCount) excludedNoteParts.push(`협약일 데이터 없음 ${base.noMouCount}곳`);
     if(base.futureMouCount) excludedNoteParts.push(`협약일이 미래 ${base.futureMouCount}곳`);
     const excludedNoteHtml = excludedNoteParts.length
@@ -9455,7 +9463,7 @@ window.SHIN2_CRM_APP_INIT = function(){
           </div>
         </div>
         ${npCmpInfoOpen ? `<div class="npcmp-info-pop">
-          플랫폼 초기 운영 그룹(A)은 구글시트에 실제 요청 기록이 처음 남은 날(${esc(earliestLabel)})부터 2026-06-30까지 협약을 맺은 업체, 7월 개선 이후 그룹(B)은 2026-07-01 이후 협약을 맺은 업체입니다. "관찰 완료"는 협약일로부터 선택한 일수(${esc(npCmpPeriodDays)}일)가 지났거나, 그 전에 이미 전환된 경우입니다 — 아직 ${esc(npCmpPeriodDays)}일이 지나지 않았고 전환도 안 된 업체("진행 중")는 전환율 분모에 포함하지 않습니다. 여기서 말하는 전환율은 관찰된 변화일 뿐이며, 특정 원인(예: 메일 개편) 때문이라고 단정하지 않습니다.
+          개선 전 그룹(A)은 2026-05-20부터 질문지 변경 기준일(2026-07-22) 직전인 2026-07-21까지 협약을 맺은 업체, 개선 후 그룹(B)은 2026-07-22 이후 협약을 맺은 업체입니다(참고: 구글시트에 실제 요청 기록이 처음 남은 날은 ${esc(earliestLabel)}). "관찰 완료"는 협약일로부터 선택한 일수(${esc(npCmpPeriodDays)}일)가 지났거나, 그 전에 이미 전환된 경우입니다 — 아직 ${esc(npCmpPeriodDays)}일이 지나지 않았고 전환도 안 된 업체("진행 중")는 전환율 분모에 포함하지 않습니다. 전환 신호는 기술자문문의·컨설팅요청_통합·샘플카달로그요청·공법설명회이력·기타문의답변현황 5개 항목 중 하나라도 발생하면 인정됩니다. 여기서 말하는 전환율은 관찰된 변화일 뿐이며, 특정 원인(예: 메일 개편) 때문이라고 단정하지 않습니다.
         </div>` : ''}
         <div class="npcmp-table-wrap">
           <table class="npcmp-table">
@@ -9522,26 +9530,36 @@ window.SHIN2_CRM_APP_INIT = function(){
   function l2l3EarlyConversionBackLimitDays(N){
     return -N * L2L3_EARLY_CONVERSION_BACK_WINDOW_MULTIPLIER; // 예: N=90 → -90일까지(경계 포함), -91일은 제외
   }
-  // mouTs 기준 -N~N-1일(§조기전환 라운드, 위 상수로 뒤쪽 경계 결정) 이내 "최초" 기술자문
-  // 문의를 찾는다. techReqs는 이미 sourceSheet==='기술자문문의'로만 걸러진 배열(아래
-  // buildL2L3AnalysisBase가 만든다) — 여기서 종류를 다시 판정하지 않는다. 같은 업체에
-  // 협약 전/후 문의가 둘 다 있으면 "전체 중 가장 이른 것"이 최초 요청일이 된다(기존
-  // "earliest wins" 규칙 그대로, 협약 전 후보도 이제 함께 비교 대상에 들어감).
+  // §전환 범위 확대 라운드(신규) — "L3 현장등록 = 기술자문문의만"이라는 §요청 8/9의 좁은
+  // 기준을 이번 라운드 사용자 확인으로 완전히 되돌린다. GSHEET_TABS(위 §7513)에 이미
+  // 정의된 5개 탭 이름을 그대로 재사용한다(새 목록을 따로 만들지 않음 — 탭 이름이
+  // 바뀌면 한 곳만 고치면 되게). 순서는 GSHEET_TABS 선언 순서와 동일하게 유지한다.
+  const L2L3_ALL_SOURCE_SHEETS = GSHEET_TABS.map(c=> c.tab);
+  // mouTs 기준 -N~N-1일(§조기전환 라운드, 위 상수로 뒤쪽 경계 결정) 이내 "최초" 요청을
+  // 찾는다. techReqs는 L2L3_ALL_SOURCE_SHEETS 5개 중 하나로 걸러진 배열(아래
+  // buildL2L3AnalysisBase가 만든다, §전환 범위 확대 라운드) — 여기서 종류를 다시
+  // 판정하지 않는다. 같은 업체에 협약 전/후 문의가 둘 다 있으면, 소스 종류와 무관하게
+  // "전체 중 가장 이른 것"이 최초 전환일이 된다(기존 "earliest wins" 규칙 그대로, 이제
+  // 5개 소스를 통틀어 비교). convertingTypes는 이 윈도우 안에 걸린(=전환으로 인정되는)
+  // 요청들의 sourceSheet 집합 — "발생한 전체 전환 유형"/소스별 요약 집계용(§요청 신규
+  // 컬럼·요약)이며, 창 밖 요청은 포함하지 않는다.
   function computeL3TechAdviceWindow(mouTs, techReqs, N){
     let firstConverting = null, isEarly = false;
     const backLimit = l2l3EarlyConversionBackLimitDays(N);
+    const convertingTypes = new Set();
     techReqs.forEach(r=>{
       if(!r.requestDate) return;
       const occ = new Date(r.requestDate).getTime();
       if(isNaN(occ)) return;
       const days = Math.round((occ - mouTs) / 86400000);
       if(days < backLimit || days > N - 1) return; // §조기전환 라운드 — 협약 -N일 이전, N일 초과 문의만 전환 아님
+      convertingTypes.add(r.sourceSheet || r.requestType);
       if(!firstConverting || occ < new Date(firstConverting.requestDate).getTime()){
         firstConverting = r;
         isEarly = days < 0; // 협약 "전" 문의면 조기전환
       }
     });
-    return firstConverting ? { req: firstConverting, isEarly } : null; // §요청 13 — 여러 건이어도 항상 최초 1건만
+    return firstConverting ? { req: firstConverting, isEarly, convertingTypes } : null; // §요청 13 — 여러 건이어도 항상 최초 1건만
   }
   // §요청 9/10/11 — 조기 전환(캘린더 N일이 안 지나도 이미 문의가 있으면)은 항상 "전환
   // 완료"로 본다(npCmpClassifyStatus와 같은 원칙). 전환이 안 됐을 때만 관찰기간(N일)이
@@ -9575,10 +9593,11 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(!mou) return;
       if(mou.ts > todayTs) return;
       const allReqs = sheetReqsByCompany.get(String(co.id)) || [];
-      // §요청 8 핵심 — sourceSheet(=requestType, 저장 시점부터 항상 같은 값)이 정확히
-      // '기술자문문의'인 요청만 이 탭의 L3 신호로 인정한다. 컨설팅요청/샘플/공법설명회/
-      // 기타문의는 이 탭 판정에서 완전히 제외한다.
-      const techReqs = allReqs.filter(r=> (r.sourceSheet || r.requestType) === '기술자문문의');
+      // §전환 범위 확대 라운드 — §요청 8/9(기술자문문의 단독 기준)를 되돌리고, 5개
+      // sourceSheet 중 하나라도 있으면 이 탭의 L3 전환 신호로 인정한다(§요청 "5개 항목
+      // 중 하나라도 발생한 업체는 전환 업체로 계산"). L2L3_ALL_SOURCE_SHEETS(위)에 없는
+      // 예상 밖 sourceSheet 값(데이터 이상)만 방어적으로 걸러낸다.
+      const techReqs = allReqs.filter(r=> L2L3_ALL_SOURCE_SHEETS.includes(r.sourceSheet || r.requestType));
       rows.push({ co, mouTs: mou.ts, techReqs });
     });
     const base = { rows, todayTs };
@@ -9602,10 +9621,25 @@ window.SHIN2_CRM_APP_INIT = function(){
       const converted = !!match;
       const bucket = classifyL3TechAdviceBucket(row.mouTs, base.todayTs, N, converted);
       const days = Math.round((base.todayTs - row.mouTs) / 86400000);
+      // §전환 범위 확대 라운드(신규 컬럼) — 90일 고정 기준의 "90일 이내 전환 여부"는
+      // 화면의 30/60/90일 선택기(N)와 별개로, 사용자가 명시한 "90일 이내" 문구 그대로
+      // 항상 90일로 고정 계산한다(§요청 "협약 체결일과 같거나 이후이고 90일 이내이면
+      // '90일 이내 전환'"). 조기전환 백워드 윈도우 규칙은 이 90일 고정 계산에도 동일하게
+      // 적용된다(l2l3EarlyConversionBackLimitDays(90)).
+      const within90 = computeL3TechAdviceWindow(row.mouTs, row.techReqs, 90);
       // §조기전환 라운드 — isEarly(협약 전 문의)는 전환/미전환 판정과 무관하게 표시용
       // 플래그로만 쓴다. bucket은 여전히 'converted'이므로 전환율 분자·전환완료 서브탭
       // 카운트에는 이미 그대로 포함된다(아래 converted/observedCount 계산 변경 없음).
-      return { co: row.co, mouTs: row.mouTs, days, converted, bucket, firstAdviceAt: match ? match.req.requestDate : null, isEarly: match ? match.isEarly : false };
+      return {
+        co: row.co, mouTs: row.mouTs, days, converted, bucket,
+        firstAdviceAt: match ? match.req.requestDate : null,
+        isEarly: match ? match.isEarly : false,
+        // §전환 범위 확대 라운드(신규 컬럼) — 최초 전환 유형(어떤 소스가 최초 전환 요청을
+        // 냈는지)과, 이번 선택된 N일 윈도우 안에서 전환 신호로 인정된 전체 소스 목록.
+        firstAdviceType: match ? (match.req.sourceSheet || match.req.requestType || '') : null,
+        sourceTypes: match ? Array.from(match.convertingTypes) : [],
+        within90dConverted: !!within90
+      };
     });
     const converted = rows.filter(r=> r.bucket === 'converted');
     const observing = rows.filter(r=> r.bucket === 'observing');
@@ -9614,7 +9648,15 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 분모/분자 어디에도 넣지 않는다.
     const observedCount = converted.length + needsAttention.length;
     const rate = observedCount ? Math.round((converted.length / observedCount) * 1000) / 10 : 0;
-    const result = { N, todayTs: base.todayTs, rows, converted, observing, needsAttention, observedCount, rate, total: rows.length };
+    // §전환 범위 확대 라운드(신규 요약) — "5개 원본 데이터별 전환 업체 수"(중복 카운트
+    // 허용, §요청 "한 업체가 2개 소스 다 있으면 두 소스 각각의 카운트에 포함") + "중복
+    // 제거 후 통합 전환 업체 수"(=converted.length, 이미 업체당 1행이라 그 자체가 dedup
+    // 값). 전환 완료(converted) 업체만 대상으로 센다 — 관찰 중/관리 필요 업체는 아직
+    // 전환되지 않았으므로 소스 카운트에도 넣지 않는다.
+    const sourceCounts = {};
+    L2L3_ALL_SOURCE_SHEETS.forEach(s=> sourceCounts[s] = 0);
+    converted.forEach(r=> (r.sourceTypes || []).forEach(t=>{ if(sourceCounts[t] != null) sourceCounts[t]++; }));
+    const result = { N, todayTs: base.todayTs, rows, converted, observing, needsAttention, observedCount, rate, total: rows.length, sourceCounts };
     l2l3ManageAnalysisCache = { base, N, result };
     return result;
   }
@@ -9623,6 +9665,89 @@ window.SHIN2_CRM_APP_INIT = function(){
   ];
   const L2L3_BUCKET_LABEL = { converted:'전환 완료', observing:'관찰 중', needsAttention:'관리 필요' };
   const L2L3_BUCKET_BADGE_CLASS = { converted:'st-converted', observing:'st-requested', needsAttention:'st-needsAttention' };
+  /* ==========================================================================
+     §전환 범위 확대 라운드(신규) — "5개 원본 데이터별 전환 업체 수 + 중복 제거 통합
+     전환 업체 수" 요약과, 전환 업체별 8개 신규 컬럼 상세표. 계산은 전혀 새로 하지
+     않는다 — 위 computeL2L3ManageAnalysis(N)이 이미 만들어 둔 result.sourceCounts /
+     result.converted(각 행에 firstAdviceType·sourceTypes·within90dConverted 포함)를
+     그대로 읽어서 HTML만 조립한다(§성능 원칙, npCmpAnalysisCache와 같은 이유로 재계산
+     없음 — computeL2L3ManageAnalysis 자체가 이미 (base,N) 캐시됨).
+     ========================================================================== */
+  let l2l3DetailTableOpen = false; // 기본은 접힘 — 전환 업체가 많아지면 표가 길어지므로(§요청 8-컬럼 상세표는 필요할 때만 펼침)
+  // 업체의 협약일이 개선 전(A, 2026-05-20~2026-07-21)/개선 후(B, 2026-07-22~)/그 밖(2026-05-20
+  // 이전 등 비교 대상 기간 밖) 중 어디인지 — §전환 범위 확대 라운드의 새 A/B 경계
+  // 상수(NPCMP_A_START_TS 등, 위 §7690 근처)를 그대로 재사용한다(두 번째 경계 판정을
+  // 새로 만들지 않음).
+  function l2l3ImprovementPhaseLabel(mouTs){
+    if(mouTs < NPCMP_A_START_TS) return '해당없음(2026-05-20 이전)';
+    if(mouTs <= NPCMP_A_END_TS) return '개선 전';
+    if(mouTs >= NPCMP_B_START_TS) return '개선 후';
+    return '해당없음';
+  }
+  function renderL2L3SourceSummaryAndDetailHtml(analysis){
+    const sourceRows = L2L3_ALL_SOURCE_SHEETS.map(s=> `
+      <tr><td style="text-align:left;">${esc(s)}</td><td>${esc(analysis.sourceCounts[s] || 0)}곳</td></tr>
+    `).join('');
+    const detailRows = analysis.converted.slice().sort((a,b)=> (b.mouTs - a.mouTs)).map(r=>{
+      const daysToConvert = r.firstAdviceAt != null ? Math.round((new Date(r.firstAdviceAt).getTime() - r.mouTs) / 86400000) : null;
+      return `
+        <tr>
+          <td style="text-align:left;"><button type="button" class="npcmp-num-btn" data-l2l3-detail-open-card="${esc(r.co.id)}">${esc(r.co.name || '(업체명 없음)')}</button></td>
+          <td>${esc(fmtDate(r.mouTs))}</td>
+          <td style="text-align:left;">${esc(l2l3ImprovementPhaseLabel(r.mouTs))}</td>
+          <td>${r.firstAdviceAt ? esc(fmtDate(r.firstAdviceAt)) : '—'}</td>
+          <td>${daysToConvert != null ? esc(daysToConvert) : '—'}</td>
+          <td style="text-align:left;">${r.firstAdviceType ? esc(r.firstAdviceType) : '—'}${r.isEarly ? ` <span class="np2-req-badge">조기전환</span>` : ''}</td>
+          <td style="text-align:left;">${(r.sourceTypes || []).length ? esc(r.sourceTypes.join(', ')) : '—'}</td>
+          <td style="text-align:left;">${r.within90dConverted ? '예' : '아니오'}</td>
+        </tr>`;
+    }).join('');
+    return `
+      <div class="npcmp-section" id="l2l3SourceSummarySection">
+        <div class="npcmp-head">
+          <div class="npcmp-title-wrap">
+            <span class="npcmp-title">5개 데이터 소스별 전환 업체 수</span>
+          </div>
+        </div>
+        <div class="npcmp-table-wrap">
+          <table class="npcmp-table" style="min-width:320px;">
+            <thead><tr><th>소스</th><th>전환 업체 수</th></tr></thead>
+            <tbody>
+              ${sourceRows}
+              <tr><td style="text-align:left;"><strong>중복 제거 통합 전환 업체 수</strong></td><td><strong>${esc(analysis.converted.length)}곳</strong></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="npcmp-info-pop" style="margin-top:8px;">소스별 수치는 중복 카운트를 허용합니다(한 업체가 2개 소스에서 모두 전환됐으면 두 소스 각각에 포함) — 통합 전환 업체 수는 이를 중복 제거해 업체당 1번만 센 값입니다.</div>
+        <div class="npcmp-head" style="margin-top:16px;">
+          <div class="npcmp-title-wrap">
+            <span class="npcmp-title">전환 업체별 상세표 (${esc(analysis.converted.length)}곳)</span>
+          </div>
+          <button type="button" class="list-filter-chip" id="l2l3DetailToggleBtn">${l2l3DetailTableOpen ? '접기' : '펼치기'}</button>
+        </div>
+        ${l2l3DetailTableOpen ? `
+        <div class="npcmp-table-wrap">
+          ${!analysis.converted.length ? `<div class="local-cloud-diag-empty">전환 완료된 업체가 없습니다.</div>` : `
+          <div style="overflow-x:auto;">
+          <table class="npcmp-table" style="min-width:920px;">
+            <thead><tr>
+              <th>업체명</th><th>협약 체결일</th><th>개선 전/후 구분</th><th>최초 전환일</th>
+              <th>협약→전환(일)</th><th>최초 전환 유형</th><th>발생한 전체 전환 유형</th><th>90일 이내 전환</th>
+            </tr></thead>
+            <tbody>${detailRows}</tbody>
+          </table>
+          </div>`}
+        </div>` : ''}
+      </div>`;
+  }
+  function bindL2L3SourceSummaryAndDetail(){
+    const toggleBtn = document.getElementById('l2l3DetailToggleBtn');
+    if(toggleBtn) toggleBtn.addEventListener('click', ()=>{
+      l2l3DetailTableOpen = !l2l3DetailTableOpen;
+      renderL2L3ManageTab(lastL2L3Enriched);
+    });
+    listEl.querySelectorAll('[data-l2l3-detail-open-card]').forEach(btn=> btn.addEventListener('click', ()=> openCard(btn.getAttribute('data-l2l3-detail-open-card'))));
+  }
   // §요청 3 — 신규 협약사 탭에서 옮겨온 히어로 카드(L2→L3 전환율)와 운영 개선 비교
   // 영역(renderNpCmpSectionHtml/bindNpCmpSection, 위에 이미 정의돼 있음 — 그대로
   // 재사용, 새로 만들지 않음)을 이 탭에서 렌더링한다. 기간 선택(30/60/90일, §요청 14)은
@@ -9661,7 +9786,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="np2-hero-rate-block">
           <div class="np2-hero-rate-label">L2 → L3 전환율</div>
           <div class="np2-hero-rate">${esc(analysis.rate)}%</div>
-          <div class="np2-hero-sub">관찰 완료 ${esc(analysis.observedCount)}곳 중 ${esc(analysis.converted.length)}곳 기술자문문의 발생(협약 후 ${esc(npCmpPeriodDays)}일 기준)</div>
+          <div class="np2-hero-sub">관찰 완료 ${esc(analysis.observedCount)}곳 중 ${esc(analysis.converted.length)}곳 현장등록(협약 후 ${esc(npCmpPeriodDays)}일 기준)</div>
           <div class="np2-hero-bar"><div class="np2-hero-bar-fill" style="width:${Math.max(0,Math.min(100,rateNum))}%;"></div></div>
         </div>
         <div class="np2-hero-stats">
@@ -9677,7 +9802,8 @@ window.SHIN2_CRM_APP_INIT = function(){
           return `<button type="button" class="list-filter-chip${l2l3SubFilter===key?' is-active':''}" data-l2l3-subfilter="${esc(key)}">${esc(label)} ${esc(cnt)}</button>`;
         }).join('')}
       </div>
-      ${renderNpCmpSectionHtml()}`;
+      ${renderNpCmpSectionHtml()}
+      ${renderL2L3SourceSummaryAndDetailHtml(analysis)}`;
 
     function bindHeroAndSubfilters(){
       listEl.querySelectorAll('[data-l2l3-subfilter]').forEach(btn=> btn.addEventListener('click', ()=>{
@@ -9685,6 +9811,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         renderL2L3ManageTab(enriched);
       }));
       bindNpCmpSection();
+      bindL2L3SourceSummaryAndDetail();
     }
 
     if(!filtered.length){
