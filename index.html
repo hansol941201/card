@@ -605,6 +605,10 @@
   .workq-reason{ color:var(--text-muted); font-size:12px; }
   .workq-days{ white-space:nowrap; font-variant-numeric:tabular-nums; }
   .workq-delay-badge{ display:inline-block; font-size:10px; font-weight:700; color:var(--orange, #C2670A); background:var(--orange-bg, #FFF7ED); border-radius:4px; padding:1px 5px; margin-left:5px; }
+  /* §업무관리 전체 업체 상시 표시 라운드(신규) — 할 일이 없는 업체(type:'none')의 "해야 할
+     일" 칸: 기존 workq-action-btn(진한 남색 버튼)과 같은 자리지만 클릭할 동작이 없으므로
+     버튼이 아니라 중립색 배지로만 보여준다(§ 새 시각 언어를 만들지 않고 기존 배지 톤 재사용). */
+  .workq-notask-badge{ display:inline-block; font-size:11.5px; font-weight:600; color:var(--text-muted); background:var(--bg); border:1px solid var(--line); border-radius:5px; padding:3px 9px; white-space:nowrap; }
   .workq-empty{ padding:24px; text-align:center; color:var(--text-muted); font-size:13px; background:#fff; border:1px solid var(--line); border-radius:8px; }
   .workq-today-line .workq-today-link{ background:none; border:none; padding:0; font:inherit; font-weight:700; color:var(--navy); cursor:pointer; }
   .workq-today-line .workq-today-link:hover{ text-decoration-style:solid; }
@@ -12008,7 +12012,16 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 에서 협약 종료 업체를 제외한다(§요청 3). 진행단계 자체는 전혀 안 건드리고 여기
     // 업무관리 항목 생성만 막는다 — 고객 상세에는 과거 이력이 그대로 보인다.
     if(D.isAgreementTerminated(co)) return null;
-    if(hasNoFunnelHistoryBeforeMou(progress)) return null; // 질문서/미팅 기록 없이 바로 MOU 체결된 업체는 제외
+    // §업무관리 전체 업체 상시 표시 라운드(신규) — 사용자 확정 지시: "업무 조건에 해당하지
+    // 않는다고 목록에서 빠지면 안 된다. 고객관리처럼 전체 업체가 항상 보이고, 할 일이 없는
+    // 업체는 '현재 업무 없음'으로 표시하라." 예전엔 여기서 hasNoFunnelHistoryBeforeMou(질문서/
+    // 미팅 기록 없이 바로 MOU 체결된 업체, 스퀘어건축사사무소 실사례)가 true면 그냥 제외
+    // (return null)했다 — 그러면 이 업체가 업무관리 어디에도 안 보였다. 이제는 이 조건으로
+    // 일찍 끊지 않고 아래 판정들을 계속 통과시킨다 — 어차피 밑에서(meeting/qWaiting/reuse/
+    // newPartner 전부 해당 없음) 최종적으로 'none'(§맨 아래 fallback) 항목으로 만들어져
+    // "현재 업무 없음"으로 표시된다. hasNoFunnelHistoryBeforeMou 함수 자체는 지금 이 호출
+    // 하나만 썼던 함수라 더 이상 아무 데서도 안 쓰지만, 판정 규칙 이력 참고용으로 그대로 둔다
+    // (§ 데이터/로직 삭제 금지 원칙 — 사용하지 않게 됐다고 정의를 지우지 않는다).
     const meeting = classifyWorkQueueMeeting(progress);
     if(meeting){
       const isScheduled = meeting.type === 'm1Scheduled' || meeting.type === 'm2Scheduled';
@@ -12088,7 +12101,22 @@ window.SHIN2_CRM_APP_INIT = function(){
         days: null, actionLabel: '첫 연락 / 온보딩', isDelayed: false
       };
     }
-    return null; // 정상 진행 중이거나(판정 대상 아님) 판정불가(mgmt.type==='unknown') — 억지로 만들지 않는다(§6)
+    // §업무관리 전체 업체 상시 표시 라운드(신규) — 위 어떤 판정(meeting/qWaiting/reuse/
+    // newPartner)에도 해당하지 않는 업체(정상 진행 중이거나, 판정불가(mgmt.type==='unknown')
+    // 이거나, MOU만 등록되고 후속 기록이 없는 업체 등)를 예전처럼 null로 돌려서 목록에서
+    // 빼지 않는다 — "고객관리와 업무관리 모두 전체 업체가 항상 표시"(§요청) 요구에 따라
+    // days/isDelayed는 여전히 임의로 지어내지 않고(§9 원칙 유지) null/false 그대로 두고,
+    // "현재 업무 없음" 상태를 나타내는 별도 type('none')으로 반환한다. 기존 type들의
+    // 배지/문구/버튼 로직은 전혀 안 건드리고, 이 new type만 렌더링 쪽에서 별도로
+    // "현재 업무 없음" 배지로 표시한다(§renderWorkQueueView noTask 분기 참고).
+    const byKeyNone = {}; progress.stages.forEach(s=> byKeyNone[s.key] = s);
+    const mouDoneNone = !!(byKeyNone.mou && byKeyNone.mou.state === 'done');
+    return {
+      co, type: 'none', category: 'none',
+      currentStateLabel: mouDoneNone ? '협약 완료' : (progress.hasAny ? '진행 확인 필요' : '등록 정보만 있음'),
+      reasonText: '해당 없음',
+      days: null, actionLabel: '현재 업무 없음', isDelayed: false, noTask: true
+    };
   }
   // computeWorkQueue: companies/activities/POUR 인덱스를 매번 새로 읽기만 하는 순수 계산 —
   // 별도 저장소 없음(§14 READ-ONLY). "오래된 업체가 위로"(§9) — days가 클수록 위(내림차순),
@@ -12595,7 +12623,9 @@ window.SHIN2_CRM_APP_INIT = function(){
                 <td class="workq-stage-progress">${stageStepperHtml}</td>
                 <td class="workq-reason">${esc(it.reasonText)}</td>
                 <td class="workq-days">${it.days === null ? '—' : esc(it.days) + '일'}${it.isDelayed ? '<span class="workq-delay-badge">지연</span>' : ''}</td>
-                <td><button type="button" class="workq-action-btn${isOpen ? ' is-open' : ''}" data-workq-toggle="${esc(it.co.id)}" data-workq-toggle-type="${esc(it.type)}">${esc(it.actionLabel)}</button></td>
+                <td>${it.noTask
+                  ? `<span class="workq-notask-badge">${esc(it.actionLabel)}</span>`
+                  : `<button type="button" class="workq-action-btn${isOpen ? ' is-open' : ''}" data-workq-toggle="${esc(it.co.id)}" data-workq-toggle-type="${esc(it.type)}">${esc(it.actionLabel)}</button>`}</td>
                 <td>${mailCellHtml}</td>
                 <td class="workq-doc-status">${esc(buildAgreementDocSummary(it.co.id, docsIdx).text)}</td>
               </tr>`;
