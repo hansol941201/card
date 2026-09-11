@@ -7635,6 +7635,16 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 렌더될 때만 일어나는 지연 계산이다(아래 renderNpCmpSection 호출부 참고, §요청 10
   // "탭 전환 속도 저하 없음").
   let npCmpAnalysisCache = { coRaw: undefined, reqRaw: undefined, base: null };
+  // §전환율 사라짐 버그 수정 — 이 함수는 SHIN2_CRM_APP_INIT 스코프(D를 통해서만 데이터
+  // 계층에 접근하는 렌더 레이어)에 있는데, CO_KEY/SHEETREQ_CACHE_KEY는 SHIN2_CRM_DATA
+  // IIFE(§37 분리) 안에서만 선언된 지역 상수라 여기서는 원래 존재하지 않았다 — 참조하는
+  // 순간 ReferenceError가 던져지고, 그 예외가 renderNpCmpSectionHtml → renderNewPartnerTab
+  // → renderList까지 그대로 전파되어 신규 협약사 탭 전체(기존 L2→L3 전환율 큰 숫자
+  // 포함)가 렌더링되지 못했다. D 모듈과 동일한 raw-캐시 무효화 원칙(§성능)을 그대로 쓰기
+  // 위해, 이미 다른 스코프들에도 각자 복사돼 있는 것과 같은 방식으로 같은 키 문자열을
+  // 이 스코프에도 선언한다(새 데이터 구조/저장 위치를 만들지 않음).
+  const CO_KEY = 'shin2-companies-staging';
+  const SHEETREQ_CACHE_KEY = 'shin2-sheet-requests-cache-v1';
   function buildNpCmpAnalysisBase(){
     const coRaw = localStorage.getItem(CO_KEY);
     const reqRaw = localStorage.getItem(SHEETREQ_CACHE_KEY);
