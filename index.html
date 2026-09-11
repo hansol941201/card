@@ -3228,7 +3228,13 @@ table.pdf-doc-table thead{ background:var(--bg); }
              "계열사 관계 후보 검토"(내부 데이터끼리 이전 상호 비교만 하는 기능, 외부
              사이트를 부르지 않음)만 남겨 관리 도구 메뉴를 그대로 유지한다. -->
         <div class="update-menu-wrap" id="crmUpdateMenuWrap">
-          <button type="button" id="crmDataUpdateBtn" class="list-secondary-link">관리 도구 ▾</button>
+          <!-- §확인 필요 복원/3단계 분류 라운드(§요청 1/2) — "확인 필요"가 관리 도구
+               드롭다운 안에 숨어 있어 안 보인다는 신고에 대한 최소 수정: 드롭다운을 열지
+               않아도 바로 보이도록, 이 버튼 자체에 실시간 배지(#crmDataUpdateReviewBadge)를
+               하나 더 붙인다(값이 0이면 비워서 안 보이게, updateGsheetReviewCountBadge가
+               같이 채운다) — 안에 있는 실제 "Google Sheets 확인 필요" 버튼/모달은 그대로
+               재사용, 위치를 옮기거나 새로 만들지 않는다. -->
+          <button type="button" id="crmDataUpdateBtn" class="list-secondary-link">관리 도구 <span id="crmDataUpdateReviewBadge" class="unreg-badge" style="display:none;"></span> ▾</button>
           <div class="update-menu" id="crmUpdateMenu">
             <!-- §계열사 관계 후보 검토 라운드(신규) — 실제 관계는 여기서 자동 저장하지 않고,
                  후보만 뽑아 보여준 뒤 사람이 한 건씩(또는 여러 건 일괄) 확인해야만
@@ -4361,6 +4367,89 @@ window.SHIN2_CRM_OCR = (function(){
         isReady: ()=> sheetReqSyncStarted,
         docId: sheetReqDocId
       };
+
+      /* ========================================================================
+         §확인 필요 복원/3단계 분류 라운드(신규) — 건바이건 업체(caseByCaseCompanies)와
+         제외 감사로그(exclusionAudit) 두 컬렉션. 위 sheetRequests 동기화와 완전히 같은
+         패턴(onSnapshot 실시간 미러 + localStorage 캐시 + 결정적 문서 id)을 그대로
+         재사용한다 — 새 동기화 방식을 만들지 않는다. 경로: users/{uid}/caseByCaseCompanies,
+         users/{uid}/exclusionAudit (같은 currentUid 재사용, 새 인증 없음).
+         ======================================================================== */
+      const CASEBYCASE_COLLECTION_NAME = 'caseByCaseCompanies';
+      const CASEBYCASE_CACHE_KEY = 'shin2-case-by-case-companies-cache-v1';
+      let caseByCaseSyncStarted = false;
+      const caseByCaseDocsById = new Map();
+      function caseByCaseCollRef(){ return currentUid ? collection(db, 'users', currentUid, CASEBYCASE_COLLECTION_NAME) : null; }
+      function persistCaseByCaseCacheToLocal(){
+        try{ localStorage.setItem(CASEBYCASE_CACHE_KEY, JSON.stringify(Array.from(caseByCaseDocsById.values()))); }catch(e){}
+      }
+      function startCaseByCaseSync(){
+        if(caseByCaseSyncStarted || !currentUid) return;
+        caseByCaseSyncStarted = true;
+        const ref = caseByCaseCollRef();
+        window.SHIN2_UNSUB_CASEBYCASE = onSnapshot(ref, (snap)=>{
+          snap.docChanges().forEach(ch=>{
+            if(ch.type === 'removed') caseByCaseDocsById.delete(ch.doc.id);
+            else caseByCaseDocsById.set(ch.doc.id, Object.assign({ id: ch.doc.id }, ch.doc.data()));
+          });
+          persistCaseByCaseCacheToLocal();
+          window.dispatchEvent(new CustomEvent('shin2-crm-casebycase-cloud-update'));
+        }, (err)=> console.warn('[CRM/Firebase] caseByCaseCompanies 구독 실패', err));
+      }
+      // §확인 필요 복원/3단계 분류 라운드 — 개별 setDoc 대신 sheetRequests와 완전히 같은
+      // writeBatch 경로를 쓴다(§패턴 재사용, 문서 1건이라도 배치로). 실제 Firestore에서는
+      // setDoc으로도 동작하지만, 이 저장소의 가상 백엔드(mock_firestore_server.js)는
+      // 컬렉션 하나를 "id맵 문서 1개"로 단순화해서 배치 commit만 반영하므로 이 경로여야
+      // 테스트 하네스에서도 실시간 반영이 실제로 확인된다.
+      async function saveCaseByCaseOne(id, fields){
+        if(!currentUid) throw Object.assign(new Error('로그인이 필요합니다.'), { code:'NOT_AUTHENTICATED' });
+        const batch = writeBatch(db);
+        const ref = doc(db, 'users', currentUid, CASEBYCASE_COLLECTION_NAME, id);
+        batch.set(ref, fields, { merge:true });
+        await batch.commit();
+      }
+      window.SHIN2_CASEBYCASE_SYNC = {
+        start: startCaseByCaseSync,
+        saveOne: saveCaseByCaseOne,
+        getAll: ()=> Array.from(caseByCaseDocsById.values()),
+        isReady: ()=> caseByCaseSyncStarted
+      };
+
+      const EXCLUSION_COLLECTION_NAME = 'exclusionAudit';
+      const EXCLUSION_CACHE_KEY = 'shin2-exclusion-audit-cache-v1';
+      let exclusionSyncStarted = false;
+      const exclusionDocsById = new Map();
+      function exclusionCollRef(){ return currentUid ? collection(db, 'users', currentUid, EXCLUSION_COLLECTION_NAME) : null; }
+      function persistExclusionCacheToLocal(){
+        try{ localStorage.setItem(EXCLUSION_CACHE_KEY, JSON.stringify(Array.from(exclusionDocsById.values()))); }catch(e){}
+      }
+      function startExclusionSync(){
+        if(exclusionSyncStarted || !currentUid) return;
+        exclusionSyncStarted = true;
+        const ref = exclusionCollRef();
+        window.SHIN2_UNSUB_EXCLUSION = onSnapshot(ref, (snap)=>{
+          snap.docChanges().forEach(ch=>{
+            if(ch.type === 'removed') exclusionDocsById.delete(ch.doc.id);
+            else exclusionDocsById.set(ch.doc.id, Object.assign({ id: ch.doc.id }, ch.doc.data()));
+          });
+          persistExclusionCacheToLocal();
+          window.dispatchEvent(new CustomEvent('shin2-crm-exclusion-cloud-update'));
+        }, (err)=> console.warn('[CRM/Firebase] exclusionAudit 구독 실패', err));
+      }
+      async function saveExclusionOne(id, fields){
+        if(!currentUid) throw Object.assign(new Error('로그인이 필요합니다.'), { code:'NOT_AUTHENTICATED' });
+        const batch = writeBatch(db);
+        const ref = doc(db, 'users', currentUid, EXCLUSION_COLLECTION_NAME, id);
+        batch.set(ref, fields, { merge:true });
+        await batch.commit();
+      }
+      window.SHIN2_EXCLUSION_SYNC = {
+        start: startExclusionSync,
+        saveOne: saveExclusionOne,
+        getAll: ()=> Array.from(exclusionDocsById.values()),
+        isReady: ()=> exclusionSyncStarted
+      };
+
       // 다른 탭(같은 브라우저의 v2)에서 방금 [클라우드 동기화 시작] 버튼을 눌러 플래그가
       // 새로 켜지면, 이 CRM 탭을 새로고침하지 않아도 바로 이어받아 실시간 동기화를 켠다.
       window.addEventListener('storage', (e)=>{
@@ -4383,6 +4472,10 @@ window.SHIN2_CRM_OCR = (function(){
         // 게이트를 기다리지 않는다 — 이 컬렉션은 이번 라운드에 새로 생기는 것이라 "기존
         // 로컬에만 있던 값과의 병합 위험" 자체가 없다(§CASE B와 동일하게 항상 안전).
         if(currentUid) startSheetReqSync();
+        // §확인 필요 복원/3단계 분류 라운드(신규) — 위 sheetRequests와 같은 이유로
+        // (새로 생기는 컬렉션이라 기존 로컬 값과의 병합 위험이 없음) 로그인만 되면 바로 켠다.
+        if(currentUid) startCaseByCaseSync();
+        if(currentUid) startExclusionSync();
         maybeStartSharedSync();
       });
 
@@ -5565,6 +5658,29 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   // 매칭이 안 돼 "확인 필요"에만 떠 있는 행)는 이 컬렉션 자체에 저장되지 않으므로
   // 여기 나타나는 값은 전부 companyId가 있는, 화면에 바로 써도 되는 값이다.
   function loadSheetRequests(){ return readArr(SHEETREQ_CACHE_KEY); }
+  // §확인 필요 복원/3단계 분류 라운드(신규) — 건바이건 업체/제외 감사로그도 sheetRequests와
+  // 같은 "onSnapshot이 채운 localStorage 캐시를 읽기 전용으로만 조회" 패턴을 그대로 쓴다.
+  const CASEBYCASE_CACHE_KEY_RO = 'shin2-case-by-case-companies-cache-v1';
+  const EXCLUSION_CACHE_KEY_RO = 'shin2-exclusion-audit-cache-v1';
+  function loadCaseByCaseCompanies(){ return readArr(CASEBYCASE_CACHE_KEY_RO); }
+  function loadExclusionAudit(){ return readArr(EXCLUSION_CACHE_KEY_RO); }
+  // 결정적 id — 정규화된 업체명 기준(§요청 "재동기화해도 같은 업체로 유지, 중복 생성 금지").
+  // sheetReqSafeIdPart와 같은 안전화 규칙을 여기서도 독립적으로 재구현한다(다른 <script>
+  // 블록이라 그 함수를 직접 호출할 수 없음 — 로직만 동일하게 복제, 새 규칙 아님).
+  function caseByCaseSafeIdPart(s){ return encodeURIComponent(String(s == null ? '' : s)).replace(/[.%]/g, '_'); }
+  function caseByCaseIdForNormName(normName){ return 'cbc_' + caseByCaseSafeIdPart(normName || '').slice(0, 400); }
+  function exclusionIdForNormName(normName){ return 'excl_' + caseByCaseSafeIdPart(normName || '').slice(0, 400); }
+  function findCaseByCaseByNormName(normName){
+    if(!normName) return null;
+    return loadCaseByCaseCompanies().find(r=> r.normName === normName) || null;
+  }
+  function findCaseByCaseById(id){
+    return loadCaseByCaseCompanies().find(r=> r.id === id) || null;
+  }
+  function isUserExcludedNormName(normName){
+    if(!normName) return false;
+    return loadExclusionAudit().some(r=> r.normName === normName && r.kind === 'user');
+  }
   let sheetReqIndexCache = { raw: undefined, map: null };
   function buildSheetRequestsIndex(){
     const raw = localStorage.getItem(SHEETREQ_CACHE_KEY);
@@ -6947,6 +7063,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     getGlobalMailAsset, saveGlobalMailAssetPatch,
     loadActivities, addActivity, updateActivityText, deleteActivity, activitiesForCompany, classifyActivity, buildActivitiesIndex,
     loadSheetRequests, buildSheetRequestsIndex, latestSheetRequestForCompany,
+    loadCaseByCaseCompanies, loadExclusionAudit, caseByCaseIdForNormName, exclusionIdForNormName, findCaseByCaseByNormName, findCaseByCaseById, isUserExcludedNormName,
     loadDocuments, documentsForCompany, buildDocumentsIndex, addDocument, updateDocumentExtracted, getBlob, renameDocument, setDocumentMemo, setDocumentVerification, deleteDocument, findDocument, migrateDocumentToCloud,
     loadMemos, memosFor, addMemo, updateMemo, deleteMemo, buildMemosIndex,
     pendingActivitiesForCompany, tasksForCompany, calendarEventsForCompany, upcomingCalendarEventsForCompany,
@@ -7517,6 +7634,18 @@ window.SHIN2_CRM_APP_INIT = function(){
     { tab:'공법설명회이력',   companyCol:'시공사',   dateCol:'등록일',   idCol:'문의ID(시스템)', siteNameCol:'현장명' }, // §요청: 반드시 등록일(요청일 아님)
     { tab:'기타문의답변현황', companyCol:'업체명',   dateCol:'등록일',   idCol:'문서ID(시스템)' }
   ];
+  // §확인 필요 복원/3단계 분류 라운드(신규) — 자동 제외 규칙(§요청 4). 이 두 패턴에
+  // 걸리는 행은 "확인 필요"/"건바이건 업체" 어디에도 절대 들어가지 않고 그 자리에서
+  // 끝난다(§요청 "전환율 계산 방식/기존 정상 업체 데이터는 건드리지 않는다" — 오직 이
+  // 두 패턴만 본다, 이름이 비슷하다고 넓게 추측해서 걸러내지 않는다).
+  const GSHEET_AUTO_EXCLUDE_TEST_RE = /^테스트사[0-9]*$/;
+  function isAutoExcludedCompanyName(raw){
+    const t = String(raw == null ? '' : raw).trim();
+    if(!t) return 'empty'; // 빈 값/공백만
+    if(t === '(업체명 없음)') return 'empty';
+    if(GSHEET_AUTO_EXCLUDE_TEST_RE.test(t)) return 'test'; // "테스트사"/"테스트사1"... — "테스트사업부"는 정규식이 끝(anchor $)이라 걸리지 않는다
+    return null;
+  }
   // §요청 "전화번호, 이메일, 담당자 이름은 가져오거나 저장하지 말 것" — 업체/발생일/ID
   // 컬럼을 뺀 나머지 중에서도 이 패턴에 걸리는 헤더는 내용 요약(coreContent)에서 제외한다.
   const GSHEET_EXCLUDED_HEADER_RE = /전화|휴대폰|휴대전화|연락처|이메일|e-?mail|담당자/i;
@@ -7551,12 +7680,16 @@ window.SHIN2_CRM_APP_INIT = function(){
       siteName: ctx.siteName || '',
       address,
       summary,
-      status: 'matched'
+      status: 'matched',
+      // §확인 필요 복원/3단계 분류 라운드(신규) — 'company'(협약사)/'caseByCase'(건바이건
+      // 업체) 구분만 추가한다. companyId 값 자체(진짜 협약사 id 또는 cbc_ 합성 id)로도
+      // 이미 구분 가능하지만, 화면에서 매번 접두어를 파싱하지 않도록 명시 필드로 둔다.
+      entityType: ctx.entityType || 'company'
     };
   }
   // §요청 "이미 저장된 값과 다를 때만 쓴다(불필요한 쓰기 방지)" — createdAt/updatedAt을
   // 뺀 실제 내용 필드만 비교한다.
-  const SHEETREQ_COMPARE_FIELDS = ['sourceSheet','sourceId','dedupKey','companyId','sourceCompanyName','requestType','requestDate','siteName','address','summary','status'];
+  const SHEETREQ_COMPARE_FIELDS = ['sourceSheet','sourceId','dedupKey','companyId','sourceCompanyName','requestType','requestDate','siteName','address','summary','status','entityType'];
   function sheetReqPayloadChanged(existing, payload){
     if(!existing) return true;
     return SHEETREQ_COMPARE_FIELDS.some(k=> String(existing[k] || '') !== String(payload[k] || ''));
@@ -7858,7 +7991,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     return { N, base, A: summarize(groups.A), B: summarize(groups.B) };
   }
 
-  let gsheetImportState = { ran:false, running:false, lastError:null, saveError:null, reviewItems:[], lastSavedCount:0, lastMatchedCount:0, lastLinkNote:null };
+  let gsheetImportState = { ran:false, running:false, lastError:null, saveError:null, reviewItems:[], lastSavedCount:0, lastMatchedCount:0, lastLinkNote:null,
+    // §확인 필요 복원/3단계 분류 라운드(신규) — 자동 제외/건바이건 매칭 결과를 화면
+    // 보고용으로만 들고 있는 값(하드코딩 아님, runGoogleSheetsImportOnce가 실행될 때마다
+    // 실제로 다시 계산해 채운다). autoExcludedByReason: {test:n, empty:n}, autoExcludedByTab: {탭명:n}
+    autoExcludedCount:0, autoExcludedByReason:{ test:0, empty:0 }, autoExcludedByTab:{}, caseByCaseMatchedCount:0, userExcludedSkippedCount:0 };
   // 확인 필요 항목에서 사용자가 기존 업체를 직접 고르면: 별칭을 저장하고(§요청, 재사용
   // 가능한 연결), 그 업체명(원본 sourceCompanyName)으로 대기 중이던 확인 필요 행 "전부"에
   // 즉시 같은 companyId를 적용해 sheetRequests 문서로 저장한다(§요청 "같은 원본 업체명을
@@ -7909,12 +8046,112 @@ window.SHIN2_CRM_APP_INIT = function(){
     renderList();
     return { ok:true, addedCount: toWrite.length };
   }
+
+  /* ==========================================================================
+     §확인 필요 복원/3단계 분류 라운드(신규) — ②건바이건 업체로 등록. resolveGsheetReviewCompany
+     (바로 위)와 완전히 같은 "같은 원본 업체명을 가진 대기 항목 전부(5개 소스 전부 포함)를
+     한 번에 적용" 패턴을 그대로 재사용한다 — 새 매칭 로직을 만들지 않는다. 유일한 차이는
+     companyId 자리에 진짜 협약사 id 대신 이 업체 전용 합성 id(cbc_...)를 쓰고, companies
+     배열에는 절대 추가하지 않는다(§요청 6/7 "건바이건 업체는 협약사가 아니다" — 이렇게 하면
+     L2→L3 전환율/A·B 비교(D.loadActiveCompanies() 기준) 모집단에도 자동으로 안 들어간다,
+     계산 로직 자체는 전혀 안 건드림).
+     ========================================================================== */
+  async function registerCaseByCaseFromReview(rawCompanyName){
+    const normName = D.normCompanyName(rawCompanyName);
+    if(!normName) return { ok:false, err:{ message:'업체명이 비어 있어 건바이건 업체로 등록할 수 없습니다.' } };
+    const cbcId = D.caseByCaseIdForNormName(normName);
+    const existingCbc = D.findCaseByCaseByNormName(normName);
+    const pending = gsheetImportState.reviewItems.filter(x=> x.dedupKey && D.normCompanyName(x.rawCompanyName) === normName);
+    const existingAll = window.SHIN2_SHEETREQ_SYNC ? window.SHIN2_SHEETREQ_SYNC.getAll() : [];
+    const existingByDedup = new Map(existingAll.map(d=> [d.dedupKey, d]));
+    const toWrite = [];
+    const sourceTabs = new Set(existingCbc && Array.isArray(existingCbc.sourceTabs) ? existingCbc.sourceTabs : []);
+    pending.forEach(item=>{
+      if(!item.dedupKey || item.uniqueId == null || item.occurredTs == null || !item.cols || !item.row) return;
+      const cfg = GSHEET_TABS.find(c=> c.tab === item.tab);
+      if(!cfg) return;
+      sourceTabs.add(cfg.tab);
+      const payload = buildSheetReqPayload(cfg, {
+        rawCompanyName: item.rawCompanyName, uniqueId: item.uniqueId, occurredTs: item.occurredTs,
+        siteName: item.siteName, companyId: cbcId, cols: item.cols, row: item.row,
+        companyColIdx: item.companyColIdx, dateColIdx: item.dateColIdx, idColIdx: item.idColIdx, entityType:'caseByCase'
+      });
+      const existing = existingByDedup.get(item.dedupKey);
+      if(!sheetReqPayloadChanged(existing, payload)) return;
+      const now = new Date().toISOString();
+      toWrite.push({
+        id: window.SHIN2_SHEETREQ_SYNC ? window.SHIN2_SHEETREQ_SYNC.docId(cfg.tab, item.uniqueId) : (cfg.tab + '_' + item.uniqueId),
+        fields: Object.assign({}, payload, { createdAt: existing ? existing.createdAt : now, updatedAt: now })
+      });
+    });
+    const nowIsoStr = new Date().toISOString();
+    try{
+      if(!window.SHIN2_CASEBYCASE_SYNC || !window.SHIN2_CASEBYCASE_SYNC.saveOne) throw new Error('SYNC_UNAVAILABLE');
+      await window.SHIN2_CASEBYCASE_SYNC.saveOne(cbcId, {
+        name: (existingCbc && existingCbc.name) || rawCompanyName,
+        normName,
+        firstSeenAt: (existingCbc && existingCbc.firstSeenAt) || nowIsoStr,
+        lastSeenAt: nowIsoStr,
+        sourceTabs: Array.from(sourceTabs),
+        convertedToCompanyId: (existingCbc && existingCbc.convertedToCompanyId) || null,
+        convertedAt: (existingCbc && existingCbc.convertedAt) || null,
+        createdAt: (existingCbc && existingCbc.createdAt) || nowIsoStr,
+        updatedAt: nowIsoStr
+      });
+      if(toWrite.length) await window.SHIN2_SHEETREQ_SYNC.saveMany(toWrite);
+    }catch(err){
+      return { ok:false, err:{ message:'건바이건 업체 등록 저장에 실패했습니다 — 다음 새로고침에서 다시 시도합니다.' } };
+    }
+    const resolvedDedupKeys = new Set(toWrite.map(w=> w.fields.dedupKey));
+    gsheetImportState.reviewItems = gsheetImportState.reviewItems.filter(x=> !(x.dedupKey && resolvedDedupKeys.has(x.dedupKey)));
+    gsheetImportState.lastLinkNote = rawCompanyName + ' → 건바이건 업체로 등록 — ' + toWrite.length + '건에 적용됨';
+    renderList();
+    return { ok:true, addedCount: toWrite.length, cbcId };
+  }
+
+  /* ==========================================================================
+     §확인 필요 복원/3단계 분류 라운드(신규) — ③제외 처리. exclusionAudit에 사유+원본
+     시트/행 위치만 기록하는 가벼운 감사로그다(§요청 "정상 UI에는 안 보이고 나중에 확인용
+     디버깅 목적" — 별도 조회 화면은 만들지 않는다). 같은 정규화 업체명 하나에 문서 하나
+     (id=exclusionIdForNormName)만 쓰므로 재동기화해도 중복 없이 항상 같은 문서를 갱신한다.
+     ========================================================================== */
+  async function excludeReviewItemsForName(rawCompanyName, reason){
+    const normName = D.normCompanyName(rawCompanyName);
+    if(!normName) return { ok:false, err:{ message:'업체명이 비어 있어 제외 처리할 수 없습니다.' } };
+    const exclId = D.exclusionIdForNormName(normName);
+    const pending = gsheetImportState.reviewItems.filter(x=> x.dedupKey && D.normCompanyName(x.rawCompanyName) === normName);
+    const nowIsoStr = new Date().toISOString();
+    try{
+      if(!window.SHIN2_EXCLUSION_SYNC || !window.SHIN2_EXCLUSION_SYNC.saveOne) throw new Error('SYNC_UNAVAILABLE');
+      await window.SHIN2_EXCLUSION_SYNC.saveOne(exclId, {
+        normName,
+        displayName: rawCompanyName,
+        kind: 'user',
+        reason: reason || '사용자 제외 처리',
+        excludedAt: nowIsoStr,
+        occurrenceCount: pending.length,
+        sources: pending.map(p=> ({ tab: p.tab, uniqueId: p.uniqueId || null, dedupKey: p.dedupKey, occurredTs: p.occurredTs || null }))
+      });
+    }catch(err){
+      return { ok:false, err:{ message:'제외 처리 저장에 실패했습니다 — 다음 새로고침에서 다시 시도합니다.' } };
+    }
+    const resolvedDedupKeys = new Set(pending.map(p=> p.dedupKey));
+    gsheetImportState.reviewItems = gsheetImportState.reviewItems.filter(x=> !(x.dedupKey && resolvedDedupKeys.has(x.dedupKey)));
+    gsheetImportState.lastLinkNote = rawCompanyName + ' → 제외 처리 — ' + pending.length + '건';
+    renderList();
+    return { ok:true, excludedCount: pending.length };
+  }
   // §요청 "접속할 때마다 한 번만 자동 확인 / 실행 중 중복 호출 방지 / 수동 동기화·반복
   // 확인은 만들지 않는다 — 새로고침하면 다시 확인" — ran/running 두 플래그로 이 함수는
   // 페이지 로드당 정확히 한 번만 실제로 동작한다(여러 트리거 경로가 동시에 불러도 안전).
   async function runGoogleSheetsImportOnce(){
     if(gsheetImportState.ran || gsheetImportState.running) return;
     gsheetImportState.running = true;
+    gsheetImportState.autoExcludedCount = 0;
+    gsheetImportState.autoExcludedByReason = { test:0, empty:0 };
+    gsheetImportState.autoExcludedByTab = {};
+    gsheetImportState.caseByCaseMatchedCount = 0;
+    gsheetImportState.userExcludedSkippedCount = 0;
     const review = [];
     const toWrite = []; // §Firestore 문서 용량 초과 수정 라운드 — customerActivities에는
     // 더 이상 추가하지 않는다. 여기서는 sheetRequests에 쓸 {id, fields}만 모아뒀다가
@@ -7954,10 +8191,24 @@ window.SHIN2_CRM_APP_INIT = function(){
         table.rows.forEach(row=>{
           if(!row || !row.c) return;
           const obj = gsheetRowToObj(cols, row);
+          // §확인 필요 복원/3단계 분류 라운드(§요청 9-1) — 업체명은 여기서 한 번만 trim한다
+          // (gsheetCellToText가 이미 trim한 문자열을 돌려주므로 별도 처리 불필요).
           const rawCompanyName = companyColIdx >= 0 ? gsheetCellToText(row.c[companyColIdx]) : '';
           const uniqueId = idColIdx >= 0 ? gsheetCellToText(row.c[idColIdx]) : '';
           const occurredTs = dateColIdx >= 0 ? parseGsheetDateCell(row.c[dateColIdx]) : null;
           const siteName = siteNameColIdx >= 0 ? gsheetCellToText(row.c[siteNameColIdx]) : '';
+
+          // §확인 필요 복원/3단계 분류 라운드(§요청 4/9-2) — 자동 제외는 다른 어떤 검사보다도
+          // 먼저 본다: 고유번호/발생일이 있고 없고와 무관하게, 이 두 패턴에 걸리면 확인
+          // 필요/건바이건 어디에도 절대 들어가지 않는다(§요청 "209 같은 숫자를 고정하지
+          // 말고 실제로 다시 계산" — 이 카운트도 매 실행마다 새로 센다).
+          const autoExReason = isAutoExcludedCompanyName(rawCompanyName);
+          if(autoExReason){
+            gsheetImportState.autoExcludedCount++;
+            gsheetImportState.autoExcludedByReason[autoExReason] = (gsheetImportState.autoExcludedByReason[autoExReason] || 0) + 1;
+            gsheetImportState.autoExcludedByTab[cfg.tab] = (gsheetImportState.autoExcludedByTab[cfg.tab] || 0) + 1;
+            return;
+          }
 
           // §요청 "고유번호가 없는 행은 자동 반영하지 말고 확인 필요로" — 이 행은
           // sourceId 자체가 없어 결정적 문서 id를 만들 수 없으므로 sheetRequests에는
@@ -7969,27 +8220,45 @@ window.SHIN2_CRM_APP_INIT = function(){
           if(occurredTs == null){ review.push({ tab:cfg.tab, reason:'발생일 해석 불가', rawCompanyName, raw:obj, dedupKey }); return; }
           if(occurredTs > todayTs) return; // §요청: 미래 날짜는 이번엔 건너뜀(다음 실행에서 다시 평가, 확인 필요 아님)
 
+          const normName = D.normCompanyName(rawCompanyName);
+          // §확인 필요 복원/3단계 분류 라운드(§요청 3③/9) — 사람이 직접 "제외 처리"한
+          // 업체명은 영구 매핑(exclusionAudit, kind:'user')으로 남아 재동기화해도 다시
+          // 확인 필요/통계에 나타나지 않는다.
+          if(D.isUserExcludedNormName(normName)){ gsheetImportState.userExcludedSkippedCount++; return; }
+
           let companyId = null;
-          const aliasHit = D.findCompanyBySheetReqAlias(D.normCompanyName(rawCompanyName), companies);
+          let isCaseByCase = false;
+          const aliasHit = D.findCompanyBySheetReqAlias(normName, companies);
           if(aliasHit){
             companyId = aliasHit.id;
           } else {
-            const hits = nameIndex.get(D.normCompanyName(rawCompanyName));
+            const hits = nameIndex.get(normName);
             if(hits && hits.size === 1){ companyId = Array.from(hits)[0]; }
             else {
-              // §요청 "업체 매칭 실패"(2) — 저장 용량 오류(1)와 구분되는 별개 상태다.
-              // companyId가 없으므로 sheetRequests 컬렉션에는 이 행을 아직 쓰지 않는다
-              // (§요청 "사용자가 수동으로 연결해야만 companyId 확정") — cols/row/각
-              // 컬럼 인덱스를 함께 들고 있어야 나중에 연결 확정 시(resolveGsheetReviewCompany)
-              // 같은 요약을 다시 만들 수 있다.
-              review.push({ tab:cfg.tab, reason: (hits && hits.size > 1) ? '복수 후보' : '업체 못 찾음', rawCompanyName, raw:obj, dedupKey, uniqueId, occurredTs, siteName,
-                cols, row, companyColIdx, dateColIdx, idColIdx, displayText:null });
-              return;
+              // §확인 필요 복원/3단계 분류 라운드(§요청 2④/9-4) — 저장된 건바이건 업체
+              // 연결 정보(사용자가 과거에 "건바이건 업체로 등록"을 눌러 만든 영구 매핑)가
+              // 있으면 여기서 그 업체로 계속 연결한다. 이미 협약사로 전환된 건바이건
+              // 업체는 convertedToCompanyId(실제 companies id)로 대신 연결한다(§요청 8
+              // "전환 후에는 기존 건바이건 이력도 그 협약사 아래로").
+              const cbc = D.findCaseByCaseByNormName(normName);
+              if(cbc){
+                companyId = cbc.convertedToCompanyId || cbc.id;
+                isCaseByCase = !cbc.convertedToCompanyId;
+              } else {
+                // §요청 "업체 매칭 실패"(2) — 저장 용량 오류(1)와 구분되는 별개 상태다.
+                // companyId가 없으므로 sheetRequests 컬렉션에는 이 행을 아직 쓰지 않는다
+                // (§요청 "사용자가 수동으로 연결해야만 companyId 확정") — cols/row/각
+                // 컬럼 인덱스를 함께 들고 있어야 나중에 연결 확정 시(resolveGsheetReviewCompany)
+                // 같은 요약을 다시 만들 수 있다.
+                review.push({ tab:cfg.tab, reason: (hits && hits.size > 1) ? '복수 후보' : '업체 못 찾음', rawCompanyName, raw:obj, dedupKey, uniqueId, occurredTs, siteName,
+                  cols, row, companyColIdx, dateColIdx, idColIdx, displayText:null });
+                return;
+              }
             }
           }
 
-          const payload = buildSheetReqPayload(cfg, { rawCompanyName, uniqueId, occurredTs, siteName, companyId, cols, row, companyColIdx, dateColIdx, idColIdx });
-          matchedCount++;
+          const payload = buildSheetReqPayload(cfg, { rawCompanyName, uniqueId, occurredTs, siteName, companyId, cols, row, companyColIdx, dateColIdx, idColIdx, entityType: isCaseByCase ? 'caseByCase' : 'company' });
+          if(isCaseByCase) gsheetImportState.caseByCaseMatchedCount++; else matchedCount++;
           const existing = existingByDedup.get(dedupKey);
           if(!sheetReqPayloadChanged(existing, payload)) return; // §요청: 변경 없으면 다시 쓰지 않는다
           const now = new Date().toISOString();
@@ -8219,6 +8488,9 @@ window.SHIN2_CRM_APP_INIT = function(){
   // KPI 요약 바의 "관리 필요" 통계는 전혀 건드리지 않았다 — 업무관리에서 계속 전체가
   // 보여야 한다는 §요청 16 그대로, 데이터/판정 로직 자체는 삭제 대상이 아니다.
   const L2L3_MANAGE_FILTER_DEF = ['l2l3Manage','L2→L3 전환관리'];
+  // §확인 필요 복원/3단계 분류 라운드(신규, §요청 5) — 건바이건 업체 탭. 같은
+  // "matchesFilter로는 못 세는 별도 판정이라 여기서 따로 채운다" 패턴(바로 위 주석과 동일).
+  const CASE_BY_CASE_FILTER_DEF = ['caseByCase','건바이건 업체'];
   function getMouStage(progress){
     return progress.stages.find(s=> s.key === 'mou') || null;
   }
@@ -8472,7 +8744,8 @@ window.SHIN2_CRM_APP_INIT = function(){
     mouDone: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12.5 8 21l4-2 4 2-1-8.5"/><circle cx="12" cy="7" r="5"/><path d="m9.3 7 1.8 1.8L15 5.3"/></svg>',
     newPartner: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v7"/><path d="M8.5 6.5 12 3l3.5 3.5"/><rect x="4" y="12" width="16" height="8" rx="1.5"/></svg>',
     trendUp: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17 10 11l4 4 6-7"/><path d="M15 8h5v5"/></svg>',
-    l2l3Manage: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="13" width="7" height="7" rx="1.5"/><path d="M10 7.5h5a2 2 0 0 1 2 2V13"/><path d="m14.5 10 2.5-2.5-2.5-2.5"/></svg>'
+    l2l3Manage: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="13" width="7" height="7" rx="1.5"/><path d="M10 7.5h5a2 2 0 0 1 2 2V13"/><path d="m14.5 10 2.5-2.5-2.5-2.5"/></svg>',
+    caseByCase: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="8" r="3"/><circle cx="17" cy="8" r="3"/><path d="M2 20c0-3 2.2-5 5-5s5 2 5 5"/><path d="M12 20c0-3 2.2-5 5-5s5 2 5 5"/></svg>'
   };
   function renderFilterChips(counts){
     const wrap = document.getElementById('crmFilterRow');
@@ -8482,7 +8755,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     // .list-filter-chip 높이/폰트는 그대로 재사용, 새 크기 체계를 만들지 않았다).
     // §업체 삭제(휴지통) 라운드(신규) — "삭제된 업체" 탭도 같은 칩 UI/클릭 위임을 그대로
     // 재사용한다(DELETED_FILTER_DEF만 목록 끝에 덧붙임, 새 템플릿·새 이벤트 바인딩 없음).
-    wrap.innerHTML = FILTER_DEFS.concat([DELETED_FILTER_DEF, L2L3_MANAGE_FILTER_DEF]).map(([key,label])=>
+    wrap.innerHTML = FILTER_DEFS.concat([DELETED_FILTER_DEF, L2L3_MANAGE_FILTER_DEF, CASE_BY_CASE_FILTER_DEF]).map(([key,label])=>
       `<button type="button" class="list-filter-chip${filterKey===key?' is-active':''}${key==='deleted'?' is-trash':''}" data-filter="${esc(key)}">${FILTER_ICON_SVG[key]||''}<span>${esc(label)}</span><span class="chip-count">${counts[key]||0}</span></button>`
     ).join('');
     wrap.querySelectorAll('[data-filter]').forEach(btn=> btn.addEventListener('click', ()=>{
@@ -8652,7 +8925,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 엘리먼트)는 "삭제된 업체"/"신규 협약사" 탭처럼 그 7컬럼 표를 아예 안 쓰는 화면에서는
     // 지금까지도 계속 보이고 있었다(다른 화면 구조/컬럼은 전혀 안 바꿈, 표시 여부만 토글).
     const coTableHeadEl = document.getElementById('crmCoTableHead');
-    if(coTableHeadEl) coTableHeadEl.hidden = (filterKey === 'deleted' || filterKey === 'newPartner' || filterKey === 'l2l3Manage');
+    if(coTableHeadEl) coTableHeadEl.hidden = (filterKey === 'deleted' || filterKey === 'newPartner' || filterKey === 'l2l3Manage' || filterKey === 'caseByCase');
     const companies = D.loadActiveCompanies(); // §업체 삭제(휴지통) 라운드 — 소프트 삭제된 업체를 일반 목록/신규 협약사/협약 진행/MOU체결 탭에서 뺀다(§요청 10)
     listTitle.textContent = '고객 ' + companies.length;
     // §미등록 업체 관리 라운드: 별도 저장소 없이 매번 다시 계산한다(§ "등록 후" 요구사항 —
@@ -8719,6 +8992,9 @@ window.SHIN2_CRM_APP_INIT = function(){
     // buildL2L3AnalysisBase, sheetRequests까지 봐야 함)이라 여기서 따로 채운다. N(30/60/90)과
     // 무관한 "전체 대상 수"만 필요하므로 가벼운 base(rows.length)만 조회한다.
     filterCounts.l2l3Manage = buildL2L3AnalysisBase().rows.length;
+    // §확인 필요 복원/3단계 분류 라운드(신규, §요청 5) — 이미 협약사로 전환된 건바이건
+    // 업체(convertedToCompanyId 있음)는 이 탭 카운트/목록에서 빠진다(§요청 8 "카운트 전환").
+    filterCounts.caseByCase = D.loadCaseByCaseCompanies().filter(r=> !r.convertedToCompanyId).length;
     renderFilterChips(filterCounts);
     // §신규 협약사 탭 라운드(신규) — "90일 임박순"/"최근 체결순" 옵션은 이 탭에서만
     // 보이게 하고, 정렬 드롭다운 표시값도 현재 sortMode와 항상 맞춰 둔다(탭 클릭
@@ -8772,6 +9048,13 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 않고 전용 화면으로 갈아탄다.
     if(filterKey === 'l2l3Manage'){
       renderL2L3ManageTab(enriched);
+      return;
+    }
+    // §확인 필요 복원/3단계 분류 라운드(신규, §요청 5) — 건바이건 업체 탭도 같은 이유로
+    // 전용 화면으로 갈아탄다. companies 배열과 무관한 별도 데이터(caseByCaseCompanies)라
+    // enriched를 넘길 필요가 없다.
+    if(filterKey === 'caseByCase'){
+      renderCaseByCaseTab();
       return;
     }
 
@@ -10103,6 +10386,189 @@ window.SHIN2_CRM_APP_INIT = function(){
       renderDeletedCompaniesTab();
       if(typeof refreshMapIfOpen === 'function') refreshMapIfOpen();
     }));
+  }
+
+  /* ==========================================================================
+     §확인 필요 복원/3단계 분류 라운드(신규, §요청 5) — "건바이건 업체" 탭. 협약사 명단에
+     없는데 Sheets 요청 이력만 있고, 사용자가 명시적으로 "②건바이건 업체로 등록"을 선택한
+     업체만 여기 모인다(§요청 "절대 자동 분류하지 않는다"). 데이터 소스는 companies
+     배열이 아니라 별도 caseByCaseCompanies 컬렉션이라 L2→L3 전환율/A·B 비교 모집단
+     (D.loadActiveCompanies() 기준)에는 처음부터 안 들어간다 — 그 계산 로직은 이 라운드에서
+     전혀 건드리지 않았다(§요청 7).
+     ========================================================================== */
+  function renderCaseByCaseTab(){
+    const all = D.loadCaseByCaseCompanies();
+    const active = all.filter(r=> !r.convertedToCompanyId); // 이미 협약사로 전환된 건 제외(§요청 8)
+    const reqIndex = D.buildSheetRequestsIndex();
+    const todayTs = getSeoulTodayDateOnly();
+    const monthStart = (()=>{ const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d.getTime(); })();
+    const day30Ago = todayTs - 30*86400000;
+    const rows = active.map(cbc=>{
+      const reqs = (reqIndex.get(String(cbc.id)) || []).slice().sort((a,b)=> new Date(b.requestDate) - new Date(a.requestDate));
+      const bySource = {};
+      L2L3_ALL_SOURCE_SHEETS.forEach(s=> bySource[s] = 0);
+      reqs.forEach(r=>{ const t = r.sourceSheet || r.requestType; if(bySource[t] != null) bySource[t]++; });
+      const first = reqs.length ? reqs[reqs.length-1] : null;
+      const last = reqs[0] || null;
+      return { cbc, reqs, bySource, firstAt: first ? first.requestDate : cbc.firstSeenAt, lastAt: last ? last.requestDate : cbc.lastSeenAt, total: reqs.length };
+    }).sort((a,b)=> new Date(b.lastAt||0) - new Date(a.lastAt||0));
+
+    const totalCompanies = active.length;
+    const totalRequests = rows.reduce((s,r)=> s + r.total, 0);
+    const newThisMonth = active.filter(cbc=> cbc.firstSeenAt && new Date(cbc.firstSeenAt).getTime() >= monthStart).length;
+    const recent30dCompanies = rows.filter(r=> r.lastAt && new Date(r.lastAt).getTime() >= day30Ago).length;
+    const repeatCompanies = rows.filter(r=> r.total > 1).length;
+    const repeatRate = totalCompanies ? Math.round((repeatCompanies / totalCompanies) * 1000) / 10 : 0;
+    const convertedCount = all.filter(r=> r.convertedToCompanyId).length;
+    const sourceTotals = {};
+    L2L3_ALL_SOURCE_SHEETS.forEach(s=> sourceTotals[s] = rows.reduce((sum,r)=> sum + (r.bySource[s]||0), 0));
+
+    renderPagination(0);
+    if(!active.length){
+      listEl.innerHTML = `
+        <div class="empty-note">건바이건 업체가 없습니다 — "확인 필요" 목록에서 [②건바이건 업체로 등록]을 눌러야만 여기 나타납니다(자동 분류 없음).</div>`;
+      return;
+    }
+    listEl.innerHTML = `
+      <div class="np2-hero" style="margin-bottom:12px;">
+        <div class="kpi-item"><span class="kpi-item-value">${totalCompanies}</span><span class="kpi-item-label">건바이건 업체 수</span></div>
+        <div class="kpi-item"><span class="kpi-item-value">${totalRequests}</span><span class="kpi-item-label">전체 요청 건수</span></div>
+        <div class="kpi-item"><span class="kpi-item-value">${newThisMonth}</span><span class="kpi-item-label">이번 달 신규</span></div>
+        <div class="kpi-item"><span class="kpi-item-value">${recent30dCompanies}</span><span class="kpi-item-label">최근 30일 요청 업체</span></div>
+        <div class="kpi-item"><span class="kpi-item-value">${repeatCompanies}(${repeatRate}%)</span><span class="kpi-item-label">반복 이용 업체</span></div>
+        <div class="kpi-item"><span class="kpi-item-value">${convertedCount}</span><span class="kpi-item-label">협약사로 전환됨</span></div>
+      </div>
+      <div class="np2-note" style="margin-bottom:8px;color:#666;font-size:12.5px;">
+        요청 유형별 건수 — ${L2L3_ALL_SOURCE_SHEETS.map(s=> `${esc(s)} ${sourceTotals[s]||0}`).join(' · ')}
+      </div>
+      <div class="deleted-co-table" style="overflow-x:auto;">
+        <div class="deleted-co-row" data-cbc-row="${''}" style="display:grid;grid-template-columns:1.4fr .9fr .9fr .6fr repeat(5,.6fr) .7fr .7fr 1fr 1.4fr .8fr;gap:6px;font-weight:600;background:#f6f7f9;">
+          <span>업체명</span><span>최초 요청일</span><span>최근 요청일</span><span>전체</span>
+          <span>기술자문</span><span>컨설팅</span><span>샘플·카탈로그</span><span>공법설명회</span><span>기타문의</span>
+          <span>담당자</span><span>연락처</span><span>출처 시트</span><span>최근 요청 내용</span><span>분류 상태</span>
+        </div>
+        ${rows.map(r=> `
+          <div class="deleted-co-row" data-cbc-row="${esc(r.cbc.id)}" style="display:grid;grid-template-columns:1.4fr .9fr .9fr .6fr repeat(5,.6fr) .7fr .7fr 1fr 1.4fr .8fr;gap:6px;cursor:pointer;">
+            <span class="deleted-co-name">${esc(r.cbc.name || '(업체명 없음)')}</span>
+            <span>${esc(fmtDate(r.firstAt))}</span>
+            <span>${esc(fmtDate(r.lastAt))}</span>
+            <span>${r.total}</span>
+            <span>${r.bySource['기술자문문의']||0}</span>
+            <span>${r.bySource['컨설팅요청_통합']||0}</span>
+            <span>${r.bySource['샘플카달로그요청']||0}</span>
+            <span>${r.bySource['공법설명회이력']||0}</span>
+            <span>${r.bySource['기타문의답변현황']||0}</span>
+            <span>—</span>
+            <span>—</span>
+            <span title="${esc((r.cbc.sourceTabs||[]).join(', '))}">${esc((r.cbc.sourceTabs||[]).join(', ') || '—')}</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.reqs[0] ? r.reqs[0].summary : '—')}</span>
+            <span>건바이건</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    listEl.querySelectorAll('[data-cbc-row]').forEach(row=>{
+      const id = row.getAttribute('data-cbc-row');
+      if(!id) return;
+      row.addEventListener('click', ()=> openCaseByCaseDetailModal(id));
+    });
+  }
+
+  /* §확인 필요 복원/3단계 분류 라운드(신규) — 업체명 클릭 → 시간순 전체 요청 이력.
+     openGsheetReqListModal(기존 협약사용 드릴다운)과 완전히 같은 .pi-overlay/.pi-panel
+     패턴을 재사용한다(§요청 "새 시각 언어를 만들지 말 것") — D.findCompany는 cbc_ id를
+     못 찾으므로 이 전용 모달만 별도로 둔다. */
+  function closeCaseByCaseDetailModal(){
+    const root = document.getElementById('caseByCaseDetailModalRoot');
+    if(root) root.innerHTML = '';
+  }
+  function openCaseByCaseDetailModal(cbcId){
+    const cbc = D.findCaseByCaseById(cbcId);
+    if(!cbc) return;
+    let root = document.getElementById('caseByCaseDetailModalRoot');
+    if(!root){
+      root = document.createElement('div');
+      root.id = 'caseByCaseDetailModalRoot';
+      document.body.appendChild(root);
+    }
+    const reqs = (D.buildSheetRequestsIndex().get(String(cbcId)) || []).slice().sort((a,b)=> new Date(b.requestDate) - new Date(a.requestDate));
+    root.innerHTML = `
+      <div class="pi-overlay" id="caseByCaseDetailOverlay">
+        <div class="pi-panel" style="max-width:640px;max-height:82vh;" role="dialog" aria-modal="true" aria-label="${esc(cbc.name)} 건바이건 요청 이력">
+          <div class="pi-head">
+            <div class="pi-title">${esc(cbc.name)} — 건바이건 요청 이력(${reqs.length})</div>
+            <button type="button" class="chart-close-btn" id="caseByCaseDetailCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-note" style="padding:0 16px;">
+            협약사 명단에 없는 건바이건 업체입니다 — L2→L3 전환율/A·B 비교 등 협약사 통계에는 포함되지 않습니다.
+            <div id="caseByCaseConvertStatus" style="margin-top:6px;"></div>
+          </div>
+          <div class="pi-body" style="overflow-y:auto;">
+            ${reqs.length ? reqs.map(r=> `
+              <div class="local-cloud-diag-row" style="align-items:flex-start;flex-direction:column;gap:2px;">
+                <div><b>${esc(fmtDate(r.requestDate))}</b> · ${esc(r.sourceSheet || r.requestType || '')}${r.sourceId ? ' · ' + esc(r.sourceId) : ''}</div>
+                <div>${esc(r.summary || '')}</div>
+              </div>
+            `).join('') : `<div class="local-cloud-diag-empty">요청 기록이 없습니다.</div>`}
+          </div>
+          <div class="pi-actions">
+            <button type="button" class="co-text-action primary" id="caseByCaseConvertBtn">이 업체를 협약사로 전환</button>
+            <button type="button" class="co-text-action" id="caseByCaseDetailCloseBtn2">닫기</button>
+          </div>
+        </div>
+      </div>`;
+    const close = ()=> closeCaseByCaseDetailModal();
+    document.getElementById('caseByCaseDetailCloseBtn').addEventListener('click', close);
+    document.getElementById('caseByCaseDetailCloseBtn2').addEventListener('click', close);
+    bindSafeBackdropClose(document.getElementById('caseByCaseDetailOverlay'), close);
+    document.getElementById('caseByCaseConvertBtn').addEventListener('click', async ()=>{
+      if(!confirm(`"${cbc.name}"을(를) 협약사로 전환할까요?\n새 업체가 만들어지고, 지금까지의 건바이건 요청 이력은 그대로 그 업체의 "협약 전 건바이건 이력"으로 보존됩니다.\n(협약 체결일은 전환 후 업체 상세에서 직접 입력해주세요)`)) return;
+      const statusEl = document.getElementById('caseByCaseConvertStatus');
+      const btn = document.getElementById('caseByCaseConvertBtn');
+      btn.disabled = true;
+      const r = await convertCaseByCaseToCompany(cbcId);
+      btn.disabled = false;
+      if(!r.ok){ if(statusEl) statusEl.innerHTML = `<span style="color:#b3261e;">${esc((r.err&&r.err.message)||'전환에 실패했습니다.')}</span>`; return; }
+      close();
+      renderList();
+      openCard(r.companyId);
+    });
+  }
+
+  /* §확인 필요 복원/3단계 분류 라운드(신규, §요청 8) — 건바이건 업체 → 협약사 명시적
+     전환. 완전 자동 감지(예: "MOU 날짜를 입력하면 자동 전환")는 오탐 위험이 커서(§요청
+     "복잡하면 명시적 버튼으로 안전하게") 이 버튼 하나로만 전환한다. 새 업체를 중복
+     생성하지 않는다는 원칙은 애초에 건바이건 업체가 companies 배열에 존재한 적이 없어서
+     "중복"이 발생할 수 없다 — 새로 만드는 이 업체가 유일한 실제 협약사 레코드가 된다.
+     기존 sheetRequests 문서들은 지우지 않고 companyId만 cbc_id → 새 회사 id로 옮겨 붙인다
+     (§요청 "기존 건바이건 요청 이력 보존") — 그 결과 기존 MOU 날짜 기준 L2→L3 필터링
+     로직이 그대로 이 업체에도 자연히 적용된다(별도 새 로직 없음, §요청 확인 사항).
+     같은 정규화 업체명이 alias로도 등록되어(D.addSheetReqAlias) 이후 재동기화되는 새
+     요청도 자동으로 이 협약사에 연결된다. */
+  async function convertCaseByCaseToCompany(cbcId){
+    const cbc = D.findCaseByCaseById(cbcId);
+    if(!cbc) return { ok:false, err:{ message:'건바이건 업체를 찾을 수 없습니다.' } };
+    if(cbc.convertedToCompanyId) return { ok:false, err:{ message:'이미 협약사로 전환된 업체입니다.' } };
+    const newCo = D.addCompany({ name: cbc.name });
+    D.addSheetReqAlias(newCo.id, cbc.normName);
+    const reqs = D.buildSheetRequestsIndex().get(String(cbcId)) || [];
+    const toWrite = reqs.map(r=> ({
+      id: window.SHIN2_SHEETREQ_SYNC ? window.SHIN2_SHEETREQ_SYNC.docId(r.sourceSheet, r.sourceId) : (r.sourceSheet + '_' + r.sourceId),
+      fields: Object.assign({}, r, { companyId: newCo.id, entityType:'company', updatedAt: new Date().toISOString() })
+    }));
+    try{
+      if(toWrite.length){
+        if(!window.SHIN2_SHEETREQ_SYNC || !window.SHIN2_SHEETREQ_SYNC.saveMany) throw new Error('SYNC_UNAVAILABLE');
+        await window.SHIN2_SHEETREQ_SYNC.saveMany(toWrite);
+      }
+      const companiesResult = await confirmCloudSave('companies');
+      if(!companiesResult.ok) return { ok:false, err: companiesResult.err };
+      if(!window.SHIN2_CASEBYCASE_SYNC || !window.SHIN2_CASEBYCASE_SYNC.saveOne) throw new Error('SYNC_UNAVAILABLE');
+      await window.SHIN2_CASEBYCASE_SYNC.saveOne(cbcId, Object.assign({}, cbc, { convertedToCompanyId: newCo.id, convertedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }));
+    }catch(err){
+      return { ok:false, err:{ message:'전환 저장에 일부 실패했습니다 — 새로고침 후 다시 시도해주세요(이미 저장된 부분은 유지됩니다).' } };
+    }
+    return { ok:true, companyId: newCo.id };
   }
 
   // §팝업 전체 크기 축소 라운드 §9(접근성): Esc로 닫기 + 닫을 때 이전 포커스 위치 복구.
@@ -17872,6 +18338,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 있는 새 요청이 "요청 전체 보기"에 안 뜨는 불일치가 있었다. mergedGsheetRequestItems로
     // 통일(다른 3곳 — 최근 요청 배지/요청기록 병합 뷰/gsheetReqCount — 와 완전히 같은 소스).
     const items = mergedGsheetRequestItems(companyId);
+    // §확인 필요 복원/3단계 분류 라운드(신규, §요청 8) — 건바이건 업체에서 전환된
+    // 업체라면, 협약 체결일 이전 요청은 "협약 전 건바이건 이력"으로 표시만 한다(판정
+    // 로직 변경 없음, 순수 UI 라벨). 전환 이력이 없는 일반 협약사에는 전혀 영향 없다.
+    const originCbc = D.loadCaseByCaseCompanies().find(r=> r.convertedToCompanyId === companyId);
+    const mou = originCbc ? resolveEffectiveMouDate(co) : null;
     root.innerHTML = `
       <div class="pi-overlay" id="gsheetReqListOverlay">
         <div class="pi-panel" style="max-width:560px;max-height:80vh;" role="dialog" aria-modal="true" aria-label="${esc(co.name)} 요청 전체 보기">
@@ -17880,12 +18351,14 @@ window.SHIN2_CRM_APP_INIT = function(){
             <button type="button" class="chart-close-btn" id="gsheetReqListCloseBtn" aria-label="닫기">&times;</button>
           </div>
           <div class="pi-body" style="overflow-y:auto;">
-            ${items.length ? items.map(it=> `
+            ${items.length ? items.map(it=> {
+              const isPreMou = mou && it.ts != null && it.ts < mou.ts;
+              return `
               <div class="local-cloud-diag-row" style="align-items:flex-start;flex-direction:column;gap:2px;">
-                <div><b>${esc(fmtDate(it.ts))}</b> · ${esc(it.sourceTab || '')}${it.sourceUniqueId ? ' · ' + esc(it.sourceUniqueId) : ''}</div>
+                <div><b>${esc(fmtDate(it.ts))}</b> · ${esc(it.sourceTab || '')}${it.sourceUniqueId ? ' · ' + esc(it.sourceUniqueId) : ''}${isPreMou ? ' · <span style="color:#8a5a00;">협약 전 건바이건 이력</span>' : ''}</div>
                 <div>${esc(it.text || '')}</div>
-              </div>
-            `).join('') : `<div class="local-cloud-diag-empty">요청 기록이 없습니다.</div>`}
+              </div>`;
+            }).join('') : `<div class="local-cloud-diag-empty">요청 기록이 없습니다.</div>`}
           </div>
           <div class="pi-actions">
             <button type="button" class="co-text-action" id="gsheetReqListCloseBtn2">닫기</button>
@@ -17912,10 +18385,15 @@ window.SHIN2_CRM_APP_INIT = function(){
     renderGsheetReviewModal();
   }
   function updateGsheetReviewCountBadge(){
+    const n = gsheetImportState.reviewItems.length; // 실제 계산된 값(하드코딩 아님, §요청)
     const el = document.getElementById('crmGsheetReviewCount');
-    if(!el) return;
-    const n = gsheetImportState.reviewItems.length;
-    el.textContent = n ? ('(' + n + ')') : '';
+    if(el) el.textContent = n ? ('(' + n + ')') : '';
+    // §확인 필요 복원/3단계 분류 라운드(신규) — 관리 도구 버튼 자체의 배지(위 주석 참고).
+    const outerBadge = document.getElementById('crmDataUpdateReviewBadge');
+    if(outerBadge){
+      if(n){ outerBadge.textContent = String(n); outerBadge.style.display = ''; }
+      else { outerBadge.textContent = ''; outerBadge.style.display = 'none'; }
+    }
   }
   function renderGsheetReviewModal(){
     const root = document.getElementById('gsheetReviewModalRoot');
@@ -17936,12 +18414,16 @@ window.SHIN2_CRM_APP_INIT = function(){
           <div class="local-cloud-diag-title">${esc(g.rawCompanyName || '(업체명 없음)')} — ${g.items.length}건</div>
           ${g.items.map(it=> `<div class="local-cloud-diag-row">${esc(it.tab)} · ${esc(it.reason)}${it.uniqueId ? ' · ' + esc(it.uniqueId) : ''}</div>`).join('')}
           ${g.rawCompanyName ? `
-            <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
-              <select id="gsheetReviewSelect_${gi}" style="flex:1;min-width:0;">
+            <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap;">
+              <select id="gsheetReviewSelect_${gi}" style="flex:1;min-width:160px;">
                 <option value="">기존 업체 선택…</option>
                 ${optionsHtml}
               </select>
-              <button type="button" class="co-text-action primary" data-gsheet-review-link="${esc(gi)}" data-gsheet-review-name="${esc(g.rawCompanyName)}">이 업체로 연결</button>
+              <button type="button" class="co-text-action primary" data-gsheet-review-link="${esc(gi)}" data-gsheet-review-name="${esc(g.rawCompanyName)}">① 기존 협약사와 연결</button>
+              <!-- §확인 필요 복원/3단계 분류 라운드(신규) — ②건바이건 업체로 등록/③제외
+                   처리. ①(위 select+연결 버튼)은 기존 그대로, 이 두 버튼만 새로 추가한다. -->
+              <button type="button" class="co-text-action" data-gsheet-review-cbc="${esc(gi)}" data-gsheet-review-name="${esc(g.rawCompanyName)}">② 건바이건 업체로 등록</button>
+              <button type="button" class="co-text-action" data-gsheet-review-exclude="${esc(gi)}" data-gsheet-review-name="${esc(g.rawCompanyName)}">③ 제외 처리</button>
               <span class="cdash-cloud-save-status" id="gsheetReviewStatus_${gi}"></span>
             </div>` : `<div class="local-cloud-diag-note">업체명이 비어 있어 연결할 수 없습니다 — 시트 원본을 확인해주세요.</div>`}
         </div>
@@ -17981,6 +18463,31 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(!companyId){ showCloudSaveStatus(statusEl, false, { message:'업체를 먼저 선택해주세요.' }); return; }
       btn.disabled = true;
       const r = await resolveGsheetReviewCompany(rawName, companyId);
+      btn.disabled = false;
+      if(!r.ok){ showCloudSaveStatus(statusEl, false, r.err); return; }
+      updateGsheetReviewCountBadge();
+      renderGsheetReviewModal();
+    }));
+    // §확인 필요 복원/3단계 분류 라운드(신규) — ②건바이건 업체로 등록.
+    root.querySelectorAll('[data-gsheet-review-cbc]').forEach(btn=> btn.addEventListener('click', async ()=>{
+      const gi = btn.getAttribute('data-gsheet-review-cbc');
+      const rawName = btn.getAttribute('data-gsheet-review-name');
+      const statusEl = document.getElementById('gsheetReviewStatus_' + gi);
+      btn.disabled = true;
+      const r = await registerCaseByCaseFromReview(rawName);
+      btn.disabled = false;
+      if(!r.ok){ showCloudSaveStatus(statusEl, false, r.err); return; }
+      updateGsheetReviewCountBadge();
+      renderGsheetReviewModal();
+    }));
+    // §확인 필요 복원/3단계 분류 라운드(신규) — ③제외 처리.
+    root.querySelectorAll('[data-gsheet-review-exclude]').forEach(btn=> btn.addEventListener('click', async ()=>{
+      const gi = btn.getAttribute('data-gsheet-review-exclude');
+      const rawName = btn.getAttribute('data-gsheet-review-name');
+      const statusEl = document.getElementById('gsheetReviewStatus_' + gi);
+      if(!confirm(`"${rawName}" 관련 항목을 전부 제외 처리할까요?\n(협약사 목록/건바이건 업체 목록/확인 필요 목록/통계 어디에도 표시되지 않으며, 사유는 감사로그에만 남습니다)`)) return;
+      btn.disabled = true;
+      const r = await excludeReviewItemsForName(rawName, '사용자 제외 처리(확인 필요 목록)');
       btn.disabled = false;
       if(!r.ok){ showCloudSaveStatus(statusEl, false, r.err); return; }
       updateGsheetReviewCountBadge();
