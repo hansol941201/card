@@ -3976,7 +3976,7 @@ window.SHIN2_CRM_OCR = (function(){
       // Firestore 클라우드에만 있던 경우 — 에서 고객 목록이 0건으로 보이는 실제 장애를
       // 일으켰다. 원인 확인 즉시 원래의 공유 키·공유 Firestore 문서로 되돌렸다 — v2와 다시
       // 공유하지만, 그게 실제로 데이터가 안전하게 보존/동기화되고 있던 유일한 경로였다).
-      const { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp } =
+      const { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, collection, getDocs, writeBatch } =
         await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js');
 
       const app = initializeApp(cfg, 'shin2crm');
@@ -4190,6 +4190,124 @@ window.SHIN2_CRM_OCR = (function(){
         getOnce: (name)=> SHARED_ARRAY_KEYS[name] ? getSharedKeyDocOnce(SHARED_ARRAY_KEYS[name]) : Promise.reject(new Error('알 수 없는 저장소: ' + name)),
         isReady: (name)=> !!sharedSyncStarted[name]
       };
+
+      /* ========================================================================
+         §Firestore 문서 용량 초과 수정 라운드(신규) — customerActivities(위 ACT_KEY,
+         SHARED_ARRAY_KEYS.customerActivities) 문서 하나에 배열 전체를 push하는 기존
+         방식(pushSharedKeyToCloud* 계열)은 구글시트 요청이 쌓이면서 문서 1건이
+         1,048,576바이트 한도를 넘겨(실측 1,103,538바이트) 쓰기 자체가 거부되고
+         "최근 요청"이 전부 "—"로 보이던 실제 장애의 원인이었다. §요청 6 "새 중복
+         저장소를 만들지 말라"는 이전 라운드(§요청 6, addSheetRequestActivity 등)의
+         지시였지만, 이번 요청은 그 반대로 명시적이다 — "customerActivities 배열에는
+         더 이상 추가하지 말고, 요청 1건당 문서 1개인 새 컬렉션에만 저장하라." 기존
+         customerActivities 문서/배열은 이 블록에서 절대 쓰지 않는다(읽기조차 하지
+         않는다) — 위 SHARED_ARRAY_KEYS/writeArr 경로는 그대로 남겨 다른 화면(전화기록,
+         메모 등 원래 목적)은 전혀 건드리지 않는다.
+
+         경로: users/{uid}/sheetRequests/{requestDocId} — uid는 이 파일의 다른 모든
+         공용 데이터(companies/customerActivities/memos/customerDocuments)와 완전히
+         같은 currentUid(고정 공용 Firebase 계정 하나) 그대로 재사용한다. 새 인증
+         플로우를 만들지 않는다.
+
+         requestDocId는 sourceSheet(탭명)+sourceId(문의ID)로부터 결정적으로 만든다
+         (§요청 "같은 문의ID는 재접속해도 항상 같은 문서 id" — encodeURIComponent 후
+         Firestore 문서 id 제약에 걸리는 나머지 문자까지 "_"로 치환해 "/" 등이 경로를
+         깨는 것을 구조적으로 막는다). 같은 id에는 setDoc({merge:true})만 쓰므로
+         재확인해도 새 문서가 늘지 않는다(§요청 "중복 생성 금지").
+         ======================================================================== */
+      const SHEETREQ_COLLECTION_NAME = 'sheetRequests';
+      // §데이터 레이어(다른 <script> 블록)가 읽는 로컬 미러 키 — DOC_SYNC_STORAGE_KEY와
+      // 같은 패턴(§위 §4031 근처 주석): onSnapshot이 받은 최신 배열을 그대로 localStorage에
+      // 적어두고, 데이터 레이어는 이 키를 읽기 전용으로만 조회한다(D.loadSheetRequests).
+      // 데이터 레이어의 SHEETREQ_CACHE_KEY 상수와 반드시 같은 문자열이어야 한다.
+      const SHEETREQ_CACHE_KEY = 'shin2-sheet-requests-cache-v1';
+      let sheetReqSyncStarted = false;
+      const sheetReqDocsById = new Map();
+      function sheetReqSafeIdPart(s){
+        // Firestore 문서 id는 "/"를 포함할 수 없고 "."만으로 이뤄지거나 ".."이면 안 되며
+        // 1,500바이트 이하여야 한다. encodeURIComponent가 "/"는 항상 %2F로 바꿔주지만
+        // "."(온점) 자체는 그대로 통과시키므로, 남는 위험 문자까지 한 번 더 "_"로 치환해
+        // 구조적으로 안전하게 만든다 — 같은 입력은 항상 같은 결과(결정적)를 낸다.
+        return encodeURIComponent(String(s == null ? '' : s)).replace(/[.%]/g, '_');
+      }
+      function sheetReqDocId(sourceSheet, sourceId){
+        const raw = sheetReqSafeIdPart(sourceSheet) + '__' + sheetReqSafeIdPart(sourceId);
+        // 빈 문자열(둘 다 없음) 방어 — 실제로는 호출부(uniqueId 없는 행)가 이 경우 아예
+        // 호출하지 않는다(§요청 "고유번호 없는 행은 확인 필요로"). Firestore 문서 id
+        // 1,500바이트 한도 방어로 1,400자에서 자른다.
+        const safe = (raw.length > 2) ? raw : ('req__' + Date.now());
+        return safe.slice(0, 1400);
+      }
+      function sheetReqCollRef(){
+        if(!currentUid) return null;
+        return collection(db, 'users', currentUid, SHEETREQ_COLLECTION_NAME);
+      }
+      function persistSheetReqCacheToLocal(){
+        try{ localStorage.setItem(SHEETREQ_CACHE_KEY, JSON.stringify(Array.from(sheetReqDocsById.values()))); }catch(e){}
+      }
+      function startSheetReqSync(){
+        if(sheetReqSyncStarted || !currentUid) return;
+        sheetReqSyncStarted = true;
+        const ref = sheetReqCollRef();
+        // §실시간 반영 — onSnapshot 하나로 이 기기/다른 기기(다른 브라우저) 모두 같은
+        // 컬렉션을 구독한다. 이 컬렉션은 사용자가 직접 편집하는 값이 아니라(가져오기
+        // 파이프라인/업체 연결 확정만 쓴다) companies/customerActivities 같은 로컬-우선
+        // localRev 가드가 필요 없다 — 오는 값을 그대로 반영해도 안전하다.
+        window.SHIN2_UNSUB_SHEETREQ = onSnapshot(ref, (snap)=>{
+          snap.docChanges().forEach(ch=>{
+            if(ch.type === 'removed') sheetReqDocsById.delete(ch.doc.id);
+            else sheetReqDocsById.set(ch.doc.id, Object.assign({ id: ch.doc.id }, ch.doc.data()));
+          });
+          persistSheetReqCacheToLocal();
+          window.dispatchEvent(new CustomEvent('shin2-crm-sheetreq-cloud-update'));
+        }, (err)=> console.warn('[CRM/Firebase] sheetRequests 구독 실패', err));
+      }
+      // saveSheetRequestsBatch: items = [{ id, fields }] (fields에는 이미 companyId 등
+      // 최종 값이 다 채워져 있다 — 이 함수는 청크로 나눠 writeBatch만 담당). §요청
+      // "500 한도 대비 400건씩" — 배치 하나가 실패해도 이미 commit된 이전 배치는
+      // Firestore에 그대로 남는다(롤백하지 않음, §요청 "부분 실패해도 기존 저장 유지").
+      // 실패 지점(failedFromIndex)을 함께 던지므로, 호출부가 재시도할 때 처음부터
+      // 다시 보내도 이미 성공한 문서는 같은 id에 같은 값을 다시 merge할 뿐이라
+      // 안전하다(멱등) — 실패 지점부터만 다시 보내도 되고, 통째로 다시 보내도 결과는
+      // 같다.
+      async function saveSheetRequestsBatch(items){
+        if(!currentUid) throw Object.assign(new Error('로그인이 필요합니다.'), { code:'NOT_AUTHENTICATED' });
+        if(!items || !items.length) return { ok:true, saved:0 };
+        const CHUNK = 400;
+        let saved = 0;
+        for(let i=0;i<items.length;i+=CHUNK){
+          const chunk = items.slice(i, i+CHUNK);
+          const batch = writeBatch(db);
+          chunk.forEach(it=>{
+            const ref = doc(db, 'users', currentUid, SHEETREQ_COLLECTION_NAME, it.id);
+            batch.set(ref, it.fields, { merge:true });
+          });
+          try{ await batch.commit(); saved += chunk.length; }
+          catch(err){
+            throw Object.assign(new Error('SHEETREQ_BATCH_FAILED'), { code: err && err.code, cause: err, saved, failedFromIndex: i });
+          }
+        }
+        return { ok:true, saved };
+      }
+      // §로컬-클라우드 비교 화면과 같은 이유로 "원본 그대로 1회성 읽기"도 남겨둔다(진단/
+      // 복구 용도) — onSnapshot 캐시(sheetReqDocsById)와는 별개로, 병합·구독에 전혀
+      // 영향을 주지 않는다.
+      async function getSheetRequestsOnce(){
+        if(!currentUid) return [];
+        const ref = sheetReqCollRef();
+        const snap = await getDocs(ref);
+        const out = [];
+        snap.forEach(d=> out.push(Object.assign({ id:d.id }, d.data())));
+        return out;
+      }
+      window.SHIN2_SHEETREQ_SYNC = {
+        start: startSheetReqSync,
+        saveMany: saveSheetRequestsBatch,
+        getAll: ()=> Array.from(sheetReqDocsById.values()),
+        getAllOnce: getSheetRequestsOnce,
+        isReady: ()=> sheetReqSyncStarted,
+        docId: sheetReqDocId
+      };
       // 다른 탭(같은 브라우저의 v2)에서 방금 [클라우드 동기화 시작] 버튼을 눌러 플래그가
       // 새로 켜지면, 이 CRM 탭을 새로고침하지 않아도 바로 이어받아 실시간 동기화를 켠다.
       window.addEventListener('storage', (e)=>{
@@ -4208,6 +4326,10 @@ window.SHIN2_CRM_OCR = (function(){
         // 안전한 그림), 이미 파일을 올린 기기는 자기 로컬 rev가 더 최신이면 오히려 클라우드로
         // 다시 밀어주는 기존 가드(localRev vs snapRev)가 그대로 지켜준다 — 데이터 유실 없음.
         if(currentUid) startDocsSync();
+        // sheetRequests도 customerDocuments와 같은 이유로 v2의 [클라우드 동기화 시작]
+        // 게이트를 기다리지 않는다 — 이 컬렉션은 이번 라운드에 새로 생기는 것이라 "기존
+        // 로컬에만 있던 값과의 병합 위험" 자체가 없다(§CASE B와 동일하게 항상 안전).
+        if(currentUid) startSheetReqSync();
         maybeStartSharedSync();
       });
 
@@ -4505,6 +4627,15 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   const DOC_KEY = 'shin2-customer-documents-v1';
   const BLOB_KEY = 'shin2-customer-doc-blobs-v1'; // 로컬 전용 — SHIN2_SYNC_KEYS에 절대 추가하지 않는다(§25)
   const MEMO_KEY = 'shin2-memos-v1';
+  // §Firestore 문서 용량 초과 수정 라운드(신규) — Google Sheets 요청은 이제 이 배열식
+  // 저장소(ACT_KEY)에 절대 추가하지 않는다. 대신 요청 1건당 문서 1개인 새 Firestore
+  // 컬렉션(users/{uid}/sheetRequests/{id})을 쓰고, 그 결과를 이 CRM 탭에서도 읽을 수
+  // 있도록 Firebase 모듈 블록(<script type="module">)의 onSnapshot이 최신 배열을
+  // 그대로 이 키에 미러링해둔다 — 이 스크립트 블록은 그 모듈 블록과 분리돼 있어(§위
+  // SHARED_ARRAY_KEYS 주석과 같은 이유) db/onSnapshot을 직접 쓸 수 없으므로, 여기서는
+  // 항상 "읽기 전용"으로만 이 키를 조회한다(쓰기는 모듈 블록의 SHIN2_SHEETREQ_SYNC만
+  // 한다). 문자열 값은 그 블록의 SHEETREQ_CACHE_KEY 상수와 반드시 같아야 한다.
+  const SHEETREQ_CACHE_KEY = 'shin2-sheet-requests-cache-v1';
   // 공용 자료실(v2/index.html SHIN2_LIBRARY 모듈)의 메타데이터 저장소 — CRM은 여기서 "읽기만"
   // 한다. 업로드/삭제/수정은 전부 v2 자료실 화면의 몫이고, 이 파일은 그 저장소의 이름과 구조를
   // 절대 바꾸지 않는다(§29). 질문에 "제공자료"를 연결할 때 파일명을 보여주기 위한 참조 전용.
@@ -5309,6 +5440,32 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     map.forEach(list=> list.sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt)));
     activitiesIndexCache = { raw, map };
     return map;
+  }
+  // §Firestore 문서 용량 초과 수정 라운드(신규) — sheetRequests는 순수 읽기 전용
+  // 미러(위 SHEETREQ_CACHE_KEY 주석 참고). companyId가 아직 없는 문서(=아직 업체
+  // 매칭이 안 돼 "확인 필요"에만 떠 있는 행)는 이 컬렉션 자체에 저장되지 않으므로
+  // 여기 나타나는 값은 전부 companyId가 있는, 화면에 바로 써도 되는 값이다.
+  function loadSheetRequests(){ return readArr(SHEETREQ_CACHE_KEY); }
+  let sheetReqIndexCache = { raw: undefined, map: null };
+  function buildSheetRequestsIndex(){
+    const raw = localStorage.getItem(SHEETREQ_CACHE_KEY);
+    if(raw === sheetReqIndexCache.raw && sheetReqIndexCache.map) return sheetReqIndexCache.map;
+    const map = new Map();
+    loadSheetRequests().forEach(r=>{
+      if(!r || !r.companyId) return;
+      const k = String(r.companyId);
+      if(!map.has(k)) map.set(k, []);
+      map.get(k).push(r);
+    });
+    map.forEach(list=> list.sort((a,b)=> new Date(b.requestDate) - new Date(a.requestDate)));
+    sheetReqIndexCache = { raw, map };
+    return map;
+  }
+  // 업체 하나의 "가장 최근 sheetRequests 문서" 1건만 필요한 곳(예: 목록 "최근 요청"
+  // 열, MOU 유무/90일 경과와 무관하게 전 업체 대상 §요청)에서 매번 정렬하지 않도록.
+  function latestSheetRequestForCompany(companyId){
+    const list = buildSheetRequestsIndex().get(String(companyId)) || [];
+    return list[0] || null;
   }
   function addMemo(companyId, text){
     const now = Date.now();
@@ -6666,6 +6823,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     getMailAssetsMeta, saveMailAssetsMeta,
     getGlobalMailAsset, saveGlobalMailAssetPatch,
     loadActivities, addActivity, updateActivityText, deleteActivity, activitiesForCompany, classifyActivity, buildActivitiesIndex,
+    loadSheetRequests, buildSheetRequestsIndex, latestSheetRequestForCompany,
     loadDocuments, documentsForCompany, buildDocumentsIndex, addDocument, updateDocumentExtracted, getBlob, renameDocument, setDocumentMemo, setDocumentVerification, deleteDocument, findDocument, migrateDocumentToCloud,
     loadMemos, memosFor, addMemo, updateMemo, deleteMemo, buildMemosIndex,
     pendingActivitiesForCompany, tasksForCompany, calendarEventsForCompany, upcomingCalendarEventsForCompany,
@@ -7072,7 +7230,10 @@ window.SHIN2_CRM_APP_INIT = function(){
     // D.activitiesForCompany로 전체 배열을 다시 읽지 않는다.
     const conv = computeL2L3Conversion(co);
     const firstReqDisplay = conv.firstRequestAt ? (fmtDate(conv.firstRequestAt) + (conv.firstRequestTab ? ' · ' + conv.firstRequestTab : '')) : '요청 없음';
-    const gsheetReqCount = (r.acts || []).filter(a=> a.source === 'google-sheets-request').length;
+    // §남은 불일치 정리 라운드 — mergedGsheetRequestItems로 통일(§요청 "이 4곳이 전부
+    // 동일한 sheetRequests 자료 기준"). r.sheetReqs는 renderList() enriched가 이미
+    // 채워둔 값(§성능, 없으면 함수 내부에서 단건 조회로 대체).
+    const gsheetReqCount = mergedGsheetRequestItems(co.id, r && r.sheetReqs, r && r.acts).length;
     return `
       <div class="new-partner-info-row" data-new-partner-info="${esc(co.id)}">
         <div class="np2-detail-line">
@@ -7236,6 +7397,47 @@ window.SHIN2_CRM_APP_INIT = function(){
   // §요청 "전화번호, 이메일, 담당자 이름은 가져오거나 저장하지 말 것" — 업체/발생일/ID
   // 컬럼을 뺀 나머지 중에서도 이 패턴에 걸리는 헤더는 내용 요약(coreContent)에서 제외한다.
   const GSHEET_EXCLUDED_HEADER_RE = /전화|휴대폰|휴대전화|연락처|이메일|e-?mail|담당자/i;
+  // §Firestore 문서 용량 초과 수정 라운드(신규) — sheetRequests 문서의 address 필드용.
+  // 주소 컬럼이 있는 탭에서만 값이 채워지고, 없으면 빈 문자열(지어내지 않음).
+  const GSHEET_ADDRESS_HEADER_RE = /주소/;
+  // 문서 하나가 다시 커지지 않도록 요약 텍스트 길이를 제한한다(§요청 "UI가 실제 쓰는
+  // 만큼만" — 목록/카드 어디에서도 500자 넘는 요약을 그대로 보여주지 않는다).
+  const SHEETREQ_SUMMARY_MAX = 500;
+  function buildSheetReqPayload(cfg, ctx){
+    const contentParts = [];
+    let address = '';
+    (ctx.cols || []).forEach((c,i)=>{
+      const label = c.label || c.id;
+      if(!label || i === ctx.companyColIdx || i === ctx.dateColIdx || i === ctx.idColIdx) return;
+      if(GSHEET_EXCLUDED_HEADER_RE.test(label)) return;
+      const v = gsheetCellToText(ctx.row.c[i]);
+      if(!v) return;
+      if(!address && GSHEET_ADDRESS_HEADER_RE.test(label)){ address = v; return; }
+      contentParts.push(label + ': ' + v);
+    });
+    let summary = contentParts.join(' · ') || '(내용 없음)';
+    if(summary.length > SHEETREQ_SUMMARY_MAX) summary = summary.slice(0, SHEETREQ_SUMMARY_MAX) + '…';
+    return {
+      sourceSheet: cfg.tab,
+      sourceId: ctx.uniqueId,
+      dedupKey: cfg.tab + '::' + ctx.uniqueId,
+      companyId: ctx.companyId,
+      sourceCompanyName: ctx.rawCompanyName,
+      requestType: cfg.tab,
+      requestDate: new Date(ctx.occurredTs).toISOString(),
+      siteName: ctx.siteName || '',
+      address,
+      summary,
+      status: 'matched'
+    };
+  }
+  // §요청 "이미 저장된 값과 다를 때만 쓴다(불필요한 쓰기 방지)" — createdAt/updatedAt을
+  // 뺀 실제 내용 필드만 비교한다.
+  const SHEETREQ_COMPARE_FIELDS = ['sourceSheet','sourceId','dedupKey','companyId','sourceCompanyName','requestType','requestDate','siteName','address','summary','status'];
+  function sheetReqPayloadChanged(existing, payload){
+    if(!existing) return true;
+    return SHEETREQ_COMPARE_FIELDS.some(k=> String(existing[k] || '') !== String(payload[k] || ''));
+  }
 
   function gsheetCellToText(cell){
     if(!cell) return '';
@@ -7297,25 +7499,33 @@ window.SHIN2_CRM_APP_INIT = function(){
   // customerActivities를 다시 읽고 필터링)를 매 업체마다 새로 부르지 않고 미리 만들어 둔
   // Map만 조회한다(computeNewPartnerConversionSummary가 한 번만 만들어서 넘김). 넘기지
   // 않으면(고객카드 등 단건 조회) 기존처럼 그 자리에서 계산 — 동작은 완전히 그대로다.
-  function computeL2L3Conversion(co, sheetsActsByCompany){
+  // §Firestore 문서 용량 초과 수정 라운드(신규) — L2→L3 전환 계산의 데이터 소스를
+  // customerActivities 배열 스캔(source==='google-sheets-request')에서 새
+  // sheetRequests 컬렉션(D.buildSheetRequestsIndex, companyId별 requestDate 내림차순)
+  // 으로 바꾼다. §요청 "0~89일(포함) 최초 1건만 전환으로 인정"·"분류/임계값 로직은
+  // 그대로 유지"는 아래에 완전히 동일하게 남아 있다 — 바뀐 건 어디서 요청 목록을
+  // 가져오는지뿐이다(occurredAt→requestDate, sourceTab→requestType 필드명만 대응).
+  function computeL2L3Conversion(co, sheetReqsByCompany){
     const mou = resolveEffectiveMouDate(co);
     if(!mou) return { hasMouDate:false, converted:false, firstRequestAt:null, firstRequestTab:null };
-    const acts = sheetsActsByCompany
-      ? (sheetsActsByCompany.get(co.id) || [])
-      : D.activitiesForCompany(co.id).filter(a=> a.source === 'google-sheets-request' && a.occurredAt);
+    const reqs = sheetReqsByCompany
+      ? (sheetReqsByCompany.get(String(co.id)) || [])
+      : D.buildSheetRequestsIndex().get(String(co.id)) || [];
     let firstOverall = null, firstConverting = null;
-    acts.forEach(a=>{
-      const occ = new Date(a.occurredAt).getTime();
-      if(!firstOverall || occ < new Date(firstOverall.occurredAt).getTime()) firstOverall = a;
+    reqs.forEach(r=>{
+      if(!r.requestDate) return;
+      const occ = new Date(r.requestDate).getTime();
+      if(isNaN(occ)) return;
+      if(!firstOverall || occ < new Date(firstOverall.requestDate).getTime()) firstOverall = r;
       const days = Math.round((occ - mou.ts) / 86400000);
       if(days < 0 || days > 89) return; // §요청: 협약 전/90일 이상은 전환 계산 제외(최근 기록엔 남음)
-      if(!firstConverting || occ < new Date(firstConverting.occurredAt).getTime()) firstConverting = a;
+      if(!firstConverting || occ < new Date(firstConverting.requestDate).getTime()) firstConverting = r;
     });
     return {
       hasMouDate: true, converted: !!firstConverting,
-      firstRequestAt: firstOverall ? firstOverall.occurredAt : null, // 참고용(협약 전후 무관 전체 최초 요청)
-      firstRequestTab: firstOverall ? firstOverall.sourceTab : null,
-      convertingRequestAt: firstConverting ? firstConverting.occurredAt : null
+      firstRequestAt: firstOverall ? firstOverall.requestDate : null, // 참고용(협약 전후 무관 전체 최초 요청)
+      firstRequestTab: firstOverall ? firstOverall.requestType : null,
+      convertingRequestAt: firstConverting ? firstConverting.requestDate : null
     };
   }
   // §신규 협약사 요약 — 요청하신 "현재 신규 협약사 수/L2→L3 전환 업체 수/전환율"을 한
@@ -7323,18 +7533,14 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 재사용 — 새 모집단 판정을 만들지 않는다.
   function computeNewPartnerConversionSummary(){
     const pool = D.loadActiveCompanies().filter(isNewPartnerCompany);
-    // §성능 수정 — customerActivities는 여기서 딱 한 번만 읽고 companyId별로 미리
-    // 묶어 둔다(§조사: 예전에는 업체마다 D.activitiesForCompany를 새로 불러 전체
-    // 배열을 다시 읽고 필터·정렬했었다 — 신규 협약사가 많을수록 렌더가 느려지던 원인).
-    const sheetsActsByCompany = new Map();
-    D.loadActivities().forEach(a=>{
-      if(a.source !== 'google-sheets-request' || !a.occurredAt) return;
-      if(!sheetsActsByCompany.has(a.companyId)) sheetsActsByCompany.set(a.companyId, []);
-      sheetsActsByCompany.get(a.companyId).push(a);
-    });
+    // §Firestore 문서 용량 초과 수정 라운드 — customerActivities 스캔 대신
+    // D.buildSheetRequestsIndex()(sheetRequests 컬렉션의 로컬 미러, companyId별로
+    // 이미 묶여 있음)를 재사용한다. 여전히 딱 한 번만 만들어 아래 map에 그대로 넘기므로
+    // §성능 원칙(신규 협약사 많아져도 렌더가 느려지지 않음)은 그대로 유지된다.
+    const sheetReqsByCompany = D.buildSheetRequestsIndex();
     let convertedCount = 0;
     const rows = pool.map(co=>{
-      const conv = computeL2L3Conversion(co, sheetsActsByCompany);
+      const conv = computeL2L3Conversion(co, sheetReqsByCompany);
       if(conv.converted) convertedCount++;
       return { co, conv };
     });
@@ -7342,33 +7548,56 @@ window.SHIN2_CRM_APP_INIT = function(){
     return { total: pool.length, converted: convertedCount, rate, rows };
   }
 
-  let gsheetImportState = { ran:false, running:false, lastError:null, reviewItems:[] };
+  let gsheetImportState = { ran:false, running:false, lastError:null, saveError:null, reviewItems:[], lastSavedCount:0, lastMatchedCount:0, lastLinkNote:null };
   // 확인 필요 항목에서 사용자가 기존 업체를 직접 고르면: 별칭을 저장하고(§요청, 재사용
-  // 가능한 연결), 그 업체명으로 대기 중이던 확인 필요 행들을 즉시 다시 반영 시도한다 —
-  // 새로고침을 기다리지 않아도 된다(§요청 "이후 같은 시트 업체명은 같은 고객에게 연결").
+  // 가능한 연결), 그 업체명(원본 sourceCompanyName)으로 대기 중이던 확인 필요 행 "전부"에
+  // 즉시 같은 companyId를 적용해 sheetRequests 문서로 저장한다(§요청 "같은 원본 업체명을
+  // 가진 모든 sheetRequests 문서에 적용, 적용 건수를 화면에 표시") — 새로고침을 기다리지
+  // 않아도 된다.
   async function resolveGsheetReviewCompany(rawCompanyName, companyId){
     const normName = D.normCompanyName(rawCompanyName);
     D.addSheetReqAlias(companyId, normName);
     const pending = gsheetImportState.reviewItems.filter(x=> x.dedupKey && D.normCompanyName(x.rawCompanyName) === normName);
-    let addedCount = 0;
+    const existingAll = window.SHIN2_SHEETREQ_SYNC ? window.SHIN2_SHEETREQ_SYNC.getAll() : [];
+    const existingByDedup = new Map(existingAll.map(d=> [d.dedupKey, d]));
+    const toWrite = [];
     pending.forEach(item=>{
-      if(D.findSheetRequestActivityByDedupKey(item.dedupKey)) return; // 이미 다른 경로로 반영됨
-      D.addSheetRequestActivity({
-        companyId, activityText: item.displayText, originalText: item.displayText,
-        category: item.tab, _dedupKey: item.dedupKey, sourceTab: item.tab,
-        sourceUniqueId: item.uniqueId, occurredAt: new Date(item.occurredTs).toISOString(),
-        siteName: item.siteName || ''
+      // 고유번호/발생일 자체가 불명확한 항목(§고유번호 없음/발생일 해석 불가)은 업체를
+      // 연결해도 sheetRequests 문서를 만들 수 없다 — 계속 확인 필요 목록에 남는다.
+      if(!item.dedupKey || item.uniqueId == null || item.occurredTs == null || !item.cols || !item.row) return;
+      const cfg = GSHEET_TABS.find(c=> c.tab === item.tab);
+      if(!cfg) return;
+      const payload = buildSheetReqPayload(cfg, {
+        rawCompanyName: item.rawCompanyName, uniqueId: item.uniqueId, occurredTs: item.occurredTs,
+        siteName: item.siteName, companyId, cols: item.cols, row: item.row,
+        companyColIdx: item.companyColIdx, dateColIdx: item.dateColIdx, idColIdx: item.idColIdx
       });
-      addedCount++;
+      const existing = existingByDedup.get(item.dedupKey);
+      if(!sheetReqPayloadChanged(existing, payload)) return;
+      const now = new Date().toISOString();
+      toWrite.push({
+        id: window.SHIN2_SHEETREQ_SYNC ? window.SHIN2_SHEETREQ_SYNC.docId(cfg.tab, item.uniqueId) : (cfg.tab + '_' + item.uniqueId),
+        fields: Object.assign({}, payload, { createdAt: existing ? existing.createdAt : now, updatedAt: now })
+      });
     });
-    const results = [confirmCloudSave('companies')];
-    if(addedCount) results.push(confirmCloudSave('customerActivities'));
-    const all = await Promise.all(results);
-    const failed = all.find(r=> !r.ok);
-    if(failed) return { ok:false, err: failed.err };
-    gsheetImportState.reviewItems = gsheetImportState.reviewItems.filter(x=> !(x.dedupKey && D.normCompanyName(x.rawCompanyName) === normName));
+    let saveErr = null;
+    if(toWrite.length){
+      try{
+        if(!window.SHIN2_SHEETREQ_SYNC || !window.SHIN2_SHEETREQ_SYNC.saveMany) throw new Error('SYNC_UNAVAILABLE');
+        await window.SHIN2_SHEETREQ_SYNC.saveMany(toWrite);
+      }catch(err){ saveErr = { message: '요청 저장에 실패했습니다 — 업체 연결 자체는 유지되어 다음 새로고침에서 다시 시도합니다.' }; }
+    }
+    const companiesResult = await confirmCloudSave('companies');
+    if(!companiesResult.ok) return { ok:false, err: companiesResult.err };
+    if(saveErr) return { ok:false, err: saveErr };
+    // §요청 6에서 다루던 예전 대기 항목(고유번호/발생일 불명 등)만 남기고, 방금 처리한
+    // 항목은 목록에서 뺀다 — 처리 못 한 항목(위에서 continue한 것들)은 그대로 남아 계속
+    // "확인 필요"로 보인다.
+    const resolvedDedupKeys = new Set(toWrite.map(w=> w.fields.dedupKey));
+    gsheetImportState.reviewItems = gsheetImportState.reviewItems.filter(x=> !(x.dedupKey && resolvedDedupKeys.has(x.dedupKey)));
+    gsheetImportState.lastLinkNote = rawCompanyName + ' → 연결 — ' + toWrite.length + '건에 적용됨';
     renderList();
-    return { ok:true, addedCount };
+    return { ok:true, addedCount: toWrite.length };
   }
   // §요청 "접속할 때마다 한 번만 자동 확인 / 실행 중 중복 호출 방지 / 수동 동기화·반복
   // 확인은 만들지 않는다 — 새로고침하면 다시 확인" — ran/running 두 플래그로 이 함수는
@@ -7377,7 +7606,10 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(gsheetImportState.ran || gsheetImportState.running) return;
     gsheetImportState.running = true;
     const review = [];
-    let addedCount = 0;
+    const toWrite = []; // §Firestore 문서 용량 초과 수정 라운드 — customerActivities에는
+    // 더 이상 추가하지 않는다. 여기서는 sheetRequests에 쓸 {id, fields}만 모아뒀다가
+    // 마지막에 한 번에 배치 저장한다(§요청 "≤400/배치").
+    let matchedCount = 0;
     const fetchErrorTabs = [];
     try{
       const companies = D.loadCompanies(); // §매칭은 삭제 여부와 무관 — 소프트 삭제된 업체도 자기 요청 기록은 유지(§요청 12 데이터 보존)
@@ -7393,6 +7625,10 @@ window.SHIN2_CRM_APP_INIT = function(){
         (co.formerNames || []).forEach(fn=> indexName(co, fn));
       });
       const todayTs = getSeoulTodayDateOnly();
+      // §요청 "이미 저장된 값과 다를 때만 쓴다" — 지금 클라우드에 있는 sheetRequests를
+      // dedupKey 기준으로 먼저 읽어둔다(onSnapshot 로컬 캐시, 새 네트워크 요청 없음).
+      const existingAll = window.SHIN2_SHEETREQ_SYNC ? window.SHIN2_SHEETREQ_SYNC.getAll() : [];
+      const existingByDedup = new Map(existingAll.map(d=> [d.dedupKey, d]));
 
       for(const cfg of GSHEET_TABS){
         let table;
@@ -7413,10 +7649,11 @@ window.SHIN2_CRM_APP_INIT = function(){
           const occurredTs = dateColIdx >= 0 ? parseGsheetDateCell(row.c[dateColIdx]) : null;
           const siteName = siteNameColIdx >= 0 ? gsheetCellToText(row.c[siteNameColIdx]) : '';
 
-          // §요청 "고유번호가 없는 행은 자동 반영하지 말고 확인 필요로"
+          // §요청 "고유번호가 없는 행은 자동 반영하지 말고 확인 필요로" — 이 행은
+          // sourceId 자체가 없어 결정적 문서 id를 만들 수 없으므로 sheetRequests에는
+          // 절대 저장하지 않는다.
           if(!uniqueId){ review.push({ tab:cfg.tab, reason:'고유번호 없음', rawCompanyName, raw:obj }); return; }
           const dedupKey = cfg.tab + '::' + uniqueId; // §요청: 출처 탭명 + 고유번호
-          if(D.findSheetRequestActivityByDedupKey(dedupKey)) return; // §요청: 중복 재반영 금지 — 이미 반영됨
 
           if(!rawCompanyName){ review.push({ tab:cfg.tab, reason:'업체명 없음', rawCompanyName:'', raw:obj, dedupKey }); return; }
           if(occurredTs == null){ review.push({ tab:cfg.tab, reason:'발생일 해석 불가', rawCompanyName, raw:obj, dedupKey }); return; }
@@ -7430,30 +7667,26 @@ window.SHIN2_CRM_APP_INIT = function(){
             const hits = nameIndex.get(D.normCompanyName(rawCompanyName));
             if(hits && hits.size === 1){ companyId = Array.from(hits)[0]; }
             else {
-              // §요청: 미발견 또는 복수 후보는 자동 연결·생성 금지 — 확인 필요로만
-              review.push({ tab:cfg.tab, reason: (hits && hits.size > 1) ? '복수 후보' : '업체 못 찾음', rawCompanyName, raw:obj, dedupKey, uniqueId, occurredTs, siteName, displayText:null });
+              // §요청 "업체 매칭 실패"(2) — 저장 용량 오류(1)와 구분되는 별개 상태다.
+              // companyId가 없으므로 sheetRequests 컬렉션에는 이 행을 아직 쓰지 않는다
+              // (§요청 "사용자가 수동으로 연결해야만 companyId 확정") — cols/row/각
+              // 컬럼 인덱스를 함께 들고 있어야 나중에 연결 확정 시(resolveGsheetReviewCompany)
+              // 같은 요약을 다시 만들 수 있다.
+              review.push({ tab:cfg.tab, reason: (hits && hits.size > 1) ? '복수 후보' : '업체 못 찾음', rawCompanyName, raw:obj, dedupKey, uniqueId, occurredTs, siteName,
+                cols, row, companyColIdx, dateColIdx, idColIdx, displayText:null });
               return;
             }
           }
 
-          // §요청 "업체명/업체 주소/현장명/발생일/요청 종류/문의ID와 필요한 상태 정보만" —
-          // 업체/날짜/ID 컬럼과 연락처류 컬럼을 뺀 나머지만 요약 텍스트로 남긴다.
-          const contentParts = [];
-          cols.forEach((c,i)=>{
-            const label = c.label || c.id;
-            if(!label || i === companyColIdx || i === dateColIdx || i === idColIdx) return;
-            if(GSHEET_EXCLUDED_HEADER_RE.test(label)) return;
-            const v = gsheetCellToText(row.c[i]);
-            if(v) contentParts.push(label + ': ' + v);
+          const payload = buildSheetReqPayload(cfg, { rawCompanyName, uniqueId, occurredTs, siteName, companyId, cols, row, companyColIdx, dateColIdx, idColIdx });
+          matchedCount++;
+          const existing = existingByDedup.get(dedupKey);
+          if(!sheetReqPayloadChanged(existing, payload)) return; // §요청: 변경 없으면 다시 쓰지 않는다
+          const now = new Date().toISOString();
+          toWrite.push({
+            id: window.SHIN2_SHEETREQ_SYNC ? window.SHIN2_SHEETREQ_SYNC.docId(cfg.tab, uniqueId) : (cfg.tab + '_' + uniqueId),
+            fields: Object.assign({}, payload, { createdAt: existing ? existing.createdAt : now, updatedAt: now })
           });
-          const displayText = `[${cfg.tab}] ${contentParts.join(' · ') || '(내용 없음)'}`;
-
-          D.addSheetRequestActivity({
-            companyId, activityText: displayText, originalText: displayText, category: cfg.tab,
-            _dedupKey: dedupKey, sourceTab: cfg.tab, sourceUniqueId: uniqueId,
-            occurredAt: new Date(occurredTs).toISOString(), siteName
-          });
-          addedCount++;
         });
       }
 
@@ -7472,12 +7705,27 @@ window.SHIN2_CRM_APP_INIT = function(){
         return item;
       });
       gsheetImportState.lastError = fetchErrorTabs.length ? ('일부 탭을 확인하지 못했습니다(' + fetchErrorTabs.join(', ') + ') — 기존 데이터는 그대로입니다.') : null;
+      gsheetImportState.lastMatchedCount = matchedCount;
 
-      if(addedCount > 0){
-        const r = await confirmCloudSave('customerActivities');
-        if(!r.ok){
-          gsheetImportState.lastError = '가져온 요청을 저장하지 못했습니다 — 기존 데이터는 그대로입니다. 새로고침하면 다시 시도합니다.';
+      if(toWrite.length){
+        try{
+          if(!window.SHIN2_SHEETREQ_SYNC || !window.SHIN2_SHEETREQ_SYNC.saveMany) throw Object.assign(new Error('SYNC_UNAVAILABLE'), { code:'SYNC_UNAVAILABLE' });
+          const r = await window.SHIN2_SHEETREQ_SYNC.saveMany(toWrite); // 내부에서 400건씩 배치
+          gsheetImportState.saveError = null;
+          gsheetImportState.lastSavedCount = r.saved;
+        }catch(err){
+          // §요청 "저장 용량 오류"(1) — 이미 커밋된 배치(err.saved)는 Firestore에 그대로
+          // 남는다(롤백 없음). 다음 세션에 같은 결정적 id로 다시 시도해도 이미 저장된
+          // 문서는 merge만 될 뿐 중복이 생기지 않는다(§요청 "부분 실패 후 재접속 시
+          // 안전하게 재시도"). customerActivities/companies 등 기존 데이터는 이 경로에서
+          // 전혀 건드리지 않았으므로 그대로다.
+          const savedSoFar = (err && typeof err.saved === 'number') ? err.saved : 0;
+          gsheetImportState.saveError = '가져온 요청 중 일부를 저장하지 못했습니다(' + savedSoFar + '/' + toWrite.length + '건 저장됨) — 기존 고객정보·이전에 저장된 요청은 그대로입니다. 새로고침하면 이어서 다시 시도합니다.';
+          console.warn('[CRM/Sheets] sheetRequests 저장 실패', err);
         }
+      } else {
+        gsheetImportState.saveError = null;
+        gsheetImportState.lastSavedCount = 0;
       }
     }catch(err){
       gsheetImportState.lastError = 'Google Sheets 확인 중 오류가 발생했습니다 — 기존 고객정보는 그대로입니다.';
@@ -7503,6 +7751,12 @@ window.SHIN2_CRM_APP_INIT = function(){
   window.addEventListener('shin2-crm-cloud-update', (e)=>{
     if(e && e.detail && e.detail.key === 'companies') runGoogleSheetsImportOnce();
   });
+  // §Firestore 문서 용량 초과 수정 라운드(신규) — sheetRequests 컬렉션은 onSnapshot
+  // 실시간 구독이라 다른 기기/브라우저가 저장하거나 이 기기 스스로의 저장이 끝나는
+  // 즉시 이 이벤트가 뜬다(§요청 "실시간으로 반영"). renderList()만 다시 부르면 되고
+  // (§Google Sheets 확인 필요 배지·"최근 요청" 열 모두 렌더 시점에 D.buildSheetRequestsIndex를
+  // 다시 조회하므로) 별도 병합·재계산 코드가 필요 없다.
+  window.addEventListener('shin2-crm-sheetreq-cloud-update', ()=>{ renderList(); });
   (function scheduleGsheetImportFallback(){
     const check = ()=>{
       if(cloudBootState === 'ready'){ setTimeout(()=> runGoogleSheetsImportOnce(), 1500); return; }
@@ -8027,7 +8281,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     // D.memosFor/D.activitiesForCompany를 불러 전체 메모·활동 배열을 매번 새로 훑던 것을,
     // 위 pourLatestIndex/requestHistoryIndex와 같은 패턴으로 렌더링당 한 번만 인덱스로
     // 만들어 두고 각 행에서는 조회만 하도록 바꾼다(§7987 호출부에서 사용).
-    const requestItemsIndex = { memos: D.buildMemosIndex(), activities: D.buildActivitiesIndex() };
+    const requestItemsIndex = { memos: D.buildMemosIndex(), activities: D.buildActivitiesIndex(), sheetReqs: D.buildSheetRequestsIndex() };
     // §실적↔매출 실제 구현 라운드: "실적 1건당 평균 매출" 상대 등급(상위/중간/하위 30·40·30%)은
     // 전체 업체의 분포를 알아야 계산할 수 있어서, 업체마다 다시 정렬할 수 없다 — 렌더링당
     // 한 번만 전체를 계산해 둔다(§11 "같은 공통 소스 재사용" + §성능 원칙과 동일).
@@ -8048,9 +8302,14 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 같고 반복 재훑기만 없앨 수 있다.
     const enriched = companies.map(co=>{
       const acts = requestItemsIndex.activities.get(String(co.id)) || [];
+      // §요청 "최근 요청 표시는 신규 협약사 여부·MOU 유무·90일 경과와 무관하게 전
+      // 업체 대상" — sheetReqs를 여기서 모든 업체에 대해 채워두면(신규 협약사 탭뿐
+      // 아니라 어떤 화면이든) newPartnerLatestRequestBadge/buildRequestListItems가
+      // 그대로 조회만 하면 된다.
+      const sheetReqs = requestItemsIndex.sheetReqs.get(String(co.id)) || [];
       const progress = buildProgressStages(co);
       const pourCount = (co.pourTrackRecords || []).length;
-      return { co, acts, summary: acts[0] || null, progress, pourCount };
+      return { co, acts, sheetReqs, summary: acts[0] || null, progress, pourCount };
     });
 
     // §고객관리 CRM 첫화면 대시보드 개편 라운드: 예전의 "★ 상위 20%" 표시는 별표를 절대
@@ -8562,12 +8821,53 @@ window.SHIN2_CRM_APP_INIT = function(){
   // §성능 요구 8/9 — r.acts는 이미 requestItemsIndex.activities에서 업체별로 조회해 둔
   // 배열을 그대로 받는 것이라(§renderNewPartnerTab 호출부), 여기서 D.activitiesForCompany로
   // customerActivities 전체를 다시 읽지 않는다.
+  // §남은 불일치 정리 라운드(신규) — "고객목록 최근 요청/고객 상세 요청기록 병합
+  // 뷰/신규 협약사 요청 건수(gsheetReqCount 포함)/L2→L3 전환율" 네 곳이 전부 이
+  // 함수 하나로 sheetRequests(§Firestore 문서 용량 초과 수정 라운드에서 만든 새
+  // 컬렉션) + 그 이전에 이미 customerActivities에 쌓여 있던 구글시트 유래 활동
+  // (source==='google-sheets-request')을 합친 같은 목록을 받도록 통일한다 — 서로
+  // 다른 소스를 각자 따로 참조하던 것(예전 gsheetReqCount/openGsheetReqListModal은
+  // customerActivities만 봤다)이 더는 없다. customerActivities는 여기서도 읽기만
+  // 한다(§요청 12 데이터 보존 — 절대 쓰거나 지우지 않음), 같은 dedupKey가 sheetRequests
+  // 에도 있으면 이중 표시만 막을 뿐 원본은 그대로 둔다.
+  // §성능 — actsHint를 넘기면(목록 렌더링처럼 D.buildActivitiesIndex()로 이미 업체별로
+  // 묶어 둔 배열이 있는 호출부) D.activitiesForCompany(전체 customerActivities를 다시
+  // 읽고 필터·정렬)를 업체마다 다시 부르지 않는다. 안 넘기면(단발성 모달 등) 기존처럼
+  // 그 자리에서 조회한다 — 결과는 완전히 동일, 반복 재훑기만 피한다(§8043 근처 기존
+  // buildActivitiesIndex 도입 이유와 같은 원칙).
+  function mergedGsheetRequestItems(companyId, sheetReqsHint, actsHint){
+    const sheetReqs = sheetReqsHint || (D.buildSheetRequestsIndex().get(String(companyId)) || []);
+    const dedupKeys = new Set(sheetReqs.map(sr=> sr.dedupKey).filter(Boolean));
+    const items = [];
+    sheetReqs.forEach(sr=>{
+      if(!sr.requestDate) return;
+      items.push({
+        ts: sr.requestDate, label: sr.requestType || sr.sourceSheet || '요청',
+        sourceTab: sr.requestType || sr.sourceSheet || '', siteName: sr.siteName || '',
+        sourceUniqueId: sr.sourceId || '', text: sr.summary || '', legacy:false
+      });
+    });
+    const acts = actsHint || D.activitiesForCompany(companyId);
+    acts.forEach(a=>{
+      if(a.source !== 'google-sheets-request' || !a.occurredAt) return;
+      if(a._dedupKey && dedupKeys.has(a._dedupKey)) return; // 새 컬렉션에도 있으면 이중 표시만 막음(원본 삭제 안 함)
+      items.push({
+        ts: a.occurredAt, label: a.sourceTab || '요청', sourceTab: a.sourceTab || '',
+        siteName: a.siteName || '', sourceUniqueId: a.sourceUniqueId || '',
+        text: a.activityText || a.originalText || '', legacy:true
+      });
+    });
+    items.sort((a,b)=> new Date(b.ts) - new Date(a.ts));
+    return items;
+  }
   function newPartnerLatestRequestBadge(co, r){
     const items = [];
-    (r && r.acts ? r.acts : []).forEach(a=>{
-      if(a.source === 'google-sheets-request' && a.occurredAt && a.sourceTab){
-        items.push({ label: a.sourceTab, ts: new Date(a.occurredAt).getTime() });
-      }
+    // §Firestore 문서 용량 초과 수정 라운드 — sheetReqs는 renderList()의 enriched
+    // 계산이 이미 채워둔 값(r.sheetReqs)을 그대로 넘겨, mergedGsheetRequestItems가
+    // D.buildSheetRequestsIndex()를 다시 조회하지 않게 한다(§성능, 다른 화면과
+    // 동일한 함수 하나만 쓰지만 반복 계산은 여전히 피함).
+    mergedGsheetRequestItems(co.id, r && r.sheetReqs, r && r.acts).forEach(it=>{
+      items.push({ label: it.label, ts: new Date(it.ts).getTime() });
     });
     (co.requestedMaterials || []).forEach(m=>{
       if(!m.materialType) return;
@@ -16601,19 +16901,22 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(!co) return;
     const root = document.getElementById('gsheetReqListModalRoot');
     if(!root) return;
-    const acts = D.activitiesForCompany(companyId).filter(a=> a.source === 'google-sheets-request');
+    // §남은 불일치 정리 라운드 — 예전엔 customerActivities만 봐서 sheetRequests에만
+    // 있는 새 요청이 "요청 전체 보기"에 안 뜨는 불일치가 있었다. mergedGsheetRequestItems로
+    // 통일(다른 3곳 — 최근 요청 배지/요청기록 병합 뷰/gsheetReqCount — 와 완전히 같은 소스).
+    const items = mergedGsheetRequestItems(companyId);
     root.innerHTML = `
       <div class="pi-overlay" id="gsheetReqListOverlay">
         <div class="pi-panel" style="max-width:560px;max-height:80vh;" role="dialog" aria-modal="true" aria-label="${esc(co.name)} 요청 전체 보기">
           <div class="pi-head">
-            <div class="pi-title">${esc(co.name)} — 요청 전체 보기(${acts.length})</div>
+            <div class="pi-title">${esc(co.name)} — 요청 전체 보기(${items.length})</div>
             <button type="button" class="chart-close-btn" id="gsheetReqListCloseBtn" aria-label="닫기">&times;</button>
           </div>
           <div class="pi-body" style="overflow-y:auto;">
-            ${acts.length ? acts.map(a=> `
+            ${items.length ? items.map(it=> `
               <div class="local-cloud-diag-row" style="align-items:flex-start;flex-direction:column;gap:2px;">
-                <div><b>${esc(fmtDate(a.occurredAt || a.createdAt))}</b> · ${esc(a.sourceTab || '')}${a.sourceUniqueId ? ' · ' + esc(a.sourceUniqueId) : ''}</div>
-                <div>${esc(a.activityText || a.originalText || '')}</div>
+                <div><b>${esc(fmtDate(it.ts))}</b> · ${esc(it.sourceTab || '')}${it.sourceUniqueId ? ' · ' + esc(it.sourceUniqueId) : ''}</div>
+                <div>${esc(it.text || '')}</div>
               </div>
             `).join('') : `<div class="local-cloud-diag-empty">요청 기록이 없습니다.</div>`}
           </div>
@@ -16683,7 +16986,15 @@ window.SHIN2_CRM_APP_INIT = function(){
             <div class="pi-title">Google Sheets 확인 필요(${items.length})</div>
             <button type="button" class="chart-close-btn" id="gsheetReviewCloseBtn" aria-label="닫기">&times;</button>
           </div>
-          <div class="pi-note" style="padding:0 16px;">이름이 비슷하다는 이유로 자동으로 연결하지 않습니다 — 기존 업체를 직접 골라야만 연결됩니다.${gsheetImportState.lastError ? `<div class="delete-co-modal-err" style="margin-top:6px;">${esc(gsheetImportState.lastError)}</div>` : ''}</div>
+          <div class="pi-note" style="padding:0 16px;">이름이 비슷하다는 이유로 자동으로 연결하지 않습니다 — 기존 업체를 직접 골라야만 연결됩니다.
+            <!-- §Firestore 문서 용량 초과 수정 라운드 — "업체 매칭 실패"(이 목록)와 "저장 용량 오류"(saveError)는
+                 서로 다른 원인이라 절대 한 문장으로 섞지 않는다(§요청). 매칭은 이미 정상 매칭된 요청이 저장되는지와
+                 무관하게 사람이 직접 연결해야만 풀리고, 저장 오류는 매칭이 끝난 요청이 Firestore에 쓰기 실패한
+                 경우라 새로고침으로 재시도하면 된다. -->
+            ${gsheetImportState.saveError ? `<div class="delete-co-modal-err" style="margin-top:6px;">[저장 용량/쓰기 오류] ${esc(gsheetImportState.saveError)}</div>` : ''}
+            ${gsheetImportState.lastError ? `<div class="delete-co-modal-err" style="margin-top:6px;">${esc(gsheetImportState.lastError)}</div>` : ''}
+            ${gsheetImportState.lastLinkNote ? `<div style="margin-top:6px;color:#1E7B34;">${esc(gsheetImportState.lastLinkNote)}</div>` : ''}
+          </div>
           <div class="pi-body" style="overflow-y:auto;">${body}</div>
           <div class="pi-actions">
             <button type="button" class="co-text-action" id="gsheetReviewCloseBtn2">닫기</button>
@@ -20351,14 +20662,19 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 발생일(occurredAt, 가져온 시각이 아님)을 쓴다. 읽기 전용(수정/삭제 버튼 없음,
     // reqRowHtml에서 kind==='gsheet' 분기) — 원본이 시트라 로컬에서 지워도 다음 확인
     // 때 dedupKey 기준으로 다시 채워질 뿐이라 혼동을 막기 위해서다.
-    const acts = (idx && idx.activities) ? (idx.activities.get(String(co.id)) || []) : D.activitiesForCompany(co.id);
-    acts.forEach(a=>{
-      if(a.source !== 'google-sheets-request' || !a.occurredAt) return;
-      const parts = [a.sourceTab, fmtDate(a.occurredAt)];
-      if(a.siteName) parts.push(a.siteName);
+    // §남은 불일치 정리 라운드 — mergedGsheetRequestItems(고객목록 최근 요청 배지/
+    // 신규 협약사 요청 건수·전체보기와 완전히 같은 함수)로 통일한다. sheetRequests +
+    // 이전 customerActivities 구글시트 유래 기록을 dedupKey로 합쳐 반환하므로,
+    // 이 함수(고객 상세 요청기록 병합 뷰)만 따로 다시 합치는 코드를 두지 않는다 —
+    // 병합 결과는 여기서도 읽기 전용으로만 쓰고 어디에도 다시 저장하지 않는다.
+    const sheetReqsHint = (idx && idx.sheetReqs) ? (idx.sheetReqs.get(String(co.id)) || []) : undefined;
+    const actsHintForGsheet = (idx && idx.activities) ? (idx.activities.get(String(co.id)) || []) : undefined;
+    mergedGsheetRequestItems(co.id, sheetReqsHint, actsHintForGsheet).forEach(it=>{
+      const parts = [it.sourceTab, fmtDate(it.ts)];
+      if(it.siteName) parts.push(it.siteName);
       items.push({
-        id: 'gsheet:' + a.id, kind:'gsheet', text: parts.join(' · '),
-        ts: a.occurredAt, createdAtIso: a.occurredAt
+        id: 'gsheet:' + (it.legacy ? 'act' : 'sheetreq') + ':' + it.sourceUniqueId + ':' + it.ts,
+        kind:'gsheet', text: parts.join(' · '), ts: it.ts, createdAtIso: it.ts
       });
     });
     items.sort((a,b)=> new Date(b.ts) - new Date(a.ts));
