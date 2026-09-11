@@ -4821,11 +4821,35 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   // 중복업체 판정이 오래된 업체 목록을 보는 일이 없도록 항상 다음 조회 때 새로 계산하게 한다.
   function saveCompanies(list){ writeArr(CO_KEY, list); _crmNormNameCountsCache = null; } // §37: 화면 개편과 무관하게 항상 이 키 그대로 유지
   function findCompany(id){ return loadCompanies().find(c=> c.id === id) || null; }
+  // §주식회사 표기 정규화 라운드(신규) — 사용자 요청: 업체명/이전상호(formerNames)에 들어가는
+  // "㈜"(반각 기호)와 "（주）"(전각 괄호+주)를 전부 반각 "(주)" 표기로 통일해서 저장한다.
+  // - "세움산업개발㈜" → "세움산업개발(주)" (접미 ㈜)
+  // - "㈜세움산업개발" → "(주)세움산업개발" (접두 ㈜)
+  // - "세움산업개발（주）" → "세움산업개발(주)" (전각 괄호)
+  // - 이미 "(주)"(반각)면 그대로, ㈜/（주） 자체가 없으면 아무것도 추가하지 않는다.
+  // - 멱등(idempotent): 이미 변환된 값에는 ㈜/（주）가 더 없으므로 두 번 실행해도 "(주)(주)"가
+  //   되지 않는다. "주식회사"(완전 풀어쓴 표기)는 이 함수가 건드리지 않는다 — 이건 렌더링/
+  //   저장용 표기 정규화가 아니라 normCompanyName()의 "매칭 전용" 규칙이라 별개(§normCompanyName
+  //   주석 참고).
+  function normalizeCorpSuffix(s){
+    if(s == null) return s;
+    return String(s).replace(/（\s*주\s*）/g, '(주)').replace(/㈜/g, '(주)');
+  }
+  // addCompany/updateCompany 양쪽에서 공용으로 쓰는 patch 정규화 — name/formerNames 두
+  // 필드만 손대고 다른 필드는 절대 건드리지 않는다(§요청 "name 필드(및 formerNames)만 변경").
+  // 호출측이 넘긴 patch/fields 객체 자체는 변경하지 않고 얕은 사본을 돌려준다.
+  function normalizeCompanyPatch(patch){
+    if(!patch) return patch;
+    const out = Object.assign({}, patch);
+    if(typeof out.name === 'string') out.name = normalizeCorpSuffix(out.name);
+    if(Array.isArray(out.formerNames)) out.formerNames = out.formerNames.map(n=> typeof n === 'string' ? normalizeCorpSuffix(n) : n);
+    return out;
+  }
   function addCompany(fields){
     // createdAt은 §영업 대시보드 카드 라운드에서 "등록일" 표시를 위해 새로 추가하는 업체부터만
     // 채운다 — 기존에 이미 저장된 업체 레코드에는 절대 소급 기입하지 않는다(§13/§17, 없음/미확인
     // 구분 원칙 — 등록일을 몰라서 비어있는 기존 업체는 화면에서 "미확인"으로만 표시된다).
-    const rec = Object.assign({ id: genId('co'), name:'', repName:'', contactName:'', position:'', phone:'', mobile:'', fax:'', email:'', bizRegNo:'', address:'', website:'', memo:'', createdAt: nowIso() }, fields);
+    const rec = Object.assign({ id: genId('co'), name:'', repName:'', contactName:'', position:'', phone:'', mobile:'', fax:'', email:'', bizRegNo:'', address:'', website:'', memo:'', createdAt: nowIso() }, normalizeCompanyPatch(fields));
     const list = loadCompanies();
     list.push(rec);
     saveCompanies(list);
@@ -4927,9 +4951,51 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     const list = loadCompanies();
     const rec = list.find(c=> c.id === id);
     if(!rec) return null;
-    applyPatchToRecord(rec, patch, !!(opts && opts.onlyFillEmpty));
+    applyPatchToRecord(rec, normalizeCompanyPatch(patch), !!(opts && opts.onlyFillEmpty));
     saveCompanies(list);
     return rec;
+  }
+  // §주식회사 표기 정규화 라운드(신규) — 기존 데이터 일괄 백필(backfill). applyPartnerImport와
+  // 같은 preview/apply 분리 관례를 그대로 따른다(§6276 previewPartnerImport 주석 참고) —
+  // preview는 아무것도 저장하지 않고 "무엇이 바뀔지"만 계산해서 돌려주고, apply만 실제로
+  // 저장한다. id/다른 필드는 전혀 건드리지 않는다 — name과 formerNames 배열의 각 항목에만
+  // normalizeCorpSuffix를 적용한다. 변경이 필요한 레코드가 하나도 없으면(멱등 — 이미 반각
+  // (주)뿐이거나 ㈜/（주）가 아예 없는 업체) apply를 호출해도 저장 자체를 건드리지 않는다.
+  // 이 함수는 이번 라운드에 자동으로 실행되지 않는다 — 보고서 검토 후 사용자가 명시적으로
+  // 실행을 요청하면 D.applyCorpSuffixMigration()을 호출해서 쓴다(§요청 "REPORT ONLY, 진행
+  // 여부 대기 중").
+  function previewCorpSuffixMigration(){
+    const list = loadCompanies();
+    const changes = [];
+    list.forEach(co=>{
+      const oldName = co.name || '';
+      const newName = normalizeCorpSuffix(oldName);
+      const oldFormerNames = Array.isArray(co.formerNames) ? co.formerNames : [];
+      const newFormerNames = oldFormerNames.map(n=> normalizeCorpSuffix(n));
+      const nameChanged = newName !== oldName;
+      const formerChanged = newFormerNames.length === oldFormerNames.length
+        && newFormerNames.some((n, i)=> n !== oldFormerNames[i]);
+      if(nameChanged || formerChanged){
+        changes.push({ id: co.id, oldName, newName, oldFormerNames: oldFormerNames.slice(), newFormerNames, nameChanged, formerChanged });
+      }
+    });
+    return { total: list.length, changeCount: changes.length, changes };
+  }
+  function applyCorpSuffixMigration(precomputedPreview){
+    const preview = precomputedPreview || previewCorpSuffixMigration();
+    if(!preview.changes.length) return { total: preview.total, changedCount: 0 };
+    const list = loadCompanies();
+    const byId = new Map(list.map(c=> [c.id, c]));
+    let changedCount = 0;
+    preview.changes.forEach(ch=>{
+      const rec = byId.get(ch.id);
+      if(!rec) return; // 방어적 처리(previewPartnerImport와 같은 관례) — 이론상 발생하지 않음
+      if(ch.nameChanged) rec.name = ch.newName;
+      if(ch.formerChanged) rec.formerNames = ch.newFormerNames;
+      changedCount++;
+    });
+    saveCompanies(list); // 기존 저장 경로 그대로(writeArr가 클라우드 push까지 그대로 처리 — §4780 SHIN2_CRM_SHARED_SYNC)
+    return { total: preview.total, changedCount };
   }
   // §고객관리 목록 출력(PDF) 라운드(신규) — "시공사발송용·외부발송용 함께 표시"
   // 체크박스(§협력업체 리스트 추가폼 이관 라운드)가 이미 co.distributionLists = ['contractor','external']
@@ -6202,7 +6268,10 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
      ================================================================ */
   function normCompanyName(s){
     if(!s) return '';
-    let t = String(s).replace(/\(주\)|㈜|주식회사/g, '');
+    // §주식회사 표기 정규화 라운드(신규) — 매칭 전용 확장: 전각 괄호 "（주）"도 반각 "(주)"/㈜/
+    // 주식회사와 동일한 법인 표기 토큰으로 보고 매칭 전에 제거한다(§요청 5, Sheets↔CRM 매칭).
+    // 기존 공백/특수문자 제거 규칙(다음 줄)은 전혀 안 건드렸다 — 이 줄 하나만 새로 추가.
+    let t = String(s).replace(/\(주\)|（주）|㈜|주식회사/g, '');
     t = t.replace(/[\s()\[\]㈱·\-_,.]/g, '');
     return t.trim().toLowerCase();
   }
@@ -6303,7 +6372,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
       if(p.address) fields.address = p.address;
       if(p.bizno) fields.bizRegNo = p.bizno;
       // addCompany()와 완전히 동일한 기본 필드 구조(§ 새 업체 최소 생성 규칙, 절대 변경 안 함).
-      const rec = Object.assign({ id: genId('co'), name:'', repName:'', contactName:'', position:'', phone:'', mobile:'', fax:'', email:'', bizRegNo:'', address:'', website:'', memo:'', createdAt: nowIso() }, fields);
+      const rec = Object.assign({ id: genId('co'), name:'', repName:'', contactName:'', position:'', phone:'', mobile:'', fax:'', email:'', bizRegNo:'', address:'', website:'', memo:'', createdAt: nowIso() }, normalizeCompanyPatch(fields));
       list.push(rec);
     });
     saveCompanies(list);
@@ -6869,7 +6938,8 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   }
 
   window.SHIN2_CRM_DATA = {
-    loadCompanies, findCompany, addCompany, updateCompany,
+    loadCompanies, findCompany, addCompany, updateCompany, normalizeCorpSuffix,
+    previewCorpSuffixMigration, applyCorpSuffixMigration,
     loadMailSettings, saveMailSettings,
     loadMailAssets, getMailAsset, saveMailAssetPatch, uploadMailAssetFile, getMailAssetFileURL,
     deleteMailAssetFile, isAllowedMailAssetFile, MAIL_ASSET_MAX_CLOUD_BYTES, MAIL_ASSET_ALLOWED_EXT,
@@ -7980,6 +8050,56 @@ window.SHIN2_CRM_APP_INIT = function(){
   (function scheduleGsheetImportFallback(){
     const check = ()=>{
       if(cloudBootState === 'ready'){ setTimeout(()=> runGoogleSheetsImportOnce(), 1500); return; }
+      if(cloudBootState === 'loading') setTimeout(check, 500);
+    };
+    check();
+  })();
+
+  // §주식회사 표기 정규화 라운드(신규) — 사용자 요청 1번("고객관리카드에 저장된 모든 현재
+  // 업체명")은 앞으로의 신규/수정 저장 시 정규화(addCompany/updateCompany 훅, §위 4824행
+  // 근처 normalizeCorpSuffix/normalizeCompanyPatch)뿐 아니라 이미 저장돼 있던 기존 업체명
+  // 백필까지 포함한다. runGoogleSheetsImportOnce(바로 위)와 완전히 같은 "접속당 정확히
+  // 한 번만 / 여러 트리거 경로가 동시에 불러도 안전" 관례(ran/running 플래그 + cloudBootState
+  // 폴백)를 그대로 재사용한다 — companies 클라우드 데이터가 실제로 이 기기의 localStorage에
+  // 병합된 직후에만 정확한 preview를 계산할 수 있으므로, 같은 신호(shin2-crm-cloud-update,
+  // detail.key==='companies' — startSharedKeySync가 payload를 localStorage에 쓴 바로 다음
+  // 줄에서 쏘는 이벤트, §4176/4191/4192)를 그대로 듣는다. 새 네트워크 호출은 전혀 추가하지
+  // 않는다 — D.previewCorpSuffixMigration/D.applyCorpSuffixMigration 모두 이미 로컬에 있는
+  // D.loadCompanies() 배열 1회 순회일 뿐이고, 변경이 있을 때만 기존 saveCompanies(=writeArr,
+  // 기존 클라우드 push 경로 그대로)로 저장한다 — 변경 대상이 0건이면 저장 자체를 아예
+  // 건너뛴다(§applyCorpSuffixMigration 자체 로직, 불필요한 쓰기 방지).
+  const corpSuffixMigrationState = { ran:false, running:false };
+  function runCorpSuffixMigrationOnce(){
+    if(corpSuffixMigrationState.ran || corpSuffixMigrationState.running) return;
+    corpSuffixMigrationState.running = true;
+    try{
+      const preview = D.previewCorpSuffixMigration();
+      if(preview.changeCount > 0){
+        const result = D.applyCorpSuffixMigration(preview);
+        console.log('[CRM/주식회사 표기 정규화] 백필 완료 — 전체 ' + result.total + '건 중 '
+          + result.changedCount + '건 변경(㈜/（주）→(주), name/formerNames만).');
+      } else {
+        console.log('[CRM/주식회사 표기 정규화] 백필 확인 — 전체 ' + preview.total
+          + '건, 변경 대상 없음(이미 (주) 표기이거나 ㈜/（주） 표기 자체가 없음).');
+      }
+    }catch(err){
+      // §요청 "실패해도 앱 로딩이나 다른 기능을 막지 않도록" — 조용히 콘솔에만 남기고
+      // 나머지 부팅/렌더는 전혀 영향받지 않는다(이 블록 바깥 어떤 상태도 건드리지 않음).
+      console.error('[CRM/주식회사 표기 정규화] 백필 중 오류 — 앱 동작에는 영향 없음(재시도는 다음 접속에서)', err);
+    }
+    corpSuffixMigrationState.ran = true;
+    corpSuffixMigrationState.running = false;
+  }
+  window.addEventListener('shin2-crm-cloud-update', (e)=>{
+    if(e && e.detail && e.detail.key === 'companies') runCorpSuffixMigrationOnce();
+  });
+  // 안전망: 클라우드에 업체가 0건이거나 이 기기가 이미 최신 로컬 값을 갖고 있어(localRev
+  // 가드) 이벤트 자체가 안 뜨는 경우에도, cloudBootState가 'ready'가 된 뒤 한 번은 그
+  // 시점의 로컬 companies 기준으로 실행한다(scheduleGsheetImportFallback과 완전히 같은
+  // 패턴·지연시간 — companies 초기 병합이 끝날 시간을 동일하게 준다).
+  (function scheduleCorpSuffixMigrationFallback(){
+    const check = ()=>{
+      if(cloudBootState === 'ready'){ setTimeout(()=> runCorpSuffixMigrationOnce(), 1500); return; }
       if(cloudBootState === 'loading') setTimeout(check, 500);
     };
     check();
