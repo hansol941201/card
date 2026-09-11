@@ -3176,7 +3176,7 @@ table.pdf-doc-table thead{ background:var(--bg); }
          버튼은 그대로, class/부모만 gnav-menu로 바꿨다. -->
     <nav class="gnav-menu" id="crmTopTabs" aria-label="주요 메뉴">
       <button type="button" class="top-tab is-active" id="crmTabCustomer" data-tab="customer">고객관리</button>
-      <button type="button" class="top-tab" id="crmTabWorkQueue" data-tab="workqueue">업무관리</button>
+      <button type="button" class="top-tab" id="crmTabWorkQueue" data-tab="workqueue">MOU 진행상황</button>
       <button type="button" class="top-tab" id="crmTabMailSettings" data-tab="mailsettings">메일 설정</button>
     </nav>
     <div class="gnav-right">
@@ -3196,7 +3196,7 @@ table.pdf-doc-table thead{ background:var(--bg); }
       </div>
       <nav class="gnav-drawer-menu" aria-label="주요 메뉴(모바일)">
         <button type="button" class="gnav-drawer-item is-active" id="gnavDrawerTabCustomer">고객관리</button>
-        <button type="button" class="gnav-drawer-item" id="gnavDrawerTabWorkQueue">업무관리</button>
+        <button type="button" class="gnav-drawer-item" id="gnavDrawerTabWorkQueue">MOU 진행상황</button>
         <button type="button" class="gnav-drawer-item" id="gnavDrawerTabMailSettings">메일 설정</button>
       </nav>
     </div>
@@ -12849,25 +12849,18 @@ window.SHIN2_CRM_APP_INIT = function(){
   // filtered 계산 자체도 그대로 둔다 — 이 칩 행에만 안 보일 뿐이다).
   // §업무관리 L단계 제거 라운드(신규) — 사용자 확정 지시 [4]: 필터에서 L1→L2/L2→L3
   // 제거. 남은 4개(전체/1차미팅/2차미팅/MOU)는 손대지 않았다.
+  // §MOU 진행상황 개편 라운드(신규) — 사용자 확정 지시: 필터 칩 라벨을 요약카드와 어울리는
+  // 실행형 문구로("1차미팅"→"1차미팅 잡기" 등). 키(m1/m2/mou)·카운트 계산·클릭 필터링
+  // 로직은 전혀 안 건드렸다 — label 문자열만 바꿨다.
   const WORKQ_FILTER_DEFS = [
-    ['all','전체'], ['m1','1차미팅'], ['m2','2차미팅'], ['mou','MOU']
+    ['all','전체'], ['m1','1차미팅 잡기'], ['m2','2차미팅 잡기'], ['mou','MOU체결 진행하기']
   ];
   let workQueueFilter = 'all';
-  // §협약서류 체크리스트 라운드(신규) — 사용자 확정 지시 [9]: 서류현황 기준 필터.
-  // buildAgreementDocSummary가 이미 계산해 둔 counts만 조회한다(새 판정 없음).
-  let workQueueDocFilter = 'all';
-  const WORKQ_DOC_FILTER_DEFS = [
-    ['all','전체'], ['missing','미등록 있음'], ['complete','모두 등록'], ['verified','확인 완료'], ['reRequest','재요청 필요']
-  ];
-  function matchesWorkqDocFilter(companyId, key, docsIndex){
-    if(key === 'all') return true;
-    const summary = buildAgreementDocSummary(companyId, docsIndex);
-    if(key === 'missing') return summary.counts.unregistered > 0;
-    if(key === 'complete') return summary.counts.unregistered === 0;
-    if(key === 'verified') return summary.counts.verified === summary.total;
-    if(key === 'reRequest') return summary.counts.reRequest > 0;
-    return true;
-  }
+  // §MOU 진행상황 개편 라운드(신규) — 사용자 확정 지시: "서류현황 탭은 없애줘"에 따라
+  // 서류현황 기준 필터 행 자체를 제거했다. workQueueDocFilter 변수/WORKQ_DOC_FILTER_DEFS/
+  // matchesWorkqDocFilter 함수와, filtered 계산에서 이 필터를 적용하던 부분도 함께
+  // 지웠다(죽은 상태값이나 항상 no-op인 필터를 남겨두지 않기 위함) — 표의 "서류 현황"
+  // 컬럼(buildAgreementDocSummary 호출) 자체는 그대로 남아 있다(§요청 범위: 필터 행만).
   // §업무관리 검색창 라운드 — 고객관리 목록 검색(matchesSearch, §searchQuery)과 완전히
   // 같은 함수를 재사용한다. 새 매칭 로직을 만들지 않는다. 요약 패널의 숫자/필터 칩 숫자는
   // 고객관리 쪽 선례(filterCounts는 searchQuery 적용 전 enriched로 계산)와 똑같이 검색과
@@ -12904,6 +12897,8 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 캐시 인덱스(D.buildActivitiesIndex/D.buildDocumentsIndex, 데이터 안 바뀌면 재사용)로
     // 바꾼다 — 검색·서류필터 결과는 이전과 동일, 반복 전체훑기만 없앤다.
     const activitiesIdxForSearch = D.buildActivitiesIndex();
+    // §MOU 진행상황 개편 라운드(신규) — docsIdx는 서류현황 "필터"용이 아니라 표의 "서류 현황"
+    // 컬럼(buildAgreementDocSummary)을 그리는 데 여전히 필요해서 그대로 남긴다.
     const docsIdx = D.buildDocumentsIndex();
     // §15: today-line 숫자도 필터로 쓸 수 있게 workQueueFilter가 category뿐 아니라 type
     // 값(m1/m2/mou)도 받을 수 있게 한다 — 기존 category 필터 칩 로직은 그대로 두고
@@ -12919,8 +12914,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(workQueueFilter === 'm2') return it.type === 'm2' || it.type === 'm2Scheduled';
       return it.category === workQueueFilter || it.type === workQueueFilter;
     }))
-      .filter(it=> matchesSearch(it.co, workQueueSearch ? (activitiesIdxForSearch.get(String(it.co.id)) || []) : [], workQueueSearch))
-      .filter(it=> matchesWorkqDocFilter(it.co.id, workQueueDocFilter, docsIdx));
+      .filter(it=> matchesSearch(it.co, workQueueSearch ? (activitiesIdxForSearch.get(String(it.co.id)) || []) : [], workQueueSearch));
     const m1Count = list.filter(it=> it.type==='m1').length;
     const m2Count = list.filter(it=> it.type==='m2').length;
     const mouCount = list.filter(it=> it.type==='mou').length;
@@ -12972,13 +12966,6 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="workq-filter-row" id="workqFilterRow">
         ${WORKQ_FILTER_DEFS.map(([key,label])=> `<button type="button" class="list-filter-chip${workQueueFilter===key?' is-active':''}" data-workq-filter="${esc(key)}">${esc(label)} ${esc(counts[key]||0)}</button>`).join('')}
       </div>
-      <!-- §협약서류 체크리스트 라운드(신규) — 사용자 확정 지시 [9]: 서류현황 기준 필터를
-           기존 상태 필터와 분리된 별도 줄로 둔다(같은 목록에 두 필터가 동시에 적용돼도
-           헷갈리지 않게 시각적으로 구분). -->
-      <div class="workq-filter-row workq-doc-filter-row" id="workqDocFilterRow">
-        <span class="workq-doc-filter-label">서류 현황</span>
-        ${WORKQ_DOC_FILTER_DEFS.map(([key,label])=> `<button type="button" class="list-filter-chip${workQueueDocFilter===key?' is-active':''}" data-workq-doc-filter="${esc(key)}">${esc(label)}</button>`).join('')}
-      </div>
       ${filtered.length ? `
         <table class="workq-table">
           <!-- §단계 진행상황 이전 라운드 — 고객관리 목록 컬럼("단계 진행상황", 질문서→1차→
@@ -13018,10 +13005,6 @@ window.SHIN2_CRM_APP_INIT = function(){
     `;
     wrap.querySelectorAll('[data-workq-filter]').forEach(btn=> btn.addEventListener('click', ()=>{
       workQueueFilter = btn.getAttribute('data-workq-filter');
-      renderWorkQueueView();
-    }));
-    wrap.querySelectorAll('[data-workq-doc-filter]').forEach(btn=> btn.addEventListener('click', ()=>{
-      workQueueDocFilter = btn.getAttribute('data-workq-doc-filter');
       renderWorkQueueView();
     }));
     const sortToggle = document.getElementById('workqSortToggle');
