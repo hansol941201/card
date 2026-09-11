@@ -318,6 +318,14 @@
   .np2-col-lastreq-type{ color:var(--text); font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .np2-col-lastreq-date{ color:var(--text-faint); font-size:11px; }
   .np2-col-lastreq.is-empty .np2-col-lastreq-type{ color:var(--text-faint); }
+  /* §L2→L3 전환관리 탭 라운드(신규) — "관리 필요" 탭을 대체하는 새 탭(§요청 1/2). 기존
+     .np2-*/.list-filter-chip 디자인 토큰을 그대로 재사용하되(새 색상/그림자 없음), 이
+     탭만 5컬럼 폭이 다르다(업체명/협약 체결일/협약 후 경과일/기술자문문의 발생일/현재
+     상태, §요청 7 "다른 컬럼 넣지 말 것") — #crmList.l2l3-active로 범위를 좁혀 신규
+     협약사 탭(.np2-table-head/.np2-row 그대로 쓰는 다른 화면)의 폭에는 전혀 영향을
+     주지 않는다. */
+  #crmList.l2l3-active .np2-table-head,
+  #crmList.l2l3-active .np2-row{ grid-template-columns: minmax(200px,1.7fr) 120px 130px 160px 110px; }
   .np2-state-badge{ display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px; font-size:11.5px; font-weight:700; white-space:nowrap; }
   .np2-state-badge.st-converted{ background:#E6F4EA; color:#1D7A46; }
   .np2-state-badge.st-needsAttention{ background:#FDECEC; color:#B3261E; }
@@ -7993,6 +8001,13 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 편이 자연스럽다는 판단, 새로고침하면 초기화됨은 다른 화면 상태와 동일).
   let newPartnerSubFilter = 'all';
   const newPartnerExpanded = new Set();
+  // §L2→L3 전환관리 탭 라운드(신규) — 이 탭 전용 보조 필터(전체/전환 완료/관찰 중/관리
+  // 필요, §요청 5) 상태. lastL2L3Enriched는 renderNpCmpSectionHtml이 재사용하는
+  // lastNewPartnerEnriched와 같은 목적(§요청 10 "period 전환 시 새 fetch 금지" — 기간
+  // 칩을 눌렀을 때 renderList() 전체를 다시 부르지 않고 이 탭만 가벼운 경로로 다시
+  // 그린다).
+  let l2l3SubFilter = 'all';
+  let lastL2L3Enriched = null;
   // §디자인 개편 라운드(신규) — "90일 임박순"/"최근 체결순"/새로 추가된 "최근 활동순"
   // 3가지를, 이 탭에서만 보이는 검색창 옆 정렬 select(crmSortSelect의 newPartner* 옵션,
   // §renderList의 syncNewPartnerSortOptions)로 고른다. urgent(기본값)는 기본 정렬(관리
@@ -8057,6 +8072,13 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 빠진 목록)를 훑어 세므로, FILTER_DEFS 안에 넣으면 항상 0건으로만 보인다(§요청 6에
   // 어긋남). renderList가 이 값은 D.loadDeletedCompanies().length로 따로 채운다.
   const DELETED_FILTER_DEF = ['deleted','삭제된 업체'];
+  // §L2→L3 전환관리 탭 라운드(신규) — 상단 "관리 필요" 탭(구 mgmt-need-chip, 클릭하면
+  // 모달만 열리던 버튼)을 제거하고 같은 위치(탭 줄 맨 끝)에 진짜 탭(filterKey 기반,
+  // FILTER_DEFS/DELETED_FILTER_DEF와 같은 클릭 위임을 그대로 재사용)을 새로 둔다(§요청
+  // 1/2). "관리 필요" 판정 기준(classifyManagementNeed)·모달(openManagementNeedModal)·
+  // KPI 요약 바의 "관리 필요" 통계는 전혀 건드리지 않았다 — 업무관리에서 계속 전체가
+  // 보여야 한다는 §요청 16 그대로, 데이터/판정 로직 자체는 삭제 대상이 아니다.
+  const L2L3_MANAGE_FILTER_DEF = ['l2l3Manage','L2→L3 전환관리'];
   function getMouStage(progress){
     return progress.stages.find(s=> s.key === 'mou') || null;
   }
@@ -8309,7 +8331,8 @@ window.SHIN2_CRM_APP_INIT = function(){
     receivable: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.8v5"/><circle cx="12" cy="16" r="0.9" fill="currentColor" stroke="none"/></svg>',
     mouDone: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12.5 8 21l4-2 4 2-1-8.5"/><circle cx="12" cy="7" r="5"/><path d="m9.3 7 1.8 1.8L15 5.3"/></svg>',
     newPartner: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v7"/><path d="M8.5 6.5 12 3l3.5 3.5"/><rect x="4" y="12" width="16" height="8" rx="1.5"/></svg>',
-    trendUp: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17 10 11l4 4 6-7"/><path d="M15 8h5v5"/></svg>'
+    trendUp: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17 10 11l4 4 6-7"/><path d="M15 8h5v5"/></svg>',
+    l2l3Manage: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="13" width="7" height="7" rx="1.5"/><path d="M10 7.5h5a2 2 0 0 1 2 2V13"/><path d="m14.5 10 2.5-2.5-2.5-2.5"/></svg>'
   };
   function renderFilterChips(counts){
     const wrap = document.getElementById('crmFilterRow');
@@ -8319,9 +8342,9 @@ window.SHIN2_CRM_APP_INIT = function(){
     // .list-filter-chip 높이/폰트는 그대로 재사용, 새 크기 체계를 만들지 않았다).
     // §업체 삭제(휴지통) 라운드(신규) — "삭제된 업체" 탭도 같은 칩 UI/클릭 위임을 그대로
     // 재사용한다(DELETED_FILTER_DEF만 목록 끝에 덧붙임, 새 템플릿·새 이벤트 바인딩 없음).
-    wrap.innerHTML = FILTER_DEFS.concat([DELETED_FILTER_DEF]).map(([key,label])=>
+    wrap.innerHTML = FILTER_DEFS.concat([DELETED_FILTER_DEF, L2L3_MANAGE_FILTER_DEF]).map(([key,label])=>
       `<button type="button" class="list-filter-chip${filterKey===key?' is-active':''}${key==='deleted'?' is-trash':''}" data-filter="${esc(key)}">${FILTER_ICON_SVG[key]||''}<span>${esc(label)}</span><span class="chip-count">${counts[key]||0}</span></button>`
-    ).join('') + `<button type="button" class="list-filter-chip mgmt-need-chip" id="mgmtNeedBtn">관리필요 ${counts.manageNeeded||0}</button>`;
+    ).join('');
     wrap.querySelectorAll('[data-filter]').forEach(btn=> btn.addEventListener('click', ()=>{
       const nextKey = btn.getAttribute('data-filter');
       // §신규 협약사 탭 라운드(신규) — "신규 협약사" 탭에 들어가면 기본 정렬을 "90일
@@ -8335,8 +8358,6 @@ window.SHIN2_CRM_APP_INIT = function(){
       currentPage = 1;
       renderList();
     }));
-    const mgmtBtn = document.getElementById('mgmtNeedBtn');
-    if(mgmtBtn) mgmtBtn.addEventListener('click', ()=> openManagementNeedModal());
   }
   // §전면 리디자인 라운드(신규) — "KPI 요약 바": 전체 고객/MOU 체결/상승 업체/관리 필요를
   // 카드 4개가 아니라 1px 세로 구분선을 쓴 가로 스트립 하나로 보여준다. 값은 전부 이미
@@ -8484,7 +8505,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 엘리먼트)는 "삭제된 업체"/"신규 협약사" 탭처럼 그 7컬럼 표를 아예 안 쓰는 화면에서는
     // 지금까지도 계속 보이고 있었다(다른 화면 구조/컬럼은 전혀 안 바꿈, 표시 여부만 토글).
     const coTableHeadEl = document.getElementById('crmCoTableHead');
-    if(coTableHeadEl) coTableHeadEl.hidden = (filterKey === 'deleted' || filterKey === 'newPartner');
+    if(coTableHeadEl) coTableHeadEl.hidden = (filterKey === 'deleted' || filterKey === 'newPartner' || filterKey === 'l2l3Manage');
     const companies = D.loadActiveCompanies(); // §업체 삭제(휴지통) 라운드 — 소프트 삭제된 업체를 일반 목록/신규 협약사/협약 진행/MOU체결 탭에서 뺀다(§요청 10)
     listTitle.textContent = '고객 ' + companies.length;
     // §미등록 업체 관리 라운드: 별도 저장소 없이 매번 다시 계산한다(§ "등록 후" 요구사항 —
@@ -8547,6 +8568,10 @@ window.SHIN2_CRM_APP_INIT = function(){
     // §업체 삭제(휴지통) 라운드(신규) — companies가 이미 활성 업체만이라 위 FILTER_DEFS.forEach
     // 루프로는 절대 못 세므로 따로 채운다(§요청 6 "삭제된 업체 탭").
     filterCounts.deleted = D.loadDeletedCompanies().length;
+    // §L2→L3 전환관리 탭 라운드(신규) — matchesFilter로는 못 세는 별도 판정(§9 근처
+    // buildL2L3AnalysisBase, sheetRequests까지 봐야 함)이라 여기서 따로 채운다. N(30/60/90)과
+    // 무관한 "전체 대상 수"만 필요하므로 가벼운 base(rows.length)만 조회한다.
+    filterCounts.l2l3Manage = buildL2L3AnalysisBase().rows.length;
     renderFilterChips(filterCounts);
     // §신규 협약사 탭 라운드(신규) — "90일 임박순"/"최근 체결순" 옵션은 이 탭에서만
     // 보이게 하고, 정렬 드롭다운 표시값도 현재 sortMode와 항상 맞춰 둔다(탭 클릭
@@ -8593,6 +8618,13 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 갈아탄다. 계산 기준(전환 판정/90일 모집단)은 전혀 안 바꾸고 화면만 새로 만든다.
     if(filterKey === 'newPartner'){
       renderNewPartnerTab(enriched);
+      return;
+    }
+    // §L2→L3 전환관리 탭 라운드(신규) — 구 "관리 필요" 탭 자리를 대체하는 새 화면(§요청
+    // 1/2). "신규 협약사"·"삭제된 업체"와 같은 이유로 무거운 7컬럼 목록 템플릿을 타지
+    // 않고 전용 화면으로 갈아탄다.
+    if(filterKey === 'l2l3Manage'){
+      renderL2L3ManageTab(enriched);
       return;
     }
 
@@ -9310,13 +9342,13 @@ window.SHIN2_CRM_APP_INIT = function(){
     const infoBtn = document.getElementById('npCmpInfoBtn');
     if(infoBtn) infoBtn.addEventListener('click', ()=>{
       npCmpInfoOpen = !npCmpInfoOpen;
-      renderNewPartnerTab(lastNewPartnerEnriched);
+      renderL2L3ManageTab(lastL2L3Enriched);
     });
     listEl.querySelectorAll('[data-npcmp-period]').forEach(btn=> btn.addEventListener('click', ()=>{
       const p = parseInt(btn.getAttribute('data-npcmp-period'), 10);
       if(!NPCMP_PERIODS.includes(p) || p === npCmpPeriodDays) return;
-      npCmpPeriodDays = p; // §요청 10 — 재조회 없이 computeNpCmpAnalysis(N)만 다시 부른다(renderNewPartnerTab 재호출은 이미 로드된 데이터만 재계산)
-      renderNewPartnerTab(lastNewPartnerEnriched);
+      npCmpPeriodDays = p; // §요청 10/14 — 재조회 없이 computeNpCmpAnalysis(N)/computeL2L3ManageAnalysis(N)만 다시 부른다(renderL2L3ManageTab 재호출은 이미 로드된 데이터만 재계산)
+      renderL2L3ManageTab(lastL2L3Enriched);
     }));
     listEl.querySelectorAll('[data-npcmp-drill]').forEach(btn=> btn.addEventListener('click', ()=>{
       const [group, metric] = btn.getAttribute('data-npcmp-drill').split(':');
@@ -9326,6 +9358,190 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(reviewBtn) reviewBtn.addEventListener('click', ()=>{
       openNpCmpExcludedModal('업체 매칭 확인 필요', (lastNpCmpAnalysis ? lastNpCmpAnalysis.base.unmatchedReviewCompanyNames : []));
     });
+  }
+  /* ==========================================================================
+     §L2→L3 전환관리 탭 라운드(신규) — 상단 "관리 필요" 탭을 대체(§요청 1/2). 기존
+     computeL2L3Conversion(신규 협약사 탭 전용, 모든 요청 종류를 L3 신호로 인정)은
+     그대로 두고 전혀 바꾸지 않는다 — 이 탭은 "L3 현장등록 = 기술자문문의"라는 더 좁은
+     별도 기준(§요청 8)을 쓰므로, 두 번째 판정 로직을 새로 만든다(기존 함수에 파라미터를
+     추가해 기본 동작을 바꾸는 대신, 별도 함수로 분리하는 쪽이 다른 호출부에 안전하다).
+     ========================================================================== */
+  // mouTs 기준 0~N-1일 이내 첫 기술자문문의를 찾는다(§요청 9/12 "협약 전/관찰기간
+  // 초과는 전환 아님"). techReqs는 이미 sourceSheet==='기술자문문의'로만 걸러진 배열
+  // (아래 buildL2L3AnalysisBase가 만든다) — 여기서 종류를 다시 판정하지 않는다.
+  function computeL3TechAdviceWindow(mouTs, techReqs, N){
+    let firstConverting = null;
+    techReqs.forEach(r=>{
+      if(!r.requestDate) return;
+      const occ = new Date(r.requestDate).getTime();
+      if(isNaN(occ)) return;
+      const days = Math.round((occ - mouTs) / 86400000);
+      if(days < 0 || days > N - 1) return; // §요청 9/12 — 협약 전, N일 초과 문의는 전환 아님
+      if(!firstConverting || occ < new Date(firstConverting.requestDate).getTime()) firstConverting = r;
+    });
+    return firstConverting; // §요청 13 — 여러 건이어도 항상 최초 1건만
+  }
+  // §요청 9/10/11 — 조기 전환(캘린더 N일이 안 지나도 이미 문의가 있으면)은 항상 "전환
+  // 완료"로 본다(npCmpClassifyStatus와 같은 원칙). 전환이 안 됐을 때만 관찰기간(N일)이
+  // 끝났는지로 "관찰 중"/"관리 필요"를 가른다.
+  function classifyL3TechAdviceBucket(mouTs, todayTs, N, converted){
+    if(converted) return 'converted';
+    return (mouTs + N * 86400000) <= todayTs ? 'needsAttention' : 'observing';
+  }
+  // §성능(§요청 10/14와 같은 원칙, npCmpAnalysisCache와 동일 패턴) — companies/
+  // sheetRequests의 localStorage 원문이 바뀌지 않았으면 다시 훑지 않는다. N(30/60/90)이
+  // 바뀔 때는 이 base를 그대로 재사용하고 computeL2L3ManageAnalysis만 다시 부른다(새
+  // Google Sheets/Firestore 조회 없음).
+  let l2l3AnalysisCache = { coRaw: undefined, reqRaw: undefined, base: null };
+  function buildL2L3AnalysisBase(){
+    const coRaw = localStorage.getItem(CO_KEY);
+    const reqRaw = localStorage.getItem(SHEETREQ_CACHE_KEY);
+    if(coRaw === l2l3AnalysisCache.coRaw && reqRaw === l2l3AnalysisCache.reqRaw && l2l3AnalysisCache.base){
+      return l2l3AnalysisCache.base;
+    }
+    const sheetReqsByCompany = D.buildSheetRequestsIndex();
+    const todayTs = getSeoulTodayDateOnly();
+    const rows = [];
+    // §요청 16/18/19/20 — D.loadActiveCompanies()만 읽는다(삭제된 업체는 이미 빠져
+    // 있음, §요청 "삭제/협약종료 업체가 여전히 제외되는지" 그대로). 협약 종료 업체 제외,
+    // 협약일이 없거나 미래인 업체는 판정 불가라 대상에서 뺀다(isNewPartnerCompany/
+    // npCmp와 같은 이상치 방어 원칙 재사용) — 계산 결과만 화면에 분류할 뿐, 어떤 필드도
+    // 쓰거나 바꾸지 않는다(§요청 20 read-only).
+    D.loadActiveCompanies().forEach(co=>{
+      if(D.isAgreementTerminated(co)) return;
+      const mou = resolveEffectiveMouDate(co);
+      if(!mou) return;
+      if(mou.ts > todayTs) return;
+      const allReqs = sheetReqsByCompany.get(String(co.id)) || [];
+      // §요청 8 핵심 — sourceSheet(=requestType, 저장 시점부터 항상 같은 값)이 정확히
+      // '기술자문문의'인 요청만 이 탭의 L3 신호로 인정한다. 컨설팅요청/샘플/공법설명회/
+      // 기타문의는 이 탭 판정에서 완전히 제외한다.
+      const techReqs = allReqs.filter(r=> (r.sourceSheet || r.requestType) === '기술자문문의');
+      rows.push({ co, mouTs: mou.ts, techReqs });
+    });
+    const base = { rows, todayTs };
+    l2l3AnalysisCache = { coRaw, reqRaw, base };
+    return base;
+  }
+  function computeL2L3ManageAnalysis(N){
+    const base = buildL2L3AnalysisBase();
+    const rows = base.rows.map(row=>{
+      const firstConverting = computeL3TechAdviceWindow(row.mouTs, row.techReqs, N);
+      const converted = !!firstConverting;
+      const bucket = classifyL3TechAdviceBucket(row.mouTs, base.todayTs, N, converted);
+      const days = Math.round((base.todayTs - row.mouTs) / 86400000);
+      return { co: row.co, mouTs: row.mouTs, days, converted, bucket, firstAdviceAt: firstConverting ? firstConverting.requestDate : null };
+    });
+    const converted = rows.filter(r=> r.bucket === 'converted');
+    const observing = rows.filter(r=> r.bucket === 'observing');
+    const needsAttention = rows.filter(r=> r.bucket === 'needsAttention');
+    // §요청 15 — 전환율 = 전환 완료 ÷ 관찰 완료된 대상(전환 완료 + 관리 필요). 관찰 중은
+    // 분모/분자 어디에도 넣지 않는다.
+    const observedCount = converted.length + needsAttention.length;
+    const rate = observedCount ? Math.round((converted.length / observedCount) * 1000) / 10 : 0;
+    return { N, todayTs: base.todayTs, rows, converted, observing, needsAttention, observedCount, rate, total: rows.length };
+  }
+  const L2L3_SUBFILTERS = [
+    ['all','전체'], ['converted','전환 완료'], ['observing','관찰 중'], ['needsAttention','관리 필요']
+  ];
+  const L2L3_BUCKET_LABEL = { converted:'전환 완료', observing:'관찰 중', needsAttention:'관리 필요' };
+  const L2L3_BUCKET_BADGE_CLASS = { converted:'st-converted', observing:'st-requested', needsAttention:'st-needsAttention' };
+  // §요청 3 — 신규 협약사 탭에서 옮겨온 히어로 카드(L2→L3 전환율)와 운영 개선 비교
+  // 영역(renderNpCmpSectionHtml/bindNpCmpSection, 위에 이미 정의돼 있음 — 그대로
+  // 재사용, 새로 만들지 않음)을 이 탭에서 렌더링한다. 기간 선택(30/60/90일, §요청 14)은
+  // npCmp 구획의 기존 선택기(npCmpPeriodDays)를 그대로 공유한다 — 이 탭의 전환율/목록도
+  // 같은 N으로 함께 다시 계산될 뿐, 두 번째 선택기를 새로 만들지 않는다(§요청 "재조회
+  // 없이 재계산만").
+  function renderL2L3ManageTab(enriched){
+    renderPagination(0);
+    listEl.classList.add('np2-active', 'l2l3-active');
+    lastL2L3Enriched = enriched;
+    listTitle.innerHTML = `L2→L3 전환관리<span class="list-title-sub">협약 체결 후 기술자문문의(현장등록) 전환 현황을 확인합니다.</span>`;
+    const enrichedById = new Map(enriched.map(r=> [r.co.id, r]));
+    const analysis = computeL2L3ManageAnalysis(npCmpPeriodDays);
+
+    // 검색 — 신규 협약사 탭과 같은 원칙(§요청 "검색 정상 동작"), 메인 검색창의
+    // searchQuery를 그대로 쓴다. 새 검색창/새 판정을 만들지 않는다.
+    const q = (searchQuery || '').trim().toLowerCase();
+    const searched = q ? analysis.rows.filter(it=>{
+      const r = enrichedById.get(it.co.id);
+      return matchesSearch(it.co, r ? r.acts : [], q);
+    }) : analysis.rows;
+
+    const filtered = l2l3SubFilter === 'all' ? searched : searched.filter(it=> it.bucket === l2l3SubFilter);
+    filtered.sort((a,b)=>{
+      const bucketOrder = { needsAttention:0, observing:1, converted:2 };
+      const oa = bucketOrder[a.bucket], ob = bucketOrder[b.bucket];
+      if(oa !== ob) return oa - ob;
+      const da = a.days == null ? -1 : a.days, db = b.days == null ? -1 : b.days;
+      if(da !== db) return db - da;
+      return String(a.co.name || '').localeCompare(String(b.co.name || ''), 'ko');
+    });
+
+    const rateNum = Number(analysis.rate) || 0;
+    const heroHtml = `
+      <div class="np2-hero">
+        <div class="np2-hero-rate-block">
+          <div class="np2-hero-rate-label">L2 → L3 전환율</div>
+          <div class="np2-hero-rate">${esc(analysis.rate)}%</div>
+          <div class="np2-hero-sub">관찰 완료 ${esc(analysis.observedCount)}곳 중 ${esc(analysis.converted.length)}곳 기술자문문의 발생(협약 후 ${esc(npCmpPeriodDays)}일 기준)</div>
+          <div class="np2-hero-bar"><div class="np2-hero-bar-fill" style="width:${Math.max(0,Math.min(100,rateNum))}%;"></div></div>
+        </div>
+        <div class="np2-hero-stats">
+          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(analysis.total)}</span><span class="np2-hero-stat-label">전체 대상</span></div>
+          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(analysis.converted.length)}</span><span class="np2-hero-stat-label">전환 완료</span></div>
+          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(analysis.observing.length)}</span><span class="np2-hero-stat-label">관찰 중</span></div>
+          ${analysis.needsAttention.length ? `<div class="np2-hero-stat"><span class="np2-hero-stat-value is-warn">${esc(analysis.needsAttention.length)}</span><span class="np2-hero-stat-label">관리 필요</span></div>` : ''}
+        </div>
+      </div>
+      <div class="np2-subfilters">
+        ${L2L3_SUBFILTERS.map(([key,label])=>{
+          const cnt = key === 'all' ? analysis.total : (key === 'converted' ? analysis.converted.length : (key === 'observing' ? analysis.observing.length : analysis.needsAttention.length));
+          return `<button type="button" class="list-filter-chip${l2l3SubFilter===key?' is-active':''}" data-l2l3-subfilter="${esc(key)}">${esc(label)} ${esc(cnt)}</button>`;
+        }).join('')}
+      </div>
+      ${renderNpCmpSectionHtml()}`;
+
+    function bindHeroAndSubfilters(){
+      listEl.querySelectorAll('[data-l2l3-subfilter]').forEach(btn=> btn.addEventListener('click', ()=>{
+        l2l3SubFilter = btn.getAttribute('data-l2l3-subfilter');
+        renderL2L3ManageTab(enriched);
+      }));
+      bindNpCmpSection();
+    }
+
+    if(!filtered.length){
+      listEl.innerHTML = heroHtml + `<div class="np2-empty">${esc(analysis.total ? '조건에 맞는 업체가 없습니다.' : '전환 관리 대상 업체가 없습니다.')}</div>`;
+      bindHeroAndSubfilters();
+      return;
+    }
+
+    // §요청 7 — 업체명/협약 체결일/협약 후 경과일/기술자문문의 발생일/현재 상태 5개만.
+    // 다른 컬럼(연락처/활동기록/메모 등)은 추가하지 않는다.
+    listEl.innerHTML = heroHtml + `
+      <div class="np2-table-head">
+        <span>업체명</span><span>협약 체결일</span><span>협약 후 경과일</span><span>기술자문문의 발생일</span><span>현재 상태</span>
+      </div>
+      <div class="np2-list">
+        ${filtered.map(it=>{
+          const elapsedText = it.days != null ? `${it.days}일` : '—';
+          const adviceText = it.firstAdviceAt ? fmtDate(it.firstAdviceAt) : '—';
+          return `
+          <div class="np2-row" data-l2l3-row="${esc(it.co.id)}" role="button" tabindex="0">
+            <span class="np2-col-company"><span class="np2-col-name-line"><span class="np2-col-name">${esc(it.co.name || '(업체명 없음)')}</span></span></span>
+            <span><span class="np2-field-label">협약 체결일</span>${esc(fmtDate(it.mouTs))}</span>
+            <span><span class="np2-field-label">협약 후 경과일</span>${esc(elapsedText)}</span>
+            <span><span class="np2-field-label">기술자문문의 발생일</span>${esc(adviceText)}</span>
+            <span><span class="np2-field-label">현재 상태</span><span class="np2-state-badge ${esc(L2L3_BUCKET_BADGE_CLASS[it.bucket])}">${esc(L2L3_BUCKET_LABEL[it.bucket])}</span></span>
+          </div>`;
+        }).join('')}
+      </div>`;
+
+    bindHeroAndSubfilters();
+    // §요청 "고객카드 열기 정상" — 기존 openCard(id) 메커니즘을 그대로 재사용한다(새
+    // 고객카드 연결 방식을 만들지 않음, npCmp 드릴다운 모달의 data-npcmp-open-card와
+    // 완전히 같은 방식).
+    listEl.querySelectorAll('[data-l2l3-row]').forEach(row=> row.addEventListener('click', ()=> openCard(row.getAttribute('data-l2l3-row'))));
   }
   const NEW_PARTNER_SUBFILTERS = [
     ['all','전체'], ['needsAttention','관리 필요'], ['inProgress','진행 중'], ['converted','현장등록']
@@ -9341,7 +9557,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     lastNewPartnerEnriched = enriched;
     // §요청 2-9 제목/부제 — 다른 탭은 그대로 "고객 N"(renderList()가 매번 먼저 그 값으로
     // 지워 두므로 탭을 벗어나면 자동 복원됨), 이 탭만 고정 문구로 덮어쓴다.
-    listTitle.innerHTML = `신규 협약사<span class="list-title-sub">L2에서 L3까지, 현장등록 전환 현황을 확인합니다.</span>`;
+    // §L2→L3 전환관리 탭 분리 라운드(신규) — 전환율 히어로 카드는 새 "L2→L3 전환관리"
+    // 탭으로 옮겼다(§요청 3/4). 이 탭은 이제 "협약 체결 후 90일 미만 업체 목록"만 보는
+    // 단순 화면이라는 부제로 바꾼다(§요청 4) — 리스트/검색/필터/상세보기 자체(아래
+    // 그대로)는 전혀 안 바꿨다.
+    listTitle.innerHTML = `신규 협약사<span class="list-title-sub">협약 체결 후 90일 미만 업체 목록입니다.</span>`;
     const enrichedById = new Map(enriched.map(r=> [r.co.id, r]));
     // 전환율 계산 기준은 기존 computeNewPartnerConversionSummary() 그대로 재사용한다
     // (§요청 "임의로 새로운 기준을 만들지 마세요"). rows에 업체별 conv가 이미 한 번씩만
@@ -9362,12 +9582,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 계산을 "최근 요청" 컬럼에서 다시 하지 않는다).
       return { co, conv, r, p, days, band, need, state, reqBadge: newPartnerLatestRequestBadge(co, r) };
     });
-    // 전환 흐름(§요청 2) — "요청 발생"은 전환 여부와 무관하게 구글시트 요청이 1건이라도
-    // 있는 업체 수(conv.firstRequestAt, 이미 계산된 값 그대로 재사용). 전환 완료는 항상
-    // 그 부분집합이다 — 전환되려면 반드시 90일 이내의 유효한 요청이 있어야 하고, 그
-    // 요청은 항상 firstRequestAt 계산에도 포함되므로(computeL2L3Conversion 참고) "15 →
-    // 8 → 3"처럼 항상 줄어드는 형태가 실제 데이터로도 보장된다.
-    const requestedCount = items.filter(it=> it.conv.firstRequestAt != null).length;
+    // 보조 필터 건수(§요청 6과 동일 원칙 — 상태 분류는 그대로, 새 판정 없음).
     const needsAttentionCount = items.filter(it=> it.state.bucket === 'needsAttention').length;
     const inProgressCount = items.filter(it=> it.state.bucket === 'inProgress').length;
 
@@ -9409,44 +9624,28 @@ window.SHIN2_CRM_APP_INIT = function(){
       });
     }
 
-    const reviewCount = gsheetImportState.reviewItems.length;
-    const rateNum = Number(summary.rate) || 0;
+    // §L2→L3 전환관리 탭 분리 라운드(신규) — 전환율 히어로 카드(rate/hero-stats)와
+    // "Google Sheets 확인 필요" 카운터(§요청 17, 관리 도구 메뉴의 crmGsheetReviewBtn에만
+    // 남긴다)는 여기서 완전히 뺐다(§요청 3). 남는 건 보조 필터(전체/관리 필요/진행 중/
+    // 현장등록, §요청 4 "리스트 자체 기능은 그대로 둘 것")뿐이다 — 판정 기준(items/state)
+    // 자체는 전혀 안 바꿨다.
     const heroHtml = `
-      <div class="np2-hero">
-        <div class="np2-hero-rate-block">
-          <div class="np2-hero-rate-label">L2 → L3 전환율</div>
-          <div class="np2-hero-rate">${esc(summary.rate)}%</div>
-          <div class="np2-hero-sub">신규 협약사 ${esc(summary.total)}곳 중 ${esc(summary.converted)}곳 현장등록</div>
-          <div class="np2-hero-bar"><div class="np2-hero-bar-fill" style="width:${Math.max(0,Math.min(100,rateNum))}%;"></div></div>
-        </div>
-        <div class="np2-hero-stats">
-          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(summary.total)}</span><span class="np2-hero-stat-label">신규협약 · 최근 90일</span></div>
-          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(requestedCount)}</span><span class="np2-hero-stat-label">요청발생 · 전환 진행 중</span></div>
-          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(summary.converted)}</span><span class="np2-hero-stat-label">현장등록 · L3 전환</span></div>
-          ${needsAttentionCount ? `<div class="np2-hero-stat"><span class="np2-hero-stat-value is-warn">${esc(needsAttentionCount)}</span><span class="np2-hero-stat-label">관리 필요</span></div>` : ''}
-          ${reviewCount ? `<button type="button" class="np2-hero-stat" id="newPartnerGsheetReviewLink"><span class="np2-hero-stat-value is-warn">${esc(reviewCount)}</span><span class="np2-hero-stat-label">Google Sheets 확인 필요</span></button>` : ''}
-        </div>
-      </div>
       ${gsheetImportState.lastError ? `<div class="np2-empty" style="margin-bottom:10px;">${esc(gsheetImportState.lastError)}</div>` : ''}
       <div class="np2-subfilters">
         ${NEW_PARTNER_SUBFILTERS.map(([key,label])=>{
           const cnt = key === 'all' ? items.length : (key === 'converted' ? summary.converted : (key === 'needsAttention' ? needsAttentionCount : inProgressCount));
           return `<button type="button" class="list-filter-chip${newPartnerSubFilter===key?' is-active':''}" data-np-subfilter="${esc(key)}">${esc(label)} ${esc(cnt)}</button>`;
         }).join('')}
-      </div>
-      ${renderNpCmpSectionHtml()}`;
+      </div>`;
 
     // §성능 요구 9 — 서브필터를 바꿀 때만(자주 누르지 않는 조작) 이 함수를 다시 부른다.
     // enriched는 renderList()가 이미 만들어 둔 값을 클로저로 그대로 재사용할 뿐, 여기서
     // 다시 만들지 않는다 — 전체 300개 업체를 다시 훑는 renderList()는 전혀 부르지 않는다.
     function bindHeroAndSubfilters(){
-      const reviewBtn = document.getElementById('newPartnerGsheetReviewLink');
-      if(reviewBtn) reviewBtn.addEventListener('click', openGsheetReviewModal);
       listEl.querySelectorAll('[data-np-subfilter]').forEach(btn=> btn.addEventListener('click', ()=>{
         newPartnerSubFilter = btn.getAttribute('data-np-subfilter');
         renderNewPartnerTab(enriched);
       }));
-      bindNpCmpSection();
     }
 
     if(!filtered.length){
