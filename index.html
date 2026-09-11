@@ -9478,7 +9478,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 숫자가 항상 computeNewPartnerConversionSummary().converted와 정확히 같아야 하기
   // 때문 — 다른 조건과 절대 안 겹치게.
   function classifyNewPartnerRow(conv, need, band){
-    if(conv.converted) return { stateKey:'converted', stateLabel:'현장등록', bucket:'converted' };
+    if(conv.converted) return { stateKey:'converted', stateLabel:'L3 전환', bucket:'converted' };
     if(need || (band && band.key === 'urgent')) return { stateKey:'needsAttention', stateLabel:'관리 필요', bucket:'needsAttention' };
     if(conv.firstRequestAt) return { stateKey:'requested', stateLabel:'요청 발생', bucket:'inProgress' };
     return { stateKey:'none', stateLabel:'활동 없음', bucket:'inProgress' };
@@ -9599,7 +9599,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   }
   const NPCMP_METRIC_LABEL = {
     total:'신규 협약', observed:'관찰 완료', inProgress:'진행 중',
-    platform:'플랫폼 요청 발생', l3:'현장등록(L3 전환)'
+    platform:'플랫폼 요청 발생', l3:'L3 전환'
   };
   const NPCMP_GROUP_LABEL = { A:'플랫폼 초기 운영', B:'7월 개선 이후' };
   function closeNpCmpDrillModal(){
@@ -9629,7 +9629,7 @@ window.SHIN2_CRM_APP_INIT = function(){
             <table class="npcmp-table" style="min-width:760px;">
               <thead><tr>
                 <th>업체명</th><th>그룹</th><th>협약일</th><th>최초 요청일</th><th>최초 요청 종류</th>
-                <th>현장등록일</th><th>협약→최초요청(일)</th><th>협약→현장등록(일)</th><th>상태</th>
+                <th>L3 전환일</th><th>협약→최초요청(일)</th><th>협약→L3 전환(일)</th><th>상태</th>
               </tr></thead>
               <tbody>
                 ${list.map(it=> `
@@ -9648,7 +9648,7 @@ window.SHIN2_CRM_APP_INIT = function(){
               </tbody>
             </table>
             </div>
-            <div class="npcmp-info-pop" style="margin-top:12px;">현장등록일은 원본 구글시트에 "현장등록"만 따로 구분하는 요청 종류가 없어, 현재는 최초 플랫폼 요청일과 같은 값을 씁니다(데이터 한계, §진단 참고).</div>
+            <div class="npcmp-info-pop" style="margin-top:12px;">L3 전환일은 원본 구글시트에 L3 전환만 따로 구분하는 요청 종류가 없어, 현재는 최초 플랫폼 요청일과 같은 값을 씁니다(데이터 한계, §진단 참고).</div>
             `}
           </div>
           <div class="pi-actions">
@@ -9751,7 +9751,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="npcmp-table-wrap">
           <table class="npcmp-table">
             <thead><tr>
-              <th>구분</th><th>신규 협약</th><th>${esc(npCmpPeriodDays)}일 관찰 완료</th><th>플랫폼 요청</th><th>플랫폼 이용 전환율</th><th>현장등록</th><th>L3 전환율</th>
+              <th>구분</th><th>신규 협약</th><th>${esc(npCmpPeriodDays)}일 관찰 완료</th><th>플랫폼 요청</th><th>플랫폼 이용 전환율</th><th>L3 전환</th><th>L3 전환율</th>
             </tr></thead>
             <tbody>
               ${rowHtml('A', A)}
@@ -9761,12 +9761,12 @@ window.SHIN2_CRM_APP_INIT = function(){
         </div>
         <div class="npcmp-callouts">
           ${deltaBlock('플랫폼 이용 전환율', A.platformRate, B.platformRate)}
-          ${deltaBlock('L3 현장등록 전환율', A.l3Rate, B.l3Rate)}
+          ${deltaBlock('L3 전환율', A.l3Rate, B.l3Rate)}
         </div>
         ${excludedNoteHtml}
         ${reviewNoteHtml}
         <div class="npcmp-info-pop" style="margin-top:10px;">
-          데이터 한계: 원본 구글시트에는 "현장등록"만 따로 구분하는 요청 종류가 없어, 위 "현장등록/L3 전환율"은 현재 "플랫폼 이용 전환율"과 같은 신호(협약 후 첫 플랫폼 요청)로 계산됩니다. 시트에 현장등록 전용 기록이 추가되면 두 지표가 서로 달라집니다.
+          데이터 한계: 원본 구글시트에는 L3 전환만 따로 구분하는 요청 종류가 없어, 위 "L3 전환/L3 전환율"은 현재 "플랫폼 이용 전환율"과 같은 신호(협약 후 첫 플랫폼 요청)로 계산됩니다. 시트에 L3 전환 전용 기록이 추가되면 두 지표가 서로 달라집니다.
         </div>
       </div>`;
   }
@@ -9818,6 +9818,48 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 정의된 5개 탭 이름을 그대로 재사용한다(새 목록을 따로 만들지 않음 — 탭 이름이
   // 바뀌면 한 곳만 고치면 되게). 순서는 GSHEET_TABS 선언 순서와 동일하게 유지한다.
   const L2L3_ALL_SOURCE_SHEETS = GSHEET_TABS.map(c=> c.tab);
+  // §문구 정리 라운드(신규, "최초 L3 전환일/유형" 표시) — 내부 sourceSheet 값(GSHEET_TABS의
+  // tab, 원본 구글시트 탭 이름 그대로)은 전혀 바꾸지 않는다. 이건 오직 화면 표시용
+  // 라벨 매핑만 추가한 것 — computeL3TechAdviceWindow/computeL2L3ManageAnalysis 등
+  // 계산 로직·데이터 구조는 손대지 않는다(§요청 "계산 로직/데이터 변경 금지").
+  const L2L3_SOURCE_DISPLAY_LABEL = {
+    '기술자문문의': '기술자문문의',
+    '컨설팅요청_통합': '컨설팅요청',
+    '샘플카달로그요청': '샘플·카탈로그 요청',
+    '공법설명회이력': '공법설명회',
+    '기타문의답변현황': '기타문의·답변'
+  };
+  function l2l3SourceDisplayLabel(raw){ return L2L3_SOURCE_DISPLAY_LABEL[raw] || raw || ''; }
+  // 같은 달력일(시:분 무관) 비교용 — 다른 곳의 getSeoulTodayDateOnly와 같은 "연-월-일만
+  // 비교" 원칙을 그대로 따른다(새 시간대 규칙을 만들지 않음).
+  function l2l3DateOnlyTs(iso){
+    const d = new Date(iso);
+    if(isNaN(d.getTime())) return null;
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  }
+  // §요청 "동일 날짜에 여러 요청 유형이 발생했다면 전부 표시" — computeL3TechAdviceWindow의
+  // convertingTypes는 윈도우 전체(-N~N-1일) 기준 집합이라 "최초 전환일과 정확히 같은 날"만
+  // 뽑아내는 값이 아니다. 새 집계 로직을 추가하는 대신, 이미 있는 techReqs(원본 목록)를
+  // 표시 시점에 "최초 전환일과 같은 달력일" 조건으로만 필터링하는 순수 표시용 헬퍼다 —
+  // 전환 판정/전환율/캐시된 분석 결과(computeL2L3ManageAnalysis)는 전혀 건드리지 않는다.
+  function l2l3SameDaySourceLabels(techReqs, firstAdviceAt){
+    if(!firstAdviceAt || !techReqs || !techReqs.length) return [];
+    const targetDay = l2l3DateOnlyTs(firstAdviceAt);
+    if(targetDay == null) return [];
+    const types = [];
+    const seen = new Set();
+    techReqs.forEach(r=>{
+      if(!r.requestDate) return;
+      if(l2l3DateOnlyTs(r.requestDate) !== targetDay) return;
+      const raw = r.sourceSheet || r.requestType || '';
+      if(!raw || seen.has(raw)) return;
+      seen.add(raw);
+      types.push(raw);
+    });
+    // GSHEET_TABS 선언 순서로 정렬 — 매번 다른 순서로 나오지 않게(사용자 눈에 안정적으로).
+    types.sort((a,b)=> L2L3_ALL_SOURCE_SHEETS.indexOf(a) - L2L3_ALL_SOURCE_SHEETS.indexOf(b));
+    return types;
+  }
   // mouTs 기준 -N~N-1일(§조기전환 라운드, 위 상수로 뒤쪽 경계 결정) 이내 "최초" 요청을
   // 찾는다. techReqs는 L2L3_ALL_SOURCE_SHEETS 5개 중 하나로 걸러진 배열(아래
   // buildL2L3AnalysisBase가 만든다, §전환 범위 확대 라운드) — 여기서 종류를 다시
@@ -9969,7 +10011,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   }
   function renderL2L3SourceSummaryAndDetailHtml(analysis){
     const sourceRows = L2L3_ALL_SOURCE_SHEETS.map(s=> `
-      <tr><td style="text-align:left;">${esc(s)}</td><td>${esc(analysis.sourceCounts[s] || 0)}곳</td></tr>
+      <tr><td style="text-align:left;">${esc(l2l3SourceDisplayLabel(s))}</td><td>${esc(analysis.sourceCounts[s] || 0)}곳</td></tr>
     `).join('');
     const detailRows = analysis.converted.slice().sort((a,b)=> (b.mouTs - a.mouTs)).map(r=>{
       const daysToConvert = r.firstAdviceAt != null ? Math.round((new Date(r.firstAdviceAt).getTime() - r.mouTs) / 86400000) : null;
@@ -9980,8 +10022,8 @@ window.SHIN2_CRM_APP_INIT = function(){
           <td style="text-align:left;">${esc(l2l3ImprovementPhaseLabel(r.mouTs))}</td>
           <td>${r.firstAdviceAt ? esc(fmtDate(r.firstAdviceAt)) : '—'}</td>
           <td>${daysToConvert != null ? esc(daysToConvert) : '—'}</td>
-          <td style="text-align:left;">${r.firstAdviceType ? esc(r.firstAdviceType) : '—'}${r.isEarly ? ` <span class="np2-req-badge">조기전환</span>` : ''}</td>
-          <td style="text-align:left;">${(r.sourceTypes || []).length ? esc(r.sourceTypes.join(', ')) : '—'}</td>
+          <td style="text-align:left;">${r.firstAdviceType ? esc(l2l3SourceDisplayLabel(r.firstAdviceType)) : '—'}${r.isEarly ? ` <span class="np2-req-badge">조기전환</span>` : ''}</td>
+          <td style="text-align:left;">${(r.sourceTypes || []).length ? esc(r.sourceTypes.map(l2l3SourceDisplayLabel).join(', ')) : '—'}</td>
           <td style="text-align:left;">${r.within90dConverted ? '예' : '아니오'}</td>
         </tr>`;
     }).join('');
@@ -10041,7 +10083,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     renderPagination(0);
     listEl.classList.add('np2-active', 'l2l3-active');
     lastL2L3Enriched = enriched;
-    listTitle.innerHTML = `L2→L3 전환관리<span class="list-title-sub">협약 체결 후 기술자문문의(현장등록) 전환 현황을 확인합니다.</span>`;
+    listTitle.innerHTML = `L2→L3 전환관리<span class="list-title-sub">협약 체결 후 L3 전환 현황을 확인합니다.</span>`;
     const enrichedById = new Map(enriched.map(r=> [r.co.id, r]));
     const analysis = computeL2L3ManageAnalysis(npCmpPeriodDays);
 
@@ -10069,7 +10111,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="np2-hero-rate-block">
           <div class="np2-hero-rate-label">L2 → L3 전환율</div>
           <div class="np2-hero-rate">${esc(analysis.rate)}%</div>
-          <div class="np2-hero-sub">관찰 완료 ${esc(analysis.observedCount)}곳 중 ${esc(analysis.converted.length)}곳 현장등록(협약 후 ${esc(npCmpPeriodDays)}일 기준)</div>
+          <div class="np2-hero-sub">관찰 완료 ${esc(analysis.observedCount)}곳 중 ${esc(analysis.converted.length)}곳 L3 전환(협약 후 ${esc(npCmpPeriodDays)}일 기준)</div>
           <div class="np2-hero-bar"><div class="np2-hero-bar-fill" style="width:${Math.max(0,Math.min(100,rateNum))}%;"></div></div>
         </div>
         <div class="np2-hero-stats">
@@ -10103,11 +10145,16 @@ window.SHIN2_CRM_APP_INIT = function(){
       return;
     }
 
-    // §요청 7 — 업체명/협약 체결일/협약 후 경과일/기술자문문의 발생일/현재 상태 5개만.
+    // §요청 7 — 업체명/협약 체결일/협약 후 경과일/최초 L3 전환일/현재 상태 5개만.
     // 다른 컬럼(연락처/활동기록/메모 등)은 추가하지 않는다.
+    // §문구 정리 라운드(신규, "최초 L3 전환 유형" 표시) — techReqs 원본 목록은 이미
+    // buildL2L3AnalysisBase()(캐시됨, 여기서 재조회 없음)가 들고 있다. 계산 로직은
+    // 전혀 새로 만들지 않고, 회사별 techReqs만 이 렌더 함수 안에서 조회해 표시용
+    // 헬퍼(l2l3SameDaySourceLabels)에 넘긴다.
+    const l2l3TechReqsById = new Map(buildL2L3AnalysisBase().rows.map(r=> [String(r.co.id), r.techReqs]));
     listEl.innerHTML = heroHtml + `
       <div class="np2-table-head">
-        <span>업체명</span><span>협약 체결일</span><span>협약 후 경과일</span><span>기술자문문의 발생일</span><span>현재 상태</span>
+        <span>업체명</span><span>협약 체결일</span><span>협약 후 경과일</span><span>최초 L3 전환일</span><span>현재 상태</span>
       </div>
       <div class="np2-list">
         ${filtered.map(it=>{
@@ -10118,13 +10165,18 @@ window.SHIN2_CRM_APP_INIT = function(){
           // 구분한다. 기존 np2-req-badge 스타일(§313 근처, 이미 다른 곳에서 쓰는 중립
           // 태그)을 재사용한다 — 새 CSS 클래스를 만들지 않는다.
           const earlyTagHtml = it.isEarly ? ` <span class="np2-req-badge">조기전환</span>` : '';
+          // §요청 "동일 날짜 복수 유형 전부 표시" — 최초 전환일과 정확히 같은 달력일에
+          // 발생한 모든 sourceSheet를 표시 라벨로 매핑해 쉼표로 나열한다(1건이어도 그대로
+          // 1개만 나옴 — 새 판정 아님, 순수 표시).
+          const sameDayTypes = l2l3SameDaySourceLabels(l2l3TechReqsById.get(String(it.co.id)) || [], it.firstAdviceAt);
+          const sameDayTypesHtml = sameDayTypes.length ? ` <span class="np2-req-badge">${esc(sameDayTypes.map(l2l3SourceDisplayLabel).join(', '))}</span>` : '';
           const stateLabel = (it.bucket === 'converted' && it.isEarly) ? '전환 완료(조기)' : L2L3_BUCKET_LABEL[it.bucket];
           return `
           <div class="np2-row" data-l2l3-row="${esc(it.co.id)}" role="button" tabindex="0">
             <span class="np2-col-company"><span class="np2-col-name-line"><span class="np2-col-name">${esc(it.co.name || '(업체명 없음)')}</span></span></span>
             <span><span class="np2-field-label">협약 체결일</span>${esc(fmtDate(it.mouTs))}</span>
             <span><span class="np2-field-label">협약 후 경과일</span>${esc(elapsedText)}</span>
-            <span><span class="np2-field-label">기술자문문의 발생일</span>${esc(adviceText)}${earlyTagHtml}</span>
+            <span><span class="np2-field-label">최초 L3 전환일</span>${esc(adviceText)}${earlyTagHtml}${sameDayTypesHtml}</span>
             <span><span class="np2-field-label">현재 상태</span><span class="np2-state-badge ${esc(L2L3_BUCKET_BADGE_CLASS[it.bucket])}">${esc(stateLabel)}</span></span>
           </div>`;
         }).join('')}
@@ -10137,7 +10189,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     listEl.querySelectorAll('[data-l2l3-row]').forEach(row=> row.addEventListener('click', ()=> openCard(row.getAttribute('data-l2l3-row'))));
   }
   const NEW_PARTNER_SUBFILTERS = [
-    ['all','전체'], ['needsAttention','관리 필요'], ['inProgress','진행 중'], ['converted','현장등록']
+    ['all','전체'], ['needsAttention','관리 필요'], ['inProgress','진행 중'], ['converted','L3 전환']
   ];
   function renderNewPartnerTab(enriched){
     renderPagination(0);
@@ -16769,7 +16821,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     ["ins_278","needs","차별화 자료 필요"],
     ["ins_279","needs","유사실적 필요"],
     ["ins_280","needs","공고 반영 지원 필요"],
-    ["ins_281","needs","현장등록 지원 필요"],
+    ["ins_281","needs","기술자문문의 지원 필요"],
     ["ins_282","needs","견적지원 필요"],
     ["ins_283","needs","PT지원 필요"],
     ["ins_284","needs","현장설명 필요"],
@@ -16829,7 +16881,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     ["ins_338","signal_progress","재문의 발생"],
     ["ins_339","signal_progress","자료 추가요청 발생"],
     ["ins_340","signal_progress","미팅 재요청 발생"],
-    ["ins_341","signal_progress","현장등록 의향 표현"],
+    ["ins_341","signal_progress","기술자문문의 의향 표현"],
     ["ins_342","signal_progress","2차미팅 의향 표현"],
     ["ins_343","signal_progress","대표 미팅 의향 표현"],
     ["ins_344","signal_progress","현장정보 자발적 공유"],
@@ -16941,7 +16993,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     ["ins_450","l1l2","협약 직후 첫 제안 준비 필요"],
     ["ins_451","l1l2","공고문 확인 즉시 현장 제안 필요"],
     ["ins_452","l1l2","신규 등록 직후 온보딩 접촉 필요"],
-    ["ins_453","l2l3","현장등록 유도 시점 도래"],
+    ["ins_453","l2l3","기술자문문의 유도 시점 도래"],
     ["ins_454","l2l3","견적요청 유도 필요"],
     ["ins_455","l2l3","2차미팅 제안 시점 도래"],
     ["ins_456","l2l3","비교자료 제공 후 압박 필요"],
