@@ -395,6 +395,8 @@
   .npcmp-callout-rate .npcmp-arrow{ color:rgba(255,255,255,.6); font-weight:600; margin:0 4px; }
   .npcmp-callout-delta{ font-size:13px; font-weight:800; color:#8FE3B0; margin-top:4px; }
   .npcmp-callout-relative{ font-size:10.5px; color:rgba(255,255,255,.68); margin-top:2px; }
+  .npcmp-table td.npcmp-ref-col, .npcmp-table th.npcmp-ref-col{ border-left:2px dashed #d7e0ea; background:#f9fbfd; color:var(--text-faint); }
+  .npcmp-ref-sub{ display:block; font-weight:500; font-size:10px; color:var(--text-faint); }
   .npcmp-excluded-note{ margin-top:10px; font-size:11px; color:var(--text-faint); }
   .npcmp-excluded-note button{ font-family:inherit; font:inherit; background:none; border:0; padding:0; color:var(--blue); text-decoration:underline; cursor:pointer; }
   @media (max-width:640px){
@@ -7881,9 +7883,14 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 참고용 표시)에서만 계속 쓰므로 계산 자체는 남겨둔다.
     const earliestReqDateOnly = npCmpFindEarliestRequestDateOnly(sheetReqsByCompany);
 
-    let noMouCount = 0, futureMouCount = 0, prePlatformExcludedCount = 0;
+    let noMouCount = 0, futureMouCount = 0, prePlatformExcludedCount = 0, terminatedCount = 0;
     const rows = []; // {co, mouTs, group, reqs} — companyId -> 값 하나로만 존재(중복 없음)
     companies.forEach(co=>{
+      // §전환율 분모 버그 수정 라운드 — 협약종료 업체는 분모·분자 어디에도 들어가면 안
+      // 된다(§요청 4). buildL2L3AnalysisBase(§9915 근처)는 이미 이 체크가 있었는데 이
+      // 비교표 base에는 빠져 있었다 — 여기서도 같은 원칙으로 맞춘다(새 판정 로직을 만들지
+      // 않고 기존 D.isAgreementTerminated 그대로 재사용).
+      if(D.isAgreementTerminated(co)){ terminatedCount++; return; }
       const mou = resolveEffectiveMouDate(co);
       if(!mou){ noMouCount++; return; } // §요청 1 "협약일 데이터가 없는 업체 수"
       if(mou.ts > todayTs){ futureMouCount++; return; } // 미래 협약일은 분석 대상 아님(이상치 방어, isNewPartnerCompany와 같은 원칙)
@@ -7901,7 +7908,7 @@ window.SHIN2_CRM_APP_INIT = function(){
 
     const base = {
       rows, todayTs, earliestReqDateOnly,
-      noMouCount, futureMouCount, prePlatformExcludedCount,
+      noMouCount, futureMouCount, prePlatformExcludedCount, terminatedCount,
       // §요청 7-5 "매칭 확인 필요" — 이 분석 범위와 무관하게 이미 존재하는 gsheetImportState.reviewItems
       // (업체명이 아예 매칭 안 됐거나 복수 후보인 시트 행, §7551 근처)를 그대로 노출만 한다 — 새 큐를 만들지 않음.
       unmatchedReviewCount: (gsheetImportState.reviewItems || []).length,
@@ -7948,44 +7955,70 @@ window.SHIN2_CRM_APP_INIT = function(){
   // A/B 그룹별 1차 전환(플랫폼 요청 발생)·최종 전환(L3, computeL2L3Conversion과 동일 판정)
   // 집계를 만든다. §성능 — localStorage/구글시트 재조회가 전혀 없고, base.rows 한 번만
   // 순회한다(업체 하나당 자기 sheetRequests만 봄, 전체 재스캔 없음).
+  // §전환율 분모 버그 수정 라운드 — "기술자문문의" 소스로만 걸러낸 reqs에 기존
+  // npCmpComputeCompanyWindow(대칭 조기전환 윈도우 포함)를 그대로 재사용해 L3(=기술자문
+  // 문의) 전용 최초 전환 신호를 구한다. 새 윈도우 판정 로직을 따로 만들지 않는다 — 입력
+  // reqs만 5개 소스 전체에서 1개로 좁힌 것뿐, -N~N-1일 경계 규칙은 완전히 동일하다.
+  // ⚠ 이 라운드에서 "L3 = 기술자문문의만"으로 좁힌 것은 §전환 범위 확대 라운드(위 §9816
+  // 근처 주석 "L3 현장등록 = 기술자문문의만"이라는 §요청 8/9의 좁은 기준을... 완전히
+  // 되돌린다")가 넓혀 둔 computeL2L3ManageAnalysis 쪽(별도 탭, 5개 소스 전부 인정)과는
+  // 다른 기준이다 — 이번 버그 리포트가 "L3 현장등록 전환율(=기술자문문의 전환율, 같은
+  // 의미로 재확인)"이라고 명시적으로 재확인했으므로 이 비교표(computeNpCmpAnalysis)에만
+  // 적용한다. computeL2L3ManageAnalysis/classifyL3TechAdviceBucket 등 다른 탭 로직은
+  // 전혀 건드리지 않았다 — 두 기준이 다시 서로 어긋나게 됐다는 점은 보고서에 명시.
+  function npCmpFilterTechAdviceReqs(reqs){
+    return reqs.filter(r=> (r.requestType || r.sourceSheet) === '기술자문문의');
+  }
   function computeNpCmpAnalysis(N){
     const base = buildNpCmpAnalysisBase();
     const groups = { A: [], B: [] };
     base.rows.forEach(row=>{
       const { firstConverting, isEarly } = npCmpComputeCompanyWindow(row.mouTs, row.reqs, N);
-      // ⚠ 위 헤더 주석의 데이터 한계 그대로: 현재 시트 데이터로는 "현장등록"만 따로
-      // 구분할 방법이 없어 platformConverted/l3Converted가 같은 신호를 쓴다. 두 값을
-      // 하나의 변수로 합치지 않고 각자 계산해 둔다 — 나중에 시트에 현장등록 전용 컬럼이
-      // 생기면 l3Converted 쪽만 그 신호로 바꾸면 된다.
+      const techReqs = npCmpFilterTechAdviceReqs(row.reqs);
+      const techWindow = npCmpComputeCompanyWindow(row.mouTs, techReqs, N);
       const platformConverted = !!firstConverting;
-      const l3Converted = !!firstConverting;
+      const l3Converted = !!techWindow.firstConverting;
+      // §요청 3 — 상태(전환완료/관찰중/관리필요) 3분류는 기존 로직 그대로, 오직 플랫폼
+      // 요청(5개 소스 중 하나) 발생 여부만 본다 — 이 상태값은 "참고용 관찰 상태" 표시에만
+      // 쓰고, 아래 summarize()의 전환율 분모에는 더 이상 쓰지 않는다(버그 수정 핵심).
       let status = npCmpClassifyStatus(row.mouTs, base.todayTs, N, platformConverted);
       // §조기전환 라운드 — 협약 "전" 문의로 전환된 경우, 기존 'early_converted'(캘린더
       // N일이 아직 안 지나 조기 관찰완료된 것)와 의미가 다르므로 별도 status 값을 쓴다.
-      // observedList 판정은 여전히 "status !== 'in_progress'"만 보므로(아래 summarize),
-      // 이 값도 그대로 분모(관찰 완료)에 포함된다 — 이미 결과가 확정된 것이니 캘린더
-      // 경과와 무관하게 항상 관찰 완료로 본다는 기존 원칙(§9791 근처) 그대로.
       if(platformConverted && isEarly) status = 'pre_mou_converted';
       groups[row.group].push({
         co: row.co, mouTs: row.mouTs, status, platformConverted, l3Converted, isEarly: !!isEarly,
         firstRequestAt: firstConverting ? firstConverting.requestDate : null,
         firstRequestType: firstConverting ? (firstConverting.requestType || firstConverting.sourceSheet || '') : null,
-        daysToFirstRequest: firstConverting ? Math.round((new Date(firstConverting.requestDate).getTime() - row.mouTs) / 86400000) : null
+        daysToFirstRequest: firstConverting ? Math.round((new Date(firstConverting.requestDate).getTime() - row.mouTs) / 86400000) : null,
+        // §전환율 분모 버그 수정 라운드(신규 필드) — L3(기술자문문의) 전용 최초 요청일/
+        // 경과일. 기존 firstRequestAt/daysToFirstRequest(플랫폼 5개 소스 전체 기준)와는
+        // 이제 값이 다를 수 있다(예: 최초 요청이 기술자문문의가 아닌 다른 소스인 경우).
+        l3RequestAt: techWindow.firstConverting ? techWindow.firstConverting.requestDate : null,
+        daysToL3Request: techWindow.firstConverting ? Math.round((new Date(techWindow.firstConverting.requestDate).getTime() - row.mouTs) / 86400000) : null,
+        l3IsEarly: !!techWindow.isEarly
       });
     });
     function summarize(list){
       const inProgressList = list.filter(it=> it.status === 'in_progress');
-      const observedList = list.filter(it=> it.status !== 'in_progress'); // 관찰 완료(조기 전환 포함) — 확정 전환율의 유일한 분모
-      const platformConvertedList = observedList.filter(it=> it.platformConverted);
-      const l3ConvertedList = observedList.filter(it=> it.l3Converted);
+      const observedList = list.filter(it=> it.status !== 'in_progress'); // §참고용 관찰 상태일 뿐 — 아래 rate 분모에는 쓰지 않는다(버그 수정 핵심)
+      // §전환율 분모 버그 수정 라운드 — 분모는 이 비교 기간(A/B)의 신규 협약 전체
+      // 업체(list, 이미 buildNpCmpAnalysisBase에서 협약종료/삭제/협약일없음/미래협약일
+      // 제외 완료)다. 예전엔 observedList(관찰 완료로 좁혀진 부분집합, 사실상 "이미
+      // 전환된 업체만 남는 경우가 많은 집합")를 분모로 써서, 관리필요(경과+미전환) 업체가
+      // 0곳이면 분모=분자가 되어 항상 100%가 나오는 버그가 있었다(§진단 참고). 이제
+      // list.length(관찰중 포함 전체 신규 협약 수)로 고정한다.
+      const platformConvertedList = list.filter(it=> it.platformConverted);
+      const l3ConvertedList = list.filter(it=> it.l3Converted);
+      const denom = list.length;
       return {
         total: list.length, list,
         observedList, inProgressList,
         observedCount: observedList.length, inProgressCount: inProgressList.length,
         platformConvertedList, platformConvertedCount: platformConvertedList.length,
-        platformRate: observedList.length ? Math.round((platformConvertedList.length / observedList.length) * 1000) / 10 : null,
+        // §요청 4 "분모 0 → 0% 표시, 에러 없이" — null 대신 0으로 고정, NaN/Infinity 없음.
+        platformRate: denom ? Math.round((platformConvertedList.length / denom) * 1000) / 10 : 0,
         l3ConvertedList, l3ConvertedCount: l3ConvertedList.length,
-        l3Rate: observedList.length ? Math.round((l3ConvertedList.length / observedList.length) * 1000) / 10 : null
+        l3Rate: denom ? Math.round((l3ConvertedList.length / denom) * 1000) / 10 : 0
       };
     }
     return { N, base, A: summarize(groups.A), B: summarize(groups.B) };
@@ -9639,16 +9672,16 @@ window.SHIN2_CRM_APP_INIT = function(){
                     <td>${esc(fmtDate(it.mouTs))}</td>
                     <td>${it.firstRequestAt ? esc(fmtDate(it.firstRequestAt)) : '—'}</td>
                     <td style="text-align:left;">${it.firstRequestType ? esc(it.firstRequestType) : '—'}</td>
-                    <td>${it.l3Converted && it.firstRequestAt ? esc(fmtDate(it.firstRequestAt)) : '—'}</td>
+                    <td>${it.l3RequestAt ? esc(fmtDate(it.l3RequestAt)) : '—'}</td>
                     <td>${it.daysToFirstRequest != null ? esc(it.daysToFirstRequest) : '—'}</td>
-                    <td>${it.l3Converted && it.daysToFirstRequest != null ? esc(it.daysToFirstRequest) : '—'}</td>
+                    <td>${it.daysToL3Request != null ? esc(it.daysToL3Request) : '—'}</td>
                     <td style="text-align:left;">${esc(fmtNpCmpStatus(it.status))}</td>
                   </tr>
                 `).join('')}
               </tbody>
             </table>
             </div>
-            <div class="npcmp-info-pop" style="margin-top:12px;">L3 전환일은 원본 구글시트에 L3 전환만 따로 구분하는 요청 종류가 없어, 현재는 최초 플랫폼 요청일과 같은 값을 씁니다(데이터 한계, §진단 참고).</div>
+            <div class="npcmp-info-pop" style="margin-top:12px;">L3 전환일은 5개 요청 종류 중 "기술자문문의"만 별도로 집계한 최초 발생일입니다(§전환율 분모 버그 수정 라운드 — 기존에는 5개 소스 전체 중 최초 요청일과 같은 값을 썼습니다).</div>
             `}
           </div>
           <div class="pi-actions">
@@ -9703,15 +9736,20 @@ window.SHIN2_CRM_APP_INIT = function(){
       return `<button type="button" class="npcmp-num-btn"${disabled ? ' disabled' : ''} data-npcmp-drill="${esc(group)}:${esc(metric)}">${esc(count)}</button>`;
     }
     function rowHtml(group, g){
+      // §전환율 분모 버그 수정 라운드 — 컬럼 구성을 "신규 협약 / 플랫폼 요청 업체 /
+      // 플랫폼 이용 전환율 / 기술자문문의 업체 / L3 전환율"로 정리(§요청 5). "N일 관찰
+      // 완료"는 전환율 계산 컬럼들과 분리해 맨 끝에 참고 전용으로만 둔다(npcmp-ref-col,
+      // 아래 CSS에서 시각적으로도 구분). 각 전환율 옆에는 분모/분자를 그대로 숫자로 보여
+      // 주는 캡션을 단다(§요청 "요청 업체 ÷ 신규 협약 업체").
       return `
         <tr>
           <td><span class="npcmp-group-name">${esc(NPCMP_GROUP_LABEL[group])}</span></td>
           <td>${numBtn(group,'total',g.total)}</td>
-          <td>${numBtn(group,'observed',g.observedCount)}${g.inProgressCount ? `<span class="npcmp-inprogress-note">진행 중 ${numBtn(group,'inProgress',g.inProgressCount)}곳</span>` : ''}</td>
           <td>${numBtn(group,'platform',g.platformConvertedCount)}</td>
-          <td>${esc(fmtNpCmpRate(g.platformRate))}<span class="npcmp-sample">표본 ${esc(g.observedCount)}곳</span></td>
+          <td>${esc(fmtNpCmpRate(g.platformRate))}<span class="npcmp-sample">요청 업체 ÷ 신규 협약 업체 (${esc(g.platformConvertedCount)}/${esc(g.total)})</span></td>
           <td>${numBtn(group,'l3',g.l3ConvertedCount)}</td>
-          <td>${esc(fmtNpCmpRate(g.l3Rate))}<span class="npcmp-sample">표본 ${esc(g.observedCount)}곳</span></td>
+          <td>${esc(fmtNpCmpRate(g.l3Rate))}<span class="npcmp-sample">기술자문문의 업체 ÷ 신규 협약 업체 (${esc(g.l3ConvertedCount)}/${esc(g.total)})</span></td>
+          <td class="npcmp-ref-col">${numBtn(group,'observed',g.observedCount)}${g.inProgressCount ? `<span class="npcmp-inprogress-note">진행 중 ${numBtn(group,'inProgress',g.inProgressCount)}곳</span>` : ''}</td>
         </tr>`;
     }
     function deltaBlock(label, rateA, rateB){
@@ -9727,10 +9765,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     }
     const excludedNoteParts = [];
     if(base.prePlatformExcludedCount) excludedNoteParts.push(`2026-05-20 이전 협약(비교 대상 아님) ${base.prePlatformExcludedCount}곳`);
-    if(base.noMouCount) excludedNoteParts.push(`협약일 데이터 없음 ${base.noMouCount}곳`);
+    if(base.noMouCount) excludedNoteParts.push(`협약일 데이터 없음(제외) ${base.noMouCount}곳`);
     if(base.futureMouCount) excludedNoteParts.push(`협약일이 미래 ${base.futureMouCount}곳`);
+    if(base.terminatedCount) excludedNoteParts.push(`협약 종료(제외) ${base.terminatedCount}곳`);
     const excludedNoteHtml = excludedNoteParts.length
-      ? `<div class="npcmp-excluded-note">A/B 비교에서 제외됨 — ${esc(excludedNoteParts.join(' · '))}</div>` : '';
+      ? `<div class="npcmp-excluded-note">A/B 비교에서 제외됨(분모·분자 모두 미포함) — ${esc(excludedNoteParts.join(' · '))}</div>` : '';
     const reviewNoteHtml = base.unmatchedReviewCount
       ? `<div class="npcmp-excluded-note">업체 매칭 확인 필요(이 분석 범위 밖) ${esc(base.unmatchedReviewCount)}건 — <button type="button" id="npCmpReviewListBtn">업체명 보기</button></div>` : '';
     return `
@@ -9746,12 +9785,13 @@ window.SHIN2_CRM_APP_INIT = function(){
           </div>
         </div>
         ${npCmpInfoOpen ? `<div class="npcmp-info-pop">
-          개선 전 그룹(A)은 2026-05-20부터 질문지 변경 기준일(2026-07-22) 직전인 2026-07-21까지 협약을 맺은 업체, 개선 후 그룹(B)은 2026-07-22 이후 협약을 맺은 업체입니다(참고: 구글시트에 실제 요청 기록이 처음 남은 날은 ${esc(earliestLabel)}). "관찰 완료"는 협약일로부터 선택한 일수(${esc(npCmpPeriodDays)}일)가 지났거나, 그 전에 이미 전환된 경우입니다 — 아직 ${esc(npCmpPeriodDays)}일이 지나지 않았고 전환도 안 된 업체("진행 중")는 전환율 분모에 포함하지 않습니다. 전환 신호는 기술자문문의·컨설팅요청_통합·샘플카달로그요청·공법설명회이력·기타문의답변현황 5개 항목 중 하나라도 발생하면 인정됩니다. 여기서 말하는 전환율은 관찰된 변화일 뿐이며, 특정 원인(예: 메일 개편) 때문이라고 단정하지 않습니다.
+          개선 전 그룹(A)은 2026-05-20부터 질문지 변경 기준일(2026-07-22) 직전인 2026-07-21까지 협약을 맺은 업체, 개선 후 그룹(B)은 2026-07-22 이후 협약을 맺은 업체입니다(참고: 구글시트에 실제 요청 기록이 처음 남은 날은 ${esc(earliestLabel)}). <b>전환율(플랫폼 이용 전환율/L3 전환율)의 분모는 해당 기간에 신규 협약한 전체 업체 수입니다</b> — 관찰 중/관리 필요 업체도 모두 분모에 포함됩니다. "${esc(npCmpPeriodDays)}일 관찰 완료"(맨 끝 참고 열)는 협약일로부터 선택한 일수가 지났는지만 따지는 상태 분류일 뿐, 전환율 계산에는 쓰이지 않습니다. 플랫폼 이용 전환율은 기술자문문의·컨설팅요청_통합·샘플카달로그요청·공법설명회이력·기타문의답변현황 5개 항목 중 하나라도 발생하면 분자에 포함되고, L3 전환율은 이 중 기술자문문의가 발생한 경우만 분자에 포함됩니다. 협약 전 문의도 대칭 N일 이내(조기전환)면 분자에 포함되고, 협약종료·삭제 업체와 협약일이 없는 업체는 분모·분자 모두에서 제외됩니다. 여기서 말하는 전환율은 관찰된 변화일 뿐이며, 특정 원인(예: 메일 개편) 때문이라고 단정하지 않습니다.
         </div>` : ''}
         <div class="npcmp-table-wrap">
           <table class="npcmp-table">
             <thead><tr>
-              <th>구분</th><th>신규 협약</th><th>${esc(npCmpPeriodDays)}일 관찰 완료</th><th>플랫폼 요청</th><th>플랫폼 이용 전환율</th><th>L3 전환</th><th>L3 전환율</th>
+              <th>구분</th><th>신규 협약</th><th>플랫폼 요청 업체</th><th>플랫폼 이용 전환율</th><th>기술자문문의 업체</th><th>L3 전환율</th>
+              <th class="npcmp-ref-col">참고: ${esc(npCmpPeriodDays)}일 관찰 완료<span class="npcmp-ref-sub">(전환율 계산 미사용)</span></th>
             </tr></thead>
             <tbody>
               ${rowHtml('A', A)}
@@ -9766,7 +9806,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         ${excludedNoteHtml}
         ${reviewNoteHtml}
         <div class="npcmp-info-pop" style="margin-top:10px;">
-          데이터 한계: 원본 구글시트에는 L3 전환만 따로 구분하는 요청 종류가 없어, 위 "L3 전환/L3 전환율"은 현재 "플랫폼 이용 전환율"과 같은 신호(협약 후 첫 플랫폼 요청)로 계산됩니다. 시트에 L3 전환 전용 기록이 추가되면 두 지표가 서로 달라집니다.
+          전환율 분모 = 해당 기간 신규 협약 전체 업체 수(플랫폼 이용/L3 전환율 공통). "관찰 완료" 열은 참고용 상태 표시일 뿐 전환율 계산에 쓰이지 않습니다. L3 전환율은 5개 요청 종류 중 "기술자문문의" 발생 여부만 따로 집계합니다.
         </div>
       </div>`;
   }
@@ -9861,13 +9901,14 @@ window.SHIN2_CRM_APP_INIT = function(){
     return types;
   }
   // mouTs 기준 -N~N-1일(§조기전환 라운드, 위 상수로 뒤쪽 경계 결정) 이내 "최초" 요청을
-  // 찾는다. techReqs는 L2L3_ALL_SOURCE_SHEETS 5개 중 하나로 걸러진 배열(아래
-  // buildL2L3AnalysisBase가 만든다, §전환 범위 확대 라운드) — 여기서 종류를 다시
-  // 판정하지 않는다. 같은 업체에 협약 전/후 문의가 둘 다 있으면, 소스 종류와 무관하게
-  // "전체 중 가장 이른 것"이 최초 전환일이 된다(기존 "earliest wins" 규칙 그대로, 이제
-  // 5개 소스를 통틀어 비교). convertingTypes는 이 윈도우 안에 걸린(=전환으로 인정되는)
-  // 요청들의 sourceSheet 집합 — "발생한 전체 전환 유형"/소스별 요약 집계용(§요청 신규
-  // 컬럼·요약)이며, 창 밖 요청은 포함하지 않는다.
+  // 찾는다. techReqs는 이제 "기술자문문의" 단독으로 걸러진 배열이다(아래
+  // buildL2L3AnalysisBase가 만든다, §L3 정의 통일 라운드 — 직전 "전환 범위 확대
+  // 라운드"가 5개 소스 전체로 넓혔던 것을 사용자 확인("둘 다 통일해줘")에 따라 다시
+  // 좁혔다). 함수 자체는 "techReqs 배열 안에서 최초 요청 찾기"라는 범용 로직이라 입력이
+  // 1개 소스로 좁아져도 그대로 동작한다 — 판정 로직은 전혀 안 바꿨다. convertingTypes는
+  // 이 윈도우 안에 걸린 요청들의 sourceSheet 집합인데, 입력이 이미 기술자문문의 하나뿐
+  // 이라 이제 항상 {'기술자문문의'}이거나 빈 집합이다(여러 소스가 섞여 나오던 예전과
+  // 다름 — 아래 §L3 정의 통일 라운드 주석 참고).
   function computeL3TechAdviceWindow(mouTs, techReqs, N){
     let firstConverting = null, isEarly = false;
     const backLimit = l2l3EarlyConversionBackLimitDays(N);
@@ -9918,11 +9959,19 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(!mou) return;
       if(mou.ts > todayTs) return;
       const allReqs = sheetReqsByCompany.get(String(co.id)) || [];
-      // §전환 범위 확대 라운드 — §요청 8/9(기술자문문의 단독 기준)를 되돌리고, 5개
-      // sourceSheet 중 하나라도 있으면 이 탭의 L3 전환 신호로 인정한다(§요청 "5개 항목
-      // 중 하나라도 발생한 업체는 전환 업체로 계산"). L2L3_ALL_SOURCE_SHEETS(위)에 없는
-      // 예상 밖 sourceSheet 값(데이터 이상)만 방어적으로 걸러낸다.
-      const techReqs = allReqs.filter(r=> L2L3_ALL_SOURCE_SHEETS.includes(r.sourceSheet || r.requestType));
+      // §L3 정의 통일 라운드 — 사용자 확인("둘 다 통일해줘"): 이 탭의 L3 전환 신호를
+      // 다시 "기술자문문의 단독" 기준으로 되돌려, 방금 고친 운영 개선 비교표
+      // (computeNpCmpAnalysis의 L3Rate)와 같은 정의를 쓰게 한다. 직전 "전환 범위 확대
+      // 라운드"가 5개 소스 전체로 넓혔던 것을 이번 라운드가 다시 좁히는 것 — 새 판정
+      // 함수를 만들지 않고, 비교표 쪽에서 이미 만든 npCmpFilterTechAdviceReqs(위 §7969
+      // 근처, "기술자문문의"만 남기는 필터)를 그대로 재사용한다(같은 필터 함수를 두
+      // 화면이 공유하므로 앞으로 정의가 또 어긋날 일이 없다). "플랫폼 이용 전환율"(5개
+      // 소스 통합)은 이 필터와 완전히 별개 — buildNpCmpAnalysisBase/row.reqs(전체 5개
+      // 소스, 필터 없음)를 그대로 쓰므로 전혀 영향 없다. L2L3_ALL_SOURCE_SHEETS 상수와
+      // 5소스 통합 로직 자체는 삭제하지 않았다(아래 sourceCounts/소스별 요약 표에서 계속
+      // 참조 — 이제 기술자문문의 외 4개 행은 항상 0으로 표시된다, §L3 정의 통일 라운드
+      // 주석 참고).
+      const techReqs = npCmpFilterTechAdviceReqs(allReqs);
       rows.push({ co, mouTs: mou.ts, techReqs });
     });
     const base = { rows, todayTs };
@@ -10031,7 +10080,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="npcmp-section" id="l2l3SourceSummarySection">
         <div class="npcmp-head">
           <div class="npcmp-title-wrap">
-            <span class="npcmp-title">5개 데이터 소스별 전환 업체 수</span>
+            <span class="npcmp-title">데이터 소스별 전환 업체 수</span>
           </div>
         </div>
         <div class="npcmp-table-wrap">
@@ -10043,7 +10092,12 @@ window.SHIN2_CRM_APP_INIT = function(){
             </tbody>
           </table>
         </div>
-        <div class="npcmp-info-pop" style="margin-top:8px;">소스별 수치는 중복 카운트를 허용합니다(한 업체가 2개 소스에서 모두 전환됐으면 두 소스 각각에 포함) — 통합 전환 업체 수는 이를 중복 제거해 업체당 1번만 센 값입니다.</div>
+        <!-- §L3 정의 통일 라운드 — L3 전환 신호가 "기술자문문의" 단독으로 좁혀졌으므로
+             아래 5개 행 중 "기술자문문의" 외 4개는 이제 항상 0곳으로 나온다(로직 오류
+             아님, 의도된 동작). 표 구조/sourceCounts 계산 자체(5소스 순회)는 그대로
+             남겨뒀다 — 나중에 다시 소스를 넓히면 코드 변경 없이 값만 채워진다. 과도한
+             리팩터를 피하기 위해 표를 없애는 대신 아래 안내문으로만 설명한다. -->
+        <div class="npcmp-info-pop" style="margin-top:8px;">L3 전환 기준은 "기술자문문의" 단독입니다(§L3 정의 통일 라운드 — 운영 개선 비교표의 L3 전환율과 동일 기준). 나머지 4개 소스는 L3 전환 신호로 더 이상 쓰이지 않아 항상 0곳으로 표시됩니다 — 5개 소스를 모두 인정하는 지표는 위 "플랫폼 이용 전환율"입니다. 소스별 수치는 중복 카운트를 허용합니다(한 업체가 2개 소스에서 모두 전환됐으면 두 소스 각각에 포함) — 통합 전환 업체 수는 이를 중복 제거해 업체당 1번만 센 값입니다.</div>
         <div class="npcmp-head" style="margin-top:16px;">
           <div class="npcmp-title-wrap">
             <span class="npcmp-title">전환 업체별 상세표 (${esc(analysis.converted.length)}곳)</span>
