@@ -6505,6 +6505,74 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   function normBizNo(s){ return String(s || '').replace(/[^0-9]/g, ''); }
   function normPhone(s){ return String(s || '').replace(/[^0-9]/g, ''); }
 
+  /* ==========================================================================
+     §Google Sheets 확인 필요 유사후보 제안 라운드(신규) — normCompanyName()의 정확일치
+     매칭 규칙은 전혀 건드리지 않는다(§요청). 이건 그 위에 얹는 순수 "정보 제공"용 계산일
+     뿐이다: 정확매칭(사업자번호/정규화이름 완전일치)에 실패해 이미 확인 필요 큐에 들어간
+     항목에 대해서만, 참고용 유사 후보를 계산해 보여준다 — 절대 자동으로 연결하지 않고,
+     기존 "이 업체로 연결"(resolveGsheetReviewCompany)을 그대로 재사용해야만 실제 연결이
+     일어난다(§요청 "자동 연결 금지 원칙, 이번에도 안 깬다").
+
+     레벤슈타인 편집거리(외부 라이브러리 없이 표준 DP, O(len(a)*len(b)))를 쓴다 — 짧은
+     한글 업체명에 흔한 오타/표기변형("본이엔씨"↔"본이앱씨" 같은 1글자 차이)을 잡기에
+     충분히 단순하고 예측 가능한 척도라 선택했다(§요청 "가장 단순하고 예측 가능한 방식").
+
+     임계값(보수적으로 설계, §요청 "장난스러운 제안 방지"):
+       - 정규화 후 두 이름 중 더 짧은 쪽 길이가 3자 미만이면 절대 제안하지 않는다
+         (짧은 이름은 편집거리 1이어도 완전히 다른 실제 회사일 가능성이 너무 크다).
+       - 편집거리 ≤1: 위 길이 조건만 만족하면 제안(가장 흔한 오탈자/한 글자 표기 차이).
+       - 편집거리 =2: 더 짧은 쪽 길이가 6자 이상일 때만 제안(짧은 이름에서 2글자 차이는
+         우연히 비슷한 서로 다른 회사일 위험이 커서 더 엄격한 조건을 요구한다).
+       - 그 외(거리 ≥3, 또는 위 조건 미충족)는 제안하지 않는다 — 이 임계값은 필요시
+         튜닝 가능하도록 아래 isCloseEnoughForSuggestion 한 곳에만 있다.
+     ========================================================================== */
+  function levenshteinDistance(a, b){
+    a = String(a || ''); b = String(b || '');
+    if(a === b) return 0;
+    const al = a.length, bl = b.length;
+    if(al === 0) return bl;
+    if(bl === 0) return al;
+    let prev = new Array(bl + 1);
+    let curr = new Array(bl + 1);
+    for(let j = 0; j <= bl; j++) prev[j] = j;
+    for(let i = 1; i <= al; i++){
+      curr[0] = i;
+      const ca = a.charCodeAt(i - 1);
+      for(let j = 1; j <= bl; j++){
+        const cost = ca === b.charCodeAt(j - 1) ? 0 : 1;
+        curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+      }
+      const tmp = prev; prev = curr; curr = tmp;
+    }
+    return prev[bl];
+  }
+  function isCloseEnoughForSuggestion(distance, lenA, lenB){
+    const minLen = Math.min(lenA, lenB);
+    if(minLen < 3) return false;
+    if(distance <= 1) return true;
+    if(distance <= 2 && minLen >= 6) return true;
+    return false;
+  }
+  // 확인 필요 화면(§고객 요청 Google Sheets 연동 라운드 renderGsheetReviewModal)이 모달을
+  // 열 때만 호출한다(§요청 "모달 오픈 시에만 계산, 앱 부팅/리스트 렌더 때마다 다시 스캔
+  // 금지") — 거리 오름차순으로 최대 3건만 돌려준다(가장 가까운 후보 위주로만 보여줘야
+  // 화면이 지저분해지지 않는다, §요청 "랭킹 상위 몇 개").
+  function findSimilarCompanySuggestions(rawCompanyName, companies){
+    const norm = normCompanyName(rawCompanyName);
+    if(!norm) return [];
+    const scored = [];
+    (companies || []).forEach(c=>{
+      const cNorm = normCompanyName(c.name);
+      if(!cNorm || cNorm === norm) return; // 완전일치면 애초에 확인 필요 큐에 안 들어왔을 것 — 방어적 스킵
+      const dist = levenshteinDistance(norm, cNorm);
+      if(isCloseEnoughForSuggestion(dist, norm.length, cNorm.length)){
+        scored.push({ companyId: c.id, companyName: c.name, distance: dist });
+      }
+    });
+    scored.sort((x, y)=> x.distance - y.distance || x.companyName.localeCompare(y.companyName, 'ko'));
+    return scored.slice(0, 3);
+  }
+
   function matchPartnerToCompany(partner, companies){
     if(partner.bizno){
       const nb = normBizNo(partner.bizno);
@@ -7400,7 +7468,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     previewPourTrackImport, applyPourTrackImport, applyPourExcelImportRecords,
     REQUESTED_MATERIAL_TYPES, REQUESTED_MATERIAL_STATUSES,
     addRequestedMaterial, addRequestedMaterialIfNew, removeRequestedMaterial, setRequestedMaterialStatus, extractRequestedMaterialsFromActivities,
-    normCompanyName,
+    normCompanyName, findSimilarCompanySuggestions,
     buildUnregisteredCompanies, getCompany2025Revenue, getCompany2024Revenue, getCompanyTotalRevenueAllYears,
     buildRevenue2026Index, getCompany2026Revenue, buildUnregisteredCompanies2026,
     getCompanyReceivable, buildReceivableCompanies,
@@ -19035,7 +19103,28 @@ window.SHIN2_CRM_APP_INIT = function(){
     const root = document.getElementById('gsheetReviewModalRoot');
     if(root) root.innerHTML = '';
   }
+  // §Google Sheets 확인 필요 유사후보 제안 라운드(신규) — normName(정확매칭 실패한 업체명)
+  // → D.findSimilarCompanySuggestions 결과 배열. 모달을 열 때(openGsheetReviewModal) 한
+  // 번만 계산해 채워두고, 그 뒤 resolveGsheetReviewCompany 등으로 목록이 줄어들 때마다
+  // 다시 그리는 renderGsheetReviewModal은 이 캐시를 그대로 읽기만 한다(§요청 "모달 오픈
+  // 시에만 계산" — 항목이 연결/제외되어 줄어들 때마다 전체를 다시 스캔하지 않는다).
+  let gsheetReviewSuggestCache = new Map();
+  function computeGsheetReviewSuggestions(){
+    gsheetReviewSuggestCache = new Map();
+    const companies = D.loadCompanies();
+    const items = gsheetImportState.reviewItems || [];
+    const done = new Set();
+    items.forEach(it=>{
+      if(!it.rawCompanyName) return;
+      const norm = D.normCompanyName(it.rawCompanyName);
+      if(!norm || done.has(norm)) return;
+      done.add(norm);
+      const suggestions = D.findSimilarCompanySuggestions(it.rawCompanyName, companies);
+      if(suggestions.length) gsheetReviewSuggestCache.set(norm, suggestions);
+    });
+  }
   function openGsheetReviewModal(){
+    computeGsheetReviewSuggestions();
     renderGsheetReviewModal();
   }
   function updateGsheetReviewCountBadge(){
@@ -19063,10 +19152,19 @@ window.SHIN2_CRM_APP_INIT = function(){
     const companies = D.loadCompanies();
     const optionsHtml = companies.slice().sort((a,b)=> (a.name||'').localeCompare(b.name||'', 'ko')).map(c=> `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
     const body = !items.length ? `<div class="local-cloud-diag-empty">확인이 필요한 항목이 없습니다.</div>` :
-      Array.from(groups.values()).map((g, gi)=> `
+      Array.from(groups.values()).map((g, gi)=> {
+        // §Google Sheets 확인 필요 유사후보 제안 라운드(신규) — 모달 오픈 시 계산해둔 캐시를
+        // 읽기만 한다(위 computeGsheetReviewSuggestions 주석 참고). 후보가 없으면 기존과
+        // 완전히 동일한 화면(수동 선택 드롭다운만)을 그대로 보여준다.
+        const suggestions = g.rawCompanyName ? (gsheetReviewSuggestCache.get(D.normCompanyName(g.rawCompanyName)) || []) : [];
+        return `
         <div class="local-cloud-diag-section">
           <div class="local-cloud-diag-title">${esc(g.rawCompanyName || '(업체명 없음)')} — ${g.items.length}건</div>
           ${g.items.map(it=> `<div class="local-cloud-diag-row">${esc(it.tab)} · ${esc(it.reason)}${it.uniqueId ? ' · ' + esc(it.uniqueId) : ''}</div>`).join('')}
+          ${suggestions.length ? `
+            <div class="local-cloud-diag-note" style="margin-top:4px;">
+              ${suggestions.map((s, si)=> `<div style="margin-top:2px;">유사 후보: <b>${esc(s.companyName)}</b>(기존 업체명과 매우 유사, 편집거리 ${s.distance}) <button type="button" class="co-text-action" data-gsheet-review-suggest="${esc(gi)}_${esc(si)}" data-gsheet-review-suggest-company="${esc(s.companyId)}" data-gsheet-review-name="${esc(g.rawCompanyName)}">이 업체로 연결</button></div>`).join('')}
+            </div>` : ''}
           ${g.rawCompanyName ? `
             <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap;">
               <select id="gsheetReviewSelect_${gi}" style="flex:1;min-width:160px;">
@@ -19081,7 +19179,8 @@ window.SHIN2_CRM_APP_INIT = function(){
               <span class="cdash-cloud-save-status" id="gsheetReviewStatus_${gi}"></span>
             </div>` : `<div class="local-cloud-diag-note">업체명이 비어 있어 연결할 수 없습니다 — 시트 원본을 확인해주세요.</div>`}
         </div>
-      `).join('');
+      `;
+      }).join('');
     root.innerHTML = `
       <div class="pi-overlay" id="gsheetReviewOverlay">
         <div class="pi-panel" style="max-width:640px;max-height:82vh;" role="dialog" aria-modal="true" aria-label="Google Sheets 확인 필요">
@@ -19115,6 +19214,24 @@ window.SHIN2_CRM_APP_INIT = function(){
       const statusEl = document.getElementById('gsheetReviewStatus_' + gi);
       const companyId = sel ? sel.value : '';
       if(!companyId){ showCloudSaveStatus(statusEl, false, { message:'업체를 먼저 선택해주세요.' }); return; }
+      btn.disabled = true;
+      const r = await resolveGsheetReviewCompany(rawName, companyId);
+      btn.disabled = false;
+      if(!r.ok){ showCloudSaveStatus(statusEl, false, r.err); return; }
+      updateGsheetReviewCountBadge();
+      renderGsheetReviewModal();
+    }));
+    // §Google Sheets 확인 필요 유사후보 제안 라운드(신규) — 유사 후보의 "이 업체로 연결"
+    // 버튼. 위 data-gsheet-review-link(수동 선택 드롭다운)와 완전히 같은
+    // resolveGsheetReviewCompany를 그대로 재사용한다 — 새 연결 경로를 따로 만들지 않는다
+    // (§요청 "동일 동작으로 원클릭 연결"). companyId를 select가 아니라 버튼 data 속성에서
+    // 바로 읽는다는 점만 다르다.
+    root.querySelectorAll('[data-gsheet-review-suggest]').forEach(btn=> btn.addEventListener('click', async ()=>{
+      const gi = btn.getAttribute('data-gsheet-review-suggest');
+      const rawName = btn.getAttribute('data-gsheet-review-name');
+      const companyId = btn.getAttribute('data-gsheet-review-suggest-company');
+      const statusEl = document.getElementById('gsheetReviewStatus_' + gi.split('_')[0]);
+      if(!companyId) return;
       btn.disabled = true;
       const r = await resolveGsheetReviewCompany(rawName, companyId);
       btn.disabled = false;
