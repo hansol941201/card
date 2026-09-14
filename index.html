@@ -3256,6 +3256,15 @@ table.pdf-doc-table thead{ background:var(--bg); }
                  업체와 자동으로(정확히 1건) 매칭 안 된 행을 사람이 직접 연결하는 화면.
                  자동 생성·자동 연결은 절대 하지 않는다(§요청). -->
             <button type="button" id="crmGsheetReviewBtn">Google Sheets 확인 필요 <span id="crmGsheetReviewCount"></span></button>
+            <!-- §마스터 업체 명단 가져오기 라운드(신규) — 사용자가 정리한 마스터 업체 명단
+                 (window.SHIN2_MASTER_COMPANY_SNAPSHOT, 352개)을 현재 companies와 매칭해
+                 미리보기→적용하는 새 관리 도구. 기존 "Google Sheets 확인 필요"와 같은
+                 위치(관리 도구 드롭다운)에 새 항목만 추가한다(§요청, 새 진입점을 따로
+                 만들지 않음). -->
+            <button type="button" id="crmMasterImportBtn">마스터 업체 명단 가져오기</button>
+            <!-- §POUR 낙찰 라이브 연동 라운드(신규) — 새 리뷰큐 UI를 만들지 않고, 기존
+                 관리 도구 줄에 상태 텍스트 한 줄만 추가한다(§요청 "미매칭은 가벼운 안내만"). -->
+            <span id="pourWonSyncNote" style="font-size:12px;color:var(--muted,#888);margin-left:4px;"></span>
           </div>
         </div>
         <!-- §전화 요청 기록 라운드(신규) — "+ 고객 등록"과 같은 줄에 배치. 처음엔 작은
@@ -3418,6 +3427,9 @@ table.pdf-doc-table thead{ background:var(--bg); }
   <!-- §고객 요청 Google Sheets 연동 라운드(신규) — "확인 필요" 목록(업체명이 매칭 안 되거나
        복수 후보인 시트 행) 전용 root. -->
   <div id="gsheetReviewModalRoot"></div>
+  <!-- §마스터 업체 명단 가져오기 라운드(신규) — 미리보기/적용 전용 모달 root. 같은
+       .pi-overlay/.pi-panel 패턴. -->
+  <div id="masterImportModalRoot"></div>
   <!-- §운영 개선 효과 비교 라운드(신규) — "신규 협약사" 탭의 플랫폼 초기 운영 vs 7월
        개선 이후 비교 표에서 숫자를 클릭했을 때 여는 업체 드릴다운 전용 root. 같은
        .pi-overlay/.pi-panel 패턴. -->
@@ -4371,6 +4383,66 @@ window.SHIN2_CRM_OCR = (function(){
       };
 
       /* ========================================================================
+         §POUR 낙찰 라이브 연동 라운드(신규) — sheetRequests와 완전히 같은 패턴(onSnapshot
+         실시간 미러 + localStorage 캐시 + 결정적 문서 id + writeBatch 400건씩)을 그대로
+         재사용한다(§요청 "새 동기화 방식을 만들지 않는다"). 경로만 다르다:
+         users/{uid}/pourWonBids. sheetRequests(요청 종류 5탭)와는 목적이 달라(시공실적/지도용)
+         별도 컬렉션으로 둔다 — 서로 절대 섞이지 않는다.
+         ======================================================================== */
+      const POURWON_COLLECTION_NAME = 'pourWonBids';
+      const POURWON_CACHE_KEY = 'shin2-pour-won-cache-v1';
+      let pourWonSyncStarted = false;
+      const pourWonDocsById = new Map();
+      function pourWonDocId(no, agreementNo){
+        const raw = sheetReqSafeIdPart(no) + '__' + sheetReqSafeIdPart(agreementNo);
+        const safe = (raw.length > 2) ? raw : ('pourwon__' + Date.now());
+        return safe.slice(0, 1400);
+      }
+      function pourWonCollRef(){ return currentUid ? collection(db, 'users', currentUid, POURWON_COLLECTION_NAME) : null; }
+      function persistPourWonCacheToLocal(){
+        try{ localStorage.setItem(POURWON_CACHE_KEY, JSON.stringify(Array.from(pourWonDocsById.values()))); }catch(e){}
+      }
+      function startPourWonSync(){
+        if(pourWonSyncStarted || !currentUid) return;
+        pourWonSyncStarted = true;
+        const ref = pourWonCollRef();
+        window.SHIN2_UNSUB_POURWON = onSnapshot(ref, (snap)=>{
+          snap.docChanges().forEach(ch=>{
+            if(ch.type === 'removed') pourWonDocsById.delete(ch.doc.id);
+            else pourWonDocsById.set(ch.doc.id, Object.assign({ id: ch.doc.id }, ch.doc.data()));
+          });
+          persistPourWonCacheToLocal();
+          window.dispatchEvent(new CustomEvent('shin2-crm-pourwon-cloud-update'));
+        }, (err)=> console.warn('[CRM/Firebase] pourWonBids 구독 실패', err));
+      }
+      async function savePourWonBatch(items){
+        if(!currentUid) throw Object.assign(new Error('로그인이 필요합니다.'), { code:'NOT_AUTHENTICATED' });
+        if(!items || !items.length) return { ok:true, saved:0 };
+        const CHUNK = 400;
+        let saved = 0;
+        for(let i=0;i<items.length;i+=CHUNK){
+          const chunk = items.slice(i, i+CHUNK);
+          const batch = writeBatch(db);
+          chunk.forEach(it=>{
+            const ref = doc(db, 'users', currentUid, POURWON_COLLECTION_NAME, it.id);
+            batch.set(ref, it.fields, { merge:true });
+          });
+          try{ await batch.commit(); saved += chunk.length; }
+          catch(err){
+            throw Object.assign(new Error('POURWON_BATCH_FAILED'), { code: err && err.code, cause: err, saved, failedFromIndex: i });
+          }
+        }
+        return { ok:true, saved };
+      }
+      window.SHIN2_POURWON_SYNC = {
+        start: startPourWonSync,
+        saveMany: savePourWonBatch,
+        getAll: ()=> Array.from(pourWonDocsById.values()),
+        isReady: ()=> pourWonSyncStarted,
+        docId: pourWonDocId
+      };
+
+      /* ========================================================================
          §확인 필요 복원/3단계 분류 라운드(신규) — 건바이건 업체(caseByCaseCompanies)와
          제외 감사로그(exclusionAudit) 두 컬렉션. 위 sheetRequests 동기화와 완전히 같은
          패턴(onSnapshot 실시간 미러 + localStorage 캐시 + 결정적 문서 id)을 그대로
@@ -4478,6 +4550,9 @@ window.SHIN2_CRM_OCR = (function(){
         // (새로 생기는 컬렉션이라 기존 로컬 값과의 병합 위험이 없음) 로그인만 되면 바로 켠다.
         if(currentUid) startCaseByCaseSync();
         if(currentUid) startExclusionSync();
+        // §POUR 낙찰 라이브 연동 라운드(신규) — pourWonBids도 새로 생기는 컬렉션이라
+        // (§sheetRequests와 같은 이유) 병합 위험 없이 로그인만 되면 바로 켠다.
+        if(currentUid) startPourWonSync();
         maybeStartSharedSync();
       });
 
@@ -4647,6 +4722,40 @@ window.SHIN2_REVENUE_2025_SNAPSHOT = [{"name":"㈜에이치제이건설","revenu
    자동으로 3개 연도를 합산한다 — 연도 하나가 비어 있어도 나머지 연도만으로 합산한다
    (§ "한 연도 업로드가 다른 연도를 건드리지 않는다"). */
 window.SHIN2_REVENUE_2024_SNAPSHOT = []; // 2024년 매출 원본 파일 미제공 — 향후 파일이 오면 SHIN2_REVENUE_2025_SNAPSHOT과 동일한 {name, revenue2024, sourceRow} 형태로만 채운다
+</script>
+
+<script>
+/* ==========================================================================
+   마스터 업체 명단 스냅샷(§마스터 업체 명단 가져오기 라운드, 신규) — 원본 파일:
+   /home/user/card_migration/master.xlsx(사용자가 직접 제공한, 오래 정리해 온 "마스터
+   업체 명단" — 352개 업체, 대부분 사업자등록번호 보유, 중복 제거 완료). 이 세션에서
+   /home/user/card_migration/master_with_codes.json(위 xlsx에서 추출한 352개 행 +
+   이 라운드에서 새로 부여한 newCode)을 그대로 읽어 한 번만 embed했다 — 기존
+   SHIN2_REVENUE_2025_SNAPSHOT/SHIN2_PARTNER_SNAPSHOT과 완전히 같은 원칙(매번 브라우저에서
+   엑셀/JSON을 다시 파싱하지 않는다, §18) — 값을 손으로 옮겨 적거나 지어내지 않았고,
+   원본 JSON의 352개 객체를 그대로 옮겼다(필드 순서/값 변경 없음).
+
+   newCode(B2B001~B2B352) 부여 방식(중요, 조정 가능한 자리표시 규칙일 뿐 확정 배정이
+   아님): 사용자가 정렬 순서를 별도로 지정하지 않아서, 원본 엑셀 파일의 행 순서 그대로
+   B2B001부터 순차 부여했다(이 세션의 임의 판단 — 완료 보고에 그대로 명시). 순서를
+   바꾸고 싶으면 master_with_codes.json을 원하는 순서로 재정렬한 뒤 이 스냅샷 배열만
+   다시 embed하면 된다(아래 매칭 로직은 newCode 값 자체가 아니라 "정렬 순서"에 의존하지
+   않으므로, 순서를 바꿔도 매칭 우선순위(사업자번호→정규화 업체명)는 전혀 영향받지 않는다).
+
+   각 항목 필드: oldCode(원본 파일의 기존 코드, 참고용), name(업체명), bizno(사업자등록
+   번호, 없으면 null), mouDate("YYYY-MM-DD" 문자열, 없으면 null), rep(대표자), phone,
+   address, gongjong(공종/협약 구분), source(원본 파일의 출처 메모), note(원본 파일의
+   비고 — 사업자번호 중복 등 큐레이터가 이미 남긴 메모 포함), newCode(이 라운드에서
+   새로 부여한 B2B### 코드).
+
+   이 배열 자체는 참조 전용 스냅샷이다(다른 스냅샷들과 완전히 같은 원칙) — 사이트의
+   실제 companies Firestore 데이터가 살아있는 원본(source of truth)이고, 이 스냅샷은
+   여기서 만드는 "마스터 업체 명단 가져오기" 관리 도구가 미리보기/매칭 계산에만 참고할
+   뿐, 절대 자동으로 적용되지 않는다 — 관리 도구 화면에서 사람이 미리보기를 확인하고
+   [적용] 버튼을 눌러야만 실제 companies에 반영된다(아래 previewMasterImport/
+   applyMasterImport 참고).
+   ========================================================================== */
+window.SHIN2_MASTER_COMPANY_SNAPSHOT = [{"oldCode":"19001","name":"(주)삼인유엔아이","bizno":"130-86-10502","mouDate":"2019-07-24","rep":"오명","phone":"02-898-2441","address":"경기도 광명시 새빛공원로 67 (일직동,광명역자이타워 b타워 617호)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"유사명 주의: (주)더원산업개발(구 '삼인유앤아이')과 표기 유사한 별개 법인","newCode":"B2B001"},{"oldCode":"19003","name":"(주)보라씨엔씨","bizno":"217-81-18276","mouDate":"2019-10-22","rep":"박성진","phone":null,"address":"서울 노원구 동일로237가길3, 3층","gongjong":"POUR 공법 협약(건설)","source":"내부","note":null,"newCode":"B2B002"},{"oldCode":"19005","name":"(주)선진기술공사","bizno":"171-88-00033","mouDate":"2019-10-22","rep":"문영찬","phone":"02-529-3480","address":"서울시 서초구 효령로55길 15, 406호 벨타워비지니스텔","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B003"},{"oldCode":"19004","name":"(주)수안건설","bizno":"410-86-25541","mouDate":"2019-10-22","rep":"이준엽","phone":"061-333-8041","address":"전라남도 나주시 노안면 학산길 85","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"연락처 외부용 상이(062-942-7707) → 내부용 정본 채택; 내부메모: ljy7417@hanmail.net_대표개인메일","newCode":"B2B004"},{"oldCode":"19006","name":"(주)풍산씨앤씨","bizno":"214-88-06595","mouDate":"2019-10-22","rep":"이승용","phone":"02-401-1873","address":"서울시 송파구 위례순환로 478,(장지동포레빌딩 902호)(장지동,센트라포레)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"주소 외부용 표기 상이 → 내부용 정본 채택","newCode":"B2B005"},{"oldCode":"19002","name":"금보(주)","bizno":"314-81-67724","mouDate":"2019-10-22","rep":"류성은","phone":"042-822-2056","address":"대전광역시 서구 유등로 25(복수동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: 구)누리온건설(주)","newCode":"B2B006"},{"oldCode":"19007","name":"동해건업(주)","bizno":"409-81-24474","mouDate":"2019-10-22","rep":"장일성","phone":"062-524-7269","address":"광주 동구 화산로351번길22, 1층(용산동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B007"},{"oldCode":"19008","name":"일오삼지앤씨(주)","bizno":"310-81-13167","mouDate":"2019-10-22","rep":"배영경","phone":"031-212-1531","address":"경기도 용인시 기흥구 중부대로 184, 에이동 지하1층 B120호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B008"},{"oldCode":"19009","name":"제이지성신건설(주)","bizno":"107-87-16750","mouDate":"2019-12-05","rep":"박우주","phone":"02-2068-0367","address":"서울시 금천구 금하로 763, 303호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: 구)지에스성신건설 / 상호명 변경으로 재협약체결; 구상호 '지에스성신건설(주)' → 현행 '제이지성신건설(주)' 로 연결","newCode":"B2B009"},{"oldCode":"20002","name":"(주)다원건설","bizno":"864-88-02491","mouDate":"2020-02-13","rep":"김소연","phone":"041-557-3577","address":"충청남도 천안시 서북구 천일고2길 153, 101호 (신당동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B010"},{"oldCode":"20003","name":"(주)가온건설산업","bizno":"174-86-01003","mouDate":"2020-04-08","rep":"양수현","phone":"043-295-1214","address":"충북 청주시 상당구 용암북로138번길 15, 3층전부(용암동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"주소 외부용 표기 상이 → 내부용 정본 채택","newCode":"B2B011"},{"oldCode":"20005","name":"(주)도원씨엔씨","bizno":"771-88-01924","mouDate":"2020-08-24","rep":"김계천","phone":"041-554-5644","address":"충남 천안시 동남구 천안천10길 47, 1층 101호(신부동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"주소 외부용 표기 상이 → 내부용 정본 채택","newCode":"B2B012"},{"oldCode":"20006","name":"서현건설(주)","bizno":null,"mouDate":"2020-08-24","rep":"김성권","phone":"031-234-2955","address":"경기도 수원시 권선구 세지로 12번길 25-1(세류동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"사업자번호 미등록","newCode":"B2B013"},{"oldCode":"20007","name":"(주)국일구조","bizno":"113-81-52012","mouDate":"2020-12-04","rep":"정진명","phone":"02-2672-3282~3","address":"서울특별시 구로구 구일로10길 27, 비동 211호(구로동, 에스케이허브수)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B014"},{"oldCode":"21001","name":"(주)대성이앤씨","bizno":"615-81-78084","mouDate":"2021-03-09","rep":"이근성","phone":"031-403-7111","address":"경기도 시흥시 수인로 2323, 304호(목감동, 뉴홍익빌딩)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"유사명 주의: (주)대승이앤씨와 1자 차이, 별개 업체","newCode":"B2B015"},{"oldCode":"21002","name":"(주)도은건설","bizno":"215-87-82449","mouDate":"2021-03-16","rep":"최종래","phone":"02-716-2500","address":"서울특별시 송파구 오금로 252, 3층 5호(송파동,가락삼익맨숀상가 3층)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: 사업자등록증X","newCode":"B2B016"},{"oldCode":"21003","name":"다우산업(주)","bizno":"129-81-23910","mouDate":"2021-05-04","rep":"윤기현","phone":"031-713-6353","address":"경기도 성남시 분당구 성남대로172번길 24, 825호(금곡동, 분당미금파크)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B017"},{"oldCode":"21004","name":"씨에스청산건설(주)","bizno":"302-81-18763","mouDate":"2021-12-21","rep":"서진우","phone":"051-721-0594","address":"부산광역시 남구 황령대로 488, 6층(대연동, 원자빌딩)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B018"},{"oldCode":"22001","name":"(주)모두건설","bizno":"445-87-01921","mouDate":"2022-01-13","rep":"최미영","phone":"02-6953-9815","address":"서울특별시 구로구 구로중앙로 207, 비47호(구로동, 오퍼스1)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"주소 외부용 표기 상이 → 내부용 정본 채택","newCode":"B2B019"},{"oldCode":"22002","name":"성진에스솔루션(주)","bizno":"125-81-25880","mouDate":"2022-04-01","rep":"서우민","phone":null,"address":"서울 송파구 법원로11길 7, C동 1005호","gongjong":"POUR 공법 협약(건설)","source":"내부+CRM","note":"약칭 '성진종합건설(주)' 로 연결; CRM기타: 세움산업개발 명칭변경; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B020"},{"oldCode":"22003","name":"(주)건양산업","bizno":"603-81-24019","mouDate":"2022-04-08","rep":"정종원","phone":"051-206-7349","address":"부산광역시 사하구 하단동 1157-7 리버타운 301","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B021"},{"oldCode":"22004","name":"(주)비전씨앤씨","bizno":"591-87-02295","mouDate":"2022-05-11","rep":"위성일","phone":"031-528-4517","address":"경기도 남양주시 진접읍 해밀예당1로 50-31, 401호(해밀리움)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B022"},{"oldCode":"22005","name":"가나랜드(주)","bizno":"606-86-46905","mouDate":"2022-06-23","rep":"조창규","phone":"051-941-3055","address":"부산광역시 강서구 낙동북로 138번길 116(강동동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B023"},{"oldCode":"22006","name":"(주)창대이엔씨","bizno":"558-88-00303","mouDate":"2022-08-25","rep":"심재업","phone":"031-8027-9040","address":"경기 하남시 신장1로27번길 22, 1층","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B024"},{"oldCode":"22007","name":"(주)정원아이앤디","bizno":"893-86-00444","mouDate":"2022-10-26","rep":"이정민","phone":"02-472-0678","address":"서울특별시 강동구 천호대로 1242, 1층(둔촌동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B025"},{"oldCode":"22008","name":"다인건설(주)","bizno":"128-86-60727","mouDate":"2022-11-14","rep":"남소영","phone":"070-4240-9807","address":"경기도 고양시 덕양구 중앙로 450, 501-1호(행신동, 명성프라자)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B026"},{"oldCode":"22009","name":"포스이앤씨","bizno":"275-81-00020","mouDate":"2022-11-14","rep":"김근태, 김대승","phone":"032-555-3706","address":"경기도 부천시 원미구 길주로 288, 9층 (중동, 다운타운)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: 대표자 변경","newCode":"B2B027"},{"oldCode":"22011","name":"(주)대한진단건설","bizno":"607-81-44583","mouDate":"2022-12-13","rep":"이헌재","phone":"051-503-4907","address":"부산광역시 동래구 사직북로63번길 55(사직동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B028"},{"oldCode":"22010","name":"(주)에이치제이건설","bizno":"579-87-01622","mouDate":"2022-12-13","rep":"노옥분","phone":"055-363-0401","address":"경남 양산시 물금읍 야리3길 34, 607호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B029"},{"oldCode":"22012","name":"진원피앤씨(주)","bizno":"114-81-46546","mouDate":"2022-12-27","rep":"엄재열,엄성수","phone":"02-2057-4480","address":"서울특별시 강남구 일원로9길 8, 4층동","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B030"},{"oldCode":"22013","name":"에이치디건설(주)","bizno":"417-81-39148","mouDate":"2022-12-30","rep":"박흥덕","phone":"061-665-7704","address":"전라남도 여수시 교동남1길 6-32(교동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B031"},{"oldCode":"23001","name":"(주)예운","bizno":"426-86-02320","mouDate":"2023-02-01","rep":"박상란","phone":"042-523-8016","address":"대전광역시 서구 대덕대로168번길 74, 603호(갈마동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: 구)도운건설","newCode":"B2B032"},{"oldCode":"23011","name":"(주)나원","bizno":"605-81-37261","mouDate":"2023-02-14","rep":"권순영","phone":"051-515-4414","address":"부산광역시 기장군 장안읍 월내해안2길 41","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: 실무 : (주)은화 / 김대홍부사장","newCode":"B2B033"},{"oldCode":"23010","name":"(주)세영건설","bizno":"230-88-02679","mouDate":"2023-02-14","rep":"김준호","phone":"031-313-9945","address":"경기도 시흥시 복지로 15, 제지1층 B112호(신천동, 시흥5차푸르지오)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B034"},{"oldCode":"23012","name":"(주)세오엔지니어링","bizno":"135-86-29480","mouDate":"2023-02-14","rep":"박윤","phone":"010-7632-6258","address":"서울특별시 금천구 가산디지털2로 169-16, 8층 제오805호","gongjong":"POUR 공법 협약(건설)","source":"내부","note":null,"newCode":"B2B035"},{"oldCode":"23003","name":"(주)우단건설","bizno":"897-81-01208","mouDate":"2023-02-14","rep":"민건태","phone":"051-507-8807","address":"부산시 동래구 미남로 51 해명빌딩 2층 (주)우단건설","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B036"},{"oldCode":"23008","name":"(주)은화","bizno":"604-81-22746","mouDate":"2023-02-14","rep":"김도형","phone":"051-518-4216","address":"부산시 금정구 중앙대로 1600 (주)은화","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B037"},{"oldCode":"23005","name":"(주)이두건설","bizno":"514-81-27206","mouDate":"2023-02-14","rep":"정종일,정재혁","phone":"053-651-5008","address":"대구광역시 달서구 월배로 439","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B038"},{"oldCode":"23007","name":"(주)이원건설","bizno":"135-81-40160","mouDate":"2023-02-14","rep":"박은영","phone":"053-633-1144","address":"대구시 달서구 월곡로 26길 5-1(상인동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"주소 외부용 표기 상이 → 내부용 정본 채택; 유사명 주의: (주)에이원건설과 유사, 별개 업체","newCode":"B2B039"},{"oldCode":"23006","name":"(주)자오건설","bizno":"229-81-16650","mouDate":"2023-02-14","rep":"윤영환,이기완","phone":"02-575-8051","address":"서울시 서초구 바우뫼로41길 61 동일애드컴사옥","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B040"},{"oldCode":"23004","name":"색채산업개발(주)","bizno":"122-86-01680","mouDate":"2023-02-14","rep":"김성언","phone":"031-989-1540","address":"경기 군포시 공단로124번길 23, 303호 (당정동, 한림에스타워)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B041"},{"oldCode":"23002","name":"엘케이개발(주)","bizno":"121-81-17170","mouDate":"2023-02-14","rep":"김재영","phone":"031-214-9441","address":"경기도 용인시 기흥구 흥덕2로 87번길 18,e씨티a동304호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B042"},{"oldCode":"23009","name":"진수이앤씨(주)","bizno":null,"mouDate":"2023-02-14","rep":"정진교","phone":"051-781-5054","address":"부산광역시 해운대구 재반로 166,B1","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"사업자번호 미등록; 내부메모: 사업자등록증X","newCode":"B2B043"},{"oldCode":"23024","name":"(주)강명건설","bizno":"503-81-62275","mouDate":"2023-02-15","rep":"김종성","phone":"053-563-5035","address":"대구광역시 서구 달서천로 387-1(원대동1가)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B044"},{"oldCode":"23016","name":"(주)명하씨앤씨","bizno":"502-81-98668","mouDate":"2023-02-15","rep":"임태진,최형민","phone":"02-3662-8370","address":"서울특별시 강서구 마곡서로 152, 오비동 9층 915, 916, 917호(마곡동, 두산더랜드타워)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"약칭 '(주)명하건설' 로 연결","newCode":"B2B045"},{"oldCode":"23023","name":"(주)미화건설","bizno":"502-81-29875","mouDate":"2023-02-15","rep":"손창락","phone":"053-939-1164","address":"대구광역시 수성구 국채보상로 1044(만촌동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B046"},{"oldCode":"23022","name":"(주)예은건설","bizno":"571-87-00968","mouDate":"2023-02-15","rep":"조성수","phone":"031-714-1126","address":"경기도 안양시 동안구 벌말로 123, A동 13층 1309호(관양동, 평촌스마트베이)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B047"},{"oldCode":"23013","name":"(주)은성이엔씨","bizno":"748-81-01658","mouDate":"2023-02-15","rep":"최민혁","phone":"055-224-7703","address":"경상남도 창원시 마산회원구 합성남3길 21, 405호,406호(합성동, KS빌딩)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B048"},{"oldCode":"23021","name":"(주)정민씨앤씨","bizno":"861-86-01000","mouDate":"2023-02-15","rep":"조성문,신동인","phone":"02-921-0435","address":"서울시 성북구 정릉로 402-9, 제상가동 제3층 303호(돈암동, 범양아파트)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"주소 외부용 표기 상이 → 내부용 정본 채택","newCode":"B2B049"},{"oldCode":"23025","name":"(주)제이비이엔씨","bizno":"808-88-01245","mouDate":"2023-02-15","rep":"이재복","phone":"053-765-6404","address":"대구광역시 수성구 들안로 219, 2층(중동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B050"},{"oldCode":"23017","name":"(주)태영씨엔씨","bizno":"712-86-00465","mouDate":"2023-02-15","rep":"홍기태","phone":"02-6013-2145","address":"서울특별시 송파구 중대로 188, 507호(가락동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"유사명 주의: (주)부영씨엔씨와 유사, 별개 업체","newCode":"B2B051"},{"oldCode":"23026","name":"동현이앤씨(주)","bizno":"139-86-01558","mouDate":"2023-02-15","rep":"박수현","phone":"031-657-8884","address":"경기도 평택시 고덕국제대로 94, 905호 (우성고덕타워Ⅱ)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B052"},{"oldCode":"23019","name":"석진건설(주)","bizno":"229-81-24543","mouDate":"2023-02-15","rep":"이인희","phone":"02-571-9066~9","address":"서울시 강남구 논현로12길 19-6 ,4층(개포동, 우도빌딩)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"주소 외부용 표기 상이 → 내부용 정본 채택; 관계사: 외부용 (주)윤산씨앤씨와 전화·건물 동일(우도빌딩), 별개 업체","newCode":"B2B053"},{"oldCode":"23014","name":"성심건설(주)","bizno":"607-81-28657","mouDate":"2023-02-15","rep":"송재구","phone":"043-716-0116","address":"충청북도 청주시 흥덕구 서현북로 42, 3층(가경동)","gongjong":"POUR 공법 협약(건설)","source":"내부","note":"내부메모: 구)로토텍다이아몬드(주); 구상호 '로토텍다이아몬드(주)' → 현행 '성심건설(주)' 로 연결; 구상호 '로토텍다이아몬드' → 현행 '성심건설(주)' 로 연결; 구상호 '로토텍 다이아몬드(주)' → 현행 '성심건설(주)' 로 연결","newCode":"B2B054"},{"oldCode":"23018","name":"신양아이엔지건설(주)","bizno":"108-81-46691","mouDate":"2023-02-15","rep":"강경구","phone":"02-2057-0835","address":"서울시 송파구 위례순환로 478, 905호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B055"},{"oldCode":"23015","name":"이루미건설(주)","bizno":"212-86-03813","mouDate":"2023-02-15","rep":"이주열","phone":"02-433-3637","address":"서울시 중랑구 봉화산로 234, 302호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B056"},{"oldCode":"23027","name":"(주)국제특수건설","bizno":"207-81-45460","mouDate":"2023-02-16","rep":"차희남","phone":"02-456-1780","address":"서울특별시 강서구 화곡로68길 82, 1203호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B057"},{"oldCode":"23031","name":"(주)도방건설","bizno":"642-81-01762","mouDate":"2023-02-16","rep":"박태병","phone":"043-283-6009","address":"충청북도 청주시 상당구 용암북로160번길 20, 301호(용암동, 대화프라자)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: (구 인승) / (구 아이티엔씨); 구상호 '(주)아이티엔씨' → 현행 '(주)도방건설' 로 연결","newCode":"B2B058"},{"oldCode":"23037","name":"(주)동심건설","bizno":null,"mouDate":"2023-02-16","rep":"이연희","phone":"02-424-4274","address":"서울시 강동구 올림픽로 659, 728호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"사업자번호 미등록; 내부메모: 사업자등록증X","newCode":"B2B059"},{"oldCode":"23035","name":"(주)디엘씨앤씨","bizno":"158-87-00479","mouDate":"2023-02-16","rep":"고태훈","phone":"031-292-0125","address":"경기도 수원시 권선구 호매실로90번길 39, 313호(호매실동,성지빌딩)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B060"},{"oldCode":"23030","name":"(주)백승","bizno":"314-86-57819","mouDate":"2023-02-16","rep":"민영자","phone":"042-535-3677","address":"대전광역시 대덕구 대전로1033번길 60, (오정동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: sh714825@naver.com 여기로 메일 발송","newCode":"B2B061"},{"oldCode":"23033","name":"(주)세림산업","bizno":"224-81-49608","mouDate":"2023-02-16","rep":"변정무","phone":"033-744-7044","address":"강원도 원주시 서원대로 86번길 33(단계동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B062"},{"oldCode":"23028","name":"(주)이음건설","bizno":"방영민,방영진","mouDate":"2023-02-16","rep":"방영민,방영진","phone":"02-306-9993","address":"서울특별시 강서구 공항대로220,10층 11,12,13호(마곡동,우성에스비타워Ⅱ)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"주소 외부용 표기 상이 → 내부용 정본 채택; 사업자번호 미등록","newCode":"B2B063"},{"oldCode":"23036","name":"(주)인경건설","bizno":"119-86-53159","mouDate":"2023-02-16","rep":"서행순,서정인","phone":"02-891-0062","address":"서울특별시 금천구 독산로44길 29, 인경스마트빌딩 101호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B064"},{"oldCode":"23029","name":"(주)정문씨앤씨","bizno":"631-87-00237","mouDate":"2023-02-16","rep":"공효인","phone":"032-611-3449","address":"인천 서구 가정로 37번길 33, 제에이동 제1층 108-1호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B065"},{"oldCode":"23034","name":"(주)창일건설","bizno":"424-87-01002","mouDate":"2023-02-16","rep":"김윤진","phone":"02-6952-1022","address":"서울시 도봉구 마들로 650, 2층 212-2호(방학동,도봉월드상가)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: (구,경동알앤씨)","newCode":"B2B066"},{"oldCode":"23032","name":"두레이엔씨(주)","bizno":"415-81-52034","mouDate":"2023-02-16","rep":"김문성","phone":"031-388-1057","address":"경기도 안양시 동안구 시민대로 230, 에이동 712호(관양동, 평촌아크로타워)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"약칭 '두레이앤씨(주)' 로 연결","newCode":"B2B067"},{"oldCode":"23038","name":"삼창엔지니어링(주)","bizno":"219-81-01811","mouDate":"2023-02-16","rep":"윤영순","phone":"02-485-5123","address":"서울시 강동구 양재대로 125길 47 2층","gongjong":"POUR 공법 협약(건설)","source":"내부","note":null,"newCode":"B2B068"},{"oldCode":"23039","name":"하은건설(주)","bizno":"215-81-62529","mouDate":"2023-02-16","rep":"이경주","phone":"02-416-0456","address":"서울특별시 송파구 올림픽로 366,202호(방이동)","gongjong":"POUR 공법 협약(건설)","source":"내부","note":null,"newCode":"B2B069"},{"oldCode":"23041","name":"(주)진성이앤지","bizno":"131-86-21114","mouDate":"2023-02-20","rep":"강성수","phone":"031-967-8796","address":"경기도 고양시 일산서구 구산로101번길 57-12","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: 031-812-7475 (업체통화 주번호)","newCode":"B2B070"},{"oldCode":"23042","name":"(주)부영씨엔씨","bizno":"416-81-21999","mouDate":"2023-02-23","rep":"정동진","phone":"02-463-2646","address":"서울특별시 광진구 뚝섬로 514, 2층","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"유사명 주의: (주)태영씨엔씨와 유사, 별개 업체","newCode":"B2B071"},{"oldCode":"23043","name":"(주)다온","bizno":"140-81-96249","mouDate":"2023-02-27","rep":"안석진","phone":"010-3099-7179","address":"부산광역시 연제구 과정로 217번길 5층","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"내부메모: 구)DH대호건설/ 사업자 x; 약칭 '(주)다온기업' 로 연결; 현장이력: 김란영차장님 조율중; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B072"},{"oldCode":"23044","name":"로이스(주)","bizno":"232-86-02652","mouDate":"2023-02-27","rep":"박정민","phone":"053-656-9006","address":"대구광역시 달서구 송현로16길 100, 1층","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B073"},{"oldCode":"23045","name":"(주)삼성리페어링","bizno":"316-86-02469","mouDate":"2023-03-07","rep":"이동광","phone":"02-2038-4830","address":"서울특별시 강서구 화곡로278, 302에이호(화곡동,동도센트리움오피스텔)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"주소 외부용 표기 상이 → 내부용 정본 채택","newCode":"B2B074"},{"oldCode":"23047","name":"(주)정광이엔씨","bizno":"408-81-67484","mouDate":"2023-03-15","rep":"박성배","phone":"02-3409-5400","address":"서울시 광진구 뚝섬로31길 11(자양동, 2층)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: (주)부영씨엔씨","newCode":"B2B075"},{"oldCode":"23046","name":"삼정아이엔지건설(주)","bizno":"122-86-2","mouDate":"2023-03-15","rep":"박정식","phone":"032-208-3119","address":"인천 계양구 까치말로6번길 7, 301호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B076"},{"oldCode":"23048","name":"(주)신정이엔씨","bizno":"280-81-00492","mouDate":"2023-03-24","rep":"윤미원","phone":"055-903-0491","address":"경상남도 창원시 성산구 외동반림로282번길 25, 지하1층","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B077"},{"oldCode":"23050","name":"(주)성림건설","bizno":"513-81-44653","mouDate":"2023-03-27","rep":"현승환","phone":"053-554-0472","address":"대구광역시 남구 용두방천2길 34, 2층 201호(이천동,상일빌딩)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B078"},{"oldCode":"23049","name":"성훈종합건설(주)","bizno":"476-88-01539","mouDate":"2023-03-27","rep":"권태훈","phone":"031-413-5011","address":"경기도 시흥시 소망공원로 323, 124호, 125호(정왕동, 보성스퀘어원지식산업센터)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B079"},{"oldCode":"23051","name":"(주)금환기업","bizno":"874-81-02316","mouDate":"2023-04-03","rep":"김진원","phone":"055-714-7617~8","address":"경상남도 창원시 성산구 중앙대로 77, 7층 707호(중앙동, 동성올림픽타운)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B080"},{"oldCode":"23052","name":"(주)영성조경","bizno":"615-81-33715","mouDate":"2023-04-05","rep":"강경숙","phone":"055-391-6802","address":"경상남도 창원시 의창구 용동로57번길 18, 904호(사림동, 시그니처엠)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B081"},{"oldCode":"23054","name":"(주)보고넷","bizno":"125-81-46527","mouDate":"2023-04-08","rep":"양재학","phone":"031-681-0101","address":"경기도 평택시 안중읍 안중로114번길 55","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B082"},{"oldCode":"23055","name":"초담건설(주)","bizno":"234-86-00887","mouDate":"2023-04-10","rep":"이명희","phone":"031-8027-3850~2","address":"경기도 하남시 미사대로 550, 현대지식산업센터한강미사1차 c동 2층 0047호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B083"},{"oldCode":"23056","name":"알지씨앤씨(주)","bizno":"865-81-03228","mouDate":"2023-04-26","rep":"유진아","phone":"041-585-5545","address":"충청남도 천안시 서북구 성거읍 신월소우길 324-26, 2층","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B084"},{"oldCode":"23057","name":"(주)진웅건설","bizno":"606-81-24814","mouDate":"2023-04-27","rep":"성가용","phone":"051-973-7714","address":"부산광역시 북구 양달로 20(화명동, 상가동 지하1층 104호 경남아너스빌)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B085"},{"oldCode":"23058","name":"현대도건(주)","bizno":"608-81-85160","mouDate":"2023-05-03","rep":"장승호,장치홍","phone":"062-952-7717","address":"광주광역시 광산구 임방울대로 578(도천동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B086"},{"oldCode":"23060","name":"(주)파가니건설","bizno":"708-88-02363","mouDate":"2023-06-22","rep":"빈성진","phone":"053-857-0227","address":"경상북도 경산시 하양읍 대경로 775, 101호(드림파크 아파트)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B087"},{"oldCode":"23059","name":"엠에스이앤지(주)","bizno":"602-81-38811","mouDate":"2023-06-22","rep":"이명식","phone":"062-714-1488","address":"광주광역시 서구 무진대로 565, 2층","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B088"},{"oldCode":"23062","name":"삼원건설(주)","bizno":"409-88-02784","mouDate":"2023-07-25","rep":"이종윤","phone":"052-287-9995","address":"울산광역시 북구 진장유통로 16, 2114호(진장동, 진장디플렉스)","gongjong":"POUR 공법 협약(건설)","source":"내부","note":null,"newCode":"B2B089"},{"oldCode":"23063","name":"(주)우영엘디아이","bizno":"121-81-50636","mouDate":"2023-11-29","rep":"하영조","phone":"032-569-0383~5","address":"인천광역시 서구 승학로 551, 306호(검암동, 동곡프라자)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B090"},{"oldCode":"23064","name":"(주)수산기업","bizno":"139-81-41287","mouDate":"2023-12-06","rep":"장수철","phone":"032-464-2754","address":"인천광역시 남동구 호구포로 888번길 13(간석동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 23.7/20_부천다정한마을쌍용예가(균열보수)_낙찰 4/30_세마역에듀파크(옥상방수)_진행; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B091"},{"oldCode":"23065","name":"(주)지호건설","bizno":"224-81-15729","mouDate":"2023-12-06","rep":"신현교","phone":"031-365-3126","address":"경기도 시흥시 수인로 3335번길 20(신천동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 4/30_충주시티자이(균열보수)_낙찰; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B092"},{"oldCode":"24001","name":"혜성씨앤씨(주)","bizno":"616-87-01163","mouDate":"2024-01-12","rep":"정영배","phone":"02-959-9818","address":"서울특별시 금천구 가산디지털 1로 205-27, 14층 1402호(가산동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B093"},{"oldCode":"24002","name":"(주)대길산업개발","bizno":"793-81-00644","mouDate":"2024-01-22","rep":"이순이","phone":"041-635-0877","address":"충남 홍성군 홍북면 도청대로 169, 1층","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: 부재","newCode":"B2B094"},{"oldCode":"24010","name":"(주)대길건설","bizno":"502-81-40720","mouDate":"2024-02-27","rep":"홍석호","phone":"053-745-2321,2","address":"대구시 달서구 상화로 300 (3층)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B095"},{"oldCode":"24011","name":"(주)루아이앤씨","bizno":"315-81-19531","mouDate":"2024-02-27","rep":"조득선,이동우","phone":"02-472-1270","address":"서울특별시 강동구 아리수로93길 33-9, 701호(강일동, 강일프라자)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B096"},{"oldCode":"24008","name":"(주)미르건축","bizno":"215-81-49185","mouDate":"2024-02-27","rep":"김영균","phone":"02-790-9930","address":"서울특별시 용산구 한강대로 262-1, 3층 305호(남영동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 1/31_영등포대우미래사랑(옥상방수)_낙찰; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B097"},{"oldCode":"24003","name":"(주)석민이앤씨","bizno":"110-81-61507","mouDate":"2024-02-27","rep":"황윤선","phone":"031-373-8470","address":"경기도 오산시 서동로 77, 2층","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B098"},{"oldCode":"24009","name":"(주)아우리","bizno":"129-81-66919","mouDate":"2024-02-27","rep":"권기준","phone":"031-718-6550","address":"경기도 성남시 분당구 느티로 16, 402호(정자동, 젤존타워1)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B099"},{"oldCode":"24007","name":"(주)유진에코","bizno":"603-81-67435","mouDate":"2024-02-27","rep":"김종석","phone":"051-507-0555","address":"부산광역시 연제구 월드컵대로243번길 19, 상가23동 505호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B100"},{"oldCode":"24005","name":"(주)지앤필드종합건설","bizno":"124-87-43193","mouDate":"2024-02-27","rep":"김형준,정회욱","phone":"031-898-6899","address":"경기도 화성시 병점동로 78, 3층 302호(병점동, 유진클라우스)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: 구)우담씨앤씨; 구상호 '(주)우담씨앤씨' → 현행 '(주)지앤필드종합건설' 로 연결","newCode":"B2B101"},{"oldCode":"24006","name":"(주)효덕산업","bizno":"127-86-59455","mouDate":"2024-02-27","rep":"심주영","phone":"031-521-1801","address":"경기도 남양주시 가운로1길 7 아인스빌2층 201호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B102"},{"oldCode":"24004","name":"삼우건설(주)","bizno":"410-81-24440","mouDate":"2024-02-27","rep":"김계환","phone":"062-375-0242~3","address":"광주광역시 서구 경열로 70, 4층","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B103"},{"oldCode":"24016","name":"(주)모아씨앤에스","bizno":"129-86-59539","mouDate":"2024-02-28","rep":"이수근","phone":"02-3665-0477","address":"서울특별시 강서구 공항대로 222, 1001호, 1002호(마곡동,발산W타워)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B104"},{"oldCode":"24012","name":"경기이앤에스(주)","bizno":"215-86-87883","mouDate":"2024-02-28","rep":"정장균","phone":"031-239-0694~5","address":"경기도 용인시 처인구 낙은로 29-6, 201호 2층(역북동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B105"},{"oldCode":"24017","name":"드림종합건설(주)","bizno":"422-87-01724","mouDate":"2024-02-28","rep":"이선환","phone":"041-578-9743","address":"충청남도 서산시 안견로 378-6, 3층(읍내동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"주소 외부용 표기 상이 → 내부용 정본 채택; 현장이력: 23.12/13_두정역코아루스위트(옥상방수)_진행 1/25_세광엔리치타워(균열보수)_진행 3/8_현대그린아파트(균열보수)_진행; CRM기타: 세광_낙찰_레인; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B106"},{"oldCode":"24013","name":"새로이건설(주)","bizno":"110-86-03797","mouDate":"2024-02-28","rep":"권제욱","phone":"02-589-2633","address":"서울특별시 송파구 위례서로 252, 515호(거여동, 유원플러스송파)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B107"},{"oldCode":"24014","name":"천강건설(주)","bizno":"585-87-02174","mouDate":"2024-02-28","rep":"임창석,박권식","phone":"032-624-4000","address":"경기도 부천시 오정구 중동로 420번길 31-4, 1층 일부(삼정동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 4/22_월드컵현대아파트(옥상방수)_낙찰 8/29_민락e편한세상(옥상)_낙찰; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B108"},{"oldCode":"24015","name":"코지건설(주)","bizno":"509-88-01993","mouDate":"2024-02-28","rep":"이지훈,문형현","phone":"031-293-8230","address":"경기도 수원시 팔달구 수성로 92 농민회관 제1별관 2층 203호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 1/9_보령동대주공(옥상방수)_낙찰☆ 5/9_신성둔촌미소지움_낙찰☆ 10/10_보정e편한세상대림1,2차(옥상)_진행; CRM기타: 세미나 참석; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B109"},{"oldCode":"24018","name":"신화건설(주)","bizno":"133-81-34207","mouDate":"2024-02-29","rep":"이용석","phone":"02-898-1741,2","address":"경기 광명시 양지로 21 유플래닛 티타워동 1505호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 23.3/29_고척경남1차(옥상방수)_낙찰 23년 5월 24.5/9 새뜸마을메이저2단지(균열보수) PT지원_진행 24.5/23; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B110"},{"oldCode":"24019","name":"퍼펙트방수","bizno":"208-41-71460","mouDate":"2024-02-29","rep":"임용구","phone":"010-6682-7428","address":"인천광역시 연수구 비류대로31번길 12-18, 806호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: 소장님","newCode":"B2B111"},{"oldCode":"24020","name":"(주)세원산업개발","bizno":"605-81-61849","mouDate":"2024-03-07","rep":"송연숙","phone":"051-463-3131","address":"부산광역시 연제구 월드컵대로243번길 19, 상가23동 501호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B112"},{"oldCode":"24021","name":"대표건설(주)","bizno":"211-86-23252","mouDate":"2024-03-08","rep":"박종현","phone":"02-848-7708","address":"서울특별시 영등포구 도신로 70, 207호(신길동, 신길우성1차상가)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 4/2_한빛마을7단지한신휴플러스(옥상,지하)_진행 4/4_사당휴먼시아(옥상방수)_진행 4/9_우리유앤미아파트(옥상방수)_진행 ; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B113"},{"oldCode":"24022","name":"한별이엔씨(주)","bizno":"833-88-02968","mouDate":"2024-03-11","rep":"황인성","phone":"031-5175-8022","address":"경기도 하남시 미사대로 540, 제2층 제비씨02-040호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"약칭 '한별이앤씨(주)' 로 연결; 현장이력: 23.11.17 수유래미안(옥상방수)_낙찰 23.12/14_송산푸르지오(옥상) 23.12/26_하남한솔리치빌5단지(옥상) 03; CRM기타: 기존_삼창; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B114"},{"oldCode":"24023","name":"(주)두영이앤씨","bizno":"163-87-03143","mouDate":"2024-03-14","rep":"김준영","phone":"031-548-2196","address":"경기도 용인시 기흥구 구성로 357, D동 2층 205호(청덕동, 용인테크노밸리)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B115"},{"oldCode":"24024","name":"(주)보람씨앤씨","bizno":"768-86-02961","mouDate":"2024-03-15","rep":"이경희","phone":"031-843-3602","address":"경기도 남양주시 별내면 청학로 78, 스파빌 211호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 10/4_주내신도푸른숲8차(옥상)_진행; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B116"},{"oldCode":"24025","name":"여름건설(주)","bizno":"163-88-03010","mouDate":"2024-04-17","rep":"박종옥","phone":"032-710-9733","address":"인천광역시 부평구 경원대로 1344번길 34, 352호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 7/10 오산대원아파트(옥상방수)_진행 9/24_계양1차하우스토리(옥상)_진행; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B117"},{"oldCode":"24026","name":"(주)태영건설","bizno":null,"mouDate":"2024-04-23","rep":"심봉섭","phone":"031-267-4986","address":"경기도 수원시 권선구 수원로 146번길 54-13, 102호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"사업자번호 미등록; [정본] 협약일 2024-04-23 (내부 원장 기준) / [참고] CRM MOU체결일 2024-04-26; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B118"},{"oldCode":"24027","name":"(주)바름피앤에스","bizno":"326-87-03012","mouDate":"2024-05-02","rep":"유옥기","phone":"042-535-9630","address":"대전광역시 서구 도산로 185, 3층(변동, 해인빌딩)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 5/9_은어송마을6단지(PT)_진행 7/17_천동위드힐(옥상)_낙찰; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B119"},{"oldCode":"24028","name":"(주)무한하우징","bizno":"716-87-03189","mouDate":"2024-05-10","rep":"김향미","phone":"02-2658-0717","address":"서울특별시 강서구 마곡중앙로 161-17, 509호(마곡동, 보타닉파크타워Ⅰ)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2024-05-10 (내부 원장 기준) / [참고] CRM MOU체결일 2024-05-09; 현장이력: 5/9_우장산롯데3차(옥상방수_우레탄)_진행 5/22_당산현대2차(균열보수)_진행; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B120"},{"oldCode":"24029","name":"(주)에스엠에이","bizno":"130-86-30454","mouDate":"2024-05-13","rep":"김성태","phone":"032-667-8246","address":"경기도 부천시 경인로 141, 4층(송내동, 국일빌딩)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 5/13_청라하우스토리(PT,옥상방수)_진행 5/17_철산주공12단지(옥상방수)_진행 6/10_병점효성해링턴플레이스(옥상)_진; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B121"},{"oldCode":"24030","name":"동일산건(주)","bizno":"229-81-16058","mouDate":"2024-05-17","rep":"양승주,권영준","phone":"02-579-6488","address":"서울특별시 서초구 논현로 49, 2층(양재동, 남주빌딩)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 9/13_경북도청우방아이유쉘센텀(옥상)_진행; CRM기타: 기존 반도체업계; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B122"},{"oldCode":"24031","name":"(주)로운건설","bizno":"122-88-01423","mouDate":"2024-05-24","rep":"이효은","phone":"032-573-1987","address":"인천광역시 서구 북항로32번안길 31, 제1동 제2층 제205호 및 206호(원창동,유은프라자)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 5/27_남악부영에씨앙(우레탄_자재)_진행 7/17_프링상뜨(옥상)_낙찰; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B123"},{"oldCode":"24032","name":"(주)세원","bizno":"134-81-99372","mouDate":"2024-06-20","rep":"한봉수","phone":"031-509-0770~1","address":"경기도 안산시 상록구 해안로 705(사동, 경기테크노파크 알아이티센터612)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"내부메모: 사업자등록증X; [정본] 협약일 2024-06-20 (내부 원장 기준) / [참고] CRM MOU체결일 2024-06-21; 현장이력: 7/25_도곡쌍용예가(옥상)_진행 10/11_안산푸르지오1차(옥상방수)_진행; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B124"},{"oldCode":"24034","name":"(주)수주건설","bizno":"134-86-51451","mouDate":"2024-06-25","rep":"유영남","phone":"031-439-2409","address":"경기도 안산시 단원구 광덕3로 135-6, 302호(고잔동, 신명타운)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"CRM기타: 전)종명건설 이사님 3사 같이 행동; 추가데이터(신규업체 CRM) 대조 완료; 약칭 '수주이앤씨' 로 연결","newCode":"B2B125"},{"oldCode":"24033","name":"(주)은천","bizno":"392-87-00142","mouDate":"2024-06-25","rep":"강명숙","phone":"031-434-3232","address":"경기도 시흥시 배곧3로 86, 411호(정왕동, 센터프라자Ⅱ)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2024-06-25 (내부 원장 기준) / [참고] CRM MOU체결일 2024-06-26; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B126"},{"oldCode":"24035","name":"(주)미성건설","bizno":"203-88-03400","mouDate":"2024-06-26","rep":"이경숙","phone":"031-413-3934","address":"경기도 안산시 단원구 선부광장1로 166, 207호(선부동, 신한빌딩)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"추가데이터(신규업체 CRM) 대조 완료; 약칭 '미성산업(주)' 로 연결; 현장이력: 단발성 자재 발주로 협약 진행 x; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B127"},{"oldCode":"24036","name":"대명이엔씨(주)","bizno":"224-81-46130","mouDate":"2024-07-11","rep":"송경종","phone":"062-375-1519","address":"광주광역시 서구 무진대로 605, 1층(유촌동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"CRM기타: 삼우건설; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B128"},{"oldCode":"26002","name":"하린이앤씨(주)","bizno":"267-86-03259","mouDate":"2024-07-23","rep":"임종구","phone":"042-483-8815","address":"대전광역시 서구 대덕대로325. 533호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2024-07-23 (내부 원장 기준) / [참고] CRM MOU체결일 2024-07-29; 현장이력: 24.8/30_대전향촌(옥상)_진행; CRM기타: 전 백승영업이사; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B129"},{"oldCode":"23061","name":"신한건설산업(주)","bizno":"416-81-82093","mouDate":"2024-07-24","rep":"김동성","phone":"042-487-7704","address":"대전광역시 중구 산서로 71번길 13","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2024-07-24 (내부 원장 기준) / [참고] CRM MOU체결일 2024-07-29; 현장이력: 25.2/21_남대전이편한세상(재도장)_낙찰 25.04/16_흥덕코오롱하늘채(배면)_낙찰 25.6/10_송강청솔배면)_낙찰; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B130"},{"oldCode":"24038","name":"(주)청람건설","bizno":"167-88-03142","mouDate":"2024-07-25","rep":"김다경","phone":"051-717-0459","address":"부산광역시 사상구 주례로 101 상가 1동 209-2호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2024-07-25 (내부 원장 기준) / [참고] CRM MOU체결일 2024-07-29; 현장이력: 24.10/11_김해부원역푸르지오(옥상)_진행 24.10/14_정관센트럴파크(옥상)_진행; CRM기타: 김훈 지사장님 추천; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B131"},{"oldCode":"24039","name":"SH(주)","bizno":"131-87-03165","mouDate":"2024-07-26","rep":"배은화","phone":"055-603-2101","address":"경상남도 창원시 마산회원구 내서읍 옥정2길 3-6","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B132"},{"oldCode":"NEW-001","name":"에스에이치(주)","bizno":null,"mouDate":"2024-07-26","rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; CRM기타: 은성자회사; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B133"},{"oldCode":"24040","name":"(주)채도건설","bizno":"875-88-02166","mouDate":"2024-07-31","rep":"이용석","phone":"032-265-8887","address":"경기도 부천시 원미구 길주로 284, 723호(중동, 신중동역 헤리움메트로타워)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 23.6/13_분당풍림아이원_진행 6/20_우리유앤미(옥상)_진행 6/24_가람마을3단지동문굿모닝힐(옥상)_진행 7/2_인천효; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B134"},{"oldCode":"24041","name":"상미건설(주)","bizno":"312-81-90078","mouDate":"2024-08-06","rep":"유세현","phone":"041-551-2470","address":"충청남도 천안시 동남구 대흥로 190-1(대흥동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B135"},{"oldCode":"24042","name":"(주)적산건설","bizno":"215-81-15555","mouDate":"2024-09-06","rep":"조영수","phone":"02-443-2127","address":"서울특별시 송파구 새말로 157, 401호(문정동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B136"},{"oldCode":"24043","name":"제일특수케미칼(주)","bizno":"312-81-48338","mouDate":"2024-09-06","rep":"김광식","phone":"041-576-7904","address":"충청남도 천안시 동남구 개옥8길 5 (봉명동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B137"},{"oldCode":"24044","name":"(주)에이플러스건설","bizno":"608-81-20605","mouDate":"2024-09-24","rep":"김세영,최지령","phone":"031-966-7404","address":"경기도 고양시 덕양구 화중로130번길 48, 205호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: 구)선재건설; 구상호 '선재기업(주)' → 현행 '(주)에이플러스건설' 로 연결","newCode":"B2B138"},{"oldCode":"24045","name":"우리방재건설(주)","bizno":"314-81-69907","mouDate":"2024-09-24","rep":"이균재","phone":"063-836-3876","address":"충청남도 천안시 동남구 개옥8길 5 (봉명동)","gongjong":"POUR 공법 협약(건설)","source":"내부+CRM","note":"내부메모: 협약종료; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B139"},{"oldCode":"24046","name":"(주)일진건설","bizno":"620-81-27160","mouDate":"2024-09-25","rep":"박진조","phone":"052-251-0488","address":"울산광역시 중구 병영16길 4(동동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 9/24_호반베르디움(재도장,옥상)_낙찰 12/18_신정현대홈타운4단지(지하주차장)_PT 25.01/10_구영푸르지오1차(재도; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B140"},{"oldCode":"24047","name":"(주)위즈페인팅","bizno":"264-86-00947","mouDate":"2024-11-11","rep":"장원준","phone":"052-977-0077","address":"울산광역시 중구 구교로 183(반구동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2024-11-11 (내부 원장 기준) / [참고] CRM MOU체결일 2024-11-12; 현장이력: 24.10.17_문수애시앙(옥상)_PT 25.5/8_문수애시앙(옥상)_진행; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B141"},{"oldCode":"24048","name":"(주)케이탑건설","bizno":"712-86-03351","mouDate":"2024-11-15","rep":"한태원","phone":"032-265-0420 / 032-265-4885","address":"인천광역시 서구 중봉대로 490, 1078호, 1079호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: 탑ENC(주)","newCode":"B2B142"},{"oldCode":"NEW-002","name":"(주)호연상사 (주)케이탑건설","bizno":null,"mouDate":"2024-11-18","rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 현장이력: 25.3/10_안산센트럴푸르지오(옥상)_PT 25.3/17_쌍문동익(옥상)_진행 25.5/16_송도글로벌파크베르디움(재도장)_; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B143"},{"oldCode":"24049","name":"(주)기림이앤씨","bizno":"250-81-03222","mouDate":"2024-12-17","rep":"송길영","phone":"041-553-1747","address":"충청남도 천안시 동남구 청수14로 60, 701호(청담동, 서미법조타워)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"관계사: (주)도경(코드 25007)과 전화 동일, 사업자번호 상이한 별개 법인; 내부메모: (주)도경 자회사","newCode":"B2B144"},{"oldCode":"24050","name":"(주)한빛","bizno":"394-81-01562","mouDate":"2024-12-17","rep":"이혜경","phone":"042-586-9200","address":"대전광역시 서구 둔산남로 163","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"연락처 외부용 상이(042-482-0104) → 내부용 정본 채택; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B145"},{"oldCode":"24051","name":"(주)경하이앤씨","bizno":"582-87-00333","mouDate":"2024-12-30","rep":"박현서","phone":"031-315-6358","address":"경기도 시흥시 은계호수로 49, 2095호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B146"},{"oldCode":"25001","name":"덕수건설(주)","bizno":"305-81-29084","mouDate":"2025-01-31","rep":"조덕수","phone":"042-534-7804","address":"대전광역시 서구 계룡로583번길 55, 111호(탄방동, 위즈상가)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 25.3/11_문화주공2단지(재도장)_PT; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B147"},{"oldCode":"25002","name":"희민건설(주)","bizno":"105-81-23592","mouDate":"2025-02-10","rep":"정재도, 김원식","phone":"051-627-5233","address":"부산 수영구 수미로 59 4층","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2025-02-10 (내부 원장 기준) / [참고] CRM MOU체결일 2025-02-20; 현장이력: 24.12.24_진영에이스타운(재도장,옥상)_낙찰 25.3.11_새진흥5차(옥상)_진행 25.03.26_센텀롯데캐슬2차(옥상,; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B148"},{"oldCode":"25003","name":"(주)효성씨앤씨","bizno":"750-88-02697","mouDate":"2025-02-14","rep":"김진한","phone":"02-488-9108","address":"서울특별시 강동구 고덕로 427, 상가동 202호(강일동, 고덕리엔파크2단지 아파트)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2025-02-14 (내부 원장 기준) / [참고] CRM MOU체결일 2025-02-26; 현장이력: 25.5.8_쌍문미라보(아스콘)_낙찰 25.5.8_도량3주공(아스콘)_낙찰 25.5.14_호원한주4차(아스콘)_낙찰 25.6.; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B149"},{"oldCode":"25004","name":"영성건설(주)","bizno":"410-86-62736","mouDate":"2025-02-19","rep":"손창근","phone":"051-728-6318~9","address":"부산광역시 강서구 대저로 165-2, 2층(대저1동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"CRM기타: X; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B150"},{"oldCode":"25005","name":"(주)케이원씨앤씨","bizno":"662-88-01974","mouDate":"2025-02-20","rep":"주용근","phone":"055-251-8120","address":"경상남도 창원시 의창구 평산로 159번길 3, 2층 201호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 25.3/27_마산마린파이브(옥상)_PT 25.3/27_진영중흥S클래스에코시티(옥상)_PT 25.4/18_마산마린파이브(옥상); 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B151"},{"oldCode":"25006","name":"(주)종명건설","bizno":"212-81-37545","mouDate":"2025-02-21","rep":"김예원","phone":"02-487-8346~7","address":"서울시 강동구 공항대로 222, 7층 708호(마곡동,발산W타워)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"내부메모: ㄹ; CRM기타: 기존협약업체 회사 매각으로 대표이사 변경 ->협약요청; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B152"},{"oldCode":"25007","name":"(주)예신건설","bizno":"404-87-02837","mouDate":"2025-02-24","rep":"이정필","phone":"062-463-1166","address":"광주광역시 광산구 하남산단6번로 57, 지식동 에이-405에이호(오선동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2025-02-24 (내부 원장 기준) / [참고] CRM MOU체결일 2025-02-26; 현장이력: 24.2.20_수완숲안애(옥상)_진행; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B153"},{"oldCode":"25008","name":"명가종합건설(주)","bizno":"503-81-46334","mouDate":"2025-02-25","rep":"손상철","phone":"053-635-1494","address":"경상북도 의성군 의성읍 문소3길 35, 2층","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"주소 외부용 표기 상이 → 내부용 정본 채택; 유사명 주의: 명가건설(유)와 상호 유사, 별개 업체; 내부메모: 서원찬 대표님 mg913@daum.net; [정본] 협약일 2025-02-25 (내부 원장 기준) / [참고] CRM MOU체결일 2025-02-26; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B154"},{"oldCode":"25010","name":"(주)대신엘엔씨건설","bizno":"118-88-00857","mouDate":"2025-03-06","rep":"송성순","phone":"032-553-5381","address":"인천광역시 계양구 계산새로 71, 씨동 502호(계산동, 하이베라스)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"CRM기타: 소개유입; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B155"},{"oldCode":"25009","name":"(주)청우엔지니어링","bizno":"301-81-58194","mouDate":"2025-03-06","rep":"홍재경, 홍현우","phone":"043-238-1457","address":"충청북도 청주시 흥덕구 대농로 43, 상업시설동 801호(복대동, 신영지웰시티1차)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 25.05.12_영화블렌하임(옥상)_진행; 추가데이터(신규업체 CRM) 대조 완료; 약칭 '(주)청우건설' 로 연결; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B156"},{"oldCode":"25013","name":"(주)주태건설","bizno":"110-81-93692","mouDate":"2025-03-24","rep":"서미정","phone":"031-905-6782","address":"경기도 고양시 일산동구 호수로 358-39, 10층 1016호(백석동, 동문타워1)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2025-03-24 (내부 원장 기준) / [참고] CRM MOU체결일 2025-03-25; 현장이력: 25.6/13_별내아이파크2차(배면)_낙찰; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B157"},{"oldCode":"25011","name":"(주)탑이앤씨","bizno":"427-88-01503","mouDate":"2025-03-24","rep":"김용귀","phone":"043-265-8884","address":"충청북도 청주시 청원구 외남로 48-36, 2층(외남동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2025-03-24 (내부 원장 기준) / [참고] CRM MOU체결일 2025-03-25; 현장이력: 25.07.02_대전노은카운티스(옥상)_진행 25.07.31_청주상당용담대림이편한(옥상)_진행 25.08.08_청주상당영운삼일; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B158"},{"oldCode":"25012","name":"도시이앤씨(주)","bizno":"214-88-14722","mouDate":"2025-03-24","rep":"박상진","phone":"032-716-9763","address":"경기도 부천시 소향로37번길 31-15, 6층 604호(상동, 한림프라자)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B159"},{"oldCode":"NEW-003","name":"우주티엔아이(주)","bizno":null,"mouDate":"2025-03-25","rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B160"},{"oldCode":"25014","name":"자연담은건설(주)","bizno":"612-81-53556","mouDate":"2025-03-26","rep":"김기주","phone":"031-992-0489","address":"경기도 김포시 북변로 8-20, 202호(북변동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"CRM기타: 대표건설 자회사; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B161"},{"oldCode":"25015","name":"명가건설(유)","bizno":"411-81-34747","mouDate":"2025-03-27","rep":"박건호","phone":"031-8083-1212","address":"경기도 의정부시 배꽃길 105, 1동 107호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"유사명 주의: 명가종합건설(주)과 상호 유사, 별개 업체; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B162"},{"oldCode":"25017","name":"(주)대승이앤씨","bizno":"836-87-03450","mouDate":"2025-04-08","rep":"이종범","phone":"032-214-2114","address":"인천광역시 계양구 안남로573번길 17, 5층(효성동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"유사명 주의: (주)대성이앤씨와 1자 차이, 별개 업체; 현장이력: 25.4/29_한화에코메트로5단지(재도장)_타공법낙찰; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B163"},{"oldCode":"25016","name":"(주)도경","bizno":"424-88-03332","mouDate":"2025-04-08","rep":"송진영","phone":"041-553-1747","address":"충청남도 아산시 음봉면 음봉로 567, 상가동 306호(더샵레이크사이드아파트)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"관계사: (주)기림이앤씨(코드 24045)와 전화 동일, 사업자번호 상이한 별개 법인; 내부메모: 기림 자회사; 현장이력: 25.3.28_성환부영2차(옥상_낙찰 25.4.7_능금마을신성(옥상)_낙찰 25.4.17_주공6단지3차(옥상)_낙찰 25.5.; CRM기타: 기림 자회사; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B164"},{"oldCode":"25018","name":"(주)예랑건설","bizno":"825-81-00811","mouDate":"2025-04-09","rep":"윤종철","phone":"031-8027-6391","address":"경기도 하남시 미사강변중앙로7번안길 25, 제2층 제씨208호(풍산동,u-테크밸리)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2025-04-09 (내부 원장 기준) / [참고] CRM MOU체결일 2025-04-08; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B165"},{"oldCode":"25019","name":"(주)일성기업","bizno":"607-81-67243","mouDate":"2025-04-09","rep":"천상우","phone":"051-526-0667","address":"부산광역시 동래구 반송로317(명장동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 25.4.29_대연경동메르빌(지하,재도장)_PT 25.5.20_해운대우신골든메르시아(옥상)_진행 25.06.23_거제유림아시아; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B166"},{"oldCode":"25020","name":"(주)디아이산업","bizno":"812-81-02550","mouDate":"2025-04-17","rep":"이성민","phone":"051-710-1080","address":"부산광역시 강서구 신덕길18번길 15-26, (대저1동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 25.3/21_구서롯데캐슬골드(옥상)_PT/4.21_진행; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B167"},{"oldCode":"25022","name":"(주)에이피티건설","bizno":"301-86-10098","mouDate":"2025-04-17","rep":"문지현","phone":"02-2083-1530","address":"경기도 광명시 하안로 60, B동 201-1호(소하동, SK테크노 파크)","gongjong":"POUR 공법 협약(건설)","source":"내부","note":"내부메모: 협약종료","newCode":"B2B168"},{"oldCode":"25021","name":"(주)한국전문건설","bizno":"114-81-52918","mouDate":"2025-04-17","rep":"황미라","phone":"031-406-1040","address":"경기도 안산시 상록구 해양3로 15, 1동 2111호(사동)","gongjong":"POUR 공법 협약(건설)","source":"내부","note":"내부메모: 협약종료","newCode":"B2B169"},{"oldCode":"NEW-004","name":"(부)APT건설","bizno":null,"mouDate":"2025-04-18","rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 현장이력: 25.4.24_월계주공2단지(재도장)_PT 25.4.25_광명한진타운(옥상)_PT/타공법으로 취소 25.4.28_매탄그린빌3단; CRM기타: 소개; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B170"},{"oldCode":"25023","name":"(주)대륜씨엔씨","bizno":"685-88-02904","mouDate":"2025-04-24","rep":"김서현","phone":"031-662-9989","address":"경기도 평택시 고덕면 도시지원1길 116, 708호,709호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"약칭 '(주)대륜씨앤씨' 로 연결; 현장이력: 25.09.15_자재발주(몰탈_바탕면); 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B171"},{"oldCode":"25024","name":"(주)케이씨건설","bizno":"604-81-40268","mouDate":"2025-04-25","rep":"장상철","phone":"051-894-8188","address":"부산광역시 남구 석포로 74, 8층(대연동, 에스엠스퀘어)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B172"},{"oldCode":"25025","name":"대흥씨앤씨(주)","bizno":"317-81-03597","mouDate":"2025-05-08","rep":"고승영","phone":"02-6952-7856","address":"서울특별시 서초구 언남길 63, 201호(양재동, 신아빌딩)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 25.2/20_수원한국2차(재도장)_PT 25.4/1_아르팰리스2단지(옥상)_진행 25.6/16_반포자이(보도블럭)_낙찰 25; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B173"},{"oldCode":"25028","name":"(주)아트텍","bizno":"189-81-01067","mouDate":"2025-05-15","rep":"최영준","phone":"042-543-7707","address":"대전광역시 서구 용소로46번길 39, 1층(도안동, 민스빌)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B174"},{"oldCode":"25027","name":"베스트건설(주)","bizno":"619-86-02728","mouDate":"2025-05-15","rep":"김세진","phone":"042-581-7760","address":"대전광역시 서구 길평길 16-65, 1층(평촌동)","gongjong":"POUR 공법 협약(건설)","source":"내부","note":"사업자번호 중복(상대: (주)어썸코퍼레이션/함영일/대전) — 대표자·지역 상이로 개별 행 유지; 내부메모: 협약취소","newCode":"B2B175"},{"oldCode":"25029","name":"(주)장수씨앤씨","bizno":"645-87-03330","mouDate":"2025-05-16","rep":"박지민","phone":"02-418-1819","address":"서울특별시 송파구 송파대로40길 3, 2층 212호(송파동,삼호빌딩)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2025-05-16 (내부 원장 기준) / [참고] CRM MOU체결일 2025-05-20; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B176"},{"oldCode":"25026","name":"(주)태강건설","bizno":"143-81-18747","mouDate":"2025-05-16","rep":"김주희","phone":"031-596-6149","address":"경기도 안양시 만안구 덕천로152번길 25, 에이-2607호 / (안양동,안양아이에스BIZ타워센트럴)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2025-05-16 (내부 원장 기준) / [참고] CRM MOU체결일 2025-05-20; 현장이력: 25.5.28_판교디지털센터(옥상)_진행 25.06.11_동백역한라비발디(옥상)_진행 25.07.17_공릉동부(담장보수)_낙찰; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B177"},{"oldCode":"25053","name":"(주)청명이앤디","bizno":"584-81-01393","mouDate":"2025-05-19","rep":"안영준","phone":"051-728-2965","address":"부산광역시 기장군 정관읍 달산2길 18, 1층","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B178"},{"oldCode":"25030","name":"(주)네오텍건설","bizno":"210-81-27774","mouDate":"2025-05-22","rep":"김운기,김재원","phone":"031-521-4011","address":"경기도 남양주시 와부읍 석실로408번길 137-7","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2025-05-22 (내부 원장 기준) / [참고] CRM MOU체결일 2025-05-27; 현장이력: 25.5.2_호평금강펜트리움(옥상)_낙찰; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B179"},{"oldCode":"25032","name":"석암산업(주)","bizno":"314-81-71664","mouDate":"2025-06-04","rep":"최순용","phone":"042-531-8250","address":"대전광역시 유성구 교촌로 34(교촌동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2025-06-04 (내부 원장 기준) / [참고] CRM MOU체결일 2025-06-05; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B180"},{"oldCode":"25034","name":"경창산업개발(주)","bizno":"734-88-00436","mouDate":"2025-07-08","rep":"한인경","phone":"02-2057-0177","address":"서울특별시 송파구 법원로9길 26, C동 1110호(문정동, 에이치비지니스파크)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"CRM기타: 배희원부사장 추천; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B181"},{"oldCode":"25035","name":"쌍용조경(주)","bizno":"408-86-05917","mouDate":"2025-07-17","rep":"탁은주","phone":"062-367-8272","address":"광주광역시 서구 화정로 140, 3층(화정동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B182"},{"oldCode":"NEW-005","name":"쌍용조겅(주)","bizno":null,"mouDate":"2025-07-21","rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B183"},{"oldCode":"25036","name":"(주)유복건설","bizno":"369-81-03297","mouDate":"2025-07-31","rep":"유경숙","phone":"031-333-3297","address":"경기도 용인시 처인구 포곡로 35, 1층(유방동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"CRM기타: 유일건설 자회사; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B184"},{"oldCode":"25038","name":"(주)더자람","bizno":"128-86-55753","mouDate":"2025-08-20","rep":"김양수","phone":"031-819-0033","address":"경기도 고양시 일산서구 구산로101번길 57-12, 3동 1층(구산동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2025-08-20 (내부 원장 기준) / [참고] CRM MOU체결일 2025-08-21; CRM기타: 진성이앤지 자회사; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B185"},{"oldCode":"25037","name":"나노지음(주)","bizno":"841-88-03288","mouDate":"2025-08-20","rep":"박비송","phone":"031-509-1801","address":"경기도 시흥시 서울대학로264번길 12, 208동 2층 비-203호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"CRM기타: 성훈종합건설 자회사; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B186"},{"oldCode":"25039","name":"(주)어썸코퍼레이션","bizno":"619-86-02728","mouDate":"2025-09-02","rep":"함영일","phone":"042-581-7760","address":"대전광역시 서구 길평길 16-65, 1층(평촌동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"사업자번호 중복(상대: 베스트건설(주)/김세진/대전) — 대표자·지역 상이로 개별 행 유지; CRM기타: 하린이앤씨 대표이직; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B187"},{"oldCode":"25042","name":"(주)대신하우징","bizno":"672-87-02861","mouDate":"2025-09-22","rep":"강미진","phone":"055-313-0488","address":"경상남도 김해시 칠산로425번길 6-7, a동","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B188"},{"oldCode":"25041","name":"(주)삼정엔지니어링","bizno":"617-81-41434","mouDate":"2025-09-22","rep":"김기령","phone":"051-627-9351","address":"부산광역시 수영구 망미번영로38번길 3(광안동, 삼정빌딩8층)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 25.08.05_신개금엘지 1,2단지(재도장,우레탄)_PT; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B189"},{"oldCode":"NEW-006","name":"대하C&D(주)","bizno":null,"mouDate":"2025-10-23","rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B190"},{"oldCode":"25043","name":"대하씨엔디(주)","bizno":"607-81-76426","mouDate":"2025-10-23","rep":"김용현","phone":"051-524-7958","address":"부산광역시 수영구 광안해변로370번길 9-32, 5층 501호(민락동,노블스카이빌딩)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: isisyabbo@naver.com 대표님메일","newCode":"B2B191"},{"oldCode":"25046","name":"(주)토형건설","bizno":"410-81-88217","mouDate":"2025-11-07","rep":"김용훈","phone":"062-383-9788~9","address":"광주광역시 서구 화정로179번길 43, 2층(화정동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B192"},{"oldCode":"25047","name":"삼호종합건설(주)","bizno":"609-81-30858","mouDate":"2025-11-07","rep":"진만수","phone":"032-678-3623","address":"경기도 부천시 신흥로 347(도당동, 4층)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 협약진행 X; CRM기타: 협력사 소개; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B193"},{"oldCode":"25048","name":"(주)유광씨앤씨","bizno":"608-81-42308","mouDate":"2025-11-21","rep":"윤일선,윤정욱","phone":"055-246-0477","address":"경상남도 창원시 마산합포구 오동동14길 53-1(오동동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 양산지사 연계 / 2차미팅 준엽; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B194"},{"oldCode":"25050","name":"(주)창도건설","bizno":"610-81-57482","mouDate":"2025-12-04","rep":"박미경","phone":"052-239-0436","address":"울산광역시 울주군 서생면 해맞이로1570-1, 2층","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"CRM기타: 우단건설 추천; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B195"},{"oldCode":"25049","name":"와이티 파트너스(주)","bizno":"595-87-02768","mouDate":"2025-12-04","rep":"김유라","phone":"031-346-2100","address":"경기도 안양시 동안구 엘에스로 142, 107호(호계동, 호계 금정역 SK V1 center)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B196"},{"oldCode":"25051","name":"(주)피앤텍이엔지","bizno":"132-86-06886","mouDate":"2025-12-05","rep":"유명상,조순제","phone":"031-506-8354","address":"경기도 안산시 단원구 풍전로 37-9, 301동 337호(원곡동,트리플렉스)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2025-12-05 (내부 원장 기준) / [참고] CRM MOU체결일 2025-12-09; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B197"},{"oldCode":"25052","name":"더이스트코리아(주)","bizno":"568-88-02894","mouDate":"2025-12-18","rep":"임성호,서희주","phone":"051-545-0477","address":"부산광역시 강서구 유통단지1로 76, 13동 705호(대저2동, 건축자재판매단지)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 연락 오면 알람; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B198"},{"oldCode":"10006","name":"(주)레인보우테크","bizno":"129-86-40821","mouDate":"2025-12-23","rep":"정한규","phone":"031-703-7929","address":"경기도 안양시 만안구 덕천로152번길 25, 에이동 2605호(안양동, 안양아이에스BIZ타워센트럴)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B199"},{"oldCode":"25056","name":"(주)두루빌엔지니어링","bizno":"206-81-97475","mouDate":"2025-12-29","rep":"이호준","phone":"02-3281-9792","address":"서울특별시 금천구 한내로 56, 4층(독산동, 케이티광명빌딩)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 2차미팅 일정회신대기(09.10); 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B200"},{"oldCode":"25054","name":"(주)미사건설","bizno":"268-86-03437","mouDate":"2025-12-29","rep":"이준휘","phone":"070-7607-8204","address":"경기도 하남시 감북로 71, 1층(감일동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2025-12-29 (내부 원장 기준) / [참고] CRM MOU체결일 2025-12-31; 현장이력: 25.04.09_라인그린(옥상)_낙찰; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B201"},{"oldCode":"25055","name":"유현건설(주)","bizno":"622-81-25789","mouDate":"2025-12-29","rep":"최형철","phone":"055-322-2477","address":"경상남도 김해시 김해대로 2285(봉황동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2025-12-29 (내부 원장 기준) / [참고] CRM MOU체결일 2025-12-31; 현장이력: 12.9_1차미팅조율중; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B202"},{"oldCode":"10002","name":"(주)다수건설","bizno":"106-86-92501","mouDate":"2026-01-09","rep":"심은용","phone":"02-553-6115","address":"서울 노원구 노원로 1바길 12, 2층(공릉동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"주소 외부용 표기 상이 → 내부용 정본 채택; 내부메모: 특허기술 공식 협약서 발행","newCode":"B2B203"},{"oldCode":"10013","name":"(주)삼흥티에스건설","bizno":"607-81-83311","mouDate":"2026-01-09","rep":"최국진","phone":"051-513-7887","address":"부산광역시 금정구 기찰로 11-1, 2층(부곡동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"[정본] 협약일 2026-01-09 (내부 원장 기준); 내부메모: (주)삼흥건축; 구상호 '(주)삼흥건축' → 현행 '(주)삼흥티에스건설' 로 연결","newCode":"B2B204"},{"oldCode":"26001","name":"극동에이앤씨(주)","bizno":"117-81-44187","mouDate":"2026-01-28","rep":"박종식","phone":"02-2692-7778","address":"서울특별시 양천구 목동중앙남로 100, 성원 102동 상가 116호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2026-01-28 (내부 원장 기준) / [참고] CRM MOU체결일 2026-02-02; 현장이력: 26.03.25 두산위브인덕원센트럴1단지아파트 컨설팅 내역서 요청; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B205"},{"oldCode":"26003","name":"(주)부성도장","bizno":"787-81-03011","mouDate":"2026-02-11","rep":"신혜선","phone":"062-942-7707","address":"광주광역시 광산구 상무대로 276, 2층","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"CRM기타: 수안건설 자회사; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B206"},{"oldCode":"10018","name":"(주)방수존건설","bizno":"137-81-42766","mouDate":"2026-02-20","rep":"김양환","phone":"031-986-9551","address":"경기도 김포시 장릉로 128, 정원빌딩402호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: 특허기술 공식 협약서 발행","newCode":"B2B207"},{"oldCode":"26004","name":"(주)청익","bizno":"306-81-10744","mouDate":"2026-03-04","rep":"권오현,권오영","phone":"042-254-8077","address":"대전광역시 중구 대흥로 176-36(대흥동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"CRM기타: 하린 박찬우사장님요청; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B208"},{"oldCode":"26005","name":"(주)유니드건설","bizno":"231-81-11717","mouDate":"2026-03-06","rep":"이정호","phone":"031-8027-0399","address":"경기도 하남시 미사대로 424(망월동,제2층 210호,211호 트레비타워)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B209"},{"oldCode":"26006","name":"(주)본이앤씨","bizno":"161-81-03145","mouDate":"2026-03-09","rep":"구자춘","phone":"032-561-3540","address":"인천광역시 서구 단봉로 148, 201, 202호(오류동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":null,"newCode":"B2B210"},{"oldCode":"26007","name":"(주)태온산업개발","bizno":"605-86-03558","mouDate":"2026-03-12","rep":"오종성","phone":"02-400-3631","address":"서울특별시 중랑구 봉화산로 221, 211호(신내동, 동성타워프라자)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"CRM기타: 이루미건설 자회사; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B211"},{"oldCode":"26012","name":"(주)새성건설","bizno":"615-81-44172","mouDate":"2026-03-27","rep":"조영석","phone":"032-321-3706","address":"경기도 부천시 원미구 신흥로223(중동) 신중동역랜드마크푸르지오시티102동 1504호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"CRM기타: 주원디엔피 자회사; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B212"},{"oldCode":"26009","name":"(주)성일피앤씨","bizno":"411-88-03660","mouDate":"2026-04-07","rep":"함성일","phone":"02-408-7282","address":"서울특별시 송파구 동남로18길 40, 206호(가락동, 프라자아파트 상가)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B213"},{"oldCode":"26008","name":"(주)엘에스도장건설","bizno":"859-88-00851","mouDate":"2026-04-07","rep":"윤혜경","phone":"02-6401-3775~7","address":"서울특별시 강서구 마곡중앙5로 87, 409호(마곡동, 우성르보아투)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 26.04.14 고창마을한양수자인아파트 컨설팅 내역서요청; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B214"},{"oldCode":"26013","name":"(주)오연건설","bizno":"657-88-02651","mouDate":"2026-04-07","rep":"하성환","phone":"032-584-3042","address":"인천광역시 서구 원창동 381-67 207호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"[정본] 협약일 2026-04-07 (내부 원장 기준) / [참고] CRM MOU체결일 2026-04-09; CRM기타: 로운건설 자회사; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B215"},{"oldCode":"26010","name":"(주)정담","bizno":"644-88-03784","mouDate":"2026-04-07","rep":"신대용","phone":"031-402-8078","address":"경기도 시흥시 수풀안길 22, 304, 305호(조남동, 웰컴시티)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B216"},{"oldCode":"26011","name":"(주)창건설산업","bizno":"168-86-00275","mouDate":"2026-04-07","rep":"조창현","phone":"051-997-6867","address":"부산광역시 수영구 수영로 600번길 71 (광안동 1층)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"현장이력: 26.02.27 명장e편한세상1차아파트 PT요청; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B217"},{"oldCode":"26014","name":"이산건설(주)","bizno":"314-86-04802","mouDate":"2026-04-17","rep":"사희섭","phone":"042-483-8204","address":"대전광역시 서구 계백로 9090, A1009호(관저동, 트램시티)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B218"},{"oldCode":"26015","name":"이로건설(주)","bizno":"740-87-03805","mouDate":"2026-05-06","rep":"서원찬","phone":"053-582-9596","address":"대구광역시 달성군 논공읍 논공중앙로45길 22-9","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"내부메모: MOU 상세에서 업체코드 등록; CRM기타: 명가종합건설 자회사; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B219"},{"oldCode":"26016","name":"동강건설(주)","bizno":"161-87-01789","mouDate":"2026-05-08","rep":"이승아","phone":"032-322-3173","address":"경기도 부천시 원미구 상동로117번길 49, 5층 503,504,505호(상동,아트프라자)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"내부메모: MOU 체결로 자동 추가됨 (2026-05-13); 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B220"},{"oldCode":"26025","name":"새움산업개발(주)","bizno":"790-88-03016","mouDate":"2026-05-29","rep":"김창호","phone":"062-375-6046","address":"광주 광역시 서구 상무평화로 89, 1204(치평동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: MOU 체결로 등록됨 (2026-07-23)","newCode":"B2B221"},{"oldCode":"26017","name":"(주)강진건설","bizno":"305-81-49192","mouDate":"2026-06-16","rep":"최태식","phone":"042-536-7736","address":"대전광역시 서구 신갈마로 51, 104동 지하2층 213호(내동, 더리치빌아파트)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: MOU 체결로 자동 추가됨 (2026-06-16)","newCode":"B2B222"},{"oldCode":"10058","name":"(주)대로건설","bizno":null,"mouDate":"2026-06-16","rep":"박상범","phone":"051-728-3985","address":"부산 기장군 정관읍 정관덕산길 36 2층","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"사업자번호 미등록; 내부메모: 정보없음 / 주소확인 필요","newCode":"B2B223"},{"oldCode":"26019","name":"(주)광명건설","bizno":"229-86-02622","mouDate":"2026-06-17","rep":"박정임","phone":"041-903-8834","address":"충청남도 천안시 서북구 오성로 107, 501호(두정동, 제이파크프라자)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"내부메모: MOU 체결로 자동 추가됨 (2026-06-23); 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B224"},{"oldCode":"26018","name":"본주건설(주)","bizno":"411-86-01751","mouDate":"2026-06-23","rep":"최미숙","phone":"02-2633-0152","address":"서울특별시 구로구 신도림로 7, 815호(신도림동, 금강리빙스텔2)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: MOU 체결로 자동 추가됨 (2026-06-23)","newCode":"B2B225"},{"oldCode":"26021","name":"(주)현덕건설","bizno":"202-87-02599","mouDate":"2026-06-30","rep":"정미정","phone":"063-323-2816","address":"전라북도 무주군 무주읍 당산강변로 218, 101-1호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"내부메모: MOU 체결로 자동 추가됨 (2026-07-07); 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B226"},{"oldCode":"26023","name":"가은건설(주)","bizno":"140-87-02030","mouDate":"2026-07-01","rep":"이가은","phone":"031-751-2090","address":"경기도 성남시 수정구 위례서로 24, 106호(창곡동, 행복빌딩)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: MOU 상세에서 업체코드 등록","newCode":"B2B227"},{"oldCode":"26020","name":"(주)우성건업","bizno":"203-81-58037","mouDate":"2026-07-03","rep":"임민선","phone":"02-571-4975","address":"경기도 남양주시 다산지금로 202, B동 4층 89호(다산동, 현대테라타워 DIMC)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: MOU 체결로 자동 추가됨 (2026-07-07)","newCode":"B2B228"},{"oldCode":"26022","name":"(주)해원건설","bizno":"453-88-01803","mouDate":"2026-07-03","rep":"송기원","phone":"02-2135-6975","address":"경기도 광명시 범안로996번길 6, 5층 504호(하안동, 광명티아모IT타워)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: MOU 상세에서 업체코드 등록","newCode":"B2B229"},{"oldCode":"26026","name":"부광이앤씨(주)","bizno":"555-87-04040","mouDate":"2026-07-29","rep":"서정혜","phone":"02-533-1110","address":"서울특별시 서초구 동광로 28, 4층(방배동,동성빌딩)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: MOU 체결로 등록됨 (2026-07-29)","newCode":"B2B230"},{"oldCode":"26027","name":"(주)푸른종합건설","bizno":"404-81-16440","mouDate":"2026-07-31","rep":"이기홍,김동노","phone":"010-3603-0915","address":"전라남도 담양군 수북면 사창동길 85-1","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: MOU 체결로 등록됨 (2026-07-31) =엠에스이앤지","newCode":"B2B231"},{"oldCode":"26028","name":"(주)더원산업개발","bizno":"238-87-00872","mouDate":"2026-08-04","rep":"이미은","phone":"032-666-0482","address":"경기도 부천시 소사구 서촌로 44번길 7-16, 1층(송내동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"유사명 주의: (주)삼인유엔아이와 표기 유사한 별개 법인; 내부메모: 기존 '삼인유앤아이'; 구상호 '(주)삼인유앤아이' → 현행 '(주)더원산업개발' 로 연결","newCode":"B2B232"},{"oldCode":"26029","name":"(주)희영컴퍼니","bizno":"433-87-04172","mouDate":"2026-08-12","rep":"양영환","phone":"044-998-0303","address":"세종특별자치시 도움1로 108,310호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: 지앤필드 자회사(재연님 전달건) 바로 체결진행","newCode":"B2B233"},{"oldCode":"26030","name":"(주)샤인하우징","bizno":"215-87-35816","mouDate":"2026-08-19","rep":"전유진","phone":"010-6344-7301","address":"경기도 구리시 건원대로 76번길 34,삼보상가 206호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"[정본] 협약일 2026-08-19 (내부 원장 기준); 내부메모: 효덕산업 자회사 whiteozgg@naver.com (개인메일)","newCode":"B2B234"},{"oldCode":"26031","name":"(주)서강건설","bizno":"859-86-03475","mouDate":"2026-08-28","rep":"김형겸.박지연","phone":"031-5175-8328","address":"경기도 하남시 미사대로 540, 현대지식산업센터 A동 C-321호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"내부메모: 김모흠 (모아) 소속","newCode":"B2B235"},{"oldCode":"26032","name":"(주)제일도장","bizno":"314-81-13174","mouDate":"2026-09-02","rep":"윤기웅","phone":"042-823-2108","address":"대전광역시 유성구 교촌로 36, 1층","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"외부용은 상호만 등재(세부정보 공란) → 외부용 보완 필요; 내부메모: MOU 체결로 등록됨 (2026-09-02)","newCode":"B2B236"},{"oldCode":"26033","name":"(주)태림이앤씨","bizno":"431-86-03980","mouDate":"2026-09-02","rep":"오광선","phone":"031-8027-8752","address":"경기도 광주시 이배재로 73 대원빌딩 202호","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"외부용은 상호만 등재(세부정보 공란) → 외부용 보완 필요; 내부메모: MOU 체결로 등록됨 (2026-09-02); 약칭 '(주)태림건설' 로 연결; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B237"},{"oldCode":"NEW-007","name":"(유)가인건설","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 추 후 재문의 안내 /영업보장이슈; CRM기타: 자오건설 소개; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B238"},{"oldCode":"NEW-008","name":"(유)대광건설산업","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 유선연락시 부재중으로 문자남김(04.30); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B239"},{"oldCode":"10055","name":"(주)건인씨엔알","bizno":null,"mouDate":null,"rep":"차창진","phone":"051-502-9016","address":"부산 동래구 미남로 51","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 사업자번호 미등록; 내부메모: 정보없음","newCode":"B2B240"},{"oldCode":"10045","name":"(주)경동하우징","bizno":"111-81-17606","mouDate":null,"rep":"송득종","phone":"02-356-7871","address":"서울특별시 영등포구 양평로 5, 7층(당산동5가)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 특허기술 공식 협약서 발행","newCode":"B2B241"},{"oldCode":"10030","name":"(주)경성기업","bizno":"135-81-41010","mouDate":null,"rep":"제석평","phone":"055-261-7704","address":"경남 창원시 성산구 신월로 42, 427호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 정보없음","newCode":"B2B242"},{"oldCode":"NEW-009","name":"(주)경원포장건설","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 포장만진행하는 시공사로, 자재활용 협약진행 X; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B243"},{"oldCode":"10051","name":"(주)금강건설공사","bizno":null,"mouDate":null,"rep":"이금숙","phone":"02-992-4375","address":"서울 강북구 덕릉로 29","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 사업자번호 미등록; 내부메모: 정보없음","newCode":"B2B244"},{"oldCode":"NEW-010","name":"(주)나눔종합건설","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B245"},{"oldCode":"25044","name":"(주)다산종합건설","bizno":"382-87-02920","mouDate":null,"rep":"허규성,최병준","phone":"031-567-0704","address":"경기도 남양주시 다산중앙로 105-18, 305호(다산동, 지앤지비즈타워)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B246"},{"oldCode":"NEW-011","name":"(주)대건건설","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B247"},{"oldCode":"10010","name":"(주)대림도장","bizno":"715-81-01911","mouDate":null,"rep":"이인숙,이진영","phone":"054-443-2387","address":"경상북도 구미시 구미중앙로42길 5-66, 502호(송정동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B248"},{"oldCode":"10015","name":"(주)대성건업","bizno":"503-81-08698","mouDate":null,"rep":"김성렬","phone":"053-624-5781","address":"대구광역시 서구 평리로 174, 2층(중리동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 특허기술 공식 협약서 발행","newCode":"B2B249"},{"oldCode":"NEW-012","name":"(주)대성종합관리","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 질문서 발송 X; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B250"},{"oldCode":"10032","name":"(주)대안이엔씨","bizno":"608-81-65960","mouDate":null,"rep":"김현철","phone":"055-333-5111","address":"경상남도 김해시 칠산로413번길 38(풍유동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"주소 외부용 표기 상이 → 내부용 정본 채택; 체결일 미기재; 사업자번호 중복(상대: (주)은광비엠씨/윤미원/경남) — 대표자·지역 상이로 개별 행 유지; 내부메모: 정보없음","newCode":"B2B251"},{"oldCode":"25033","name":"(주)더베스트 이앤비","bizno":"411-87-03232","mouDate":null,"rep":"배윤영","phone":"010-2907-5505","address":"인천광역시 연수구 송도과학로16번길 13-18, 8층 822호(송도동, 송도건원테크노큐브)","gongjong":"POUR 공법 협약(건설)","source":"내부","note":"체결일 미기재","newCode":"B2B252"},{"oldCode":"NEW-013","name":"(주)더블유종합건설","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 11.21_서남병원 종료후 연락예정/ 재연락전 X; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B253"},{"oldCode":"25040","name":"(주)더세움","bizno":"162-87-02326","mouDate":null,"rep":"홍정욱","phone":"031-813-3864","address":"경기도 고양시 일산서구 송포로 248-6, B동 2호(가좌동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B254"},{"oldCode":"10046","name":"(주)덕경","bizno":"791-88-01215","mouDate":null,"rep":"이세기, 박형열","phone":"055-744-0477","address":"경상남도 진주시 돗골로20번길 21(상평동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B255"},{"oldCode":"10001","name":"(주)덕일산업","bizno":"610-81-32730","mouDate":null,"rep":"김용준","phone":"052-281-7707~8","address":"울산광역시 남구 산업로 669(삼산동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B256"},{"oldCode":"10038","name":"(주)도경이엔지","bizno":"409-81-49174","mouDate":null,"rep":"정경내","phone":"062-603-3577","address":"광주광역시 서구 매월2로15번길 16, 103동 213호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B257"},{"oldCode":"10023","name":"(주)동건씨앤씨","bizno":"621-81-83850","mouDate":null,"rep":"변재식","phone":"051-515-4023","address":"부산광역시 해운대구 재반로 89-6","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 약칭 '(주)동건씨엔씨' 로 연결","newCode":"B2B258"},{"oldCode":"10027","name":"(주)동성로라","bizno":"253-88-01955","mouDate":null,"rep":"송운영","phone":"051-832-0112","address":"부산광역시 강서구 녹산산단261로 25(송정동)","gongjong":"제조업_로라조각,도금","source":"내부","note":"체결일 미기재; 내부메모: 제조업_로라조각,도금","newCode":"B2B259"},{"oldCode":"10019","name":"(주)두영건설","bizno":"502-28-3","mouDate":null,"rep":"문영희","phone":"053-756-3210","address":"대구 수성구 지범로22길 9, 103동 1207호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 특허기술 공식 협약서 발행","newCode":"B2B260"},{"oldCode":"NEW-014","name":"(주)디노종합건설","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 연락X; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B261"},{"oldCode":"EXT-003","name":"(주)라인탑케이에스","bizno":null,"mouDate":null,"rep":"김창희","phone":"02-2652-2402","address":"서울특별시 양천구 목동중앙본로30가길 15, 1층 101-1호","gongjong":"POUR 공법 협약(건설)","source":"외부","note":"내부 원장 미등재 — 사업자번호·체결일 확인 후 내부 등록 필요","newCode":"B2B262"},{"oldCode":"NEW-015","name":"(주)보천건설","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 1차미팅 일정회신대기(09.03); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B263"},{"oldCode":"NEW-016","name":"(주)본이엔씨","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B264"},{"oldCode":"10029","name":"(주)삼강기업","bizno":"603-81-2","mouDate":null,"rep":"정은재","phone":"051-714-1888","address":"부산광역시 연제구 월드컵대로 58번길 15 (2층)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 정보없음","newCode":"B2B265"},{"oldCode":"NEW-017","name":"(주)삼화건설산업","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B266"},{"oldCode":"10003","name":"(주)서린건설","bizno":"620-81-22184","mouDate":null,"rep":"서창덕","phone":"052-293-4455","address":"울산광역시 중구 손골2길 12,103동 상가1층(동덕현대3차아파트)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 특허기술 공식 협약서 발행","newCode":"B2B267"},{"oldCode":"NEW-018","name":"(주)서영이엔씨","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 추가문의 전 보류(09.03); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B268"},{"oldCode":"NEW-019","name":"(주)서전ENC","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B269"},{"oldCode":"25045","name":"(주)세원티엠","bizno":"295-87-02311","mouDate":null,"rep":"정진영","phone":"031-812-7475","address":"인천광역시 서구 청라한내로 96, 4층 402호 (청라동, 하엘에스페이스)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"연락처 외부용 상이(032-561-2331) → 내부용 정본 채택; 체결일 미기재","newCode":"B2B270"},{"oldCode":"NEW-020","name":"(주)세정이엔지","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B271"},{"oldCode":"10054","name":"(주)송주종합건설","bizno":null,"mouDate":null,"rep":"김중호","phone":"0507-1313-8874","address":"울산 울주군 온산읍 서영남5길 31 지하1층","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 사업자번호 미등록; 내부메모: 정보없음","newCode":"B2B272"},{"oldCode":"NEW-021","name":"(주)수지씨앤에스","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B273"},{"oldCode":"25057","name":"(주)스타건설","bizno":"812-88-01638","mouDate":null,"rep":"김영민","phone":null,"address":"경기도 부천시 길주로77번길 55-19","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B274"},{"oldCode":"NEW-022","name":"(주)시스텍이앤씨","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B275"},{"oldCode":"NEW-023","name":"(주)신원이앤씨","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B276"},{"oldCode":"10016","name":"(주)신창건업","bizno":"502-81-57051","mouDate":null,"rep":"이명하","phone":"053-965-0132","address":"대구광역시 동구 동호로5길 23(신서동,5층 501호)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 특허기술 공식 협약서 발행","newCode":"B2B277"},{"oldCode":"10042","name":"(주)썬시카방수","bizno":"504-81-28834","mouDate":null,"rep":"신현수","phone":"053-952-5106","address":"경북 경산시 하양읍 지식산업4로1길 22","gongjong":"POUR 공법 협약(건설)","source":"내부","note":"체결일 미기재; 내부메모: 특허기술 공식 협약서 발행","newCode":"B2B278"},{"oldCode":"NEW-024","name":"(주)씨앤엠건설","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 2차미팅 일정회신대기(06.11); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B279"},{"oldCode":"10009","name":"(주)에스에스건설","bizno":"781-81-00938","mouDate":null,"rep":"정인성","phone":"054-371-6696","address":"경상북도 청도군 풍각면 헐티로 175","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B280"},{"oldCode":"10014","name":"(주)에이원건설","bizno":"744-81-00550","mouDate":null,"rep":"윤영걸","phone":"041-566-1501","address":"충남 천안시 동남구 광풍로 1859(2층 201호)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 유사명 주의: (주)이원건설과 유사, 별개 업체; 내부메모: 특허기술 공식 협약서 발행","newCode":"B2B281"},{"oldCode":"10037","name":"(주)엠지건설","bizno":"547-87-01305","mouDate":null,"rep":"윤성진","phone":"061-272-0479","address":"전라남도 목포시 양을로220번길 7, 1층(용당동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B282"},{"oldCode":"10020","name":"(주)예화건설","bizno":"514-81-66039","mouDate":null,"rep":"김동기","phone":"053-290-7875~6","address":"대구광역시 달서구 상인서로10길 42(상인동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 특허기술 공식 협약서 발행","newCode":"B2B283"},{"oldCode":"NEW-025","name":"(주)와이비엘","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B284"},{"oldCode":"NEW-026","name":"(주)우인건설","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B285"},{"oldCode":"10048","name":"(주)유일건설","bizno":"473-86-00783","mouDate":null,"rep":"손성운, 박동규","phone":"031-795-1128","address":"경기도 하남시 대청로 50-1, 3층 2호(신장동, 백송한신아파트 상가동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B286"},{"oldCode":"EXT-001","name":"(주)윤산씨앤씨","bizno":null,"mouDate":null,"rep":"신대용","phone":"02-571-9066~9","address":"서울시 강남구 논현로12길 19-6,6층 601호(개포동, 우도빌딩)","gongjong":"POUR 공법 협약(건설)","source":"외부","note":"내부 원장 미등재 — 사업자번호·체결일 확인 후 내부 등록 필요; 석진건설(주)(코드 23019)과 전화·건물 동일 — 관계사 추정","newCode":"B2B287"},{"oldCode":"10047","name":"(주)은광비엠씨","bizno":"608-81-65960","mouDate":null,"rep":"윤미원","phone":"055-333-5111","address":"경상남도 김해시 칠산로413번길 38(풍유동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 사업자번호 중복(상대: (주)대안이엔씨/김현철/경남) — 대표자·지역 상이로 개별 행 유지","newCode":"B2B288"},{"oldCode":"NEW-027","name":"(주)이스턴퍼시픽","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B289"},{"oldCode":"NEW-028","name":"(주)정훈라이테크","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 25.12.23_시공사 실적없어, 협약 보류; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B290"},{"oldCode":"10041","name":"(주)제이에이치건설","bizno":"408-81-86574","mouDate":null,"rep":"박대성","phone":"063-276-8836","address":"전라북도 전주시 완산구 바우배기1길 11, 404호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B291"},{"oldCode":"10021","name":"(주)제이제이ENG","bizno":"148-87-00074","mouDate":null,"rep":"한수민","phone":"051-862-6200","address":"부산 연제구 월드컵대로 111번길 38, 대원빌딩 5층","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 특허기술 공식 협약서 발행","newCode":"B2B292"},{"oldCode":"10004","name":"(주)조광피엔텍","bizno":"615-81-87977","mouDate":null,"rep":"변영준","phone":"051-315-7709","address":"부산광역시 사상구 장인로7, 1층","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 특허기술 공식 협약서 발행","newCode":"B2B293"},{"oldCode":"NEW-029","name":"(주)중앙공사","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B294"},{"oldCode":"26024","name":"(주)지건씨앤씨","bizno":"673-87-02296","mouDate":null,"rep":"이재경","phone":"1833-5772","address":"경기도 남양주시 순화궁로 272, 10층 1024호(별내동, 동광 비즈타워 별내)","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"체결일 미기재; 내부메모: MOU체결예정; 현장이력: 25.2.25_그린타운우성아파트(옥상)_낙찰 25.3.12_문수로2차아이파크2단지(재도장,에폭시)_낙찰 25.04.07_은평뉴; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B295"},{"oldCode":"10053","name":"(주)지온산업","bizno":"879-81-03270","mouDate":null,"rep":"정민지","phone":null,"address":"경상남도 김해시 율하3로8번길 18, 1층(율하동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B296"},{"oldCode":"NEW-030","name":"(주)케이하우징","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 추 후 재문의 안내 / 경쟁요건 불충족; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B297"},{"oldCode":"10011","name":"(주)탱크마스타","bizno":"204-86-20714","mouDate":null,"rep":"심재설","phone":"02-432-9599","address":"서울시 중량구 용마산로112길90,5층","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 특허기술 공식 협약서 발행","newCode":"B2B298"},{"oldCode":"10039","name":"(주)풍전이엔씨","bizno":"605-88-02155","mouDate":null,"rep":"김정환","phone":"031-444-0411","address":"경기도 안양시 만안구 덕천로152번길 25, 비동 2206호(안양동, 안양아이에스BIZ타워센트럴)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 약칭 '(주)풍전이앤씨' 로 연결","newCode":"B2B299"},{"oldCode":"NEW-031","name":"(주)하얀건설","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B300"},{"oldCode":"10005","name":"(주)한림제코","bizno":"211-86-70264","mouDate":null,"rep":"전경종","phone":"053-384-0250","address":"대구광역시 북구 검단공단로21길 19","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B301"},{"oldCode":"25031","name":"(주)헤븐","bizno":"734-81-02959","mouDate":null,"rep":"김세훈","phone":"010-3939-0903","address":"광주광역시 북구 첨단과기로208번길 17-29, 애플지식센터 제그린동 비동 1호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B302"},{"oldCode":"NEW-032","name":"(주)현일건설","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 연락 오면 알람; CRM기타: X; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B303"},{"oldCode":"25058","name":"(주)현지이앤씨","bizno":"382-88-01438","mouDate":null,"rep":"노용수","phone":"051-625-3573","address":"부산광역시 남구 황령대로319번가길 158-30, 상가동 2층 1호(대연동, 신원아파트)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B304"},{"oldCode":"NEW-033","name":"(주)호남아스콘산업","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B305"},{"oldCode":"NEW-034","name":"(주)황소홀딩스","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 협약 진행 X; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B306"},{"oldCode":"10028","name":"(주)흥산건설산업","bizno":"605-81-2","mouDate":null,"rep":"강용호/강재원","phone":"051-804-7277","address":"부산광역시 부산진구 성지로 137번길 25 (초읍동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 정보없음","newCode":"B2B307"},{"oldCode":"10012","name":"K.B건설(주)","bizno":"612-81-16809","mouDate":null,"rep":"김진이","phone":"055-252-9720","address":"경상남도 창원시 마산회원구 중리상곡로 136,상가동405호(동신2차아파트)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 특허기술 공식 협약서 발행","newCode":"B2B308"},{"oldCode":"NEW-035","name":"SG건설산업(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 협약 진행 X; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B309"},{"oldCode":"NEW-036","name":"가온알앤씨","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 26 현장교육; CRM기타: 협약진행X; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B310"},{"oldCode":"10044","name":"강남이앤알(주)","bizno":"113-81-84663","mouDate":null,"rep":"김승수","phone":"010-3110-1910","address":"충청남도 홍성군 광천읍 광천로430번길 41-129","gongjong":"POUR 공법 협약(건설)","source":"내부","note":"체결일 미기재","newCode":"B2B311"},{"oldCode":"10056","name":"건영이앤씨(주)","bizno":"753-88-00965","mouDate":null,"rep":"천경수","phone":"031-8054-0068","address":"경기도 평택시 팔각정길 8-1, 2층(비전동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 정보없음","newCode":"B2B312"},{"oldCode":"10022","name":"건진개발(주)","bizno":"606-81-16240","mouDate":null,"rep":"심수율","phone":"051-301-6476","address":"부산 사상구 백양대로 955-29","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"체결일 미기재; 내부메모: 특허기술 공식 협약서 발행; 약칭 '건진산업(주)' 로 연결; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B313"},{"oldCode":"10057","name":"광일포장건설(주)","bizno":null,"mouDate":null,"rep":"이은미","phone":"061-751-6966","address":"전남 순천시 조례못등3길 3-6","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 사업자번호 미등록; 내부메모: 정보없음","newCode":"B2B314"},{"oldCode":"NEW-037","name":"근영건설(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B315"},{"oldCode":"NEW-038","name":"나이스원건설(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B316"},{"oldCode":"NEW-039","name":"뉴월드건설(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B317"},{"oldCode":"NEW-040","name":"다빈치건설(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B318"},{"oldCode":"10050","name":"대경건설(주)","bizno":"615-81-32507","mouDate":null,"rep":"이군희","phone":"051-972-9974","address":"부산광역시 강서구 대저로255번길 16(대저1동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 정보없음","newCode":"B2B319"},{"oldCode":"NEW-041","name":"대길포장건설(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B320"},{"oldCode":"NEW-042","name":"대로건설화학(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B321"},{"oldCode":"NEW-043","name":"대보특수방수","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); CRM기타: 스토어파트너스인계; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B322"},{"oldCode":"10024","name":"대진건설(주)","bizno":"515-81-01645","mouDate":null,"rep":"김호경","phone":"053-656-2100","address":"대구광역시 서구 서대구로42길 49(평리동)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B323"},{"oldCode":"NEW-044","name":"대한페인트공사","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B324"},{"oldCode":"10025","name":"덕산기업","bizno":"201-31-94764","mouDate":null,"rep":"박성은","phone":"010-7431-5911","address":"울산광역시 동구 화정4길 24, 101호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B325"},{"oldCode":"NEW-045","name":"동명기산(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B326"},{"oldCode":"10043","name":"동양에폭시(주)","bizno":"130-81-58423","mouDate":null,"rep":"김태건","phone":"031-996-8822","address":"경기 김포시 양촌읍 황금6로 30","gongjong":"POUR 공법 협약(건설)","source":"내부","note":"체결일 미기재","newCode":"B2B327"},{"oldCode":"NEW-046","name":"동은건설(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 단편 협약서 요청건으로, 재연락 전 진행X; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B328"},{"oldCode":"NEW-047","name":"만보건설(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B329"},{"oldCode":"10008","name":"명서건설(주)","bizno":"409-81-60427","mouDate":null,"rep":"채영기","phone":"062-512-5121","address":"광주광역시 서구 내방로 235(쌍촌동, 삼화빌딩 5층)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 특허기술 공식 협약서 발행","newCode":"B2B330"},{"oldCode":"10034","name":"미래건축","bizno":"864-11-01073","mouDate":null,"rep":"김병석","phone":"010-3857-5147","address":"경상남도 거제시 장평로6길 30, 8동 902호","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 소장님","newCode":"B2B331"},{"oldCode":"NEW-048","name":"비이건설(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B332"},{"oldCode":"NEW-049","name":"삼동건설(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 자체실적 없어, 1년 지켜보고 방향 결정예정; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B333"},{"oldCode":"NEW-050","name":"삼은기업(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B334"},{"oldCode":"10036","name":"삼흥환경건설(주)","bizno":"123-81-34189","mouDate":null,"rep":"성백정","phone":"031-458-6162","address":"경기도 군포시 산본로324번길 8, 3층 6~7호(금정동, 동영센트럴타워)","gongjong":"서비스_폐기물","source":"내부","note":"체결일 미기재; 내부메모: 서비스_폐기물","newCode":"B2B335"},{"oldCode":"NEW-051","name":"썬위드이엔씨(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B336"},{"oldCode":"NEW-052","name":"연합특수방수(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 스토어 연계방안 지원; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B337"},{"oldCode":"NEW-053","name":"영광건설산업(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B338"},{"oldCode":"NEW-054","name":"원투쓰리방수","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 현장이력: 현장팀 운영; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B339"},{"oldCode":"NEW-055","name":"인석건설(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B340"},{"oldCode":"10052","name":"제네시스광고기획","bizno":null,"mouDate":null,"rep":"임희정","phone":"055-366-9290","address":"경남 양산시 양주4길 31","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 사업자번호 미등록; 내부메모: 정보없음","newCode":"B2B341"},{"oldCode":"NEW-056","name":"제비표페인트","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B342"},{"oldCode":"EXT-002","name":"조양도장산업(주)","bizno":null,"mouDate":null,"rep":"이금옥","phone":"055-326-6998","address":"경상남도 김해시 김해대로2715번길 17, 2층(지내동)","gongjong":"POUR 공법 협약(건설)","source":"외부","note":"내부 원장 미등재 — 사업자번호·체결일 확인 후 내부 등록 필요; 내부 원장에서 삭제된 업체가 외부용에 잔존 — 외부용 삭제 여부 확인 필요","newCode":"B2B343"},{"oldCode":"NEW-057","name":"조이건설(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B344"},{"oldCode":"10031","name":"청학건설(주)","bizno":"219-81-08361","mouDate":null,"rep":"김익신","phone":"02-2057-3455","address":"서울특별시 서초구 동산로 77(양재동, 청학빌딩 3층)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재","newCode":"B2B345"},{"oldCode":"10049","name":"태동건설","bizno":"138-02-77337","mouDate":null,"rep":"이종균","phone":"031-282-0700","address":"경기도 용인시 기흥구 중부대로 555, 2층 207호(구갈동, 대경프라자)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 특허기술 공식 협약서 발행","newCode":"B2B346"},{"oldCode":"10007","name":"태형산업개발","bizno":"636-05-02914","mouDate":null,"rep":"윤세인","phone":"051-336-9003","address":"부산광역시 부산진구 백양관문로77번길 81, 113동 1905호(개금동, 개금우드빌)","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"주소 외부용 표기 상이 → 내부용 정본 채택; 체결일 미기재; 내부메모: 정보없음","newCode":"B2B347"},{"oldCode":"NEW-058","name":"토탈엔지니어링","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); CRM기타: 김훈지사장님 연결; 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B348"},{"oldCode":"NEW-059","name":"하나건설공사(주)","bizno":null,"mouDate":null,"rep":null,"phone":null,"address":null,"gongjong":"POUR 공법 협약(건설)","source":"추가데이터","note":"추가데이터(신규업체 CRM)에서 신규 편입 — 마스터 미등재; 체결일 미기재(MOU 진행중 또는 미체결); 사업자번호·대표자·연락처·주소 미확보 → 확인 필요","newCode":"B2B349"},{"oldCode":"10017","name":"하진건설(주)","bizno":"610-81-62025","mouDate":null,"rep":"김도현","phone":"052-281-5700","address":"울산광역시 중구 반구정16길 64","gongjong":"POUR 공법 협약(건설)","source":"양쪽","note":"체결일 미기재; 내부메모: 특허기술 공식 협약서 발행","newCode":"B2B350"},{"oldCode":"10035","name":"현네트웍스","bizno":"461-13-01669","mouDate":null,"rep":"손창현","phone":null,"address":"서울특별시 노원구 한글비석로36길 22, 101호","gongjong":"건설_랜공사","source":"내부","note":"체결일 미기재; 내부메모: 건설_랜공사","newCode":"B2B351"},{"oldCode":"10040","name":"효원이엔씨(주)","bizno":null,"mouDate":null,"rep":"이세형","phone":"02-402-8065","address":"서울특별시 송파구 문정동 31-1, 2층","gongjong":"POUR 공법 협약(건설)","source":"양쪽+CRM","note":"체결일 미기재; 사업자번호 미등록; 내부메모: 24.1.29 메일 수신 불가, 정보없음; CRM기타: 협약보류; 추가데이터(신규업체 CRM) 대조 완료","newCode":"B2B352"}];
 </script>
 
 <script>
@@ -6498,6 +6607,197 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   }
 
   /* ==========================================================================
+     마스터 업체 명단 가져오기(§마스터 업체 명단 가져오기 라운드, 신규) — window.
+     SHIN2_MASTER_COMPANY_SNAPSHOT(352개 업체, 사용자가 직접 정리한 "마스터 업체 명단",
+     위 스냅샷 주석 참고)을 현재 companies와 매칭해서 "안전한 교체/재연결"한다(사용자가
+     명시적으로 선택한 방식). Partner Dashboard 이관(바로 위)과 같은 안전 원칙 + 이번
+     라운드 전용 추가 원칙:
+
+     - company.id는 절대 바꾸지 않는다 — 매칭된 기존 업체는 updateCompany(patch)로만
+       필드를 갱신하고, 기존 활동(customerActivities)/sheetRequests/매출 연결은 모두
+       companyId를 그대로 참조하므로 전혀 끊어지지 않는다(§요청 "히스토리 유실 금지").
+     - 마스터 명단에 없는 기존 업체는 절대 삭제/휴지통 이동하지 않는다(§요청, 아래
+       computeCompaniesNotInMaster는 "확인 필요" 표시용 계산만 하고 아무것도 쓰지 않음).
+     - 매칭 우선순위: ①masterCode 재실행 보호(이미 이 도구로 연결된 업체 — 재실행해도
+       중복 생성/재매칭 없게 하는 멱등성 보호, 사업자번호보다도 먼저 본다) ②사업자등록번호
+       완전일치(공백/대시 정규화만, 유사매칭 금지) ③normCompanyName() 완전일치(기존
+       Sheets 매칭 파이프라인과 완전히 같은 함수 재사용, §"업체명이 비슷하다는 이유로
+       임의 연결 금지") ④매칭 안 됨 → 신규 생성 예정. 동일 단계에서 후보가 2건 이상이면
+       (예: 같은 정규화 이름의 CRM 업체가 여러 건) 자동 연결하지 않고 "확인 필요(모호한
+       매칭)"로만 분류한다(Partner 이관과 동일한 review 원칙).
+     - MOU 날짜(co.partnerDashboard.mouDate, §위 resolvePartnerAgreementDate 주석에서
+       이미 확인된 실제 저장 경로)는 L2→L3 전환 계산에 쓰이는 고위험 필드라 특별 취급한다:
+       마스터 값이 없으면(null) 절대 건드리지 않고, 기존 값이 비어 있으면 채우고(gap-fill,
+       충돌 아님), 기존 값이 있고 마스터 값과 다르면 "충돌"로 분류해 기본적으로 적용 배치에
+       넣지 않는다 — 사람이 미리보기 화면에서 개별 체크박스 또는 일괄 토글로 명시적으로
+       켜야만(기본 OFF) 그 건의 MOU 날짜가 덮어써진다. 그 외 필드(업체명/사업자번호/주소/
+       전화/대표자/공종)는 큐레이션된 원본의 보정값이라 매칭된 건에는 항상 적용한다.
+     - previewMasterImportRoster()는 아무것도 저장하지 않는다 — 분류 결과만 계산해서
+       반환한다. applyMasterImportRoster()만 실제로 저장하며, 그마저도 preview가 이미
+       계산해 둔 matched/newCompanies만 쓴다(모호한 매칭/마스터에 없는 기존 업체는 절대
+       자동 처리하지 않음).
+     ========================================================================== */
+  function matchMasterRowToCompany(row, companies){
+    if(row.newCode){
+      const hit = companies.find(c=> c.masterCode === row.newCode);
+      if(hit) return { company: hit, matchedBy: 'masterCode' };
+    }
+    if(row.bizno){
+      const nb = normBizNo(row.bizno);
+      if(nb){
+        const hits = companies.filter(c=> c.bizRegNo && normBizNo(c.bizRegNo) === nb);
+        if(hits.length === 1) return { company: hits[0], matchedBy: 'bizno' };
+        if(hits.length > 1) return { ambiguous: true, reason: '동일 사업자번호의 CRM 업체가 여러 건', candidates: hits };
+      }
+    }
+    const rn = normCompanyName(row.name);
+    if(rn){
+      const hits = companies.filter(c=> normCompanyName(c.name) === rn);
+      if(hits.length === 1) return { company: hits[0], matchedBy: 'name' };
+      if(hits.length > 1) return { ambiguous: true, reason: '동일 정규화 업체명의 CRM 업체가 여러 건', candidates: hits };
+    }
+    return { noMatch: true };
+  }
+
+  // 마스터 파일 자체 안에서 사업자번호가 중복되는 행들(큐레이터가 이미 note에 "개별 행
+  // 유지"라고 판단해 둔 경우가 실제 데이터에 있음) — 정보성으로만 미리보기에 보여준다
+  // (§요청 "블로킹 아님").
+  function computeMasterBizNoDuplicates(rows){
+    const byBiz = new Map();
+    rows.forEach(r=>{
+      if(!r.bizno) return;
+      const nb = normBizNo(r.bizno);
+      if(!nb) return;
+      if(!byBiz.has(nb)) byBiz.set(nb, []);
+      byBiz.get(nb).push(r);
+    });
+    return Array.from(byBiz.values()).filter(g=> g.length > 1);
+  }
+
+  // 매칭된 기존 업체 co와 마스터 행 row를 비교해서 "무엇이 바뀔지"만 계산한다(저장 안 함).
+  // 각 항목: { field, label, from, to } — from/to가 실제로 다를 때만 포함.
+  const MASTER_FIELD_MAP = [
+    ['name', 'name', '업체명'],
+    ['bizRegNo', 'bizno', '사업자번호'],
+    ['address', 'address', '주소'],
+    ['phone', 'phone', '전화번호'],
+    ['repName', 'rep', '대표자'],
+    ['gongjong', 'gongjong', '공종']
+  ];
+  function diffMasterRowAgainstCompany(co, row){
+    const diffs = [];
+    MASTER_FIELD_MAP.forEach(([coField, rowField, label])=>{
+      const to = row[rowField];
+      if(!to) return; // 마스터 값이 없으면 비교하지 않는다(빈 값으로 덮어쓰지 않음)
+      const from = co[coField] || '';
+      if(from !== to) diffs.push({ field: coField, label, from, to });
+    });
+    return diffs;
+  }
+  // MOU 날짜 충돌 판정 — 위 클래스 주석의 규칙 그대로. status: 'none'(마스터 값 없음, 손대지
+  // 않음) | 'fill'(빈 값 채우기, 충돌 아님) | 'same'(이미 같은 값) | 'conflict'(사람 승인 필요).
+  function classifyMasterMouDate(co, row){
+    const existing = (co.partnerDashboard && co.partnerDashboard.mouDate) || null;
+    if(!row.mouDate) return { status: 'none', existing, incoming: null };
+    if(!existing) return { status: 'fill', existing, incoming: row.mouDate };
+    if(existing === row.mouDate) return { status: 'same', existing, incoming: row.mouDate };
+    return { status: 'conflict', existing, incoming: row.mouDate };
+  }
+
+  // previewMasterImportRoster: 순수 분석 함수 — 아무것도 저장하지 않는다.
+  function previewMasterImportRoster(){
+    const roster = window.SHIN2_MASTER_COMPANY_SNAPSHOT || [];
+    const companies = loadActiveCompanies();
+    const matched = [], newCompanies = [], review = [];
+    const matchedCompanyIds = new Set();
+    const referencedCompanyIds = new Set(); // 모호한 매칭 후보도 "확인 필요"로 참조된 것으로 본다(§요청 "마스터 명단에 없음"은 어느 마스터 행과도 전혀 안 겹치는 경우만)
+    roster.forEach(row=>{
+      const r = matchMasterRowToCompany(row, companies);
+      if(r.company){
+        matchedCompanyIds.add(r.company.id);
+        referencedCompanyIds.add(r.company.id);
+        matched.push({
+          row, companyId: r.company.id, companyName: r.company.name, matchedBy: r.matchedBy,
+          diffs: diffMasterRowAgainstCompany(r.company, row),
+          mou: classifyMasterMouDate(r.company, row)
+        });
+      } else if(r.ambiguous){
+        (r.candidates || []).forEach(c=> referencedCompanyIds.add(c.id));
+        review.push({ row, reason: r.reason, candidates: (r.candidates || []).map(c=> ({ id: c.id, name: c.name })) });
+      } else {
+        newCompanies.push({ row });
+      }
+    });
+    const notInMaster = companies.filter(co=> !referencedCompanyIds.has(co.id));
+    const bizNoDuplicates = computeMasterBizNoDuplicates(roster);
+    return {
+      total: roster.length, matched, newCompanies, review, notInMaster, bizNoDuplicates,
+      conflictCount: matched.filter(m=> m.mou.status === 'conflict').length
+    };
+  }
+
+  function buildMasterImportMeta(row, matchedBy){
+    return { source: 'master-roster', oldCode: row.oldCode, matchedBy, importedAt: nowIso(), note: row.note || null };
+  }
+
+  // applyMasterImportRoster: preview가 분류한 matched/newCompanies만 저장한다(review/
+  // notInMaster는 절대 자동 처리하지 않음 — notInMaster는 애초에 계산만 하고 아무 데도
+  // 쓰지 않는다, §요청 "삭제 안 함"). mouOverrideRowKeys는 "충돌" 건 중 사용자가 명시적으로
+  // 체크한 row.newCode의 Set — 그 안에 있는 row만 MOU 날짜를 덮어쓴다.
+  function applyMasterImportRoster(precomputedPreview, mouOverrideRowKeys){
+    const preview = precomputedPreview || previewMasterImportRoster();
+    const overrideSet = mouOverrideRowKeys instanceof Set ? mouOverrideRowKeys : new Set(mouOverrideRowKeys || []);
+    const list = loadCompanies();
+    const byId = new Map(list.map(c=> [c.id, c]));
+    let updatedCount = 0, mouFilledCount = 0, mouOverwrittenCount = 0, mouSkippedConflictCount = 0;
+    preview.matched.forEach(m=>{
+      const rec = byId.get(m.companyId);
+      if(!rec) return; // 이론상 발생하지 않음(preview가 이 loadActiveCompanies() 스냅샷 기준으로 매칭) — 방어적 처리
+      const row = m.row;
+      const patch = { masterCode: row.newCode, masterImportMeta: buildMasterImportMeta(row, m.matchedBy) };
+      if(row.name) patch.name = row.name;
+      if(row.bizno) patch.bizRegNo = row.bizno;
+      if(row.address) patch.address = row.address;
+      if(row.phone) patch.phone = row.phone;
+      if(row.rep) patch.repName = row.rep;
+      if(row.gongjong) patch.gongjong = row.gongjong;
+      if(m.mou.status === 'fill'){
+        patch.partnerDashboard = Object.assign({}, rec.partnerDashboard || {}, { mouDate: row.mouDate });
+        mouFilledCount++;
+      } else if(m.mou.status === 'conflict'){
+        if(overrideSet.has(row.newCode)){
+          patch.partnerDashboard = Object.assign({}, rec.partnerDashboard || {}, { mouDate: row.mouDate });
+          mouOverwrittenCount++;
+        } else {
+          mouSkippedConflictCount++;
+        }
+      }
+      applyPatchToRecord(rec, normalizeCompanyPatch(patch), false);
+      updatedCount++;
+    });
+    let createdCount = 0;
+    preview.newCompanies.forEach(n=>{
+      const row = n.row;
+      const fields = { name: row.name, masterCode: row.newCode, masterImportMeta: buildMasterImportMeta(row, 'new') };
+      if(row.rep) fields.repName = row.rep;
+      if(row.phone) fields.phone = row.phone;
+      if(row.address) fields.address = row.address;
+      if(row.bizno) fields.bizRegNo = row.bizno;
+      if(row.gongjong) fields.gongjong = row.gongjong;
+      if(row.mouDate) fields.partnerDashboard = { mouDate: row.mouDate };
+      // addCompany()와 완전히 동일한 기본 필드 구조(§ 새 업체 최소 생성 규칙, 절대 변경 안 함).
+      const rec = Object.assign({ id: genId('co'), name:'', repName:'', contactName:'', position:'', phone:'', mobile:'', fax:'', email:'', bizRegNo:'', address:'', website:'', memo:'', createdAt: nowIso() }, normalizeCompanyPatch(fields));
+      list.push(rec);
+      createdCount++;
+    });
+    saveCompanies(list);
+    return {
+      updatedCount, createdCount, mouFilledCount, mouOverwrittenCount, mouSkippedConflictCount,
+      reviewCount: preview.review.length, notInMasterCount: preview.notInMaster.length
+    };
+  }
+
+  /* ==========================================================================
      POUR 시공실적 연결(§POUR 시공실적 라운드) — SHIN2_POUR_TRACK_RECORD_SNAPSHOT(엑셀에서
      한 번만 추출해 embed된 원본 값)을 현재 CRM companies와 "정규화된 업체명 완전일치"로만
      연결한다. Partner Dashboard 이관과 같은 안전 원칙을 그대로 따른다:
@@ -6924,11 +7224,22 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   // 결과 Map을 한 번만 만들어 재사용해도 값은 완전히 동일하다(순수 함수, 캐시가 답을
   // 바꾸지 않음) — 그래서 최초 1회만 계산하고 이후 호출은 캐시를 그대로 반환한다.
   let _pourRecordIndexCache = null;
+  // §POUR 낙찰 라이브 연동 라운드(신규) — 기존 1149건 정적 스냅샷(SHIN2_POUR_TRACK_RECORD_SNAPSHOT,
+  // 절대 수정하지 않음)에 새 "26년 POUR 공고문 현황" 탭에서 낙찰(정확히 "낙찰"만, "타공법낙찰"
+  // 제외)로 실시간 동기화된 레코드(window.SHIN2_POUR_WON_LIVE_RECORDS, 정적 스냅샷과 완전히
+  // 같은 {company, year, category, region, city, client, households, patentNo, sourceSheet,
+  // sourceRow, sourceRecordId} 형태로만 채워짐 — §요청)를 그대로 concat만 한다. 이 인덱스를
+  // 쓰는 D.getAllPourRecordsForCompany/getTotalPourRecordsForCompany(고객 상세 팝업 시공실적
+  // Drawer) · buildMapCompanies/buildPourApartmentGroups(지도) 양쪽 모두 새 계산 없이 이
+  // concat 하나로 라이브 데이터를 함께 본다(§요청 "새 판정 기준을 만들지 않는다"와 동일한
+  // 원칙 — 여기서도 두 번째 집계 경로를 만들지 않는다).
+  function invalidatePourRecordIndexCache(){ _pourRecordIndexCache = null; }
   function buildPourRecordIndex(){
     if(_pourRecordIndexCache) return _pourRecordIndexCache;
     const snapshot = window.SHIN2_POUR_TRACK_RECORD_SNAPSHOT || [];
+    const liveWon = window.SHIN2_POUR_WON_LIVE_RECORDS || [];
     const index = new Map(); // normName -> records[]
-    snapshot.forEach(r=>{
+    snapshot.concat(liveWon).forEach(r=>{
       const norm = normCompanyNameForPour(r.company);
       if(!norm) return;
       if(!index.has(norm)) index.set(norm, []);
@@ -7085,6 +7396,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     isCompanyDeleted, loadActiveCompanies, loadDeletedCompanies, softDeleteCompany, restoreDeletedCompany,
     addCurrentSituation, removeCurrentSituation, addInterestField, removeInterestField,
     previewPartnerImport, applyPartnerImport,
+    previewMasterImportRoster, applyMasterImportRoster,
     previewPourTrackImport, applyPourTrackImport, applyPourExcelImportRecords,
     REQUESTED_MATERIAL_TYPES, REQUESTED_MATERIAL_STATUSES,
     addRequestedMaterial, addRequestedMaterialIfNew, removeRequestedMaterial, setRequestedMaterialStatus, extractRequestedMaterialsFromActivities,
@@ -7092,7 +7404,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     buildUnregisteredCompanies, getCompany2025Revenue, getCompany2024Revenue, getCompanyTotalRevenueAllYears,
     buildRevenue2026Index, getCompany2026Revenue, buildUnregisteredCompanies2026,
     getCompanyReceivable, buildReceivableCompanies,
-    getLatestPourRecordForCompany, getAllPourRecordsForCompany, buildPourLatestIndex,
+    getLatestPourRecordForCompany, getAllPourRecordsForCompany, buildPourLatestIndex, invalidatePourRecordIndexCache,
     buildRequestHistory, buildRequestHistoryIndex,
     // §외부 동기화 제거 라운드(신규) — partner-dashboard(외부 사이트)를 fetch하던
     // previewPartnerSync/applyPartnerSync/previewPartnerListSync/applyPartnerListSync/
@@ -7636,6 +7948,16 @@ window.SHIN2_CRM_APP_INIT = function(){
     { tab:'공법설명회이력',   companyCol:'시공사',   dateCol:'등록일',   idCol:'문의ID(시스템)', siteNameCol:'현장명' }, // §요청: 반드시 등록일(요청일 아님)
     { tab:'기타문의답변현황', companyCol:'업체명',   dateCol:'등록일',   idCol:'문서ID(시스템)' }
   ];
+  // §POUR 낙찰 라이브 연동 라운드(신규) — 위 GSHEET_TABS(5개 탭, sheetRequests로 감)와는
+  // 완전히 별개의 소스다(§요청 "request-ingestion 루프에 합치지 말 것"). 다른 스프레드시트
+  // (사용자가 공유한 링크의 spreadsheetId)의 "26년 POUR 공고문 현황" 탭 하나만 본다 — "특허"/
+  // "26년 전체 공고문" 탭은 범위 밖(§요청, 건드리지 않음). gid=1294038008은 사용자가 링크에서
+  // 준 값이지만 이 세션에서는 실제로 그 gid가 이 탭인지 검증할 수 없다(라이브 네트워크 접근
+  // 불가) — 그래서 gid를 아예 쓰지 않고, 위 5개 탭과 동일한 이름 기반(gviz `sheet=` 파라미터)
+  // 방식으로 "26년 POUR 공고문 현황"을 직접 지정한다. 배포 후 실제 탭 이름이 시트와 정확히
+  // 일치하는지는 실사이트에서 확인이 필요하다(보고서에 명시).
+  const POUR_WON_GSHEET_ID = '1uYftf05-dZ0VS3tPzvEV-G0fukcc8QFShXkbKMzRQ4U';
+  const POUR_WON_TAB_NAME = '26년 POUR 공고문 현황';
   // §확인 필요 복원/3단계 분류 라운드(신규) — 자동 제외 규칙(§요청 4). 이 두 패턴에
   // 걸리는 행은 "확인 필요"/"건바이건 업체" 어디에도 절대 들어가지 않고 그 자리에서
   // 끝난다(§요청 "전환율 계산 방식/기존 정상 업체 데이터는 건드리지 않는다" — 오직 이
@@ -7723,10 +8045,15 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 전용 GET 하나로 끝난다. 콜백 이름은 매 호출 유일하게 만들어 동시에 여러 탭을 불러도
   // 서로 덮어쓰지 않게 하고, 다 쓰면 콜백/스크립트 태그를 정리한다.
   let gsheetJsonpSeq = 0;
-  function fetchGSheetTabJSONP(tabName, timeoutMs){
+  // §POUR 낙찰 라이브 연동 라운드(신규) — spreadsheetId 파라미터(선택)를 추가했을 뿐, 기존
+  // 호출부(GSHEET_TABS 5개 탭, 인자 2개만 넘김)는 그대로 GSHEET_ID를 쓴다(§요청 "5개 탭
+  // 파이프라인은 건드리지 않는다"). 새 POUR 시트는 다른 스프레드시트(POUR_WON_GSHEET_ID)에
+  // 있어 세 번째 인자로 그 id를 넘긴다 — sheet=탭명(gviz 이름 기반) 방식은 기존과 완전히
+  // 동일하고, gid는 어느 호출에서도 쓰지 않는다(§보고서 "gid 대신 이름 기반 재사용" 참고).
+  function fetchGSheetTabJSONP(tabName, timeoutMs, spreadsheetId){
     return new Promise((resolve, reject)=>{
       const cbName = '__gsheetCb' + (++gsheetJsonpSeq) + '_' + Date.now();
-      const url = 'https://docs.google.com/spreadsheets/d/' + GSHEET_ID + '/gviz/tq?sheet='
+      const url = 'https://docs.google.com/spreadsheets/d/' + (spreadsheetId || GSHEET_ID) + '/gviz/tq?sheet='
         + encodeURIComponent(tabName) + '&tqx=out:json;responseHandler:' + cbName;
       let done = false;
       const script = document.createElement('script');
@@ -8354,6 +8681,208 @@ window.SHIN2_CRM_APP_INIT = function(){
       renderList();
     }
   }
+
+  /* ==========================================================================
+     §POUR 낙찰 라이브 연동 라운드(신규) — GSHEET_TABS(5개 탭 → sheetRequests) 파이프라인과
+     완전히 별개(§요청 "합치지 말 것"). 다른 스프레드시트(POUR_WON_GSHEET_ID)의
+     "26년 POUR 공고문 현황" 탭만 보고, users/{uid}/pourWonBids에 저장한 뒤
+     window.SHIN2_POUR_WON_LIVE_RECORDS(정적 SHIN2_POUR_TRACK_RECORD_SNAPSHOT과 같은 레코드
+     모양)를 채운다 — 이후 D.buildPourRecordIndex()가 그 배열을 그대로 concat해서 고객 상세
+     팝업 시공실적/지도 양쪽에 자동 반영된다(§요청 "두 번째 집계 경로를 만들지 않는다").
+     ========================================================================== */
+  let pourWonImportState = { ran:false, running:false, lastError:null, totalRows:0, wonRows:0,
+    savedCount:0, dedupSkippedCount:0, unmatchedCount:0, unmatchedNames:[] };
+  function parsePourYearFromDateText(s){
+    if(!s) return null;
+    const m = /(\d{4})/.exec(String(s));
+    return m ? parseInt(m[1], 10) : null;
+  }
+  function refreshPourWonLiveRecords(){
+    const all = window.SHIN2_POURWON_SYNC ? window.SHIN2_POURWON_SYNC.getAll() : [];
+    // §요청 "정적 스냅샷과 호환되는 형태로" — SHIN2_POUR_TRACK_RECORD_SNAPSHOT 레코드가 쓰는
+    // 필드(company/year/category/region/city/client/households/patentNo/sourceSheet/
+    // sourceRow/sourceRecordId)는 반드시 채우고, 이 시트에서만 있는 추가 필드(agreementNo 등)는
+    // 덧붙이기만 한다 — 기존 소비처(D.buildPourRecordIndex 등)는 모르는 필드는 그냥 무시한다.
+    window.SHIN2_POUR_WON_LIVE_RECORDS = all.map(d=> ({
+      company: d.company, year: (typeof d.year === 'number' ? d.year : null), category: d.category || '',
+      region: d.region || '', city: d.city || '', client: d.client || '',
+      households: (typeof d.households === 'number' ? d.households : null),
+      patentNo: d.patentNo || '', sourceSheet: d.sourceSheet, sourceRow: d.sourceRow, sourceRecordId: d.sourceRecordId,
+      agreementNo: d.agreementNo || '', awardAmount: d.awardAmount || '', bidCode: d.bidCode || '',
+      siteManager: d.siteManager || '', completionDate: d.completionDate || '', bidOpenDate: d.bidOpenDate || '', noticeDate: d.noticeDate || ''
+    }));
+    if(D && D.invalidatePourRecordIndexCache) D.invalidatePourRecordIndexCache();
+    updatePourWonSyncNote();
+    renderList();
+  }
+  async function runPourWonImportOnce(){
+    if(pourWonImportState.ran || pourWonImportState.running) return;
+    pourWonImportState.running = true;
+    try{
+      let table;
+      try{ table = await fetchGSheetTabJSONP(POUR_WON_TAB_NAME, 12000, POUR_WON_GSHEET_ID); }
+      catch(err){
+        pourWonImportState.lastError = 'POUR 공고문 시트를 확인하지 못했습니다(' + (err && err.message || err) + ') — 기존 시공실적은 그대로입니다.';
+        return;
+      }
+      if(!table || !Array.isArray(table.rows) || !Array.isArray(table.cols)){
+        pourWonImportState.lastError = 'POUR 공고문 시트 형식을 읽지 못했습니다.';
+        return;
+      }
+      const cols = table.cols;
+      function idx(label){ return cols.findIndex(c=> (c.label || c.id) === label); }
+      const cStatus = idx('공고현황'), cCompany = idx('낙찰업체'), cSite = idx('단지명'),
+        cCatBig = idx('공사구분(대)'), cCatSmall = idx('공사구분(소)'), cCatDetail = idx('공종상세'),
+        cAgreement = idx('협약서발행번호'), cRegion = idx('지역'), cCity = idx('도시'), cAddr = idx('나머지주소'),
+        cHouseholds = idx('세대수'), cPatent = idx('특허번호'), cNo = idx('NO.'),
+        cCompletion = idx('준공일'), cBidOpen = idx('개찰일'), cNotice = idx('공고일'),
+        cAward = idx('낙찰금액'), cBidCode = idx('업체코드'), cManager = idx('현장소장');
+
+      const companies = D.loadActiveCompanies();
+      const crmNormNames = new Set(companies.map(co=> D.normCompanyName(co.name)));
+      // §POUR 낙찰 dedup 기준 변경 라운드(신규, 사용자 확인) — 정적 스냅샷(SHIN2_POUR_TRACK_RECORD_SNAPSHOT,
+      // 1149건) 레코드 실제 모양(company/year/category/region/city/client/households/patentNo/
+      // sourceSheet/sourceRow/sourceRecordId)에는 협약서발행번호 필드 자체가 없다(grep으로 확인,
+      // §보고서에 명시). 그래서 "협약서발행번호 일치" 단독 기준은 old snapshot 쪽에서 항상 0건만
+      // 걸러지는(=사실상 무의미한) 규칙이었다 — 사용자 확인에 따라 주 기준을 "단지명(client) +
+      // 낙찰업체명(company) + 날짜(year)" 조합 키로 바꾼다:
+      //  - 업체명: 기존 normCompanyNameForPour/D.normCompanyName과 동일한 정규화(㈜/주식회사/공백/
+      //    특수문자 제거) — 새 정규화 규칙을 만들지 않는다.
+      //  - 단지명: 지도 기능이 이미 쓰는 normAptName(§POUR 시공 아파트 지도 라운드, 아래 정의—
+      //    괄호 안 설명/‘아파트’·APT 표기/공백만 제거하는 얕은 정규화)을 그대로 재사용한다. 유사
+      //    이름을 임의로 합치는 fuzzy matching은 하지 않는다(완전 일치만 중복으로 판정).
+      //  - 날짜: 정적 스냅샷 레코드에는 연(year) 단위만 있고 월/일이 없다(grep으로 확인) — 그래서
+      //    비교 가능한 최대 정밀도는 "연도"뿐이다. 라이브 시트 쪽 연도는 준공일(있으면)→개찰일→
+      //    공고일 순으로 이미 파싱해 두는 값(아래 `year`, "실제 시공이 이뤄진/완료된 연도"에 가장
+      //    가까운 준공일을 최우선으로 삼음 — old snapshot의 year도 "그 해 시공실적"을 뜻하므로
+      //    같은 의미의 값끼리 비교한다, §보고서에 근거 명시)을 그대로 쓴다.
+      // 협약서발행번호는 양쪽에 값이 있을 때만 보조로 함께 확인한다(필드가 있으면 우선 사용) —
+      // 없으면 완전히 무해하게 스킵된다(§요청 "없어서 원래 무의미했던 부분, 단순하게 교체").
+      const oldSnapshot = window.SHIN2_POUR_TRACK_RECORD_SNAPSHOT || [];
+      function buildOldDedupKey(r){
+        const normCo = D.normCompanyName(r.company);
+        const normSite = normAptName(r.client);
+        if(!normCo || !normSite || typeof r.year !== 'number') return null;
+        return normCo + '|' + normSite + '|' + r.year;
+      }
+      const oldDedupKeys = new Set(oldSnapshot.map(buildOldDedupKey).filter(Boolean));
+      const oldAgreementNos = new Set(oldSnapshot.map(r=> r.agreementNo).filter(Boolean));
+
+      let wonRows = 0, dedupSkipped = 0;
+      const unmatchedSet = new Set();
+      const toWrite = [];
+      // §타이밍 — Firestore 저장(saveMany) 직후에는 onSnapshot 폴링(가짜 백엔드 기준 최대
+      // 400ms)이 아직 새 문서를 못 따라잡았을 수 있어, window.SHIN2_POUR_WON_LIVE_RECORDS를
+      // 그 캐시에서 다시 만들면 방금 막 가져온 이번 세션 레코드가 잠깐 비어 보일 수 있다.
+      // 그래서 이번 실행에서 실제로 채택된 레코드는 별도로 메모리에 모아뒀다가 바로 반영한다
+      // (다른 기기/세션에서 쓴 값은 여전히 onSnapshot 구독 → refreshPourWonLiveRecords()로
+      // 실시간 반영된다, 아래 이벤트 리스너 참고).
+      const keptRecords = [];
+      const existingAll = window.SHIN2_POURWON_SYNC ? window.SHIN2_POURWON_SYNC.getAll() : [];
+      const existingById = new Map(existingAll.map(d=> [d.id, d]));
+
+      table.rows.forEach((row, rowIdx)=>{
+        if(!row || !row.c) return;
+        const statusRaw = cStatus >= 0 ? gsheetCellToText(row.c[cStatus]) : '';
+        // §CRITICAL(§요청 명시) — 반드시 정확 일치("낙찰"만). "타공법낙찰"은 substring으로는
+        // 걸리지만 의미가 다른 별개 상태이므로 여기서 반드시 제외되어야 한다.
+        if(statusRaw.trim() !== '낙찰') return;
+        wonRows++;
+        const companyName = cCompany >= 0 ? gsheetCellToText(row.c[cCompany]) : '';
+        const siteName = cSite >= 0 ? gsheetCellToText(row.c[cSite]) : '';
+        const agreementNo = cAgreement >= 0 ? gsheetCellToText(row.c[cAgreement]) : '';
+        const no = cNo >= 0 ? gsheetCellToText(row.c[cNo]) : String(rowIdx);
+        if(!companyName) return; // 업체명 없는 행은 매칭/표시/dedup 근거가 없어 저장하지 않는다
+        const completion = cCompletion>=0 ? gsheetCellToText(row.c[cCompletion]) : '';
+        const bidOpen = cBidOpen>=0 ? gsheetCellToText(row.c[cBidOpen]) : '';
+        const notice = cNotice>=0 ? gsheetCellToText(row.c[cNotice]) : '';
+        // §근거(보고서에도 명시) — 준공일을 최우선으로 쓴다: old snapshot의 year는 "그 해에
+        // 시공한 실적"을 뜻하는데(§POUR 시공실적 라운드 주석), 이 시트에서 그 의미에 가장
+        // 가까운 날짜는 개찰일/공고일(입찰 절차 날짜)이 아니라 준공일(실제 시공 완료 시점)이다.
+        // 준공일이 비어 있는 행만 개찰일→공고일 순으로 대체한다.
+        const year = parsePourYearFromDateText(completion) || parsePourYearFromDateText(bidOpen) || parsePourYearFromDateText(notice);
+
+        // §POUR 낙찰 dedup 기준 변경 라운드(신규) — 주 기준: 단지명+업체명+연도 조합 완전 일치.
+        // 협약서발행번호는 양쪽에 값이 있을 때만 보조로 함께 확인한다(있으면 우선 신호로 추가
+        // 사용, 없다고 스킵을 막지 않는다 — 위 buildOldDedupKey 주석 참고).
+        if(agreementNo && oldAgreementNos.has(agreementNo)){ dedupSkipped++; return; }
+        const normName0 = D.normCompanyName(companyName);
+        const normSite0 = normAptName(siteName);
+        const liveDedupKey = (normName0 && normSite0 && typeof year === 'number') ? (normName0 + '|' + normSite0 + '|' + year) : null;
+        if(liveDedupKey && oldDedupKeys.has(liveDedupKey)){ dedupSkipped++; return; }
+
+        const normName = normName0;
+        if(!crmNormNames.has(normName)) unmatchedSet.add(companyName); // §요청: 미매칭은 강제 연결하지 않고 카운트만
+
+        const category = [cCatBig, cCatSmall, cCatDetail].map(ci=> ci>=0 ? gsheetCellToText(row.c[ci]) : '').filter(Boolean).join('\n');
+        const householdsRaw = cHouseholds>=0 ? gsheetCellToText(row.c[cHouseholds]) : '';
+        const householdsNum = householdsRaw ? parseInt(householdsRaw.replace(/[^0-9]/g,''), 10) : NaN;
+        const sourceRecordId = 'pourwon|' + no + '|' + agreementNo;
+        const docId = window.SHIN2_POURWON_SYNC ? window.SHIN2_POURWON_SYNC.docId(no, agreementNo) : ('pourwon_' + no + '_' + agreementNo);
+
+        const fields = {
+          company: companyName, year: (typeof year === 'number' ? year : null), category,
+          region: cRegion>=0 ? gsheetCellToText(row.c[cRegion]) : '', city: cCity>=0 ? gsheetCellToText(row.c[cCity]) : '',
+          address: cAddr>=0 ? gsheetCellToText(row.c[cAddr]) : '',
+          client: siteName, households: (!isNaN(householdsNum) ? householdsNum : null),
+          patentNo: cPatent>=0 ? gsheetCellToText(row.c[cPatent]) : '',
+          sourceSheet: 'POUR라이브:' + POUR_WON_TAB_NAME, sourceRow: (parseInt(no,10) || rowIdx), sourceRecordId,
+          agreementNo, awardAmount: cAward>=0 ? gsheetCellToText(row.c[cAward]) : '',
+          bidCode: cBidCode>=0 ? gsheetCellToText(row.c[cBidCode]) : '', siteManager: cManager>=0 ? gsheetCellToText(row.c[cManager]) : '',
+          completionDate: completion, bidOpenDate: bidOpen, noticeDate: notice
+        };
+        keptRecords.push(fields);
+        const existing = existingById.get(docId);
+        const changed = !existing || Object.keys(fields).some(k=> String(existing[k] == null ? '' : existing[k]) !== String(fields[k] == null ? '' : fields[k]));
+        if(changed){
+          const now = new Date().toISOString();
+          toWrite.push({ id: docId, fields: Object.assign({}, fields, { createdAt: existing ? existing.createdAt : now, updatedAt: now }) });
+        }
+      });
+
+      pourWonImportState.totalRows = table.rows.length;
+      pourWonImportState.wonRows = wonRows;
+      pourWonImportState.dedupSkippedCount = dedupSkipped;
+      pourWonImportState.unmatchedCount = unmatchedSet.size;
+      pourWonImportState.unmatchedNames = Array.from(unmatchedSet);
+
+      if(toWrite.length){
+        try{
+          if(!window.SHIN2_POURWON_SYNC || !window.SHIN2_POURWON_SYNC.saveMany) throw Object.assign(new Error('SYNC_UNAVAILABLE'), { code:'SYNC_UNAVAILABLE' });
+          const r = await window.SHIN2_POURWON_SYNC.saveMany(toWrite); // 내부에서 400건씩 배치
+          pourWonImportState.savedCount = r.saved;
+        }catch(err){
+          pourWonImportState.lastError = 'POUR 낙찰 건 일부를 저장하지 못했습니다 — 기존 시공실적은 그대로입니다.';
+          console.warn('[CRM/POUR] pourWonBids 저장 실패', err);
+        }
+      }
+      // §타이밍 수정 — sync 캐시(onSnapshot)를 거치지 않고 이번 실행에서 채택된 레코드를
+      // 바로 반영한다(위 keptRecords 주석 참고). 정적 스냅샷과 같은 레코드 모양이라
+      // D.buildPourRecordIndex가 그대로 concat해서 쓴다.
+      window.SHIN2_POUR_WON_LIVE_RECORDS = keptRecords;
+      if(D && D.invalidatePourRecordIndexCache) D.invalidatePourRecordIndexCache();
+      renderList();
+    }catch(err){
+      pourWonImportState.lastError = 'POUR 낙찰 시트 확인 중 오류가 발생했습니다 — 기존 시공실적은 그대로입니다.';
+      console.warn('[CRM/POUR] 가져오기 실패', err);
+    }finally{
+      pourWonImportState.running = false;
+      pourWonImportState.ran = true;
+      updatePourWonSyncNote();
+    }
+  }
+  function updatePourWonSyncNote(){
+    const el = document.getElementById('pourWonSyncNote');
+    if(!el) return;
+    if(pourWonImportState.running){ el.textContent = 'POUR 낙찰 동기화 중…'; return; }
+    if(!pourWonImportState.ran){ el.textContent = ''; return; }
+    if(pourWonImportState.lastError){ el.textContent = pourWonImportState.lastError; return; }
+    const parts = ['POUR 낙찰 동기화: ' + pourWonImportState.wonRows + '건(낙찰)'];
+    if(pourWonImportState.dedupSkippedCount) parts.push('기존 실적과 중복 ' + pourWonImportState.dedupSkippedCount + '건 제외');
+    if(pourWonImportState.unmatchedCount) parts.push('미매칭 업체 ' + pourWonImportState.unmatchedCount + '건');
+    el.textContent = parts.join(' · ');
+  }
+
   // §요청 "로그인·고객정보 로딩 완료 후 접속마다 1회" — 두 경로 모두 같은 idempotent
   // 함수를 부르므로 어느 쪽이 먼저 오든, 둘 다 오든 정확히 한 번만 실행된다(§요청 "중복
   // 호출 방지"). ①companies 클라우드 데이터가 실제로 도착한 시점(가장 정확한 신호)
@@ -8372,6 +8901,17 @@ window.SHIN2_CRM_APP_INIT = function(){
   (function scheduleGsheetImportFallback(){
     const check = ()=>{
       if(cloudBootState === 'ready'){ setTimeout(()=> runGoogleSheetsImportOnce(), 1500); return; }
+      if(cloudBootState === 'loading') setTimeout(check, 500);
+    };
+    check();
+  })();
+  // §POUR 낙찰 라이브 연동 라운드(신규) — 위 sheetRequests(5탭) 부트 트리거와 같은 이유·
+  // 같은 idempotent 원칙(접속마다 정확히 1회)으로 별도 타이머를 하나 더 둔다(§요청 "세션당
+  // 1회, 매 렌더마다 fetch 금지").
+  window.addEventListener('shin2-crm-pourwon-cloud-update', ()=>{ refreshPourWonLiveRecords(); });
+  (function schedulePourWonImportFallback(){
+    const check = ()=>{
+      if(cloudBootState === 'ready'){ setTimeout(()=> runPourWonImportOnce(), 1800); return; }
       if(cloudBootState === 'loading') setTimeout(check, 500);
     };
     check();
@@ -9948,16 +10488,24 @@ window.SHIN2_CRM_APP_INIT = function(){
     const sheetReqsByCompany = D.buildSheetRequestsIndex();
     const todayTs = getSeoulTodayDateOnly();
     const rows = [];
+    let terminatedCount = 0, noMouCount = 0, futureMouCount = 0, preFloorExcludedCount = 0;
     // §요청 16/18/19/20 — D.loadActiveCompanies()만 읽는다(삭제된 업체는 이미 빠져
     // 있음, §요청 "삭제/협약종료 업체가 여전히 제외되는지" 그대로). 협약 종료 업체 제외,
     // 협약일이 없거나 미래인 업체는 판정 불가라 대상에서 뺀다(isNewPartnerCompany/
     // npCmp와 같은 이상치 방어 원칙 재사용) — 계산 결과만 화면에 분류할 뿐, 어떤 필드도
     // 쓰거나 바꾸지 않는다(§요청 20 read-only).
+    // §5/20 기준일 고정 라운드 — 사용자 확인("L2→L3 전환률, 무조건 다 5월 20일 기점으로
+    // 진행할거야" → 이 탭 population을 2026-05-20 이후 협약 업체로만 한정). buildNpCmpAnalysisBase
+    // (위 §8156 근처)가 이미 NPCMP_A_START_TS(2026-05-20 00:00)를 A그룹 시작(포함) 경계로
+    // 쓰고 있으므로 그 상수를 그대로 재사용한다(새 날짜 상수를 만들지 않음, 두 base가 항상
+    // 같은 5/20 경계를 쓰도록 보장). 신규협약사 탭의 isNewPartnerCompany(rolling 0~89일
+    // 창)는 이 함수와 완전히 분리된 별도 경로라 영향 없음.
     D.loadActiveCompanies().forEach(co=>{
-      if(D.isAgreementTerminated(co)) return;
+      if(D.isAgreementTerminated(co)){ terminatedCount++; return; }
       const mou = resolveEffectiveMouDate(co);
-      if(!mou) return;
-      if(mou.ts > todayTs) return;
+      if(!mou){ noMouCount++; return; }
+      if(mou.ts > todayTs){ futureMouCount++; return; }
+      if(mou.ts < NPCMP_A_START_TS){ preFloorExcludedCount++; return; } // 2026-05-20 이전 협약 제외
       const allReqs = sheetReqsByCompany.get(String(co.id)) || [];
       // §L3 정의 통일 라운드 — 사용자 확인("둘 다 통일해줘"): 이 탭의 L3 전환 신호를
       // 다시 "기술자문문의 단독" 기준으로 되돌려, 방금 고친 운영 개선 비교표
@@ -9974,7 +10522,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       const techReqs = npCmpFilterTechAdviceReqs(allReqs);
       rows.push({ co, mouTs: mou.ts, techReqs });
     });
-    const base = { rows, todayTs };
+    const base = { rows, todayTs, terminatedCount, noMouCount, futureMouCount, preFloorExcludedCount };
     l2l3AnalysisCache = { coRaw, reqRaw, base };
     return base;
   }
@@ -18601,6 +19149,138 @@ window.SHIN2_CRM_APP_INIT = function(){
     }));
   }
 
+  /* ==========================================================================
+     §마스터 업체 명단 가져오기 라운드(신규) — "관리 도구 ▸ 마스터 업체 명단 가져오기"가
+     여는 미리보기/적용 모달. 위 previewMasterImportRoster/applyMasterImportRoster(순수
+     계산/저장 분리, §Partner Dashboard 이관과 완전히 같은 관례)만 부른다 — 매칭·병합 규칙은
+     이 화면에 전혀 없고 전부 그 두 함수 안에 있다. 화면을 열 때 딱 한 번 계산해서
+     masterImportState.preview에 캐시해 둔다(모달을 열어 둔 채 체크박스만 토글할 때마다
+     352개를 다시 매칭하지 않기 위해서, §렉 방지) — [다시 계산] 버튼을 눌러야만(또는
+     [적용] 성공 후 자동으로) 다시 계산한다.
+     ========================================================================== */
+  let masterImportState = { preview: null, mouOverride: new Set(), applying: false, result: null, error: null };
+  function closeMasterImportModal(){
+    const root = document.getElementById('masterImportModalRoot');
+    if(root) root.innerHTML = '';
+  }
+  function openMasterImportModal(){
+    if(!masterImportState.preview){
+      try{ masterImportState.preview = D.previewMasterImportRoster(); masterImportState.error = null; }
+      catch(e){ masterImportState.error = '미리보기 계산 중 오류가 발생했습니다: ' + (e && e.message || e); }
+    }
+    renderMasterImportModal();
+  }
+  function recomputeMasterImportPreview(){
+    try{ masterImportState.preview = D.previewMasterImportRoster(); masterImportState.error = null; }
+    catch(e){ masterImportState.error = '미리보기 계산 중 오류가 발생했습니다: ' + (e && e.message || e); }
+    masterImportState.result = null;
+    renderMasterImportModal();
+  }
+  function masterImportDiffRowHtml(m){
+    const diffHtml = m.diffs.length
+      ? m.diffs.map(d=> `<div class="local-cloud-diag-row">${esc(d.label)}: ${esc(d.from || '(빈 값)')} → <b>${esc(d.to)}</b></div>`).join('')
+      : `<div class="local-cloud-diag-row" style="opacity:.6;">필드 변경사항 없음</div>`;
+    let mouHtml = '';
+    if(m.mou.status === 'fill'){
+      mouHtml = `<div class="local-cloud-diag-row">MOU 날짜: (기록 없음) → <b>${esc(m.mou.incoming)}</b> (자동 채움)</div>`;
+    } else if(m.mou.status === 'conflict'){
+      const checked = masterImportState.mouOverride.has(m.row.newCode) ? 'checked' : '';
+      mouHtml = `<div class="local-cloud-diag-row" style="color:#B23B3B;">MOU 날짜 충돌 — 기존: <b>${esc(m.mou.existing)}</b> / 마스터: <b>${esc(m.mou.incoming)}</b>
+        <label style="margin-left:8px;font-weight:normal;"><input type="checkbox" data-master-mou-toggle="${esc(m.row.newCode)}" ${checked}> 이 건만 마스터 값으로 덮어쓰기</label></div>`;
+    }
+    return `<div class="local-cloud-diag-section">
+      <div class="local-cloud-diag-title">${esc(m.companyName)}${m.row.name !== m.companyName ? ' → ' + esc(m.row.name) : ''} <span style="font-weight:normal;opacity:.65;">(${esc(m.row.newCode)}, 매칭: ${esc(m.matchedBy)})</span></div>
+      ${diffHtml}${mouHtml}
+    </div>`;
+  }
+  function renderMasterImportModal(){
+    const root = document.getElementById('masterImportModalRoot');
+    if(!root) return;
+    const st = masterImportState;
+    const p = st.preview;
+    const conflictRows = p ? p.matched.filter(m=> m.mou.status === 'conflict') : [];
+    const allConflictsChecked = conflictRows.length > 0 && conflictRows.every(m=> st.mouOverride.has(m.row.newCode));
+    const body = st.error ? `<div class="delete-co-modal-err">${esc(st.error)}</div>` : !p ? `<div class="local-cloud-diag-empty">계산 중…</div>` : `
+      <div class="pi-note" style="padding:0 0 10px;">
+        마스터 명단 총 ${p.total}건 — 매칭됨 ${p.matched.length}건(그중 MOU 충돌 ${p.conflictCount}건) · 신규 생성 예정 ${p.newCompanies.length}건 ·
+        확인 필요(모호한 매칭) ${p.review.length}건 · 마스터 명단에 없음(기존 CRM, 삭제하지 않음) ${p.notInMaster.length}건 ·
+        마스터 파일 내 사업자번호 중복 ${p.bizNoDuplicates.length}쌍(정보용, 이미 개별 행 유지로 판단됨)
+      </div>
+      ${st.result ? `<div style="color:#1E7B34;margin-bottom:10px;">적용 완료 — 업데이트됨 ${st.result.updatedCount}건 / 신규생성됨 ${st.result.createdCount}건 /
+        MOU 자동채움 ${st.result.mouFilledCount}건 / MOU 충돌 중 덮어씀 ${st.result.mouOverwrittenCount}건 / MOU 충돌로 건너뜀(미승인) ${st.result.mouSkippedConflictCount}건</div>` : ''}
+      ${conflictRows.length ? `<div class="local-cloud-diag-section">
+        <label><input type="checkbox" id="masterMouOverrideAllChk" ${allConflictsChecked ? 'checked' : ''}> 충돌 건도 전부 마스터 값으로 덮어쓰기(일괄, 기본 OFF)</label>
+      </div>` : ''}
+      <details open><summary><b>매칭됨 — 기존 업체 유지, 필드 업데이트 예정 (${p.matched.length}건)</b></summary>
+        ${p.matched.length ? p.matched.map(masterImportDiffRowHtml).join('') : `<div class="local-cloud-diag-empty">없음</div>`}
+      </details>
+      <details><summary><b>신규 생성 예정 — 마스터에는 있지만 기존 CRM에 없음 (${p.newCompanies.length}건)</b></summary>
+        ${p.newCompanies.length ? p.newCompanies.map(n=> `<div class="local-cloud-diag-row">${esc(n.row.newCode)} · ${esc(n.row.name)}${n.row.bizno ? ' · ' + esc(n.row.bizno) : ''}</div>`).join('') : `<div class="local-cloud-diag-empty">없음</div>`}
+      </details>
+      <details><summary><b>확인 필요 — 모호한 매칭(후보 2건 이상, 자동 연결 안 함) (${p.review.length}건)</b></summary>
+        ${p.review.length ? p.review.map(r=> `<div class="local-cloud-diag-row">${esc(r.row.newCode)} · ${esc(r.row.name)} — ${esc(r.reason)}: ${r.candidates.map(c=> esc(c.name)).join(', ')}</div>`).join('') : `<div class="local-cloud-diag-empty">없음</div>`}
+      </details>
+      <details><summary><b>마스터 명단에 없음 — 기존 CRM에는 있지만 마스터 파일에 없음(자동 삭제 안 함, 수동 확인용) (${p.notInMaster.length}건)</b></summary>
+        ${p.notInMaster.length ? p.notInMaster.map(c=> `<div class="local-cloud-diag-row">${esc(c.name)}${c.bizRegNo ? ' · ' + esc(c.bizRegNo) : ''}</div>`).join('') : `<div class="local-cloud-diag-empty">없음</div>`}
+      </details>
+      ${p.bizNoDuplicates.length ? `<details><summary><b>마스터 파일 내 사업자번호 중복(정보용, 블로킹 아님) (${p.bizNoDuplicates.length}쌍)</b></summary>
+        ${p.bizNoDuplicates.map(g=> `<div class="local-cloud-diag-row">${g.map(r=> esc(r.name) + '(' + esc(r.newCode) + ')').join(' ↔ ')} — ${esc(g[0].bizno)}</div>`).join('')}
+      </details>` : ''}
+    `;
+    root.innerHTML = `
+      <div class="pi-overlay" id="masterImportOverlay">
+        <div class="pi-panel" style="max-width:820px;max-height:88vh;" role="dialog" aria-modal="true" aria-label="마스터 업체 명단 가져오기">
+          <div class="pi-head">
+            <div class="pi-title">마스터 업체 명단 가져오기</div>
+            <button type="button" class="chart-close-btn" id="masterImportCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body" style="overflow-y:auto;">${body}</div>
+          <div class="pi-actions">
+            <button type="button" class="co-text-action" id="masterImportRecomputeBtn">다시 계산</button>
+            <button type="button" class="co-text-action" id="masterImportCloseBtn2">닫기</button>
+            <button type="button" class="co-text-action primary" id="masterImportApplyBtn" ${(!p || st.applying) ? 'disabled' : ''}>${st.applying ? '적용 중…' : '적용'}</button>
+          </div>
+        </div>
+      </div>`;
+    const close = ()=> closeMasterImportModal();
+    document.getElementById('masterImportCloseBtn').addEventListener('click', close);
+    document.getElementById('masterImportCloseBtn2').addEventListener('click', close);
+    bindSafeBackdropClose(document.getElementById('masterImportOverlay'), close);
+    document.getElementById('masterImportRecomputeBtn').addEventListener('click', recomputeMasterImportPreview);
+    root.querySelectorAll('[data-master-mou-toggle]').forEach(chk=> chk.addEventListener('change', ()=>{
+      const key = chk.getAttribute('data-master-mou-toggle');
+      if(chk.checked) st.mouOverride.add(key); else st.mouOverride.delete(key);
+      renderMasterImportModal();
+    }));
+    const allChk = document.getElementById('masterMouOverrideAllChk');
+    if(allChk) allChk.addEventListener('change', ()=>{
+      conflictRows.forEach(m=>{
+        if(allChk.checked) st.mouOverride.add(m.row.newCode); else st.mouOverride.delete(m.row.newCode);
+      });
+      renderMasterImportModal();
+    });
+    const applyBtn = document.getElementById('masterImportApplyBtn');
+    if(applyBtn) applyBtn.addEventListener('click', ()=>{
+      if(!p) return;
+      const msg = `매칭됨 ${p.matched.length}건 업데이트, 신규 ${p.newCompanies.length}건 생성합니다.\n` +
+        (p.conflictCount ? `MOU 날짜 충돌 ${p.conflictCount}건 중 ${st.mouOverride.size}건만 덮어씁니다(체크한 건만).\n` : '') +
+        `마스터 명단에 없는 기존 업체(${p.notInMaster.length}건)는 삭제/변경하지 않습니다.\n계속할까요?`;
+      if(!confirm(msg)) return;
+      st.applying = true;
+      renderMasterImportModal();
+      try{
+        st.result = D.applyMasterImportRoster(p, st.mouOverride);
+        st.mouOverride = new Set();
+      }catch(e){
+        st.error = '적용 중 오류가 발생했습니다: ' + (e && e.message || e);
+      }
+      st.applying = false;
+      st.preview = null; // 적용 후 재계산(masterCode 재실행 보호 반영, §멱등성)
+      try{ st.preview = D.previewMasterImportRoster(); }catch(e){ /* 다음 [다시 계산] 클릭으로 재시도 가능 */ }
+      renderMasterImportModal();
+    });
+  }
+
   function closeLocalCloudDiagModal(){
     localCloudDiagState = null;
     const root = document.getElementById('localCloudDiagModalRoot');
@@ -25030,6 +25710,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   });
   document.getElementById('crmLocalCloudDiagBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openLocalCloudDiagModal(); });
   document.getElementById('crmGsheetReviewBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openGsheetReviewModal(); });
+  document.getElementById('crmMasterImportBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openMasterImportModal(); });
   function closeUpdateMenu(){ document.getElementById('crmUpdateMenu').classList.remove('is-open'); }
   document.getElementById('crmDataUpdateBtn').addEventListener('click', (e)=>{
     e.stopPropagation();
