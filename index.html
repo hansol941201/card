@@ -3262,6 +3262,10 @@ table.pdf-doc-table thead{ background:var(--bg); }
                  위치(관리 도구 드롭다운)에 새 항목만 추가한다(§요청, 새 진입점을 따로
                  만들지 않음). -->
             <button type="button" id="crmMasterImportBtn">마스터 업체 명단 가져오기</button>
+            <!-- §중복 업체 병합 라운드(신규) — 실사용 사례("본주건설(주)" 완전 동일 이름
+                 2건 중복, §보고서 참고). 클릭하면 먼저 중복 후보 목록(읽기 전용)을 보여주고,
+                 거기서 "병합하기"를 눌러야만 선택→미리보기→적용 병합 도구로 넘어간다. -->
+            <button type="button" id="crmMergeDupBtn">중복 업체 병합</button>
             <!-- §POUR 낙찰 라이브 연동 라운드(신규) — 새 리뷰큐 UI를 만들지 않고, 기존
                  관리 도구 줄에 상태 텍스트 한 줄만 추가한다(§요청 "미매칭은 가벼운 안내만"). -->
             <span id="pourWonSyncNote" style="font-size:12px;color:var(--muted,#888);margin-left:4px;"></span>
@@ -3434,6 +3438,10 @@ table.pdf-doc-table thead{ background:var(--bg); }
   <!-- §마스터 업체 명단 가져오기 라운드(신규) — 미리보기/적용 전용 모달 root. 같은
        .pi-overlay/.pi-panel 패턴. -->
   <div id="masterImportModalRoot"></div>
+  <!-- §중복 업체 병합 라운드(신규) — 중복 후보 목록(읽기 전용) + 선택/미리보기/적용 병합
+       도구, 두 개의 전용 root. 같은 .pi-overlay/.pi-panel 패턴(새 시각 언어 없음). -->
+  <div id="dupListModalRoot"></div>
+  <div id="mergeDupModalRoot"></div>
   <!-- §운영 개선 효과 비교 라운드(신규) — "신규 협약사" 탭의 플랫폼 초기 운영 vs 7월
        개선 이후 비교 표에서 숫자를 클릭했을 때 여는 업체 드릴다운 전용 root. 같은
        .pi-overlay/.pi-panel 패턴. -->
@@ -6870,6 +6878,229 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   }
 
   /* ==========================================================================
+     §중복 업체 병합 라운드(신규) — 실사용 사례: "본주건설(주)"가 완전히 같은 이름으로
+     두 건 등록돼 있고(스크린샷으로 확인됨), 5탭 Google Sheets 파이프라인의 정확일치
+     매칭이 가져오기 실행마다 둘 중 어느 쪽으로 resolve되는지에 따라 sheetRequests가
+     반반 갈라져 한쪽의 "최근 요청"이 "—"로 보였던 실제 장애. 사용자 요청 그대로
+     "첫번째랑 두번째랑 합쳐줘. 그리고 하나 지워줘"를 사람이 미리보기를 확인하고 명시
+     적용하는 관리 도구로 만든다 — previewMasterImportRoster/applyMasterImportRoster와
+     완전히 같은 관례(순수 계산 → 사람 확인 → 명시 적용, 이 세션 내내 지켜온 안전
+     절차)를 그대로 따른다.
+     - 생존/패자는 이 함수가 절대 자동으로 정하지 않는다 — 호출부(화면)가 사람이 고른
+       survivorId를 그대로 넘긴다(§요청 "자동 결정 금지").
+     - 완전 삭제는 절대 하지 않는다 — 기존 D.softDeleteCompany(휴지통) 그대로 재사용.
+     - sheetRequests/caseByCaseCompanies.convertedToCompanyId는 이 함수가 직접
+       Firestore에 쓰지 않는다 — 그 두 컬렉션은 per-문서 동기화(window.SHIN2_SHEETREQ_SYNC/
+       SHIN2_CASEBYCASE_SYNC)라 D 레이어가 아니라 호출부(화면 스크립트)가 실제로
+       저장한다 — 기존 registerCaseByCaseFromReview/convertCaseByCaseToCompany와 완전히
+       같은 레이어 분리 원칙(§7441 D 네임스페이스 주석 근처 — 이 파일의 다른 <script>
+       블록에서만 그 SYNC 객체들을 호출하는 기존 관례, 새로 만들지 않음). 이 함수는
+       "무엇을 재배정해야 하는지" 목록만 계산해서 돌려준다.
+     - POUR 실적(pourWonBids)·2025 매출 스냅샷(SHIN2_REVENUE_2025_SNAPSHOT)·제외
+       감사로그(exclusionAudit)는 코드 확인 결과 companyId를 저장하지 않고 매 조회
+       시점에 업체명(정규화)으로만 매칭한다(§조사 — normCompanyNameForPour/
+       normCompanyNameForRevenue가 co.name만 보고, exclusionAudit은 normName 키).
+       재배정할 Firestore 문서 자체가 없어 이 미리보기에는 포함하지 않는다(§요청
+       "실제 데이터 모델을 읽고 확인 후 판단, 추측 금지") — 다만 formerNames에 패자
+       이름을 추가해 두면 sheetRequests/케이스바이케이스 매칭 인덱스(§8608 indexName)는
+       그대로 이어지고, POUR/매출 스냅샷은 이름이 바뀌지 않는 한 원래도 co.name 기준
+       매칭이라 이번 병합으로 새로 끊어지는 연결은 없다(기존에도 formerNames를 보지
+       않던 한계이며, 이 라운드에서 그 한계 자체를 고치지는 않는다 — §범위 밖, 지도/
+       시공실적 core logic 불변).
+     - customerActivities/memos는 회사 레코드에 내장된 배열이 아니라 companyId/targetId
+       로 참조하는 별도 flat 배열이라(§5240/§5823 각 addActivity/addMemo 정의 참고),
+       "병합"은 그 참조 필드만 패자→생존자로 바꿔 다는 것으로 충분하다(개념적 concat).
+       그 외 회사 레코드에 직접 내장된 배열 필드(요청자료 co.requestedMaterials, 핵심
+       니즈 needs, 현재상황 currentSituation 등 여러 라운드에 걸쳐 늘어난 필드들)는
+       이번 라운드의 명시 범위(§요청 "customerActivities/memos")에 없어 자동 이관하지
+       않는다 — 패자 레코드는 소프트 삭제(휴지통)로만 남으므로 데이터 자체는 소실되지
+       않고, 필요하면 "삭제된 업체" 탭에서 사람이 직접 확인해 옮길 수 있다(§보고서에
+       한계로 명시).
+     ========================================================================== */
+  const MERGE_SIMPLE_FIELDS = [
+    ['name', '업체명'],
+    ['bizRegNo', '사업자번호'],
+    ['address', '주소'],
+    ['phone', '전화번호'],
+    ['mobile', '휴대전화'],
+    ['repName', '대표자'],
+    ['contactName', '담당자'],
+    ['assigneeUserId', '내부 담당자'],
+    ['dealStage', '진행단계'],
+    ['agreementStatus', '협약 종료 상태(terminated)'],
+    ['masterCode', '마스터 코드']
+  ];
+  function mergeFieldValue(co, field){
+    if(field === '_mouDate') return (co && co.partnerDashboard && co.partnerDashboard.mouDate) || '';
+    return (co && co[field]) || '';
+  }
+  // 필드 하나의 상태 분류 — §요청 "빈 값만 채우기, 양쪽 다 값 있고 다르면 충돌로 표시하고
+  // 기본은 생존자 값 유지"(마스터 명단 가져오기의 MOU 충돌 처리와 동일 원칙, 이번엔 모든
+  // 단일값 필드에 일괄 적용).
+  function classifyMergeField(survivorVal, loserVal){
+    const sv = String(survivorVal || '').trim();
+    const lv = String(loserVal || '').trim();
+    if(!lv) return 'none'; // 패자 쪽에 값이 없으면 비교할 것도 채울 것도 없음
+    if(!sv) return 'gapfill';
+    if(sv === lv) return 'same';
+    return 'conflict';
+  }
+  // previewMergeDuplicateCompanies: 순수 분석 함수 — 아무것도 저장하지 않는다.
+  function previewMergeDuplicateCompanies(survivorId, loserId){
+    const list = loadCompanies();
+    const survivor = list.find(c=> c.id === survivorId);
+    const loser = list.find(c=> c.id === loserId);
+    if(!survivor || !loser) return { ok:false, err:'선택한 업체를 찾을 수 없습니다.' };
+    if(survivorId === loserId) return { ok:false, err:'같은 업체는 병합할 수 없습니다.' };
+    // §멱등성(§요청 "두 번 실행해도 안전") — 이미 이 병합으로 패자가 소프트 삭제되고
+    // mergedIntoCompanyId가 이 survivorId를 가리키면 다시 실행할 게 없다.
+    const alreadyMerged = !!(loser.deletedAt && loser.mergedIntoCompanyId === survivorId);
+    const fields = MERGE_SIMPLE_FIELDS.map(([field,label])=>{
+      const sv = mergeFieldValue(survivor, field);
+      const lv = mergeFieldValue(loser, field);
+      return { field, label, survivorValue: sv, loserValue: lv, status: classifyMergeField(sv, lv) };
+    });
+    const mouSv = mergeFieldValue(survivor, '_mouDate');
+    const mouLv = mergeFieldValue(loser, '_mouDate');
+    fields.push({ field:'_mouDate', label:'MOU 날짜', survivorValue: mouSv, loserValue: mouLv, status: classifyMergeField(mouSv, mouLv) });
+    const sheetReqIdx = buildSheetRequestsIndex();
+    const sheetRequestsToReassign = sheetReqIdx.get(String(loserId)) || [];
+    const activitiesToMerge = loadActivities().filter(a=> a.companyId === loserId);
+    const memosToMerge = loadMemos().filter(m=> m.targetType === 'company' && m.targetId === loserId);
+    const caseByCaseToReassign = loadCaseByCaseCompanies().filter(r=> r.convertedToCompanyId === loserId);
+    // formerNames: 패자의 현재 이름 + 패자가 이미 갖고 있던 이전 상호까지 전부, 생존자
+    // 쪽과 정규화 기준 중복/현재 이름 동일한 것만 뺀다(§addFormerName과 같은 중복 판정
+    // 재사용, §요청 "재사용, 안 건드림" — 실제 저장은 apply에서 addFormerName을 그대로
+    // 호출해서 하고, 여기서는 무엇이 추가될지 미리보기만 계산한다).
+    const formerNamesToAdd = [];
+    const survivorNorm = new Set([normCompanyName(survivor.name)].concat((survivor.formerNames||[]).map(normCompanyName)));
+    [loser.name].concat(loser.formerNames || []).forEach(n=>{
+      const norm = normCompanyName(n);
+      if(!norm || survivorNorm.has(norm)) return;
+      survivorNorm.add(norm);
+      formerNamesToAdd.push(n);
+    });
+    return {
+      ok:true, survivor, loser, alreadyMerged, fields,
+      sheetRequestsToReassign, activitiesToMerge, memosToMerge, caseByCaseToReassign, formerNamesToAdd,
+      conflictCount: fields.filter(f=> f.status === 'conflict').length
+    };
+  }
+  // applyMergeDuplicateCompanies: 로컬 저장소(companies/customerActivities/memos)만
+  // 실제로 쓴다. 반환값의 sheetRequestsToReassign/caseByCaseToReassign은 이미 재배정된
+  // 결과가 아니라 "호출부가 이어서 Firestore에 반영해야 할 목록"이다(§위 레이어 분리
+  // 주석) — 화면 스크립트가 이 배열을 받아 window.SHIN2_SHEETREQ_SYNC.saveMany /
+  // window.SHIN2_CASEBYCASE_SYNC.saveOne으로 실제 저장한다.
+  // fieldChoices: { [field]: 'survivor' | 'loser' } — 충돌(status:'conflict') 필드에서
+  // 사람이 명시적으로 고른 값만 반영한다(§요청 "기본값은 생존자 값 유지, 충돌은 명시
+  // 선택"). 갭필(status:'gapfill') 필드는 항상 패자 값으로 자동으로 빈 칸만 채운다.
+  function applyMergeDuplicateCompanies(survivorId, loserId, fieldChoices){
+    const preview = previewMergeDuplicateCompanies(survivorId, loserId);
+    if(!preview.ok) return preview;
+    if(preview.alreadyMerged){
+      // §요청 "두 번째 실행 시 에러 없이 이미 병합됨으로 안내" — 아무것도 다시 쓰지 않는다.
+      return { ok:true, alreadyMerged:true, survivorId, loserId, sheetRequestsToReassign: [], caseByCaseToReassign: [], fieldsUpdated:0, formerNamesAdded:0, activitiesReassigned:0, memosReassigned:0 };
+    }
+    const choices = fieldChoices || {};
+    const patch = {};
+    preview.fields.forEach(f=>{
+      if(f.field === '_mouDate') return; // MOU는 partnerDashboard 중첩 필드라 아래서 따로 처리
+      if(f.status === 'gapfill') patch[f.field] = f.loserValue;
+      else if(f.status === 'conflict' && choices[f.field] === 'loser') patch[f.field] = f.loserValue;
+    });
+    const mouField = preview.fields.find(f=> f.field === '_mouDate');
+    if(mouField && (mouField.status === 'gapfill' || (mouField.status === 'conflict' && choices._mouDate === 'loser'))){
+      const survivorNow = findCompany(survivorId);
+      patch.partnerDashboard = Object.assign({}, (survivorNow && survivorNow.partnerDashboard) || {}, { mouDate: mouField.loserValue });
+    }
+    if(Object.keys(patch).length) updateCompany(survivorId, patch);
+    preview.formerNamesToAdd.forEach(n=> addFormerName(survivorId, n));
+    // 패자 소프트 삭제 — softDeleteCompany가 내부적으로 addActivity(loserId, ...)를
+    // 한 번 남기는데(§6354), 아래 활동 재배정 루프가 그 감사기록까지 포함해 한 번에
+    // 생존자 쪽으로 옮기므로 softDeleteCompany를 활동 재배정보다 먼저 호출한다(순서
+    // 중요 — 반대로 하면 그 감사기록만 패자 쪽에 남는다).
+    softDeleteCompany(loserId, `중복 병합 — "${preview.survivor.name}"(${survivorId})로 통합됨`);
+    updateCompany(loserId, { mergedIntoCompanyId: survivorId, mergedAt: nowIso() });
+    const acts = loadActivities();
+    let activitiesReassigned = 0;
+    acts.forEach(a=>{ if(a.companyId === loserId){ a.companyId = survivorId; activitiesReassigned++; } });
+    if(activitiesReassigned) saveActivities(acts);
+    const memos = loadMemos();
+    let memosReassigned = 0;
+    memos.forEach(m=>{ if(m.targetType === 'company' && m.targetId === loserId){ m.targetId = survivorId; memosReassigned++; } });
+    if(memosReassigned) saveMemos(memos);
+    addActivity(survivorId, `[업체 병합] "${preview.loser.name}" 업체를 병합하고 소프트 삭제했습니다 — 필드 ${Object.keys(patch).length}건 반영, 이전 상호 ${preview.formerNamesToAdd.length}건 추가.`);
+    return {
+      ok:true, alreadyMerged:false, survivorId, loserId,
+      fieldsUpdated: Object.keys(patch).length,
+      formerNamesAdded: preview.formerNamesToAdd.length,
+      activitiesReassigned, memosReassigned,
+      sheetRequestsToReassign: preview.sheetRequestsToReassign,
+      caseByCaseToReassign: preview.caseByCaseToReassign
+    };
+  }
+
+  // §중복 업체 병합 라운드 §추가요청("병합 도구를 열기 전에 중복 후보 목록을 먼저 보여줘") —
+  // 순수 읽기 전용 리포트다. 아무것도 자동으로 합치지 않는다(§요청 "자동으로 아무것도
+  // 합치지 않습니다") — 사람이 그룹을 보고 "병합하기"를 눌러야만 위 미리보기/적용 흐름으로
+  // 넘어간다. loadActiveCompanies()만 대상으로 한다(이미 소프트 삭제된 업체는 휴지통에서
+  // 따로 다루므로 중복 후보에 다시 섞이지 않게, §업체 삭제 라운드와 같은 원칙).
+  // 업체 하나당 미리보기에 참고할 최소한의 요약만 계산한다(최근 요청 유무/MOU 여부/활동
+  // 건수) — 그 이상(전체 필드 diff)은 병합 도구 쪽 previewMergeDuplicateCompanies가 이미
+  // 계산하므로 여기서 중복 계산하지 않는다.
+  function summarizeCompanyForDupList(co){
+    const latestReq = latestSheetRequestForCompany(co.id);
+    return {
+      id: co.id, name: co.name,
+      hasRecentRequest: !!latestReq,
+      latestRequestDate: latestReq ? latestReq.requestDate : null,
+      hasMou: !!(co.partnerDashboard && co.partnerDashboard.mouDate),
+      activityCount: activitiesForCompany(co.id).length,
+      createdAt: co.createdAt || null
+    };
+  }
+  // 이름 기준 중복 — normCompanyName() 완전일치(기존 Sheets 매칭과 같은 정규화, §요청
+  // "유사매칭/자동판단 없음 — 순수 그룹화만").
+  function findDuplicateCompanyGroupsByName(){
+    const companies = loadActiveCompanies();
+    const byNorm = new Map();
+    companies.forEach(co=>{
+      const norm = normCompanyName(co.name);
+      if(!norm) return;
+      if(!byNorm.has(norm)) byNorm.set(norm, []);
+      byNorm.get(norm).push(co);
+    });
+    const groups = [];
+    byNorm.forEach((list, norm)=>{
+      if(list.length < 2) return;
+      groups.push({ key: norm, name: list[0].name, companies: list.map(summarizeCompanyForDupList) });
+    });
+    groups.sort((a,b)=> b.companies.length - a.companies.length || a.name.localeCompare(b.name, 'ko'));
+    return groups;
+  }
+  // 사업자번호 기준 중복 — 이름은 달라도 같은 법인일 수 있다(§요청). bizRegNo가 빈 업체는
+  // 이 기준에서 제외한다(§요청 "사업자번호 없는 업체는 제외") — normBizNo(공백/대시 정규화만,
+  // 마스터 명단 매칭에서 이미 쓰던 같은 함수 재사용).
+  function findDuplicateCompanyGroupsByBizNo(){
+    const companies = loadActiveCompanies();
+    const byBiz = new Map();
+    companies.forEach(co=>{
+      if(!co.bizRegNo) return;
+      const nb = normBizNo(co.bizRegNo);
+      if(!nb) return;
+      if(!byBiz.has(nb)) byBiz.set(nb, []);
+      byBiz.get(nb).push(co);
+    });
+    const groups = [];
+    byBiz.forEach((list, nb)=>{
+      if(list.length < 2) return;
+      groups.push({ key: nb, bizRegNo: list[0].bizRegNo, companies: list.map(summarizeCompanyForDupList) });
+    });
+    groups.sort((a,b)=> b.companies.length - a.companies.length);
+    return groups;
+  }
+
+  /* ==========================================================================
      POUR 시공실적 연결(§POUR 시공실적 라운드) — SHIN2_POUR_TRACK_RECORD_SNAPSHOT(엑셀에서
      한 번만 추출해 embed된 원본 값)을 현재 CRM companies와 "정규화된 업체명 완전일치"로만
      연결한다. Partner Dashboard 이관과 같은 안전 원칙을 그대로 따른다:
@@ -7469,6 +7700,8 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     addCurrentSituation, removeCurrentSituation, addInterestField, removeInterestField,
     previewPartnerImport, applyPartnerImport,
     previewMasterImportRoster, applyMasterImportRoster,
+    previewMergeDuplicateCompanies, applyMergeDuplicateCompanies,
+    findDuplicateCompanyGroupsByName, findDuplicateCompanyGroupsByBizNo,
     previewPourTrackImport, applyPourTrackImport, applyPourExcelImportRecords,
     REQUESTED_MATERIAL_TYPES, REQUESTED_MATERIAL_STATUSES,
     addRequestedMaterial, addRequestedMaterialIfNew, removeRequestedMaterial, setRequestedMaterialStatus, extractRequestedMaterialsFromActivities,
@@ -19521,6 +19754,303 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
   }
 
+  /* ==========================================================================
+     §중복 업체 병합 라운드(신규) — "관리 도구 ▸ 중복 업체 병합"이 여는 두 모달.
+     ① dupListModalRoot: 전체 활성 업체를 정규화 업체명/사업자번호 기준으로 그룹화한
+        읽기 전용 리포트(§추가 요청) — 여기서는 아무것도 저장하지 않는다. 그룹마다
+        "병합하기"를 누르면 그 두 업체가 미리 선택된 채로 ②를 연다.
+     ② mergeDupModalRoot: 실제 선택(① 업체 A/B ② 생존 업체) → 미리보기(D.
+        previewMergeDuplicateCompanies) → 적용(D.applyMergeDuplicateCompanies +
+        sheetRequests/caseByCase Firestore 반영 + confirmCloudSave) 흐름. 3건 이상
+        겹치는 그룹은 처음 두 건만 다루고(§요청 "3개 이상 동시 병합은 범위 밖"), 병합
+        후 목록을 다시 열면 남은 건이 다시 중복으로 잡혀 반복 병합할 수 있다.
+     ========================================================================== */
+  let dupListState = null;
+  function closeDupListModal(){
+    const root = document.getElementById('dupListModalRoot');
+    if(root) root.innerHTML = '';
+  }
+  function openDupListModal(){
+    dupListState = {
+      byName: D.findDuplicateCompanyGroupsByName(),
+      byBizNo: D.findDuplicateCompanyGroupsByBizNo()
+    };
+    renderDupListModal();
+  }
+  function dupListCompanySummaryHtml(s){
+    return `<div class="local-cloud-diag-row">
+      <b>${esc(s.name)}</b> — 최근 요청: ${s.hasRecentRequest ? esc(fmtDate(s.latestRequestDate)) : '없음'}
+      · MOU: ${s.hasMou ? '체결' : '없음'} · 활동기록 ${s.activityCount}건
+    </div>`;
+  }
+  function dupGroupSectionHtml(g, gi, kind){
+    const title = kind === 'name'
+      ? `${esc(g.name)} — ${g.companies.length}건 중복`
+      : `사업자번호 ${esc(g.bizRegNo)} — ${g.companies.length}건 중복(업체명이 다를 수 있음)`;
+    const attr = kind === 'name' ? 'data-dup-merge-name' : 'data-dup-merge-biz';
+    const btnLabel = g.companies.length > 2
+      ? `병합하기 (${esc(g.companies[0].name)} · ${esc(g.companies[1].name)} — ${g.companies.length}건 중 처음 2건)`
+      : `병합하기 (${esc(g.companies[0].name)} · ${esc(g.companies[1].name)})`;
+    return `<div class="local-cloud-diag-section">
+      <div class="local-cloud-diag-title">${title}</div>
+      ${g.companies.map(dupListCompanySummaryHtml).join('')}
+      <div style="margin-top:6px;"><button type="button" class="co-text-action primary" ${attr}="${esc(gi)}">${btnLabel}</button></div>
+    </div>`;
+  }
+  function renderDupListModal(){
+    const root = document.getElementById('dupListModalRoot');
+    if(!root || !dupListState) return;
+    const st = dupListState;
+    const nameGroupsHtml = st.byName.length ? st.byName.map((g, gi)=> dupGroupSectionHtml(g, gi, 'name')).join('')
+      : `<div class="local-cloud-diag-empty">완전히 같은 업체명으로 중복된 업체가 없습니다.</div>`;
+    const bizGroupsHtml = st.byBizNo.length ? st.byBizNo.map((g, gi)=> dupGroupSectionHtml(g, gi, 'biz')).join('')
+      : `<div class="local-cloud-diag-empty">사업자번호가 같은데 서로 다른 업체로 등록된 경우가 없습니다.</div>`;
+    root.innerHTML = `
+      <div class="pi-overlay" id="dupListOverlay">
+        <div class="pi-panel" style="max-width:720px;max-height:88vh;" role="dialog" aria-modal="true" aria-label="중복 업체 목록">
+          <div class="pi-head">
+            <div class="pi-title">중복 업체 목록</div>
+            <button type="button" class="chart-close-btn" id="dupListCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-note" style="padding:0 16px;">읽기 전용입니다 — 여기서는 아무것도 자동으로 합쳐지지 않습니다. "병합하기"를 눌러야 선택/미리보기/적용 화면으로 넘어갑니다.</div>
+          <div class="pi-body" style="overflow-y:auto;">
+            <details open><summary><b>업체명 완전일치 중복 (${st.byName.length}그룹)</b></summary>${nameGroupsHtml}</details>
+            <details><summary><b>사업자번호 일치(이름은 다를 수 있음) 중복 (${st.byBizNo.length}그룹)</b></summary>${bizGroupsHtml}</details>
+          </div>
+          <div class="pi-actions">
+            <button type="button" class="co-text-action" id="dupListCloseBtn2">닫기</button>
+          </div>
+        </div>
+      </div>`;
+    const close = ()=> closeDupListModal();
+    document.getElementById('dupListCloseBtn').addEventListener('click', close);
+    document.getElementById('dupListCloseBtn2').addEventListener('click', close);
+    bindSafeBackdropClose(document.getElementById('dupListOverlay'), close);
+    root.querySelectorAll('[data-dup-merge-name]').forEach(btn=> btn.addEventListener('click', ()=>{
+      const g = st.byName[parseInt(btn.getAttribute('data-dup-merge-name'), 10)];
+      if(!g) return;
+      closeDupListModal();
+      openMergeDupModal({ companyAId: g.companies[0].id, companyBId: g.companies[1].id });
+    }));
+    root.querySelectorAll('[data-dup-merge-biz]').forEach(btn=> btn.addEventListener('click', ()=>{
+      const g = st.byBizNo[parseInt(btn.getAttribute('data-dup-merge-biz'), 10)];
+      if(!g) return;
+      closeDupListModal();
+      openMergeDupModal({ companyAId: g.companies[0].id, companyBId: g.companies[1].id });
+    }));
+  }
+
+  let mergeDupState = { companyAId:'', companyBId:'', survivorId:'', preview:null, fieldChoices:{}, applying:false, result:null, error:null };
+  function closeMergeDupModal(){
+    mergeDupState = { companyAId:'', companyBId:'', survivorId:'', preview:null, fieldChoices:{}, applying:false, result:null, error:null };
+    const root = document.getElementById('mergeDupModalRoot');
+    if(root) root.innerHTML = '';
+  }
+  // openMergeDupModal(preset) — preset은 §추가요청("병합하기 클릭 시 두 업체 미리 선택")
+  // 전용, 없으면(관리 도구에서 바로 열었을 때) 빈 선택 상태로 시작한다.
+  function openMergeDupModal(preset){
+    mergeDupState = {
+      companyAId: (preset && preset.companyAId) || '', companyBId: (preset && preset.companyBId) || '',
+      survivorId:'', preview:null, fieldChoices:{}, applying:false, result:null, error:null
+    };
+    renderMergeDupModal();
+  }
+  function recomputeMergeDupPreview(){
+    const st = mergeDupState;
+    st.result = null; st.error = null; st.fieldChoices = {};
+    if(!st.survivorId){ st.preview = null; return; }
+    const loserId = st.survivorId === st.companyAId ? st.companyBId : st.companyAId;
+    try{
+      const p = D.previewMergeDuplicateCompanies(st.survivorId, loserId);
+      st.preview = p.ok ? p : null;
+      if(!p.ok) st.error = p.err;
+    }catch(e){ st.error = '미리보기 계산 중 오류가 발생했습니다: ' + (e && e.message || e); st.preview = null; }
+  }
+  function mergeDupFieldRowHtml(f){
+    if(f.status === 'none' || f.status === 'same') return '';
+    if(f.status === 'gapfill'){
+      return `<div class="local-cloud-diag-row">${esc(f.label)}: (빈 값) → <b>${esc(f.loserValue)}</b> (자동 채움)</div>`;
+    }
+    const choice = mergeDupState.fieldChoices[f.field] || 'survivor';
+    return `<div class="local-cloud-diag-row" style="color:#B23B3B;">
+      ${esc(f.label)} 충돌 — 생존자: <b>${esc(f.survivorValue)}</b> / 패자: <b>${esc(f.loserValue)}</b>
+      <label style="margin-left:8px;font-weight:normal;"><input type="radio" name="mergeDupField_${esc(f.field)}" value="survivor" ${choice==='survivor'?'checked':''} data-merge-field-choice="${esc(f.field)}"> 생존자 값 유지(기본)</label>
+      <label style="margin-left:6px;font-weight:normal;"><input type="radio" name="mergeDupField_${esc(f.field)}" value="loser" ${choice==='loser'?'checked':''} data-merge-field-choice="${esc(f.field)}"> 패자 값으로 덮어쓰기</label>
+    </div>`;
+  }
+  function renderMergeDupModal(){
+    const root = document.getElementById('mergeDupModalRoot');
+    if(!root) return;
+    const st = mergeDupState;
+    const companies = D.loadActiveCompanies().slice().sort((a,b)=> (a.name||'').localeCompare(b.name||'', 'ko'));
+    const optionsHtml = (selectedId)=> companies.map(c=> `<option value="${esc(c.id)}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join('');
+    const coA = st.companyAId ? D.findCompany(st.companyAId) : null;
+    const coB = st.companyBId ? D.findCompany(st.companyBId) : null;
+    const bothPicked = !!(coA && coB && coA.id !== coB.id);
+    function activityHint(co){
+      const acts = D.activitiesForCompany(co.id);
+      return acts.length ? acts[0].createdAt : null;
+    }
+    let survivorPickHtml = '';
+    if(bothPicked){
+      const hintA = activityHint(coA), hintB = activityHint(coB);
+      const recommend = (hintA && hintB) ? (new Date(hintA) > new Date(hintB) ? coA.id : coB.id) : null;
+      [coA, coB].forEach(co=>{
+        const hint = co.id === coA.id ? hintA : hintB;
+        survivorPickHtml += `<label style="display:block;margin:4px 0;">
+          <input type="radio" name="mergeDupSurvivor" value="${esc(co.id)}" ${st.survivorId===co.id?'checked':''} data-merge-survivor-pick>
+          <b>${esc(co.name)}</b>${hint ? ' — 최근 활동: ' + esc(fmtDate(hint)) : ' — 활동기록 없음'}${recommend===co.id ? ' <span style="color:#1E7B34;">(더 최근에 활동이 있는 쪽 — 추천)</span>' : ''}
+        </label>`;
+      });
+    }
+    const p = st.preview;
+    let previewHtml = '';
+    if(st.error){
+      previewHtml = `<div class="delete-co-modal-err">${esc(st.error)}</div>`;
+    } else if(p && p.alreadyMerged){
+      previewHtml = `<div style="color:#1E7B34;">이미 병합되어 있습니다 — 패자 업체가 이미 소프트 삭제되어 생존 업체로 통합된 상태입니다. 더 할 작업이 없습니다.</div>`;
+    } else if(p){
+      const fieldRows = p.fields.map(mergeDupFieldRowHtml).filter(Boolean).join('')
+        || `<div class="local-cloud-diag-row" style="opacity:.6;">필드 충돌/빈칸 채움 없음(모든 단일값 필드가 같거나 패자 쪽이 비어 있음)</div>`;
+      previewHtml = `
+        <div class="pi-note" style="padding:0 0 10px;">
+          생존: <b>${esc(p.survivor.name)}</b>(유지, id 그대로) · 패자: <b>${esc(p.loser.name)}</b>(병합 후 소프트 삭제)<br>
+          sheetRequests 재배정 ${p.sheetRequestsToReassign.length}건 · 활동기록 병합 ${p.activitiesToMerge.length}건 · 메모 병합 ${p.memosToMerge.length}건 ·
+          건바이건 연결 재배정 ${p.caseByCaseToReassign.length}건 · 이전 상호 추가 ${p.formerNamesToAdd.length}건${p.conflictCount ? ' · 필드 충돌 ' + p.conflictCount + '건(아래에서 선택 필요)' : ''}
+        </div>
+        <details open><summary><b>필드 병합 규칙 적용 결과</b></summary>${fieldRows}</details>
+        <details><summary><b>재배정될 sheetRequests (${p.sheetRequestsToReassign.length}건)</b></summary>
+          ${p.sheetRequestsToReassign.length ? p.sheetRequestsToReassign.map(r=> `<div class="local-cloud-diag-row">${esc(r.requestType)} · ${esc(fmtDate(r.requestDate))}${r.siteName ? ' · ' + esc(r.siteName) : ''}</div>`).join('') : `<div class="local-cloud-diag-empty">없음</div>`}
+        </details>
+        <details><summary><b>건바이건 연결(convertedToCompanyId) 재배정 (${p.caseByCaseToReassign.length}건)</b></summary>
+          ${p.caseByCaseToReassign.length ? p.caseByCaseToReassign.map(r=> `<div class="local-cloud-diag-row">${esc(r.name || r.rawCompanyName || r.id)}</div>`).join('') : `<div class="local-cloud-diag-empty">없음</div>`}
+        </details>
+        <div class="pi-note" style="padding:8px 0 0;color:var(--muted,#888);">
+          참고: POUR 실적/2025 매출 스냅샷/제외 감사로그는 companyId가 아니라 업체명으로만 매칭되어 이 병합에서 재배정할 Firestore 문서가 없습니다(업체명 자체를 바꾸지 않는 한 영향 없음). 업체 레코드에 직접 내장된 그 외 배열(요청자료/핵심니즈 등)은 이번 도구가 자동 이관하지 않습니다 — 패자는 소프트 삭제(휴지통)로만 남으므로 필요하면 "삭제된 업체" 탭에서 직접 확인할 수 있습니다.
+        </div>`;
+    } else if(st.survivorId){
+      previewHtml = `<div class="local-cloud-diag-empty">계산 중…</div>`;
+    }
+    root.innerHTML = `
+      <div class="pi-overlay" id="mergeDupOverlay">
+        <div class="pi-panel" style="max-width:760px;max-height:90vh;" role="dialog" aria-modal="true" aria-label="중복 업체 병합">
+          <div class="pi-head">
+            <div class="pi-title">중복 업체 병합</div>
+            <button type="button" class="chart-close-btn" id="mergeDupCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body" style="overflow-y:auto;">
+            <div class="local-cloud-diag-section">
+              <div class="local-cloud-diag-title">① 병합할 업체 2곳 선택</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <select id="mergeDupSelectA" style="flex:1;min-width:180px;">
+                  <option value="">업체 A 선택…</option>${optionsHtml(st.companyAId)}
+                </select>
+                <select id="mergeDupSelectB" style="flex:1;min-width:180px;">
+                  <option value="">업체 B 선택…</option>${optionsHtml(st.companyBId)}
+                </select>
+              </div>
+            </div>
+            ${bothPicked ? `
+            <div class="local-cloud-diag-section">
+              <div class="local-cloud-diag-title">② 생존(유지)할 업체 선택 — 자동으로 정하지 않습니다</div>
+              ${survivorPickHtml}
+            </div>` : (coA && coB && coA.id === coB.id ? `<div class="delete-co-modal-err">같은 업체를 두 번 선택했습니다 — 서로 다른 두 업체를 골라주세요.</div>` : '')}
+            ${st.survivorId ? `<div class="local-cloud-diag-section"><div class="local-cloud-diag-title">③ 미리보기 — 아직 아무것도 저장되지 않았습니다</div>${previewHtml}</div>` : ''}
+            ${st.result ? `<div style="color:#1E7B34;margin:10px 0;">적용 완료 — 필드 ${st.result.fieldsUpdated}건 반영 · 이전상호 ${st.result.formerNamesAdded}건 추가 · sheetRequests ${st.result.sheetReqPushed||0}건 재배정 · 건바이건 ${st.result.cbcPushed||0}건 재배정 · 활동기록 ${st.result.activitiesReassigned}건 · 메모 ${st.result.memosReassigned}건 병합${(st.result.pushErrors && st.result.pushErrors.length) ? ('<br><span style="color:#B23B3B;">일부 저장 확인 실패: ' + esc(st.result.pushErrors.join(', ')) + ' — 새로고침 후 다시 시도해주세요.</span>') : ''}</div>` : ''}
+          </div>
+          <div class="pi-actions">
+            <button type="button" class="co-text-action" id="mergeDupCloseBtn2">닫기</button>
+            <button type="button" class="co-text-action primary" id="mergeDupApplyBtn" ${(!p || !p.ok || p.alreadyMerged || st.applying) ? 'disabled' : ''}>${st.applying ? '적용 중…' : '적용'}</button>
+          </div>
+        </div>
+      </div>`;
+    const close = ()=> closeMergeDupModal();
+    document.getElementById('mergeDupCloseBtn').addEventListener('click', close);
+    document.getElementById('mergeDupCloseBtn2').addEventListener('click', close);
+    bindSafeBackdropClose(document.getElementById('mergeDupOverlay'), close);
+    document.getElementById('mergeDupSelectA').addEventListener('change', (e)=>{
+      st.companyAId = e.target.value; st.survivorId=''; st.preview=null; st.result=null; renderMergeDupModal();
+    });
+    document.getElementById('mergeDupSelectB').addEventListener('change', (e)=>{
+      st.companyBId = e.target.value; st.survivorId=''; st.preview=null; st.result=null; renderMergeDupModal();
+    });
+    root.querySelectorAll('[data-merge-survivor-pick]').forEach(r=> r.addEventListener('change', (e)=>{
+      st.survivorId = e.target.value;
+      recomputeMergeDupPreview();
+      renderMergeDupModal();
+    }));
+    root.querySelectorAll('[data-merge-field-choice]').forEach(r=> r.addEventListener('change', (e)=>{
+      st.fieldChoices[e.target.getAttribute('data-merge-field-choice')] = e.target.value;
+      renderMergeDupModal();
+    }));
+    const applyBtn = document.getElementById('mergeDupApplyBtn');
+    if(applyBtn) applyBtn.addEventListener('click', async ()=>{
+      if(!p || !p.ok || p.alreadyMerged) return;
+      const loserId = st.survivorId === st.companyAId ? st.companyBId : st.companyAId;
+      if(!confirm(`"${p.loser.name}"을(를) "${p.survivor.name}"에 병합하고 소프트 삭제(휴지통 이동)합니다.\nsheetRequests ${p.sheetRequestsToReassign.length}건, 활동기록 ${p.activitiesToMerge.length}건, 메모 ${p.memosToMerge.length}건이 재배정됩니다.\n계속할까요?`)) return;
+      st.applying = true;
+      renderMergeDupModal();
+      await applyMergeDupFlow(st.survivorId, loserId, st.fieldChoices);
+    });
+  }
+  // applyMergeDupFlow: D.applyMergeDuplicateCompanies(로컬 저장)를 먼저 부르고, 그
+  // 결과가 돌려준 sheetRequestsToReassign/caseByCaseToReassign을 이어서 실제
+  // Firestore에 반영한다(§위 D 레이어 §레이어 분리 주석과 동일한 순서) — 그다음
+  // confirmCloudSave로 companies/customerActivities/memos를 "저장 확인"한다(§기존
+  // 전 라운드부터 지켜온 관례, 로컬 저장 실패 없이 클라우드 확인까지 끝나야 완료로
+  // 표시). 일부 단계가 실패해도 이미 성공한 로컬 저장은 되돌리지 않고(§요청과 동일한
+  // 원칙 — 부분 실패해도 기존 저장 유지) pushErrors로만 알린다.
+  async function applyMergeDupFlow(survivorId, loserId, fieldChoices){
+    const st = mergeDupState;
+    const pushErrors = [];
+    try{
+      const result = D.applyMergeDuplicateCompanies(survivorId, loserId, fieldChoices);
+      if(!result.ok){
+        st.error = result.err || '병합 적용 중 오류가 발생했습니다.';
+        st.applying = false; renderMergeDupModal(); return;
+      }
+      if(result.alreadyMerged){
+        st.result = { fieldsUpdated:0, formerNamesAdded:0, activitiesReassigned:0, memosReassigned:0, sheetReqPushed:0, cbcPushed:0, pushErrors:[] };
+        st.applying = false; st.preview = null; st.survivorId = '';
+        renderMergeDupModal();
+        return;
+      }
+      let sheetReqPushed = 0, cbcPushed = 0;
+      if(result.sheetRequestsToReassign.length){
+        try{
+          if(!window.SHIN2_SHEETREQ_SYNC || !window.SHIN2_SHEETREQ_SYNC.saveMany) throw new Error('SYNC_UNAVAILABLE');
+          await window.SHIN2_SHEETREQ_SYNC.saveMany(result.sheetRequestsToReassign.map(r=> ({ id: r.id, fields: { companyId: survivorId } })));
+          sheetReqPushed = result.sheetRequestsToReassign.length;
+        }catch(e){ pushErrors.push('sheetRequests 재배정 실패 — 새로고침 후 다시 시도해주세요'); }
+      }
+      for(const rec of result.caseByCaseToReassign){
+        try{
+          if(!window.SHIN2_CASEBYCASE_SYNC || !window.SHIN2_CASEBYCASE_SYNC.saveOne) throw new Error('SYNC_UNAVAILABLE');
+          await window.SHIN2_CASEBYCASE_SYNC.saveOne(rec.id, Object.assign({}, rec, { convertedToCompanyId: survivorId }));
+          cbcPushed++;
+        }catch(e){ pushErrors.push('건바이건 연결 재배정 일부 실패'); }
+      }
+      const rc1 = await confirmCloudSave('companies');
+      if(!rc1.ok) pushErrors.push('업체 정보 클라우드 저장 확인 실패');
+      if(result.activitiesReassigned){
+        const rc2 = await confirmCloudSave('customerActivities');
+        if(!rc2.ok) pushErrors.push('활동기록 클라우드 저장 확인 실패');
+      }
+      if(result.memosReassigned){
+        const rc3 = await confirmCloudSave('memos');
+        if(!rc3.ok) pushErrors.push('메모 클라우드 저장 확인 실패');
+      }
+      st.result = Object.assign({}, result, { sheetReqPushed, cbcPushed, pushErrors });
+    }catch(e){
+      st.error = '적용 중 오류가 발생했습니다: ' + (e && e.message || e);
+    }
+    st.applying = false;
+    st.preview = null;
+    st.survivorId = '';
+    renderMergeDupModal();
+    if(typeof refreshMapIfOpen === 'function') refreshMapIfOpen();
+  }
+
   function closeLocalCloudDiagModal(){
     localCloudDiagState = null;
     const root = document.getElementById('localCloudDiagModalRoot');
@@ -25951,6 +26481,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   document.getElementById('crmLocalCloudDiagBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openLocalCloudDiagModal(); });
   document.getElementById('crmGsheetReviewBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openGsheetReviewModal(); });
   document.getElementById('crmMasterImportBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openMasterImportModal(); });
+  document.getElementById('crmMergeDupBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openDupListModal(); });
   function closeUpdateMenu(){ document.getElementById('crmUpdateMenu').classList.remove('is-open'); }
   document.getElementById('crmDataUpdateBtn').addEventListener('click', (e)=>{
     e.stopPropagation();
