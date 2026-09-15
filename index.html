@@ -11211,6 +11211,16 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 바뀔 때는 이 base를 그대로 재사용하고 computeL2L3ManageAnalysis만 다시 부른다(새
   // Google Sheets/Firestore 조회 없음).
   let l2l3AnalysisCache = { coRaw: undefined, reqRaw: undefined, base: null };
+  // 협약 진행 업체는 체결일이 없더라도 L3로 전환할 수 있다. 이 경우 실제 진행기록 중
+  // 가장 이른 날짜를 90일 전환 판단의 시작일로 쓴다. 날짜를 임의로 만들지 않는다.
+  function resolveL2L3ProgressStartDate(co){
+    const nm = resolveNewMouForCompany(co) || {};
+    const values = [nm.qSentLabel, nm.qReplyLabel, nm.m1Label, nm.m2Label]
+      .map(parsePartnerDateLabel)
+      .filter(Boolean)
+      .sort((a,b)=> a.ts - b.ts);
+    return values[0] || null;
+  }
   function buildL2L3AnalysisBase(){
     const coRaw = localStorage.getItem(CO_KEY);
     const reqRaw = localStorage.getItem(SHEETREQ_CACHE_KEY);
@@ -11235,9 +11245,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     D.loadActiveCompanies().forEach(co=>{
       if(D.isAgreementTerminated(co)){ terminatedCount++; return; }
       const mou = resolveEffectiveMouDate(co);
-      if(!mou){ noMouCount++; return; }
-      if(mou.ts > todayTs){ futureMouCount++; return; }
-      if(mou.ts < NPCMP_A_START_TS){ preFloorExcludedCount++; return; } // 2026-05-20 이전 협약 제외
+      const progressStart = mou ? null : resolveL2L3ProgressStartDate(co);
+      const cohortStart = mou || progressStart;
+      if(!cohortStart){ noMouCount++; return; }
+      if(cohortStart.ts > todayTs){ futureMouCount++; return; }
+      if(cohortStart.ts < NPCMP_A_START_TS){ preFloorExcludedCount++; return; } // 2026-05-20 이전 시작 제외
       const allReqs = sheetReqsByCompany.get(String(co.id)) || [];
       // §L3 정의 통일 라운드 — 사용자 확인("둘 다 통일해줘"): 이 탭의 L3 전환 신호를
       // 다시 "기술자문문의 단독" 기준으로 되돌려, 방금 고친 운영 개선 비교표
@@ -11252,7 +11264,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 참조 — 이제 기술자문문의 외 4개 행은 항상 0으로 표시된다, §L3 정의 통일 라운드
       // 주석 참고).
       const techReqs = npCmpFilterTechAdviceReqs(allReqs);
-      rows.push({ co, mouTs: mou.ts, techReqs });
+      rows.push({ co, mouTs: cohortStart.ts, cohortKind: mou ? 'mou' : 'progress', techReqs });
     });
     const base = { rows, todayTs, terminatedCount, noMouCount, futureMouCount, preFloorExcludedCount };
     l2l3AnalysisCache = { coRaw, reqRaw, base };
@@ -11285,7 +11297,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 플래그로만 쓴다. bucket은 여전히 'converted'이므로 전환율 분자·전환완료 서브탭
       // 카운트에는 이미 그대로 포함된다(아래 converted/observedCount 계산 변경 없음).
       return {
-        co: row.co, mouTs: row.mouTs, days, converted, bucket,
+        co: row.co, mouTs: row.mouTs, cohortKind: row.cohortKind, days, converted, bucket,
         firstAdviceAt: match ? match.req.requestDate : null,
         isEarly: match ? match.isEarly : false,
         // §전환 범위 확대 라운드(신규 컬럼) — 최초 전환 유형(어떤 소스가 최초 전환 요청을
@@ -11445,11 +11457,11 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="np2-hero-rate-block">
           <div class="np2-hero-rate-label">L2 → L3 전환율</div>
           <div class="np2-hero-rate">${esc(analysis.rate)}%</div>
-          <div class="np2-hero-sub">5월 20일 이후 신규 협약 ${esc(analysis.total)}곳 중 ${esc(analysis.converted.length)}곳 L3 전환(협약 후 ${esc(npCmpPeriodDays)}일 기준)</div>
+          <div class="np2-hero-sub">5월 20일 이후 신규 협약·진행 ${esc(analysis.total)}곳 중 ${esc(analysis.converted.length)}곳 L3 전환(시작 후 ${esc(npCmpPeriodDays)}일 기준)</div>
           <div class="np2-hero-bar"><div class="np2-hero-bar-fill" style="width:${Math.max(0,Math.min(100,rateNum))}%;"></div></div>
         </div>
         <div class="np2-hero-stats">
-          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(analysis.total)}</span><span class="np2-hero-stat-label">5월 20일 이후 신규 협약</span></div>
+          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(analysis.total)}</span><span class="np2-hero-stat-label">5월 20일 이후 신규 협약·진행</span></div>
           <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(analysis.converted.length)}</span><span class="np2-hero-stat-label">전환 완료</span></div>
           <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(analysis.observing.length)}</span><span class="np2-hero-stat-label">관찰 중</span></div>
           ${analysis.needsAttention.length ? `<div class="np2-hero-stat"><span class="np2-hero-stat-value is-warn">${esc(analysis.needsAttention.length)}</span><span class="np2-hero-stat-label">관리 필요</span></div>` : ''}
