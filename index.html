@@ -3031,6 +3031,24 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .agr-doc-actions{ display:flex; flex-wrap:wrap; gap:8px; }
 .agr-doc-memo-edit{ display:flex; gap:6px; margin-top:6px; }
 .agr-doc-memo-edit input{ flex:1; }
+/* 상담 중에는 질문서를 닫지 않고 함께 볼 수 있도록, 문서 보기와 메모를 한 창의 두 칸으로 배치한다. */
+.questionnaire-work-card{ border:1px solid #c9d9ef; border-radius:8px; padding:11px 12px; margin:0 0 12px; background:#f8fbff; }
+.questionnaire-work-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.questionnaire-work-title{ font-size:13px; font-weight:700; color:var(--navy); }
+.questionnaire-work-meta{ margin-top:5px; font-size:11.5px; color:var(--text-muted); }
+.questionnaire-work-actions{ display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
+.questionnaire-session-panel{ max-width:1180px !important; width:calc(100vw - 42px); height:min(780px, calc(100vh - 42px)); display:flex; flex-direction:column; }
+.questionnaire-session-body{ flex:1; min-height:0; display:grid; grid-template-columns:minmax(0, 1.35fr) minmax(300px, .85fr); gap:14px; }
+.questionnaire-viewer{ min-height:0; border:1px solid var(--line); border-radius:7px; overflow:hidden; background:var(--bg); }
+.questionnaire-viewer iframe{ border:0; width:100%; height:100%; min-height:500px; background:#fff; }
+.questionnaire-viewer img{ width:100%; height:100%; min-height:500px; object-fit:contain; background:#fff; }
+.questionnaire-viewer-fallback{ height:100%; min-height:300px; display:flex; align-items:center; justify-content:center; text-align:center; padding:24px; color:var(--text-muted); }
+.questionnaire-note-pane{ min-height:0; display:flex; flex-direction:column; }
+.questionnaire-note-pane label{ font-size:12.5px; font-weight:700; margin-bottom:7px; }
+.questionnaire-note-pane textarea{ flex:1; min-height:280px; resize:vertical; line-height:1.55; }
+.questionnaire-note-footer{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:9px; }
+.questionnaire-save-status{ font-size:11.5px; color:var(--text-muted); }
+@media(max-width:760px){ .questionnaire-session-panel{ width:calc(100vw - 20px); height:calc(100vh - 20px); } .questionnaire-session-body{ grid-template-columns:1fr; overflow:auto; } .questionnaire-viewer{ min-height:300px; } .questionnaire-viewer iframe,.questionnaire-viewer img{ min-height:300px; } .questionnaire-note-pane{ min-height:300px; } }
 /* §고객관리 사진·서류 통합 라운드(신규) — 카드+썸네일 체크리스트 */
 .doc-card-summary{ font-size:12px; color:var(--text-muted); margin-bottom:8px; }
 .doc-card-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:10px; }
@@ -17665,6 +17683,89 @@ window.SHIN2_CRM_APP_INIT = function(){
     const root = document.getElementById('agreementModalRoot');
     if(root) root.innerHTML = '';
   }
+  // 질문지와 상담 기록은 같은 문서 레코드의 memo 필드에 저장한다. 별도의 메모 저장소를
+  // 만들지 않아 고객카드의 서류함에서도 해당 질문지를 찾았을 때 기록이 함께 남는다.
+  function closeQuestionnaireSession(){
+    const root = document.getElementById('questionnaireSessionRoot');
+    if(root) root.innerHTML = '';
+  }
+  function openQuestionnaireSession(companyId, docId){
+    const co = D.findCompany(companyId);
+    const doc = D.documentsForCompany(companyId, 'questionnaire').find(d=> d.id === docId);
+    if(!co || !doc) return;
+    let root = document.getElementById('questionnaireSessionRoot');
+    if(!root){ root = document.createElement('div'); root.id = 'questionnaireSessionRoot'; document.body.appendChild(root); }
+    const fileName = doc.fileName || doc.originalFileName || '질문서';
+    root.innerHTML = `
+      <div class="pi-overlay" id="questionnaireSessionOverlay" style="z-index:10030;">
+        <div class="pi-panel questionnaire-session-panel" role="dialog" aria-modal="true" aria-label="질문지 상담 기록">
+          <div class="pi-head">
+            <div class="pi-title">질문지 상담 기록 — ${esc(co.name)}</div>
+            <button type="button" class="chart-close-btn" id="questionnaireSessionClose" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body questionnaire-session-body">
+            <section class="questionnaire-viewer" id="questionnaireViewer"><div class="doc-preview-loading">질문서를 불러오는 중…</div></section>
+            <section class="questionnaire-note-pane">
+              <label for="questionnaireConsultationMemo">상담 메모</label>
+              <textarea id="questionnaireConsultationMemo" placeholder="질문지를 보면서 상담 내용, 요청사항, 다음 조치를 바로 기록하세요.">${esc(doc.memo || '')}</textarea>
+              <div class="questionnaire-note-footer"><span class="questionnaire-save-status" id="questionnaireSaveStatus">이 질문지에 함께 저장됩니다</span><button type="button" class="co-text-action primary" id="questionnaireMemoSave">저장</button></div>
+            </section>
+          </div>
+        </div>
+      </div>`;
+    const close = ()=> closeQuestionnaireSession();
+    document.getElementById('questionnaireSessionClose').addEventListener('click', close);
+    bindSafeBackdropClose(document.getElementById('questionnaireSessionOverlay'), close);
+    const save = async ()=>{
+      const btn = document.getElementById('questionnaireMemoSave');
+      const text = document.getElementById('questionnaireConsultationMemo').value.trim();
+      const status = document.getElementById('questionnaireSaveStatus');
+      btn.disabled = true; status.textContent = '저장 중…';
+      D.setDocumentMemo(doc.id, text);
+      const r = await confirmDocsCloudSave();
+      btn.disabled = false;
+      status.textContent = r.ok ? `저장됨 · ${fmtDate(new Date())}` : '이 기기에는 저장됨 · 클라우드 저장 확인 실패';
+      if(!r.ok) status.title = cloudSaveErrorMessage(r.err);
+    };
+    document.getElementById('questionnaireMemoSave').addEventListener('click', save);
+    document.getElementById('questionnaireConsultationMemo').addEventListener('keydown', e=>{
+      if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){ e.preventDefault(); save(); }
+    });
+    const viewer = document.getElementById('questionnaireViewer');
+    const isImage = (doc.mimeType || '').startsWith('image/');
+    const isPdf = (doc.mimeType || '') === 'application/pdf';
+    getDocUrl(doc).then(url=>{
+      if(!url || !viewer) return;
+      if(isImage) viewer.innerHTML = `<img src="${esc(url)}" alt="${esc(fileName)}" />`;
+      else if(isPdf) viewer.innerHTML = `<iframe src="${esc(url)}" title="질문지 미리보기"></iframe>`;
+      else viewer.innerHTML = `<div class="questionnaire-viewer-fallback">이 파일 형식은 화면에서 바로 볼 수 없습니다.<br/><a href="${esc(url)}" target="_blank" rel="noopener" download="${esc(fileName)}">질문서 열기 또는 다운로드</a></div>`;
+    }).catch(()=>{ if(viewer) viewer.innerHTML = '<div class="questionnaire-viewer-fallback">질문서를 불러오지 못했습니다. 로그인 상태를 확인해주세요.</div>'; });
+  }
+  function questionnaireWorkHtml(companyId){
+    const docs = D.documentsForCompany(companyId, 'questionnaire');
+    const doc = docs[0];
+    const accepted = 'image/*,application/pdf,.doc,.docx,.hwp,.hwpx,.txt';
+    if(!doc) return `<div class="questionnaire-work-card"><div class="questionnaire-work-head"><span class="questionnaire-work-title">질문지 상담</span></div><div class="questionnaire-work-meta">질문서를 등록하면, 문서를 보면서 상담 메모를 바로 저장할 수 있습니다.</div><div class="questionnaire-work-actions"><input type="file" id="agreementQuestionnaireInput" accept="${accepted}" style="display:none;" /><button type="button" class="co-text-action primary" id="agreementQuestionnaireUpload">질문지 등록</button></div></div>`;
+    return `<div class="questionnaire-work-card"><div class="questionnaire-work-head"><span class="questionnaire-work-title">질문지 상담</span><span class="status-badge is-progress">등록됨</span></div><div class="questionnaire-work-meta">${esc(doc.fileName || doc.originalFileName || '질문서')} · ${esc(fmtDate(doc.createdAt))} 등록${doc.memo ? ' · 상담 메모 있음' : ''}</div><div class="questionnaire-work-actions"><input type="file" id="agreementQuestionnaireInput" accept="${accepted}" style="display:none;" /><button type="button" class="co-text-action primary" data-questionnaire-session="${esc(doc.id)}">질문지 열고 상담 메모</button><button type="button" class="co-text-action" id="agreementQuestionnaireReplace">질문지 교체</button></div></div>`;
+  }
+  function bindQuestionnaireWork(companyId){
+    const upload = ()=> document.getElementById('agreementQuestionnaireInput').click();
+    const uploadBtn = document.getElementById('agreementQuestionnaireUpload');
+    const replaceBtn = document.getElementById('agreementQuestionnaireReplace');
+    if(uploadBtn) uploadBtn.addEventListener('click', upload);
+    if(replaceBtn) replaceBtn.addEventListener('click', upload);
+    const input = document.getElementById('agreementQuestionnaireInput');
+    if(input) input.addEventListener('change', e=>{
+      const file = e.target.files && e.target.files[0]; e.target.value = '';
+      if(!file) return;
+      D.addDocument(companyId, 'questionnaire', file).then(async ()=>{
+        const r = await confirmDocsCloudSave();
+        if(!r.ok) alert('질문서 정보 저장 확인에 실패했습니다(파일은 등록됨) — ' + cloudSaveErrorMessage(r.err));
+        renderAgreementPopupBody(companyId);
+      }).catch(err=> alert(err && err.code === 'FILE_TYPE' ? '허용되지 않는 파일 형식입니다.' : '질문서 등록에 실패했습니다.'));
+    });
+    document.querySelectorAll('[data-questionnaire-session]').forEach(btn=> btn.addEventListener('click', ()=> openQuestionnaireSession(companyId, btn.getAttribute('data-questionnaire-session'))));
+  }
   function renderAgreementPopupBody(companyId){
     const co = D.findCompany(companyId);
     const body = document.getElementById('agreementPopupBody');
@@ -17713,6 +17814,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         </div>
       </div>
       <div class="agr-bottom">
+        ${questionnaireWorkHtml(companyId)}
         <div class="agr-section-title">서류 현황</div>
         <div id="agreementDocSection">${agreementDocChecklistHtml(co.id)}</div>
       </div>
@@ -17775,6 +17877,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       body.querySelectorAll('[data-agr-stage-more]').forEach(b=> b.setAttribute('aria-expanded','false'));
     });
     bindAgreementDocChecklistHandlers(co.id);
+    bindQuestionnaireWork(co.id);
   }
   function openAgreementPopup(companyId){
     const co = D.findCompany(companyId);
