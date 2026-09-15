@@ -3055,6 +3055,12 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .questionnaire-qa-text{ font-size:12.5px; color:var(--text); background:#f4f7fb; border:1px solid var(--line); border-radius:7px; padding:8px 10px; margin-bottom:7px; line-height:1.5; white-space:pre-wrap; word-break:break-word; }
 .questionnaire-qa-answer{ width:100%; min-height:70px; resize:vertical; line-height:1.5; box-sizing:border-box; }
 .questionnaire-qa-etc{ margin-top:4px; border-top:1px solid var(--line); padding-top:14px; }
+/* §질문지 상담 기록 요약 라운드(신규) — 고객카드 "질문지 상담 요약" 카드(단순 나열, AI 요약
+   아님). 기존 .cdash2-card 내부에서 .cdash2-timeline과 같은 레벨의 목록 스타일을 재사용한다. */
+.cdash-qa-summary-list{ display:flex; flex-direction:column; gap:10px; }
+.cdash-qa-summary-item{ min-width:0; }
+.cdash-qa-summary-label{ font-size:11px; font-weight:700; color:var(--navy); margin-bottom:3px; }
+.cdash-qa-summary-text{ font-size:12.5px; color:var(--text); line-height:1.5; white-space:pre-wrap; word-break:break-word; }
 .questionnaire-note-pane textarea#questionnaireConsultationMemo{ width:100%; min-height:120px; resize:vertical; line-height:1.55; box-sizing:border-box; }
 .questionnaire-note-footer{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:9px; flex:0 0 auto; }
 .questionnaire-save-status{ font-size:11.5px; color:var(--text-muted); }
@@ -12486,6 +12492,9 @@ window.SHIN2_CRM_APP_INIT = function(){
               <div class="cdash2-col-stack">
                 <div id="cdashTimelineCard"></div>
                 <div id="cdashInsightTagsCard"></div>
+                <!-- §질문지 상담 기록 요약 라운드(신규) — 이미 저장된 doc.qaAnswers를 AI 요약
+                     없이 채워진 답변만 그대로 나열만 한다(새 저장소/계산 없음, §요청 A안). -->
+                <div id="cdashQuestionnaireCard"></div>
                 <!-- §업체 관계·협약 종료 라운드(신규) — 현재 상호/이전 상호/자회사·모회사/
                      협약 종료 처리를 한 카드에 모은다. -->
                 <div id="cdashRelationsCard"></div>
@@ -12504,6 +12513,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     renderSummaryRow2(co);
     renderContactTimelineCard(co);
     renderInsightTagsCard(co);
+    renderQuestionnaireSummaryCard(co);
     renderCompanyRelationsCard(co);
     renderPourResultsCard(co);
     renderFooterBar(co);
@@ -13011,6 +13021,43 @@ window.SHIN2_CRM_APP_INIT = function(){
     const btn = document.getElementById('cdashInsightTagsCardBtn');
     btn.addEventListener('click', openInsight);
     btn.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' ') openInsight(); });
+  }
+
+  // ---- §질문지 상담 기록 요약 라운드(신규) — 이미 저장된 서류함 질문서 문서의
+  // doc.qaAnswers(§질문지 상담 기록 구조화 라운드, QUESTIONNAIRE_SESSION_QUESTIONS/
+  // openQuestionnaireSession/D.setDocumentQaAnswers 전부 그대로 재사용)를 AI 요약 없이
+  // 채워진 답변만 Q1~Q8 순서대로 나열만 한다(사용자 승인 "A안" — 새 API/새 저장소/새 계산
+  // 로직 없음). 문서가 여러 건이면 questionnaireWorkHtml과 동일하게 docs[0](가장 최근
+  // 등록·교체된 것) 하나만 본다. 문항 텍스트/라벨은 QUESTIONNAIRE_SESSION_QUESTIONS
+  // 상수를 그대로 읽어 한 글자도 새로 하드코딩하지 않는다.
+  function renderQuestionnaireSummaryCard(co){
+    const wrap = document.getElementById('cdashQuestionnaireCard');
+    if(!wrap) return;
+    const docs = D.documentsForCompany(co.id, 'questionnaire');
+    const doc = docs[0];
+    const qa = (doc && doc.qaAnswers) || {};
+    const answered = QUESTIONNAIRE_SESSION_QUESTIONS.filter(q=> String(qa[q.key] || '').trim());
+    const openBtnHtml = doc ? `<button type="button" class="co-text-action" id="cdashQuestionnaireOpenBtn" style="font-size:11px;padding:2px 8px;white-space:nowrap;">질문지 상담 기록 열기</button>` : '';
+    wrap.innerHTML = `
+      <div class="cdash2-card">
+        <div class="cdash2-card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <span>질문지 상담 요약</span>
+          ${openBtnHtml}
+        </div>
+        ${answered.length ? `
+          <div class="cdash-qa-summary-list">
+            ${answered.map(q=> `
+              <div class="cdash-qa-summary-item">
+                <div class="cdash-qa-summary-label">${esc(q.num)} · ${esc(q.type)}</div>
+                <div class="cdash-qa-summary-text">${esc(String(qa[q.key] || '').trim())}</div>
+              </div>
+            `).join('')}
+          </div>
+        ` : `<div class="chart-empty">아직 등록된 질문지 상담 답변이 없습니다</div>`}
+      </div>
+    `;
+    const openBtn = document.getElementById('cdashQuestionnaireOpenBtn');
+    if(openBtn) openBtn.addEventListener('click', ()=> openQuestionnaireSession(co.id, doc.id));
   }
 
   // ---- §고객카드 전면 개선 라운드 [6] 최근 POUR 시공실적 — getTotalPourRecordsForCompany
@@ -17923,7 +17970,17 @@ window.SHIN2_CRM_APP_INIT = function(){
           </div>
         </div>
       </div>`;
-    const close = ()=> closeQuestionnaireSession();
+    // §질문지 상담 기록 요약 라운드(신규) — 이 팝업은 카드 위에 겹쳐 열리므로(z-index만
+    // 다름, cardView 자체는 그대로 살아있음) 닫힐 때 현재 열려있는 고객카드가 같은
+    // 업체라면 "질문지 상담 요약" 카드만 다시 그려 최신 qaAnswers를 즉시 반영한다(카드
+    // 전체를 새로고침하지 않음 — 새 재조회 로직 없이 기존 renderQuestionnaireSummaryCard 재사용).
+    const refreshSummaryCard = ()=>{
+      if(currentCompanyId === companyId){
+        const freshCo = D.findCompany(companyId);
+        if(freshCo) renderQuestionnaireSummaryCard(freshCo);
+      }
+    };
+    const close = ()=>{ closeQuestionnaireSession(); refreshSummaryCard(); };
     document.getElementById('questionnaireSessionClose').addEventListener('click', close);
     bindSafeBackdropClose(document.getElementById('questionnaireSessionOverlay'), close);
     const save = async ()=>{
@@ -17937,6 +17994,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       btn.disabled = true; status.textContent = '저장 중…';
       D.setDocumentQaAnswers(doc.id, qaAnswers);
       D.setDocumentMemo(doc.id, text);
+      refreshSummaryCard(); // §질문지 상담 기록 요약 라운드: 팝업을 닫기 전에도 카드 요약이 바로 최신값을 보여준다.
       const r = await confirmDocsCloudSave();
       btn.disabled = false;
       status.textContent = r.ok ? `저장됨 · ${fmtDate(new Date())}` : '이 기기에는 저장됨 · 클라우드 저장 확인 실패';
