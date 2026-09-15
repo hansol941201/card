@@ -17906,11 +17906,25 @@ window.SHIN2_CRM_APP_INIT = function(){
       // FileList는 input을 비우기 전에 별도 변수로 잡아야 선택 파일이 사라지지 않는다.
       const file = e.target.files && e.target.files[0]; e.target.value = '';
       if(!file) return;
+      // §질문지 업로드 무반응 버그 수정 라운드(신규) — 실사용자 보고 "질문지 버튼누르고
+      // 파일 눌렀는데. 삽입이 안돼": 재현해보니 saveDocumentFile이 이 순간 클라우드
+      // 로그인 상태를 아직 확인 못 했을 때(예: 세션 갱신 중 잠깐 SHIN2_STORAGE.isSignedIn()
+      // 이 false) waitForCloudReady(4000)로 최대 4초를 기다리는데, 그동안 버튼(label)에
+      // 아무 표시도 없어 사용자가 "삽입이 안 됐다"고 오인하고 이탈했을 가능성이 가장 크다
+      // (실제로는 4초 뒤 정상 등록됨 — alert도 없어서 실패로 착각하기 더 쉬웠다). 저장
+      // 성공/실패 판정 로직(§7772cf9의 LOCAL_STORAGE_FULL throw 등 안전장치)은 전혀
+      // 건드리지 않고, 클릭 즉시 label에 "저장 중..." 표시만 더한다 — 성공 시엔 바로 아래
+      // renderAgreementPopupBody가 label을 통째로 다시 그리고, 실패 시엔 restoreLabels로
+      // 원래 문구로 되돌려 재시도 가능한 상태를 유지한다.
+      const labels = Array.from(document.querySelectorAll('label[for="agreementQuestionnaireInput"]'));
+      const labelOriginals = labels.map(l=> l.textContent);
+      labels.forEach(l=>{ l.textContent = '저장 중...'; l.style.pointerEvents = 'none'; l.style.opacity = '0.6'; });
+      const restoreLabels = ()=> labels.forEach((l,i)=>{ l.textContent = labelOriginals[i]; l.style.pointerEvents = ''; l.style.opacity = ''; });
       D.addDocument(companyId, 'questionnaire', file).then(async ()=>{
         const r = await confirmDocsCloudSave();
         if(!r.ok) alert('질문서 정보 저장 확인에 실패했습니다(파일은 등록됨) — ' + cloudSaveErrorMessage(r.err));
         renderAgreementPopupBody(companyId);
-      }).catch(err=> alert(documentUploadErrorMessage(err && err.code)));
+      }).catch(err=>{ restoreLabels(); alert(documentUploadErrorMessage(err && err.code)); });
     });
     document.querySelectorAll('[data-questionnaire-session]').forEach(btn=> btn.addEventListener('click', ()=> openQuestionnaireSession(companyId, btn.getAttribute('data-questionnaire-session'))));
   }
