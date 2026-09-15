@@ -3064,6 +3064,19 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .questionnaire-note-pane textarea#questionnaireConsultationMemo{ width:100%; min-height:120px; resize:vertical; line-height:1.55; box-sizing:border-box; }
 .questionnaire-note-footer{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:9px; flex:0 0 auto; }
 .questionnaire-save-status{ font-size:11.5px; color:var(--text-muted); }
+/* §질문지 저장 완료 미니 토스트 라운드(신규) — "저장됨" 텍스트만 바뀌던 것과 별개로,
+   저장 성공 시 아주 작은 팝업을 잠깐 띄워달라는 요청(§요청 원문 그대로). 화면 전체를
+   덮는 오버레이가 아니라 화면 하단 중앙에 고정된 작은 알약 모양 배지 하나만 잠깐
+   나타났다 사라진다 — 기존 questionnaireSaveStatus 텍스트 갱신 로직은 그대로 둔 채
+   추가된 것일 뿐이다(대체 아님). z-index는 이 팝업의 오버레이(10030)보다 높게 잡아야
+   가려지지 않는다. */
+.mini-save-toast{
+  position:fixed; left:50%; bottom:28px; transform:translate(-50%, 8px);
+  background:var(--navy); color:#fff; font-size:12.5px; font-weight:600;
+  padding:8px 16px; border-radius:999px; box-shadow:0 6px 18px rgba(15,23,42,.28);
+  z-index:10050; opacity:0; pointer-events:none; transition:opacity .18s ease, transform .18s ease;
+}
+.mini-save-toast.is-show{ opacity:1; transform:translate(-50%, 0); }
 @media(max-width:760px){ .questionnaire-session-panel{ width:calc(100vw - 20px); height:calc(100vh - 20px); } .questionnaire-session-body{ grid-template-columns:1fr; overflow:auto; } .questionnaire-viewer{ min-height:300px; } .questionnaire-viewer iframe,.questionnaire-viewer img{ min-height:300px; } .questionnaire-note-pane{ min-height:300px; } }
 /* §고객관리 사진·서류 통합 라운드(신규) — 카드+썸네일 체크리스트 */
 .doc-card-summary{ font-size:12px; color:var(--text-muted); margin-bottom:8px; }
@@ -8327,6 +8340,24 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 대신, 공통 함수 하나로 "진짜 배경 클릭"만 골라낸다 — pointerdown/pointerup 두
   // 시점 모두 오버레이 자신이어야 하고, 두 지점 사이 이동이 거의 없어야 하고, 텍스트
   // 선택 상태가 아니어야 닫는다(§요청 예시 로직 그대로 채택).
+  // §저장 완료 미니 토스트 라운드(신규) — 화면 하단 중앙에 아주 작은 배지를 잠깐
+  // 띄웠다 없앤다. 팝업/오버레이가 아니라 body에 딱 1개만 재사용하는 고정 엘리먼트라
+  // 여러 번 연달아 호출해도(예: 빠르게 두 번 저장) DOM이 쌓이지 않는다.
+  let miniSaveToastTimer = null;
+  function showMiniSaveToast(text){
+    let el = document.getElementById('miniSaveToast');
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'miniSaveToast';
+      el.className = 'mini-save-toast';
+      document.body.appendChild(el);
+    }
+    el.textContent = text || '저장됨';
+    // 리플로우를 강제해 연속 호출 시에도 트랜지션이 다시 재생되게 한다.
+    el.classList.remove('is-show'); void el.offsetWidth; el.classList.add('is-show');
+    if(miniSaveToastTimer) clearTimeout(miniSaveToastTimer);
+    miniSaveToastTimer = setTimeout(()=>{ el.classList.remove('is-show'); }, 1500);
+  }
   function bindSafeBackdropClose(overlay, closeFn){
     if(!overlay) return;
     let startedOnBackdrop = false;
@@ -17999,6 +18030,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       btn.disabled = false;
       status.textContent = r.ok ? `저장됨 · ${fmtDate(new Date())}` : '이 기기에는 저장됨 · 클라우드 저장 확인 실패';
       if(!r.ok) status.title = cloudSaveErrorMessage(r.err);
+      showMiniSaveToast(r.ok ? '저장됨' : '이 기기에만 저장됨');
     };
     document.getElementById('questionnaireMemoSave').addEventListener('click', save);
     document.getElementById('questionnaireNoteScroll').addEventListener('keydown', e=>{
