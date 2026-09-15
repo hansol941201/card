@@ -3066,17 +3066,20 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .questionnaire-save-status{ font-size:11.5px; color:var(--text-muted); }
 /* §질문지 저장 완료 미니 토스트 라운드(신규) — "저장됨" 텍스트만 바뀌던 것과 별개로,
    저장 성공 시 아주 작은 팝업을 잠깐 띄워달라는 요청(§요청 원문 그대로). 화면 전체를
-   덮는 오버레이가 아니라 화면 하단 중앙에 고정된 작은 알약 모양 배지 하나만 잠깐
-   나타났다 사라진다 — 기존 questionnaireSaveStatus 텍스트 갱신 로직은 그대로 둔 채
-   추가된 것일 뿐이다(대체 아님). z-index는 이 팝업의 오버레이(10030)보다 높게 잡아야
-   가려지지 않는다. */
+   덮는 오버레이가 아니라 작은 알약 모양 배지 하나만 잠깐 나타났다 사라진다 — 기존
+   questionnaireSaveStatus 텍스트 갱신 로직은 그대로 둔 채 추가된 것일 뿐이다(대체
+   아님). z-index는 이 팝업의 오버레이(10030)보다 높게 잡아야 가려지지 않는다.
+   §위치 조정 라운드 — 화면 하단에 두니 "너무 안 보인다"는 피드백을 받아, 열려있는
+   팝업창(pi-panel) 맨 위쪽에 겹쳐 뜨도록 top 고정으로 바꾸고 크기/대비도 키웠다. */
 .mini-save-toast{
-  position:fixed; left:50%; bottom:28px; transform:translate(-50%, 8px);
-  background:var(--navy); color:#fff; font-size:12.5px; font-weight:600;
-  padding:8px 16px; border-radius:999px; box-shadow:0 6px 18px rgba(15,23,42,.28);
-  z-index:10050; opacity:0; pointer-events:none; transition:opacity .18s ease, transform .18s ease;
+  position:fixed; left:50%; top:22px; transform:translate(-50%, -14px);
+  background:#16A34A; color:#fff; font-size:14px; font-weight:700;
+  padding:10px 22px; border-radius:999px; box-shadow:0 10px 28px rgba(15,23,42,.35);
+  z-index:10060; opacity:0; pointer-events:none; transition:opacity .18s ease, transform .18s ease;
+  display:flex; align-items:center; gap:6px;
 }
 .mini-save-toast.is-show{ opacity:1; transform:translate(-50%, 0); }
+.mini-save-toast::before{ content:'✓'; font-weight:800; }
 @media(max-width:760px){ .questionnaire-session-panel{ width:calc(100vw - 20px); height:calc(100vh - 20px); } .questionnaire-session-body{ grid-template-columns:1fr; overflow:auto; } .questionnaire-viewer{ min-height:300px; } .questionnaire-viewer iframe,.questionnaire-viewer img{ min-height:300px; } .questionnaire-note-pane{ min-height:300px; } }
 /* §고객관리 사진·서류 통합 라운드(신규) — 카드+썸네일 체크리스트 */
 .doc-card-summary{ font-size:12px; color:var(--text-muted); margin-bottom:8px; }
