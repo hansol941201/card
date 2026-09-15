@@ -5090,6 +5090,8 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   const ACT_KEY = 'shin2-customer-activities-v1';
   const DOC_KEY = 'shin2-customer-documents-v1';
   const BLOB_KEY = 'shin2-customer-doc-blobs-v1'; // 로컬 전용 — SHIN2_SYNC_KEYS에 절대 추가하지 않는다(§25)
+  const DOC_FILE_DB_NAME = 'shin2-customer-document-files-v1';
+  const DOC_FILE_DB_STORE = 'files';
   const MEMO_KEY = 'shin2-memos-v1';
   // §업체코드 중복발급 방지 라운드(신규) — 연도별 "마지막 발급 번호" 영구 저장소(§요청 6/7).
   // 위 Firebase 모듈 블록의 COMPANY_CODE_COUNTER_STORAGE_KEY 문자열과 반드시 같아야
@@ -5736,6 +5738,37 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
       }catch(e){ reject(e); }
     });
   }
+  // localStorage보다 큰 파일은 IndexedDB에 Blob 그대로 보관한다. Firebase Storage가
+  // 실패해도 이 브라우저에서 질문지를 열고 상담을 계속할 수 있다.
+  function openLocalDocFileDb(){
+    return new Promise((resolve, reject)=>{
+      if(!window.indexedDB) return reject(Object.assign(new Error('INDEXEDDB_UNAVAILABLE'), { code:'INDEXEDDB_UNAVAILABLE' }));
+      const req = window.indexedDB.open(DOC_FILE_DB_NAME, 1);
+      req.onupgradeneeded = ()=>{ if(!req.result.objectStoreNames.contains(DOC_FILE_DB_STORE)) req.result.createObjectStore(DOC_FILE_DB_STORE); };
+      req.onsuccess = ()=> resolve(req.result);
+      req.onerror = ()=> reject(Object.assign(req.error || new Error('INDEXEDDB_OPEN_FAILED'), { code:'INDEXEDDB_OPEN_FAILED' }));
+    });
+  }
+  function putLocalDocFile(id, file){
+    return openLocalDocFileDb().then(db=> new Promise((resolve,reject)=>{
+      const tx = db.transaction(DOC_FILE_DB_STORE, 'readwrite'); tx.objectStore(DOC_FILE_DB_STORE).put(file, id);
+      tx.oncomplete = ()=>{ db.close(); resolve(); };
+      tx.onerror = ()=>{ db.close(); reject(Object.assign(tx.error || new Error('INDEXEDDB_WRITE_FAILED'), { code:'INDEXEDDB_WRITE_FAILED' })); };
+    }));
+  }
+  function getLocalDocFile(id){
+    return openLocalDocFileDb().then(db=> new Promise((resolve,reject)=>{
+      const req = db.transaction(DOC_FILE_DB_STORE, 'readonly').objectStore(DOC_FILE_DB_STORE).get(id);
+      req.onsuccess = ()=>{ db.close(); if(req.result) resolve(req.result); else reject(Object.assign(new Error('NO_BLOB'), { code:'NO_BLOB' })); };
+      req.onerror = ()=>{ db.close(); reject(Object.assign(req.error || new Error('INDEXEDDB_READ_FAILED'), { code:'INDEXEDDB_READ_FAILED' })); };
+    }));
+  }
+  function deleteLocalDocFile(id){
+    return openLocalDocFileDb().then(db=> new Promise((resolve,reject)=>{
+      const tx = db.transaction(DOC_FILE_DB_STORE, 'readwrite'); tx.objectStore(DOC_FILE_DB_STORE).delete(id);
+      tx.oncomplete = ()=>{ db.close(); resolve(); }; tx.onerror = ()=>{ db.close(); reject(tx.error); };
+    })).catch(()=>{});
+  }
 
   // §클라우드 파일 저장 문제 해결 라운드: 페이지를 막 연 직후(Firebase SDK 비동기 로딩+
   // 로그인 왕복이 아직 안 끝난 순간) 파일을 놓으면 실제로는 로그인이 곧 성공할 상황인데도
@@ -5759,6 +5792,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   // 반환: Promise<{ localOnly, storagePath, dataUrl }> — dataUrl은 localOnly일 때만 채워진다.
   function saveDocumentFile(id, companyId, file, onProgress, opts){
     opts = opts || {};
+    if(file.size > DOC_MAX_CLOUD_BYTES) return Promise.reject(Object.assign(new Error('SIZE_LIMIT_CLOUD'), { code:'SIZE_LIMIT_CLOUD' }));
     function attempt(useCloud){
       const ST = window.SHIN2_STORAGE; // §클라우드 파일 저장 문제 해결 라운드: waitForCloudReady로
       // 기다리는 동안 Firebase 모듈이 이제 막 로드돼 window.SHIN2_STORAGE 자체가 이 함수
@@ -5770,11 +5804,8 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
         }
         const path = `users/${ST.getUid()}/customers/${companyId}/documents/${id}/${file.name}`;
         return ST.uploadFile(file, path, onProgress).then(res=> ({ localOnly:false, storagePath: res.storagePath, dataUrl:null }))
-          // Firebase Storage 규칙/일시 네트워크 오류가 있어도 작은 질문지는 상담을 멈추지
-          // 않도록 이 브라우저에 보관한다. 4MB 초과 파일은 기존처럼 원래 오류를 그대로
-          // 돌려주므로, 클라우드 실패를 숨기며 큰 파일을 성공 처리하지 않는다.
+          // Firebase Storage 규칙/일시 네트워크 오류가 있어도 이 브라우저에 보관한다.
           .catch(err=>{
-            if(file.size > DOC_MAX_LOCAL_BYTES) throw err;
             return attempt(false).then(local=> Object.assign(local, { cloudUploadErrorCode: (err && err.code) || 'UNKNOWN' }));
           });
       }
@@ -5782,7 +5813,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
       // 경우에만 여기로 온다.
       return new Promise((resolve, reject)=>{
         if(file.size > DOC_MAX_LOCAL_BYTES){
-          reject(Object.assign(new Error('SIZE_LIMIT'), { code:'SIZE_LIMIT' }));
+          putLocalDocFile(id, file).then(()=> resolve({ localOnly:true, storagePath:'idb:' + id, dataUrl:null, indexedDb:true }), reject);
           return;
         }
         const reader = new FileReader();
@@ -5826,6 +5857,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
         createdAt: now, updatedAt: now, uploadedAt: now, uploadedBy: currentUserLabel(),
         localOnly: result.localOnly // true면 이 기기에만 파일 바이트가 있음, false면 Storage 업로드 완료
       };
+      if(result.indexedDb) rec.localIndexedDb = true;
       if(result.cloudUploadErrorCode) rec.cloudUploadErrorCode = result.cloudUploadErrorCode;
       if(extracted){
         rec.extractedContactName = extracted.contactName && extracted.contactName.value || '';
@@ -5898,6 +5930,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     const blobs = readObj(BLOB_KEY);
     delete blobs[id];
     writeObj(BLOB_KEY, blobs, { allowShrink:true });
+    if(rec && rec.localIndexedDb) deleteLocalDocFile(id);
     // §11: 메타데이터를 지운 뒤 실제 Storage 파일도 함께 지운다(클라우드 문서일 때만).
     // 메타데이터 삭제(화면/다른 직원에게 즉시 반영되어야 함)를 이 네트워크 요청 때문에
     // 지연시키지 않는다 — best-effort로 뒤따라 지우고, 실패해도 콘솔 경고만 남긴다
@@ -8043,7 +8076,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     loadActivities, addActivity, updateActivityText, deleteActivity, activitiesForCompany, classifyActivity, buildActivitiesIndex,
     loadSheetRequests, buildSheetRequestsIndex, latestSheetRequestForCompany,
     loadCaseByCaseCompanies, loadExclusionAudit, caseByCaseIdForNormName, exclusionIdForNormName, findCaseByCaseByNormName, findCaseByCaseById, isUserExcludedNormName,
-    loadDocuments, documentsForCompany, buildDocumentsIndex, addDocument, updateDocumentExtracted, getBlob, renameDocument, setDocumentMemo, setDocumentVerification, deleteDocument, findDocument, migrateDocumentToCloud,
+    loadDocuments, documentsForCompany, buildDocumentsIndex, addDocument, updateDocumentExtracted, getBlob, getLocalDocFile, renameDocument, setDocumentMemo, setDocumentVerification, deleteDocument, findDocument, migrateDocumentToCloud,
     loadMemos, memosFor, addMemo, updateMemo, deleteMemo, buildMemosIndex,
     pendingActivitiesForCompany, tasksForCompany, calendarEventsForCompany, upcomingCalendarEventsForCompany,
     DEAL_STAGES, setDealStage, setAssigneeUserId, addNeed, removeNeed, dismissNeedSuggestion, addSpecialNote, removeSpecialNote, setImportant, suggestNeedFor,
@@ -17476,7 +17509,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         if(doc.verifiedAt) metaBits.push('확인 ' + esc(fmtDate(doc.verifiedAt)) + (doc.verifiedBy ? ' · ' + esc(doc.verifiedBy) : ''));
         if(doc.verificationMemo) metaBits.push('메모: ' + esc(doc.verificationMemo));
       }
-      const hasBlob = doc ? (doc.localOnly ? !!D.getBlob(doc.id) : true) : false;
+      const hasBlob = doc ? (doc.localOnly ? (!!D.getBlob(doc.id) || !!doc.localIndexedDb) : true) : false;
       return `
         <div class="agr-doc-row" data-agr-doc-type="${esc(it.type)}">
           <div class="agr-doc-row-head">
@@ -17648,7 +17681,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     const summary = buildAgreementDocSummary(companyId);
     const cards = summary.list.map(it=>{
       const doc = it.doc;
-      const hasBlob = doc ? (doc.localOnly ? !!D.getBlob(doc.id) : true) : false;
+      const hasBlob = doc ? (doc.localOnly ? (!!D.getBlob(doc.id) || !!doc.localIndexedDb) : true) : false;
       const isImage = doc && (doc.mimeType||'').startsWith('image/');
       // 로컬전용 이미지는 기존 object URL 캐시(getDocObjectUrl)로 동기 썸네일이 바로
       // 되고, 클라우드 이미지는 Storage에서 매번 새 URL을 받아야 해서(§기존 getDocUrl
@@ -23839,6 +23872,12 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 다운로드 URL을 요청한다(캐시하지 않음 — 보안규칙 상 로그인 상태 변화에 항상 최신이어야 함).
   function getDocUrl(doc){
     if(doc.localOnly){
+      if(doc.localIndexedDb){
+        return D.getLocalDocFile(doc.id).then(blob=>{
+          if(docBlobUrlCache[doc.id]) return docBlobUrlCache[doc.id];
+          const url = URL.createObjectURL(blob); docBlobUrlCache[doc.id] = url; return url;
+        });
+      }
       return Promise.resolve(getDocObjectUrl(doc));
     }
     const ST = window.SHIN2_STORAGE;
@@ -23942,7 +23981,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 로컬 전용 문서는 실제 blob이 있어야 하고, 클라우드 문서는 storagePath가 local:이
       // 아니면(=업로드가 실제로 성공해 기록된 경우) 파일이 있다고 본다 — addDocument가 업로드
       // 성공 후에만 메타데이터를 쓰므로 이 가정이 성립한다(§ 고아 메타데이터 금지).
-      const hasBlob = doc.localOnly ? !!D.getBlob(doc.id) : true;
+      const hasBlob = doc.localOnly ? (!!D.getBlob(doc.id) || !!doc.localIndexedDb) : true;
       const isImg = (doc.mimeType||'').startsWith('image/');
       const dataUrl = (doc.localOnly && hasBlob) ? D.getBlob(doc.id) : '';
       const displayName = doc.fileName || doc.originalFileName || '(이름 없음)';
