@@ -3265,6 +3265,10 @@ table.pdf-doc-table thead{ background:var(--bg); }
             <!-- §POUR 낙찰 라이브 연동 라운드(신규) — 새 리뷰큐 UI를 만들지 않고, 기존
                  관리 도구 줄에 상태 텍스트 한 줄만 추가한다(§요청 "미매칭은 가벼운 안내만"). -->
             <span id="pourWonSyncNote" style="font-size:12px;color:var(--muted,#888);margin-left:4px;"></span>
+            <!-- §삭제된 업체 매칭-불일치 소급 탐지 라운드(신규) — pourWonSyncNote와 같은 위치에
+                 같은 패턴(정보용 한 줄 텍스트, 클릭 시 "삭제된 업체" 탭으로 이동)으로 추가한다.
+                 새 모달을 만들지 않는다(§요청 "최소한으로"). -->
+            <span id="orphanedDeletedNote" style="font-size:12px;color:#B23B3B;margin-left:4px;cursor:pointer;"></span>
           </div>
         </div>
         <!-- §전화 요청 기록 라운드(신규) — "+ 고객 등록"과 같은 줄에 배치. 처음엔 작은
@@ -8588,6 +8592,10 @@ window.SHIN2_CRM_APP_INIT = function(){
     const fetchErrorTabs = [];
     try{
       const companies = D.loadCompanies(); // §매칭은 삭제 여부와 무관 — 소프트 삭제된 업체도 자기 요청 기록은 유지(§요청 12 데이터 보존)
+      // §삭제된 업체 매칭-불일치 예방 라운드(신규) — 매칭으로 찾은 companyId가 소프트
+      // 삭제된 업체인지 즉시 확인하기 위한 id 조회용(아래 §삭제된 업체 매칭-불일치 예방
+      // 라운드 지점에서만 쓴다, companies 배열 자체의 매칭 범위는 그대로 유지).
+      const companiesById = new Map(companies.map(co=> [co.id, co]));
       const nameIndex = new Map(); // normName -> Set(companyId) — 정확히 1건일 때만 자동 연결(§요청)
       function indexName(co, raw){
         const n = D.normCompanyName(raw);
@@ -8682,6 +8690,26 @@ window.SHIN2_CRM_APP_INIT = function(){
                   cols, row, companyColIdx, dateColIdx, idColIdx, displayText:null });
                 return;
               }
+            }
+          }
+
+          // §삭제된 업체 매칭-불일치 예방 라운드(신규) — 매칭 자체는 여전히 삭제 여부와
+          // 무관하게 D.loadCompanies() 전체를 본다(위 §매칭은 삭제 여부와 무관 주석과
+          // 모순 없음, companiesById도 그 배열 그대로). 다만 최종적으로 찾은 상대가
+          // "진짜 협약사"(isCaseByCase가 아님)이면서 이미 소프트 삭제된 상태면, 여기서
+          // 자동으로 companyId를 확정하지 않는다 — 확정해버리면 이 요청은 "매칭 성공"으로
+          // 처리돼 확인 필요 큐에도 안 뜨고, 그렇다고 삭제된 업체는 일반 목록/최근 요청
+          // 어디에도 안 보여 완전히 유실된다(§본주건설 실사례). 대신 기존 확인 필요
+          // 큐(review)로 돌려 사람이 "복구" 또는 "다른 업체로 연결"을 직접 선택하게 한다
+          // (§요청 "자동 연결·자동 생성 금지" 원칙 그대로 적용, 새 메커니즘을 만들지 않고
+          // 기존 review 배열/reason 필드만 재사용).
+          if(companyId && !isCaseByCase){
+            const matchedCo = companiesById.get(companyId);
+            if(matchedCo && matchedCo.deletedAt){
+              review.push({ tab:cfg.tab, reason:'matched_but_company_deleted', rawCompanyName, raw:obj, dedupKey, uniqueId, occurredTs, siteName,
+                cols, row, companyColIdx, dateColIdx, idColIdx, displayText:null,
+                matchedDeletedCompanyId: matchedCo.id, matchedDeletedCompanyName: matchedCo.name });
+              return;
             }
           }
 
@@ -8949,6 +8977,21 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(pourWonImportState.dedupSkippedCount) parts.push('기존 실적과 중복 ' + pourWonImportState.dedupSkippedCount + '건 제외');
     if(pourWonImportState.unmatchedCount) parts.push('미매칭 업체 ' + pourWonImportState.unmatchedCount + '건');
     el.textContent = parts.join(' · ');
+  }
+  // §삭제된 업체 매칭-불일치 소급 탐지 라운드(신규) — 관리 도구 줄에 sitewide 집계 한 줄만
+  // 보여준다(§요청 3, 새 모달 없음). computeOrphanedDeletedCompanies(§renderDeletedCompaniesTab
+  // 바로 위, 소프트 삭제 라운드에서 정의)를 그대로 재사용해 따로 계산하지 않는다. 클릭하면
+  // 기존 "삭제된 업체" 필터 칩과 완전히 같은 동작(filterKey='deleted')으로 그 탭을 연다
+  // (nice-to-have, 새 모달/새 화면 없음).
+  function updateOrphanedDeletedNote(){
+    const el = document.getElementById('orphanedDeletedNote');
+    if(!el) return;
+    if(typeof computeOrphanedDeletedCompanies !== 'function'){ el.textContent = ''; return; }
+    const orphaned = computeOrphanedDeletedCompanies();
+    if(!orphaned.length){ el.textContent = ''; el.onclick = null; return; }
+    const totalReqs = orphaned.reduce((s,o)=> s + o.count, 0);
+    el.textContent = `⚠ 삭제된 업체 중 삭제 후 요청이 들어온 업체 ${orphaned.length}곳(${totalReqs}건) — 클릭해 확인`;
+    el.onclick = ()=>{ filterKey = 'deleted'; currentPage = 1; renderList(); };
   }
 
   // §요청 "로그인·고객정보 로딩 완료 후 접속마다 1회" — 두 경로 모두 같은 idempotent
@@ -9572,6 +9615,10 @@ window.SHIN2_CRM_APP_INIT = function(){
     // §미등록 업체 관리 라운드: 별도 저장소 없이 매번 다시 계산한다(§ "등록 후" 요구사항 —
     // 사용자가 업체를 등록하면 다음 renderList()에서 자동으로 줄어든다).
     renderUnregisteredBadge();
+    // §삭제된 업체 매칭-불일치 소급 탐지 라운드(신규) — renderUnregisteredBadge와 같은 이유로
+    // (§ "등록/복구 후" 자동 반영) renderList()가 불릴 때마다 다시 계산한다. 삭제된 업체 수만큼만
+    // 순회하는 가벼운 계산이라(위 computeOrphanedDeletedCompanies 주석) 매 렌더 호출에서 불러도 된다.
+    if(typeof updateOrphanedDeletedNote === 'function') updateOrphanedDeletedNote();
     // §상단 경고 정리 라운드: renderOverdueBadge() 호출을 없앴다 — "기한 초과" 배지는
     // 더 이상 메인 첫화면 상단에 안 보인다(함수 자체는 아래에 그대로 남아있다, §요청).
     // §최근 요청 라운드: 업체마다 전체 POUR 스냅샷/전체 활동기록을 다시 훑으면
@@ -11064,6 +11111,26 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 무거운 7컬럼 템플릿(매출/실적/MOU 등)은 재사용하지 않고, 요청된 3가지 정보(삭제일/
   // 업체명/삭제 사유)와 복구 버튼만 보여주는 단순한 표를 그린다. 소스는
   // D.loadDeletedCompanies() 하나뿐이라 다른 탭의 집계·정렬 로직과 전혀 얽히지 않는다.
+  // §삭제된 업체 매칭-불일치 소급 탐지 라운드(신규) — 소프트 삭제된 업체인데 deletedAt
+  // 이후에도(예방 로직 적용 전 과거 케이스 포함) sheetRequests가 쌓인 "유실된" 케이스를
+  // 계산한다(§본주건설 실사례와 동일 패턴). D.buildSheetRequestsIndex()(이미 다른 화면들이
+  // 쓰는 캐시된 companyId→요청배열 Map)만 조회하므로, 원본 sheetRequests 배열 전체를
+  // 다시 순회하지 않고 "삭제된 업체 수"만큼만 순회한다(§성능, 삭제된 업체는 보통 소수).
+  // 순수 조회/계산 함수 — 아무것도 저장/변경하지 않는다.
+  function computeOrphanedDeletedCompanies(){
+    const deleted = D.loadDeletedCompanies();
+    const reqIndex = D.buildSheetRequestsIndex();
+    const result = [];
+    deleted.forEach(co=>{
+      if(!co.deletedAt) return;
+      const delTs = new Date(co.deletedAt).getTime();
+      if(!delTs || isNaN(delTs)) return;
+      const reqs = reqIndex.get(String(co.id)) || [];
+      const n = reqs.filter(r=> r.requestDate && new Date(r.requestDate).getTime() > delTs).length;
+      if(n > 0) result.push({ company: co, count: n });
+    });
+    return result;
+  }
   function renderDeletedCompaniesTab(){
     const deleted = D.loadDeletedCompanies().slice().sort((a,b)=> new Date(b.deletedAt||0) - new Date(a.deletedAt||0));
     renderPagination(0);
@@ -11071,6 +11138,9 @@ window.SHIN2_CRM_APP_INIT = function(){
       listEl.innerHTML = '<div class="empty-note">삭제된 업체가 없습니다.</div>';
       return;
     }
+    // §삭제된 업체 매칭-불일치 소급 탐지 라운드(신규) — 업체별 "삭제 후 들어온 요청" 건수만
+    // 빠르게 찾아 쓰기 위한 Map(위 computeOrphanedDeletedCompanies 결과를 companyId로 색인).
+    const orphanedByCoId = new Map(computeOrphanedDeletedCompanies().map(o=> [o.company.id, o.count]));
     listEl.innerHTML = `
       <div class="deleted-co-table">
         <div class="deleted-co-head">
@@ -11079,7 +11149,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         ${deleted.map(co=> `
           <div class="deleted-co-row" data-deleted-co="${esc(co.id)}">
             <span class="deleted-co-date">${esc(fmtDate(co.deletedAt))}</span>
-            <span class="deleted-co-name">${esc(co.name || '(업체명 없음)')}</span>
+            <span class="deleted-co-name">${esc(co.name || '(업체명 없음)')}${orphanedByCoId.has(co.id) ? `<div style="color:#B23B3B;font-size:11.5px;font-weight:600;margin-top:2px;">⚠ 삭제 후 들어온 요청 ${orphanedByCoId.get(co.id)}건</div>` : ''}</span>
             <span class="deleted-co-reason">${esc(co.deleteReason || '사유 미기재')}</span>
             <span class="deleted-co-actions">
               <button type="button" class="co-text-action primary" data-restore-co="${esc(co.id)}">복구</button>
@@ -12068,9 +12138,20 @@ window.SHIN2_CRM_APP_INIT = function(){
       .filter(x=> x.text && x.raw != null && !isNaN(new Date(x.raw).getTime()))
       .sort((a,b)=> new Date(b.raw).getTime() - new Date(a.raw).getTime())
       .slice(0, 3);
+    // §삭제된 업체 매칭-불일치 예방 라운드(신규) — 카드에 Google Sheets 요청(sheetRequests)을
+    // 보여주는 진입점이 전혀 없던 기존 갭을 메운다. git blame으로 확인한 결과 renderReqPreview/
+    // #cdashReqPreviewBlock("최근 요청 / 고객 메모" 박스)은 §고객카드 전면 개선 라운드(§9
+    // 요청)에서 의도적으로 화면에서 뺀 것("함수는 보존, 화면에서만 뺐다" 관례)이라 그 박스를
+    // 그대로 되살리지 않는다 — 대신 목록 화면 "최근 요청" 컬럼이 이미 쓰는 openRequestPopover
+    // (buildRequestListItems 재사용, sheetRequests 포함)를 그대로 호출하는 작은 진입점 버튼만
+    // "최근 접촉 기록" 카드 제목 옆에 추가한다(새 데이터/새 팝업 로직 없음).
+    const reqCount = buildRequestListItems(co).length;
     wrap.innerHTML = `
       <div class="cdash2-card">
-        <div class="cdash2-card-title">최근 접촉 기록</div>
+        <div class="cdash2-card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <span>최근 접촉 기록</span>
+          <button type="button" class="co-text-action" id="cdashContactReqBtn" style="font-size:11px;padding:2px 8px;white-space:nowrap;">최근 요청 보기${reqCount ? ` (${reqCount})` : ''}</button>
+        </div>
         ${items.length ? `
           <div class="cdash2-timeline">
             ${items.map(it=> `
@@ -12086,6 +12167,8 @@ window.SHIN2_CRM_APP_INIT = function(){
         ` : `<div class="chart-empty">최근 접촉 기록 없음</div>`}
       </div>
     `;
+    const reqBtn = document.getElementById('cdashContactReqBtn');
+    if(reqBtn) reqBtn.addEventListener('click', (e)=>{ e.stopPropagation(); openRequestPopover(co, reqBtn); });
   }
 
   // ---- §고객카드 전면 개선 라운드 [5] 고객 인사이트 — buildInsightRepTagsFull(co)(이미
@@ -19099,6 +19182,13 @@ window.SHIN2_CRM_APP_INIT = function(){
      자체는 아무것도 자동으로 연결·생성하지 않는다(§요청 "자동 연결·자동 생성 금지").
      업체를 직접 골라 [이 업체로 연결]을 눌러야만 resolveGsheetReviewCompany가 실행된다.
      ========================================================================== */
+  // §삭제된 업체 매칭-불일치 예방 라운드(신규) — reason 코드값('matched_but_company_deleted')을
+  // 그대로 노출하면 사용자가 알아보기 어려워 표시용 한글 라벨로만 바꿔준다(기존 reason들은
+  // 이미 한글 문자열이라 그대로 통과).
+  function gsheetReviewReasonLabel(reason){
+    if(reason === 'matched_but_company_deleted') return '매칭된 업체가 삭제됨';
+    return reason;
+  }
   function closeGsheetReviewModal(){
     const root = document.getElementById('gsheetReviewModalRoot');
     if(root) root.innerHTML = '';
@@ -19157,10 +19247,20 @@ window.SHIN2_CRM_APP_INIT = function(){
         // 읽기만 한다(위 computeGsheetReviewSuggestions 주석 참고). 후보가 없으면 기존과
         // 완전히 동일한 화면(수동 선택 드롭다운만)을 그대로 보여준다.
         const suggestions = g.rawCompanyName ? (gsheetReviewSuggestCache.get(D.normCompanyName(g.rawCompanyName)) || []) : [];
+        // §삭제된 업체 매칭-불일치 예방 라운드(신규) — 이 그룹(같은 원본 업체명)의 항목이
+        // "매칭된 업체가 삭제됨" 사유면 전용 안내+복구 버튼을 보여준다. 같은 원본 업체명은
+        // 항상 같은 매칭 결과로 귀결되므로(매칭 로직이 normName 기준 1:1) 그룹 내 첫 항목만
+        // 확인하면 충분하다.
+        const deletedMatch = g.items.find(it=> it.reason === 'matched_but_company_deleted' && it.matchedDeletedCompanyId);
         return `
         <div class="local-cloud-diag-section">
           <div class="local-cloud-diag-title">${esc(g.rawCompanyName || '(업체명 없음)')} — ${g.items.length}건</div>
-          ${g.items.map(it=> `<div class="local-cloud-diag-row">${esc(it.tab)} · ${esc(it.reason)}${it.uniqueId ? ' · ' + esc(it.uniqueId) : ''}</div>`).join('')}
+          ${g.items.map(it=> `<div class="local-cloud-diag-row">${esc(it.tab)} · ${esc(gsheetReviewReasonLabel(it.reason))}${it.uniqueId ? ' · ' + esc(it.uniqueId) : ''}</div>`).join('')}
+          ${deletedMatch ? `
+            <div class="local-cloud-diag-note" style="margin-top:4px;color:#B23B3B;">
+              이 업체(<b>${esc(deletedMatch.matchedDeletedCompanyName)}</b>)는 삭제된 상태입니다 — 업체를 복구하거나 아래에서 다른 업체로 연결하세요.
+              <button type="button" class="co-text-action primary" data-gsheet-review-restore="${esc(gi)}" data-gsheet-review-restore-company="${esc(deletedMatch.matchedDeletedCompanyId)}" data-gsheet-review-name="${esc(g.rawCompanyName)}">업체 복구 후 연결</button>
+            </div>` : ''}
           ${suggestions.length ? `
             <div class="local-cloud-diag-note" style="margin-top:4px;">
               ${suggestions.map((s, si)=> `<div style="margin-top:2px;">유사 후보: <b>${esc(s.companyName)}</b>(기존 업체명과 매우 유사, 편집거리 ${s.distance}) <button type="button" class="co-text-action" data-gsheet-review-suggest="${esc(gi)}_${esc(si)}" data-gsheet-review-suggest-company="${esc(s.companyId)}" data-gsheet-review-name="${esc(g.rawCompanyName)}">이 업체로 연결</button></div>`).join('')}
@@ -19238,6 +19338,29 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(!r.ok){ showCloudSaveStatus(statusEl, false, r.err); return; }
       updateGsheetReviewCountBadge();
       renderGsheetReviewModal();
+    }));
+    // §삭제된 업체 매칭-불일치 예방 라운드(신규) — "업체 복구 후 연결". 새 복구 로직을
+    // 만들지 않고 "삭제된 업체" 탭이 쓰는 D.restoreDeletedCompany를 그대로 부른 뒤,
+    // 기존 resolveGsheetReviewCompany(위 data-gsheet-review-link와 완전히 동일한 연결
+    // 경로)로 바로 연결까지 마친다 — 다음 새로고침을 기다릴 필요 없음(§요청 "즉시 재반영").
+    root.querySelectorAll('[data-gsheet-review-restore]').forEach(btn=> btn.addEventListener('click', async ()=>{
+      const gi = btn.getAttribute('data-gsheet-review-restore');
+      const companyId = btn.getAttribute('data-gsheet-review-restore-company');
+      const rawName = btn.getAttribute('data-gsheet-review-name');
+      const statusEl = document.getElementById('gsheetReviewStatus_' + gi);
+      const co = D.findCompany(companyId);
+      if(!co){ showCloudSaveStatus(statusEl, false, { message:'업체를 찾을 수 없습니다.' }); return; }
+      if(!confirm(`"${co.name}" 업체를 복구하고 이 요청들과 연결하시겠습니까?`)) return;
+      btn.disabled = true;
+      D.restoreDeletedCompany(companyId);
+      const rc = await confirmCloudSave('companies');
+      if(!rc.ok){ btn.disabled = false; showCloudSaveStatus(statusEl, false, rc.err); return; }
+      const r = await resolveGsheetReviewCompany(rawName, companyId);
+      btn.disabled = false;
+      if(!r.ok){ showCloudSaveStatus(statusEl, false, r.err); return; }
+      updateGsheetReviewCountBadge();
+      renderGsheetReviewModal();
+      if(typeof refreshMapIfOpen === 'function') refreshMapIfOpen();
     }));
     // §확인 필요 복원/3단계 분류 라운드(신규) — ②건바이건 업체로 등록.
     root.querySelectorAll('[data-gsheet-review-cbc]').forEach(btn=> btn.addEventListener('click', async ()=>{
