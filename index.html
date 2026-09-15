@@ -3273,6 +3273,10 @@ table.pdf-doc-table thead{ background:var(--bg); }
                  같은 패턴(정보용 한 줄 텍스트, 클릭 시 "삭제된 업체" 탭으로 이동)으로 추가한다.
                  새 모달을 만들지 않는다(§요청 "최소한으로"). -->
             <span id="orphanedDeletedNote" style="font-size:12px;color:#B23B3B;margin-left:4px;cursor:pointer;"></span>
+            <!-- §확인 필요 큐 구조 오류 버그 수정 라운드(신규) — pourWonSyncNote/orphanedDeletedNote와
+                 같은 위치·같은 패턴(정보용 한 줄 텍스트)으로 탭 구조 오류(필수 컬럼을 못 찾음)를
+                 눈에 띄게 보여준다. 새 모달을 만들지 않는다(§요청 "기존 관리 도구 안내문 패턴 재사용"). -->
+            <span id="gsheetStructureErrorNote" style="font-size:12px;color:#B23B3B;margin-left:4px;"></span>
           </div>
         </div>
         <!-- §전화 요청 기록 라운드(신규) — "+ 고객 등록"과 같은 줄에 배치. 처음엔 작은
@@ -8358,8 +8362,18 @@ window.SHIN2_CRM_APP_INIT = function(){
   function fetchGSheetTabJSONP(tabName, timeoutMs, spreadsheetId){
     return new Promise((resolve, reject)=>{
       const cbName = '__gsheetCb' + (++gsheetJsonpSeq) + '_' + Date.now();
+      // §확인 필요 큐 구조 오류 버그 수정 라운드(신규) — headers=1을 명시적으로 넘긴다.
+      // 이게 없으면 gviz가 헤더 행을 항상 정확히 자동 감지하지 못한다(탭마다 다름 —
+      // "공법설명회이력" 탭에서 실사용 중 table.cols[].label이 전부 빈 문자열로 온
+      // 사례가 실제로 확인됨, §본주건설 실사례). label이 비면 아래 gsheetRowToObj가
+      // cols[i].id(gviz 자동 생성 "A"/"B"/...)로 폴백해 실제 헤더명(예: '시공사')과
+      // 전혀 다른 키가 되고, 그 결과 companyCol 등 필수 컬럼을 찾지 못해 행 전체가
+      // 잘못 처리된다. 이 URL은 POUR 라이브 연동(§POUR 낙찰 라이브 연동 라운드)과
+      // 공유하는 함수이지만 headers=1은 gviz 표준 파라미터로 두 시트 모두에 안전하다
+      // (탭의 실제 첫 행이 헤더인 것은 5개 탭/POUR 탭 전부 동일 — 데이터 구조를 바꾸지
+      // 않는다, §요청 8 검증).
       const url = 'https://docs.google.com/spreadsheets/d/' + (spreadsheetId || GSHEET_ID) + '/gviz/tq?sheet='
-        + encodeURIComponent(tabName) + '&tqx=out:json;responseHandler:' + cbName;
+        + encodeURIComponent(tabName) + '&headers=1&tqx=out:json;responseHandler:' + cbName;
       let done = false;
       const script = document.createElement('script');
       function cleanup(){ clearTimeout(timer); try{ delete window[cbName]; }catch(e){ window[cbName] = undefined; } if(script.parentNode) script.parentNode.removeChild(script); }
@@ -8660,7 +8674,13 @@ window.SHIN2_CRM_APP_INIT = function(){
     // §확인 필요 복원/3단계 분류 라운드(신규) — 자동 제외/건바이건 매칭 결과를 화면
     // 보고용으로만 들고 있는 값(하드코딩 아님, runGoogleSheetsImportOnce가 실행될 때마다
     // 실제로 다시 계산해 채운다). autoExcludedByReason: {test:n, empty:n}, autoExcludedByTab: {탭명:n}
-    autoExcludedCount:0, autoExcludedByReason:{ test:0, empty:0 }, autoExcludedByTab:{}, caseByCaseMatchedCount:0, userExcludedSkippedCount:0 };
+    autoExcludedCount:0, autoExcludedByReason:{ test:0, empty:0 }, autoExcludedByTab:{}, caseByCaseMatchedCount:0, userExcludedSkippedCount:0,
+    // §확인 필요 큐 구조 오류 버그 수정 라운드(신규) — 탭별 필수 컬럼(companyCol/dateCol/
+    // idCol/siteNameCol)을 실제 반환된 cols[].label에서 찾지 못한 경우를 담는다. 이
+    // 상태면 "업체명 없음"처럼 행별로 조용히 확인 필요/제외 처리하지 않고, 그 탭 전체를
+    // 이번 동기화에서 건너뛰고 명시적으로 사용자에게 알린다(§요청 4). 매 실행마다 새로
+    // 계산(아래 runGoogleSheetsImportOnce 시작부에서 초기화).
+    tabStructureErrors:[] };
   // 확인 필요 항목에서 사용자가 기존 업체를 직접 고르면: 별칭을 저장하고(§요청, 재사용
   // 가능한 연결), 그 업체명(원본 sourceCompanyName)으로 대기 중이던 확인 필요 행 "전부"에
   // 즉시 같은 companyId를 적용해 sheetRequests 문서로 저장한다(§요청 "같은 원본 업체명을
@@ -8817,6 +8837,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     gsheetImportState.autoExcludedByTab = {};
     gsheetImportState.caseByCaseMatchedCount = 0;
     gsheetImportState.userExcludedSkippedCount = 0;
+    gsheetImportState.tabStructureErrors = [];
     const review = [];
     const toWrite = []; // §Firestore 문서 용량 초과 수정 라운드 — customerActivities에는
     // 더 이상 추가하지 않는다. 여기서는 sheetRequests에 쓸 {id, fields}만 모아뒀다가
@@ -8856,6 +8877,26 @@ window.SHIN2_CRM_APP_INIT = function(){
         const dateColIdx = cols.findIndex(c=> (c.label || c.id) === cfg.dateCol);
         const idColIdx = cols.findIndex(c=> (c.label || c.id) === cfg.idCol);
         const siteNameColIdx = cfg.siteNameCol ? cols.findIndex(c=> (c.label || c.id) === cfg.siteNameCol) : -1;
+
+        // §확인 필요 큐 구조 오류 버그 수정 라운드(신규, §요청 4) — 필수 컬럼(업체/발생일/
+        // 고유번호, 있다면 현장명)을 실제로 못 찾으면 그 행들을 "업체명 없음"처럼 조용히
+        // 확인 필요/제외로 흘려보내지 않는다. 대신 탭 단위로 명확한 구조 오류로 기록하고
+        // (headers=1로도 이 탭의 헤더 행 자체가 바뀌었거나 시트 구조가 실제로 달라진
+        // 경우를 대비한 안전망) 이번 사이클에는 이 탭 행을 아예 처리하지 않는다 — 잘못된
+        // 데이터로 절반만 처리하는 것보다 명시적으로 건너뛰는 편이 안전하다(§요청 "절대
+        // 조용히 실패하지 않는다").
+        const missingCols = [];
+        if(companyColIdx < 0) missingCols.push(cfg.companyCol);
+        if(dateColIdx < 0) missingCols.push(cfg.dateCol);
+        if(idColIdx < 0) missingCols.push(cfg.idCol);
+        if(cfg.siteNameCol && siteNameColIdx < 0) missingCols.push(cfg.siteNameCol);
+        if(missingCols.length){
+          gsheetImportState.tabStructureErrors.push({
+            tab: cfg.tab, missingColumns: missingCols,
+            foundColumns: cols.map(c=> (c.label || c.id) || '(빈 헤더)')
+          });
+          continue; // §요청: 이 탭 행은 이번 사이클에 처리하지 않는다(다음 탭은 계속 진행)
+        }
 
         table.rows.forEach(row=>{
           if(!row || !row.c) return;
@@ -9002,6 +9043,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       gsheetImportState.running = false;
       gsheetImportState.ran = true;
       updateGsheetReviewCountBadge();
+      updateGsheetStructureErrorNote();
       // §최근 요청 표시 수정 라운드 — 예전엔 "신규 협약사" 탭에서만 이 결과를 썼어서 그
       // 탭일 때만 다시 그렸는데, 이제 "최근 요청" 열이 모든 탭에서 이 데이터를 쓰므로
       // (§요청 "신규 협약사 여부와 관계없이 반영") 탭과 무관하게 항상 다시 그려야 화면에
@@ -19460,6 +19502,17 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(n){ outerBadge.textContent = String(n); outerBadge.style.display = ''; }
       else { outerBadge.textContent = ''; outerBadge.style.display = 'none'; }
     }
+  }
+  // §확인 필요 큐 구조 오류 버그 수정 라운드(신규) — pourWonSyncNote/orphanedDeletedNote와
+  // 같은 자리에 탭 구조 오류(필수 컬럼을 못 찾아 그 탭 전체를 건너뜀)를 명시적으로 보여준다
+  // (§요청 4 "절대 조용히 실패하지 않는다"). gsheetImportState.tabStructureErrors는
+  // runGoogleSheetsImportOnce가 매 실행마다 새로 채운다.
+  function updateGsheetStructureErrorNote(){
+    const el = document.getElementById('gsheetStructureErrorNote');
+    if(!el) return;
+    const errs = gsheetImportState.tabStructureErrors || [];
+    if(!errs.length){ el.textContent = ''; return; }
+    el.textContent = errs.map(e=> '⚠ ' + e.tab + ' 탭 구조 오류: \'' + e.missingColumns.join(', ') + '\' 열을 찾을 수 없음 (동기화 건너뜀)').join(' · ');
   }
   function renderGsheetReviewModal(){
     const root = document.getElementById('gsheetReviewModalRoot');
