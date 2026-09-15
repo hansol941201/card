@@ -11211,9 +11211,6 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 바뀔 때는 이 base를 그대로 재사용하고 computeL2L3ManageAnalysis만 다시 부른다(새
   // Google Sheets/Firestore 조회 없음).
   let l2l3AnalysisCache = { coRaw: undefined, reqRaw: undefined, base: null };
-  // 전환율 모집단은 오늘을 포함한 최근 90일 안에 체결한 신규 협약사다.
-  // 협약 후 요청을 기다리는 업체도 분모에서 빼지 않는다.
-  const L2L3_RECENT_MOU_WINDOW_DAYS = 90;
   function buildL2L3AnalysisBase(){
     const coRaw = localStorage.getItem(CO_KEY);
     const reqRaw = localStorage.getItem(SHEETREQ_CACHE_KEY);
@@ -11223,8 +11220,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     const sheetReqsByCompany = D.buildSheetRequestsIndex();
     const todayTs = getSeoulTodayDateOnly();
     const rows = [];
-    let terminatedCount = 0, noMouCount = 0, futureMouCount = 0, preFloorExcludedCount = 0, olderMouExcludedCount = 0;
-    const recentMouStartTs = todayTs - (L2L3_RECENT_MOU_WINDOW_DAYS - 1) * 86400000;
+    let terminatedCount = 0, noMouCount = 0, futureMouCount = 0, preFloorExcludedCount = 0;
     // §요청 16/18/19/20 — D.loadActiveCompanies()만 읽는다(삭제된 업체는 이미 빠져
     // 있음, §요청 "삭제/협약종료 업체가 여전히 제외되는지" 그대로). 협약 종료 업체 제외,
     // 협약일이 없거나 미래인 업체는 판정 불가라 대상에서 뺀다(isNewPartnerCompany/
@@ -11242,7 +11238,6 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(!mou){ noMouCount++; return; }
       if(mou.ts > todayTs){ futureMouCount++; return; }
       if(mou.ts < NPCMP_A_START_TS){ preFloorExcludedCount++; return; } // 2026-05-20 이전 협약 제외
-      if(mou.ts < recentMouStartTs){ olderMouExcludedCount++; return; }
       const allReqs = sheetReqsByCompany.get(String(co.id)) || [];
       // §L3 정의 통일 라운드 — 사용자 확인("둘 다 통일해줘"): 이 탭의 L3 전환 신호를
       // 다시 "기술자문문의 단독" 기준으로 되돌려, 방금 고친 운영 개선 비교표
@@ -11259,7 +11254,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       const techReqs = npCmpFilterTechAdviceReqs(allReqs);
       rows.push({ co, mouTs: mou.ts, techReqs });
     });
-    const base = { rows, todayTs, recentMouStartTs, terminatedCount, noMouCount, futureMouCount, preFloorExcludedCount, olderMouExcludedCount };
+    const base = { rows, todayTs, terminatedCount, noMouCount, futureMouCount, preFloorExcludedCount };
     l2l3AnalysisCache = { coRaw, reqRaw, base };
     return base;
   }
@@ -11303,7 +11298,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     const converted = rows.filter(r=> r.bucket === 'converted');
     const observing = rows.filter(r=> r.bucket === 'observing');
     const needsAttention = rows.filter(r=> r.bucket === 'needsAttention');
-    // 전환율 = 전환 완료 ÷ 오늘 기준 최근 90일 이내 신규 협약사 전체.
+    // 전환율 = 전환 완료 ÷ 2026-05-20 이후 신규 협약사 전체.
     // 관찰 중인 업체도 협약 모집단이므로 분모에 포함한다.
     const observedCount = converted.length + needsAttention.length;
     const rate = rows.length ? Math.round((converted.length / rows.length) * 1000) / 10 : 0;
@@ -11315,7 +11310,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     const sourceCounts = {};
     L2L3_ALL_SOURCE_SHEETS.forEach(s=> sourceCounts[s] = 0);
     converted.forEach(r=> (r.sourceTypes || []).forEach(t=>{ if(sourceCounts[t] != null) sourceCounts[t]++; }));
-    const result = { N, todayTs: base.todayTs, recentMouStartTs: base.recentMouStartTs, rows, converted, observing, needsAttention, observedCount, rate, total: rows.length, sourceCounts };
+    const result = { N, todayTs: base.todayTs, rows, converted, observing, needsAttention, observedCount, rate, total: rows.length, sourceCounts };
     l2l3ManageAnalysisCache = { base, N, result };
     return result;
   }
@@ -11450,11 +11445,11 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="np2-hero-rate-block">
           <div class="np2-hero-rate-label">L2 → L3 전환율</div>
           <div class="np2-hero-rate">${esc(analysis.rate)}%</div>
-          <div class="np2-hero-sub">최근 90일 신규 협약 ${esc(analysis.total)}곳 중 ${esc(analysis.converted.length)}곳 L3 전환(협약 후 ${esc(npCmpPeriodDays)}일 기준)</div>
+          <div class="np2-hero-sub">5월 20일 이후 신규 협약 ${esc(analysis.total)}곳 중 ${esc(analysis.converted.length)}곳 L3 전환(협약 후 ${esc(npCmpPeriodDays)}일 기준)</div>
           <div class="np2-hero-bar"><div class="np2-hero-bar-fill" style="width:${Math.max(0,Math.min(100,rateNum))}%;"></div></div>
         </div>
         <div class="np2-hero-stats">
-          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(analysis.total)}</span><span class="np2-hero-stat-label">최근 90일 신규 협약</span></div>
+          <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(analysis.total)}</span><span class="np2-hero-stat-label">5월 20일 이후 신규 협약</span></div>
           <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(analysis.converted.length)}</span><span class="np2-hero-stat-label">전환 완료</span></div>
           <div class="np2-hero-stat"><span class="np2-hero-stat-value">${esc(analysis.observing.length)}</span><span class="np2-hero-stat-label">관찰 중</span></div>
           ${analysis.needsAttention.length ? `<div class="np2-hero-stat"><span class="np2-hero-stat-value is-warn">${esc(analysis.needsAttention.length)}</span><span class="np2-hero-stat-label">관리 필요</span></div>` : ''}
