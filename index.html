@@ -3037,6 +3037,8 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .questionnaire-work-title{ font-size:13px; font-weight:700; color:var(--navy); }
 .questionnaire-work-meta{ margin-top:5px; font-size:11.5px; color:var(--text-muted); }
 .questionnaire-work-actions{ display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
+.questionnaire-file-label{ display:inline-block; cursor:pointer; }
+.questionnaire-file-input{ position:absolute; width:1px; height:1px; opacity:0; overflow:hidden; }
 .questionnaire-session-panel{ max-width:1180px !important; width:calc(100vw - 42px); height:min(780px, calc(100vh - 42px)); display:flex; flex-direction:column; }
 .questionnaire-session-body{ flex:1; min-height:0; display:grid; grid-template-columns:minmax(0, 1.35fr) minmax(300px, .85fr); gap:14px; }
 .questionnaire-viewer{ min-height:0; border:1px solid var(--line); border-radius:7px; overflow:hidden; background:var(--bg); }
@@ -17744,18 +17746,16 @@ window.SHIN2_CRM_APP_INIT = function(){
   function questionnaireWorkHtml(companyId){
     const docs = D.documentsForCompany(companyId, 'questionnaire');
     const doc = docs[0];
-    const accepted = 'image/*,application/pdf,.doc,.docx,.hwp,.hwpx,.txt';
-    if(!doc) return `<div class="questionnaire-work-card"><div class="questionnaire-work-head"><span class="questionnaire-work-title">질문지 상담</span></div><div class="questionnaire-work-meta">질문서를 등록하면, 문서를 보면서 상담 메모를 바로 저장할 수 있습니다.</div><div class="questionnaire-work-actions"><input type="file" id="agreementQuestionnaireInput" accept="${accepted}" style="display:none;" /><button type="button" class="co-text-action primary" id="agreementQuestionnaireUpload">질문지 등록</button></div></div>`;
-    return `<div class="questionnaire-work-card"><div class="questionnaire-work-head"><span class="questionnaire-work-title">질문지 상담</span><span class="status-badge is-progress">등록됨</span></div><div class="questionnaire-work-meta">${esc(doc.fileName || doc.originalFileName || '질문서')} · ${esc(fmtDate(doc.createdAt))} 등록${doc.memo ? ' · 상담 메모 있음' : ''}</div><div class="questionnaire-work-actions"><input type="file" id="agreementQuestionnaireInput" accept="${accepted}" style="display:none;" /><button type="button" class="co-text-action primary" data-questionnaire-session="${esc(doc.id)}">질문지 열고 상담 메모</button><button type="button" class="co-text-action" id="agreementQuestionnaireReplace">질문지 교체</button></div></div>`;
+    // label[for]를 사용해 모바일/브라우저별 programmatic input.click() 제한을 피한다.
+    const accepted = '.pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.hwp,.hwpx,.xls,.xlsx';
+    const inputHtml = `<input type="file" id="agreementQuestionnaireInput" class="questionnaire-file-input" accept="${accepted}" />`;
+    if(!doc) return `<div class="questionnaire-work-card"><div class="questionnaire-work-head"><span class="questionnaire-work-title">질문지 상담</span></div><div class="questionnaire-work-meta">질문서를 등록하면, 문서를 보면서 상담 메모를 바로 저장할 수 있습니다.</div><div class="questionnaire-work-actions">${inputHtml}<label for="agreementQuestionnaireInput" class="co-text-action primary questionnaire-file-label">질문지 등록</label></div></div>`;
+    return `<div class="questionnaire-work-card"><div class="questionnaire-work-head"><span class="questionnaire-work-title">질문지 상담</span><span class="status-badge is-progress">등록됨</span></div><div class="questionnaire-work-meta">${esc(doc.fileName || doc.originalFileName || '질문서')} · ${esc(fmtDate(doc.createdAt))} 등록${doc.memo ? ' · 상담 메모 있음' : ''}</div><div class="questionnaire-work-actions">${inputHtml}<button type="button" class="co-text-action primary" data-questionnaire-session="${esc(doc.id)}">질문지 열고 상담 메모</button><label for="agreementQuestionnaireInput" class="co-text-action questionnaire-file-label">질문지 교체</label></div></div>`;
   }
   function bindQuestionnaireWork(companyId){
-    const upload = ()=> document.getElementById('agreementQuestionnaireInput').click();
-    const uploadBtn = document.getElementById('agreementQuestionnaireUpload');
-    const replaceBtn = document.getElementById('agreementQuestionnaireReplace');
-    if(uploadBtn) uploadBtn.addEventListener('click', upload);
-    if(replaceBtn) replaceBtn.addEventListener('click', upload);
     const input = document.getElementById('agreementQuestionnaireInput');
     if(input) input.addEventListener('change', e=>{
+      // FileList는 input을 비우기 전에 별도 변수로 잡아야 선택 파일이 사라지지 않는다.
       const file = e.target.files && e.target.files[0]; e.target.value = '';
       if(!file) return;
       D.addDocument(companyId, 'questionnaire', file).then(async ()=>{
