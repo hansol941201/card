@@ -4362,6 +4362,44 @@ window.SHIN2_CRM_OCR = (function(){
         isReady: ()=> companyCodeCounterSyncStarted
       };
 
+      // §업체코드 B2B 포맷 전환 라운드(신규) — §요청 8 "가능하면 마지막 발급번호를
+      // 별도로 영구 보존"을 위 연도별 카운터(COMPANY_CODE_COUNTER_STORAGE_KEY)와
+      // 완전히 분리된 새 키로 만든다(요청이 명시적으로 "별도의 새 키"를 지정). 값은
+      // 객체가 아니라 단순 숫자 하나(마지막으로 발급한 B2B 일련번호, 예: 352)라 위
+      // byYear 병합(연도별 max) 패턴 대신 단일 값 max 병합만 하면 된다 — 더 단순하다.
+      const COMPANY_CODE_B2B_COUNTER_STORAGE_KEY = 'shin2-company-code-b2b-counter-v1';
+      let companyCodeB2BCounterSyncStarted = false;
+      let companyCodeB2BCounterPushTimer = null;
+      function pushCompanyCodeB2BCounterToCloud(value){
+        if(!currentUid) return;
+        const n = parseInt(value, 10);
+        if(!Number.isFinite(n)) return;
+        clearTimeout(companyCodeB2BCounterPushTimer);
+        companyCodeB2BCounterPushTimer = setTimeout(async ()=>{
+          try{ await setDoc(doc(db, 'users', currentUid, 'shin2', COMPANY_CODE_B2B_COUNTER_STORAGE_KEY), { value: n, updatedAt: serverTimestamp() }); }
+          catch(e){ console.error('[CRM/Firebase] B2B 업체코드 카운터 저장 실패', e); }
+        }, 500);
+      }
+      function startCompanyCodeB2BCounterSync(){
+        if(companyCodeB2BCounterSyncStarted || !currentUid) return;
+        companyCodeB2BCounterSyncStarted = true;
+        const ref = doc(db, 'users', currentUid, 'shin2', COMPANY_CODE_B2B_COUNTER_STORAGE_KEY);
+        onSnapshot(ref, (snap)=>{
+          if(!snap.exists()) return;
+          const cloudVal = (snap.data() || {}).value;
+          if(!Number.isFinite(parseInt(cloudVal, 10))) return;
+          try{
+            if(typeof window.SHIN2_CRM_MERGE_B2B_COUNTER_FROM_CLOUD === 'function'){
+              window.SHIN2_CRM_MERGE_B2B_COUNTER_FROM_CLOUD(parseInt(cloudVal, 10));
+            }
+          }catch(e){}
+        }, (err)=> console.warn('[CRM/Firebase] B2B 업체코드 카운터 구독 실패', err));
+      }
+      window.SHIN2_CRM_B2B_COUNTER_SYNC = {
+        push: (value)=> pushCompanyCodeB2BCounterToCloud(value),
+        isReady: ()=> companyCodeB2BCounterSyncStarted
+      };
+
       /* ========================================================================
          §Firestore 문서 용량 초과 수정 라운드(신규) — customerActivities(위 ACT_KEY,
          SHARED_ARRAY_KEYS.customerActivities) 문서 하나에 배열 전체를 push하는 기존
@@ -4654,6 +4692,9 @@ window.SHIN2_CRM_OCR = (function(){
         // §업체코드 중복발급 방지 라운드(신규) — 위 sheetRequests/caseByCase와 같은 이유
         // (새로 생기는 문서라 기존 로컬 값과의 병합 위험이 없음)로 로그인만 되면 바로 켠다.
         if(currentUid) startCompanyCodeCounterSync();
+        // §업체코드 B2B 포맷 전환 라운드(신규) — 위 연도별 카운터 동기화와 같은 이유로
+        // 로그인만 되면 바로 켠다.
+        if(currentUid) startCompanyCodeB2BCounterSync();
         maybeStartSharedSync();
       });
 
@@ -5161,6 +5202,54 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   window.SHIN2_CRM_MERGE_CODE_COUNTER_FROM_CLOUD = function(cloudByYear){
     if(!cloudByYear || typeof cloudByYear !== 'object') return;
     Object.keys(cloudByYear).forEach(yy=> bumpCompanyCodeCounter(yy, cloudByYear[yy]));
+  };
+
+  // §업체코드 B2B 포맷 전환 라운드(신규) — "B2B" + 3자리 숫자 전용 영구 카운터
+  // (§요청 8). 위 연도별 카운터(COMPANY_CODE_COUNTER_KEY)는 옛 yy+3digit 포맷 전용으로
+  // 그대로 남겨두고(이미 발급된 업체들의 이력/향후 참고용, §요청 8 "삭제할 필요 없음"),
+  // 이번 라운드는 완전히 새 키(COMPANY_CODE_B2B_COUNTER_KEY, 위 Firebase 모듈 블록의
+  // COMPANY_CODE_B2B_COUNTER_STORAGE_KEY 문자열과 반드시 같아야 함)에 숫자 하나만
+  // 저장한다. §사용자 명시 "현재 마지막 발급번호는 B2B352" — 아직 이 키에 저장된 값이
+  // 없을 때(최초 1회)는 352로 시드해, 마스터 업체 명단 가져오기 도구가 아직 실행되지
+  // 않은 상태에서도 첫 신규 등록이 항상 B2B353부터 시작하도록 한다(§요청 "매우 중요"
+  // 섹션). 이미 값이 있으면(0 이상 정수 포함) 그 값을 그대로 쓰고 절대 352로 되돌리지
+  // 않는다 — writeObj를 거치지 않고 raw 문자열을 직접 다루는 이유는 이 저장소가 배열도
+  // 객체(키 개수 비교)도 아닌 숫자 하나뿐이라 기존 writeArr/writeObj의 "줄어들면 막는다"
+  // 가드 형태가 맞지 않기 때문이다(대신 아래 bump 함수 자체가 단조증가를 보장한다).
+  const COMPANY_CODE_B2B_COUNTER_KEY = 'shin2-company-code-b2b-counter-v1';
+  const COMPANY_CODE_B2B_SEED = 352;
+  function loadCompanyCodeB2BCounter(){
+    let raw;
+    try{ raw = localStorage.getItem(COMPANY_CODE_B2B_COUNTER_KEY); }catch(e){ raw = null; }
+    if(raw == null || raw === ''){
+      // 최초 1회 시드 — 다음부터는 항상 저장된 값을 그대로 읽는다.
+      try{ localStorage.setItem(COMPANY_CODE_B2B_COUNTER_KEY, String(COMPANY_CODE_B2B_SEED)); }catch(e){}
+      return COMPANY_CODE_B2B_SEED;
+    }
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) ? n : COMPANY_CODE_B2B_SEED;
+  }
+  function saveCompanyCodeB2BCounter(n){
+    const val = parseInt(n, 10);
+    if(!Number.isFinite(val)) return false;
+    try{ localStorage.setItem(COMPANY_CODE_B2B_COUNTER_KEY, String(val)); return true; }
+    catch(e){ storageProblem('저장 공간이 가득 찼거나 저장이 거부되었습니다(' + COMPANY_CODE_B2B_COUNTER_KEY + ')', e); return false; }
+  }
+  // seq가 현재 저장된 값보다 클 때만 갱신(단조증가, §연도별 카운터의 bumpCompanyCodeCounter와
+  // 동일한 규칙). 실제로 갱신했을 때만 true를 돌려주고 클라우드로도 밀어보낸다.
+  function bumpCompanyCodeB2BCounter(seq){
+    const cur = loadCompanyCodeB2BCounter();
+    const seqNum = parseInt(seq, 10) || 0;
+    if(seqNum <= cur) return false;
+    saveCompanyCodeB2BCounter(seqNum);
+    try{ if(window.SHIN2_CRM_B2B_COUNTER_SYNC) window.SHIN2_CRM_B2B_COUNTER_SYNC.push(seqNum); }catch(e){}
+    return true;
+  }
+  // Firebase 모듈 블록의 onSnapshot이 클라우드 값을 받으면 이 전역 함수를 호출해 병합한다
+  // (§위 SHIN2_CRM_MERGE_CODE_COUNTER_FROM_CLOUD와 동일한 패턴).
+  window.SHIN2_CRM_MERGE_B2B_COUNTER_FROM_CLOUD = function(cloudVal){
+    const n = parseInt(cloudVal, 10);
+    if(Number.isFinite(n)) bumpCompanyCodeB2BCounter(n);
   };
 
   // ---- companies (기존 저장소, 재사용만) ----
@@ -7805,6 +7894,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   window.SHIN2_CRM_DATA = {
     loadCompanies, findCompany, addCompany, updateCompany, normalizeCorpSuffix,
     loadCompanyCodeCounters, bumpCompanyCodeCounter,
+    loadCompanyCodeB2BCounter, bumpCompanyCodeB2BCounter,
     previewCorpSuffixMigration, applyCorpSuffixMigration,
     loadMailSettings, saveMailSettings,
     loadMailAssets, getMailAsset, saveMailAssetPatch, uploadMailAssetFile, getMailAssetFileURL,
@@ -24256,24 +24346,47 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 카운터 중 더 큰 쪽" — 카운터가 스캔보다 앞서 있을 수 있는 유일한 이유는 동기화 지연
   // (다른 기기가 이미 발급했지만 이 기기 로컬 배열엔 아직 안 들어온 경우)뿐이라 max가
   // 항상 정답이다.
-  function nextCompanySeqForYear(yy, companies){
+  // §업체코드 B2B 포맷 전환 라운드(신규) — §요청 1 "연도 기반(yy+3digit) 자동생성 로직은
+  // 신규 업체 등록에서 완전히 제거". 옛 nextCompanySeqForYear(yy 기반)는 더 이상 새 코드
+  // 발급에 쓰지 않는다(연도별 카운터 저장소 COMPANY_CODE_COUNTER_KEY/loadCompanyCodeCounters
+  // 자체는 이력 보존용으로 그대로 남겨둔다, §요청 8). 이 함수가 그 자리를 완전히 대체한다.
+  //
+  // §요청 3 "현재 저장된 B2B 업체코드 중 가장 큰 숫자를 찾아 MAX+1" — 스캔 대상은 두
+  // 필드 모두다(§요청 "매우 중요" 섹션): co.code(일반 신규 등록 경로가 쓰는 필드)와
+  // co.masterCode(마스터 업체 명단 가져오기 도구 — previewMasterImportRoster/
+  // applyMasterImportRoster, 아래 §참고 — 가 같은 B2B 포맷 코드를 저장하는 별도 필드,
+  // grep으로 확인함). 그 도구가 아직 실행되지 않았거나 code/masterCode 중 한쪽에만 값이
+  // 들어있는 경우까지 전부 커버하려면 양쪽 다 스캔해 더 큰 값을 취해야 한다.
+  //
+  // §요청 8 "영구 카운터"도 함께 반영한다 — 최종 발급 번호 = max(라이브 데이터 스캔
+  // 결과, 영구 카운터(초기값 352로 시드)) + 1. 카운터가 스캔보다 앞설 수 있는 이유는
+  // (a) 동기화 지연, (b) 마스터 명단 가져오기 도구가 아직 실행되지 않아 실데이터에는
+  // B2B 코드가 전혀 없지만 "사용자가 이미 B2B352까지 배정하기로 확정했다"고 알려준
+  // 경우(§요청 "매우 중요" 섹션 — 시드 352) 두 가지이며, 두 경우 모두 max가 항상
+  // 정답이다.
+  function nextB2BSeq(companies){
     const list = companies || D.loadCompanies();
-    const used = list
-      .map(c=> c.code)
-      .filter(code=> typeof code === 'string' && code.startsWith(yy) && /^\d{5}$/.test(code))
-      .map(code=> parseInt(code.slice(2), 10));
-    const scanMax = used.length ? Math.max(...used) : 0;
+    let scanMax = 0;
+    const B2B_RE = /^B2B(\d{3})$/;
+    list.forEach(c=>{
+      [c.code, c.masterCode].forEach(v=>{
+        if(typeof v !== 'string') return;
+        const m = v.match(B2B_RE);
+        if(m){ const n = parseInt(m[1], 10); if(n > scanMax) scanMax = n; }
+      });
+    });
     let counterVal = 0;
-    try{ counterVal = parseInt((D.loadCompanyCodeCounters() || {})[yy], 10) || 0; }catch(e){}
+    try{ counterVal = parseInt(D.loadCompanyCodeB2BCounter(), 10) || 0; }catch(e){}
     return Math.max(scanMax, counterVal) + 1;
   }
-  // 업체코드 자동 생성 — partner-dashboard 스냅샷의 실제 표기 규칙(예: "19001"=19년도
-  // 1번째)을 그대로 따른다: 올해 2자리 + 그 해 안에서의 다음 순번(3자리). 이미 있는
-  // code 값과 절대 겹치지 않도록 실제 저장된 값 중 같은 연도 접두어의 최댓값+1만 쓴다.
+  // 업체코드 자동 생성 — §요청 2 "B2B + 3자리 숫자(zero-padded)" 형식으로 완전히 교체
+  // (예: B2B001…B2B352, 다음 신규 = B2B353). 기존 함수명(genCompanyCode)은 그대로
+  // 유지해 호출부(폼을 여는 코드, crmNewFSave 재검증) 수정을 최소화한다 — 내부 로직만
+  // B2B 전용으로 새로 작성했다(§요청 "기존 함수명을 그대로 유지하는 편이 호출부 수정을
+  // 최소화하니 그 방향 권장").
   function genCompanyCode(companies){
-    const yy = String(new Date().getFullYear()).slice(2);
-    const next = nextCompanySeqForYear(yy, companies);
-    return yy + String(next).padStart(3, '0');
+    const next = nextB2BSeq(companies);
+    return 'B2B' + String(next).padStart(3, '0');
   }
   // §업체코드 중복발급 방지 라운드(신규) — 저장 직전(crmNewFSave) 재검증 전용. 최신
   // companies 배열(호출부가 바로 그 시점에 D.loadCompanies()로 새로 읽어 넘긴다) 안에
@@ -24559,7 +24672,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         </div>
       </div>
       <div class="co-form-field"><label>상호 *</label><input type="text" id="crmNewF_name" /></div>
-      <div class="co-form-field"><label>업체코드(자동 생성 — 필요시 수정 가능)</label><input type="text" id="crmNewF_code" /></div>
+      <div class="co-form-field"><label>업체코드(자동 생성)</label><input type="text" id="crmNewF_code" readonly title="업체코드는 자동으로 발급됩니다." /></div>
       ${NEW_FIELD_LABELS.slice(1).map(([k,l])=> `<div class="co-form-field"><label>${esc(l)}</label><input type="text" id="crmNewF_${k}" /></div>`).join('')}
       ${renderDealStageBlockHtml('addco', resolveDealStageFormValues(null))}
       <div class="co-form-field"><label>비고</label><textarea id="crmNewF_note"></textarea></div>
@@ -24877,13 +24990,16 @@ window.SHIN2_CRM_APP_INIT = function(){
         saveErrEl.style.display = 'block';
         return;
       }
-      // §업체코드 중복발급 방지 라운드(신규) — §요청 6/7 "발급한 코드는 연도별 영구
-      // 저장소에 남긴다". 클라우드 저장까지 성공한 뒤에만(위 try 블록 통과) 올린다 —
-      // 저장이 실패해 재시도될 code는 아직 "실제로 발급된" 코드가 아니기 때문이다.
-      // rec.code가 "yy+3자리" 형식일 때만 반영(수기로 전혀 다른 형식을 입력했을 수도
-      // 있는 예외적인 값까지 카운터에 밀어넣지 않는다).
-      if(typeof rec.code === 'string' && /^\d{5}$/.test(rec.code)){
-        D.bumpCompanyCodeCounter(rec.code.slice(0,2), parseInt(rec.code.slice(2), 10));
+      // §업체코드 B2B 포맷 전환 라운드(신규) — §요청 8 "발급한 코드는 영구 저장소에
+      // 남긴다"를 B2B 전용 카운터로 반영. 클라우드 저장까지 성공한 뒤에만(위 try 블록
+      // 통과) 올린다 — 저장이 실패해 재시도될 code는 아직 "실제로 발급된" 코드가 아니기
+      // 때문이다. rec.code가 B2B+3자리 형식일 때만 반영(수기로 전혀 다른 형식을 입력했을
+      // 수도 있는 예외적인 값까지 카운터에 밀어넣지 않는다 — 옛 yy+3digit 형식이면 이
+      // 새 카운터를 건드리지 않는다, §요청 6 "기존 코드는 절대 변경하지 않음"과 같은
+      // 취지로 옛 포맷은 이 카운터의 관할이 아니다).
+      const b2bMatch = typeof rec.code === 'string' && rec.code.match(/^B2B(\d{3})$/);
+      if(b2bMatch){
+        D.bumpCompanyCodeB2BCounter(parseInt(b2bMatch[1], 10));
       }
       pendingNewCompanyId = null;
       closeAddCompanyForm();
@@ -26935,10 +27051,52 @@ window.SHIN2_CRM_APP_INIT = function(){
       memo: latestMemo ? mouPdfTruncate(latestMemo.text, 30) : '없음'
     };
   }
+  // §외부용 PDF 개인정보 유출 긴급 수정 라운드(신규) — 실제 배포본(commit b795be3)의
+  // 외부용 PDF "업체번호" 컬럼이 co.code를 그대로 노출하고 있었는데, 사용자가 라이브
+  // 화면에서 "대부분의 업체에서 업체번호 자리에 전화번호가 뜬다"고 확인했다. 원인 조사
+  // 결과(§커밋 메시지/보고 참고) co.code 필드 자체가 2026-09-01(ba13163, "신규 고객
+  // 등록" 빠른입력 폼 최초 도입) ~ 2026-09-15(b795be3, 폼을 readonly B2B 자동발급으로
+  // 전환) 사이 "업체코드(자동 생성 — 필요시 수정 가능)"라는 이름의 수정 가능한 입력칸을
+  // 통해 직원이 자동 생성값을 지우고 전화번호를 직접 타이핑해 넣은 이력 데이터 오염이다
+  // (코드가 code/phone을 뒤섞어 쓰는 활성 버그가 아니라, 이미 readonly 전환으로 막힌
+  // "과거에 사람이 잘못 입력할 수 있었던 통로"의 잔재 — SHIN2_PARTNER_SNAPSHOT 등 과거
+  // 스냅샷의 code는 전부 정상적인 "연도2자리+3자리" 형식이고 phone과 별도 필드로 분리돼
+  // 있어 매핑 버그는 아님을 확인했다).
+  //
+  // co.code 저장값 자체를 지금 와서 일괄 재검증/정정하는 건 이 라운드 범위 밖(과거
+  // 데이터 각 건을 실제 업체코드로 되돌릴 근거가 없다)이므로, 외부용 PDF 쪽만 방어적으로
+  // 틀어막는다 — "안전하다고 검증된 형식"만 통과시키는 화이트리스트 + "전화번호처럼
+  // 생겼으면 이중으로 한 번 더 차단"하는 벨트-앤-서스펜더스 두 겹 방어. 내부용
+  // (buildInternalPdfRow)은 co.code를 그대로 보여주는 기존 동작을 건드리지 않는다 —
+  // 내부 문서는 개인정보 우려 대상이 아니라고 사용자가 확인했고, 실제 저장된 값을 담당자가
+  // 알아야 데이터 정정도 가능하기 때문이다.
+  //
+  // KNOWN_SAFE_CODE_RE: B2B 신규 포맷(B2B+3자리, nextB2BSeq의 B2B_RE와 동일 패턴 —
+  // 그 상수 자체는 함수 지역 변수라 그대로 재사용할 수 없어 같은 정규식을 여기 별도로
+  // 정의한다) 또는 레거시 "연도2자리+3자리"(5자리 숫자, 예: "26008") 형식만 안전하다고
+  // 간주한다.
+  const MOU_PDF_SAFE_CODE_RE = /^(?:B2B\d{3}|\d{5})$/;
+  // PHONE_SHAPE_RE: 위 화이트리스트에 구멍이 있어도 잡아내는 2차 방어선 — 한국 전화번호
+  // 형태(하이픈 유무 모두, 지역번호/휴대폰 공통 0으로 시작하는 2~3자리 + 3~4자리 +
+  // 4자리)를 명시적으로 걸러낸다.
+  const MOU_PDF_PHONE_SHAPE_RE = /^0\d{1,2}-?\d{3,4}-?\d{4}$/;
+  function mouPdfSafeCompanyCode(co){
+    const candidates = [co.code, co.masterCode];
+    for(const raw of candidates){
+      const v = String(raw || '').trim();
+      if(!v) continue;
+      if(!MOU_PDF_SAFE_CODE_RE.test(v)) continue; // 화이트리스트 1차 방어
+      if(MOU_PDF_PHONE_SHAPE_RE.test(v)) continue; // 전화번호 형태 2차 방어(벨트-앤-서스펜더스)
+      return v;
+    }
+    return '-';
+  }
   // buildExternalPdfRow: §보안 요구사항의 핵심 — 이 함수가 반환하는 3필드 객체가 외부용
-  // 문서가 실제로 접근할 수 있는 데이터의 전부다(위 라운드 헤더 주석 참고).
+  // 문서가 실제로 접근할 수 있는 데이터의 전부다(위 라운드 헤더 주석 참고). §긴급 수정
+  // 라운드 — code 필드는 co.code를 그대로 노출하지 않고 mouPdfSafeCompanyCode()를 거친
+  // 값만 내보낸다(안전 형식이 아니면 '-').
   function buildExternalPdfRow(co, idx){
-    return { no: idx + 1, name: co.name || '-', code: co.code || '-', address: co.address || '-' };
+    return { no: idx + 1, name: co.name || '-', code: mouPdfSafeCompanyCode(co), address: co.address || '-' };
   }
   const MOU_PDF_INTERNAL_COLUMNS = ['no','code','name','repName','contactName','phone','email','address','grade','mouDate','techAdvice','activity','memo'];
   const MOU_PDF_INTERNAL_LABELS = {
