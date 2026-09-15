@@ -3046,9 +3046,17 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .questionnaire-viewer img{ width:100%; height:100%; min-height:500px; object-fit:contain; background:#fff; }
 .questionnaire-viewer-fallback{ height:100%; min-height:300px; display:flex; align-items:center; justify-content:center; text-align:center; padding:24px; color:var(--text-muted); }
 .questionnaire-note-pane{ min-height:0; display:flex; flex-direction:column; }
-.questionnaire-note-pane label{ font-size:12.5px; font-weight:700; margin-bottom:7px; }
-.questionnaire-note-pane textarea{ flex:1; min-height:280px; resize:vertical; line-height:1.55; }
-.questionnaire-note-footer{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:9px; }
+.questionnaire-note-pane label{ font-size:12.5px; font-weight:700; margin-bottom:7px; display:block; }
+.questionnaire-note-scroll{ flex:1; min-height:0; overflow-y:auto; padding-right:4px; }
+.questionnaire-qa-section{ font-size:13px; font-weight:800; color:var(--navy); margin:16px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--line); }
+.questionnaire-qa-section:first-child{ margin-top:0; }
+.questionnaire-qa-item{ margin-bottom:14px; }
+.questionnaire-qa-label{ font-size:11.5px; font-weight:700; color:var(--navy); margin-bottom:4px; }
+.questionnaire-qa-text{ font-size:12.5px; color:var(--text); background:#f4f7fb; border:1px solid var(--line); border-radius:7px; padding:8px 10px; margin-bottom:7px; line-height:1.5; white-space:pre-wrap; word-break:break-word; }
+.questionnaire-qa-answer{ width:100%; min-height:70px; resize:vertical; line-height:1.5; box-sizing:border-box; }
+.questionnaire-qa-etc{ margin-top:4px; border-top:1px solid var(--line); padding-top:14px; }
+.questionnaire-note-pane textarea#questionnaireConsultationMemo{ width:100%; min-height:120px; resize:vertical; line-height:1.55; box-sizing:border-box; }
+.questionnaire-note-footer{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:9px; flex:0 0 auto; }
 .questionnaire-save-status{ font-size:11.5px; color:var(--text-muted); }
 @media(max-width:760px){ .questionnaire-session-panel{ width:calc(100vw - 20px); height:calc(100vh - 20px); } .questionnaire-session-body{ grid-template-columns:1fr; overflow:auto; } .questionnaire-viewer{ min-height:300px; } .questionnaire-viewer iframe,.questionnaire-viewer img{ min-height:300px; } .questionnaire-note-pane{ min-height:300px; } }
 /* §고객관리 사진·서류 통합 라운드(신규) — 카드+썸네일 체크리스트 */
@@ -5903,6 +5911,14 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     const list = loadDocuments(); const rec = list.find(d=> d.id===id); if(!rec) return;
     rec.memo = memo; rec.updatedAt = nowIso(); saveDocuments(list);
   }
+  // §질문지 상담 기록 구조화 라운드 — 문항별 답변을 기존 memo와 별도 필드(qaAnswers)로
+  // 같은 documents 레코드에 저장한다(새 저장소 없음, setDocumentMemo와 동일 패턴으로
+  // loadDocuments→레코드 찾기→필드 병합→saveDocuments). memo는 그대로 "기타 메모"로 유지.
+  function setDocumentQaAnswers(id, qaAnswers){
+    const list = loadDocuments(); const rec = list.find(d=> d.id===id); if(!rec) return;
+    rec.qaAnswers = Object.assign({}, rec.qaAnswers || {}, qaAnswers || {});
+    rec.updatedAt = nowIso(); saveDocuments(list);
+  }
   // §협약서류 체크리스트 라운드(신규) — 사용자 확정 지시 [3]: verificationStatus 등
   // 신규 메타데이터를 문서 레코드에 얹는다(새 저장소 아님, 기존 documents 배열의 필드만
   // 늘어난다). 상태값: unregistered/registered/verified/reRequest — 이 함수는 registered
@@ -8076,7 +8092,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     loadActivities, addActivity, updateActivityText, deleteActivity, activitiesForCompany, classifyActivity, buildActivitiesIndex,
     loadSheetRequests, buildSheetRequestsIndex, latestSheetRequestForCompany,
     loadCaseByCaseCompanies, loadExclusionAudit, caseByCaseIdForNormName, exclusionIdForNormName, findCaseByCaseByNormName, findCaseByCaseById, isUserExcludedNormName,
-    loadDocuments, documentsForCompany, buildDocumentsIndex, addDocument, updateDocumentExtracted, getBlob, getLocalDocFile, renameDocument, setDocumentMemo, setDocumentVerification, deleteDocument, findDocument, migrateDocumentToCloud,
+    loadDocuments, documentsForCompany, buildDocumentsIndex, addDocument, updateDocumentExtracted, getBlob, getLocalDocFile, renameDocument, setDocumentMemo, setDocumentQaAnswers, setDocumentVerification, deleteDocument, findDocument, migrateDocumentToCloud,
     loadMemos, memosFor, addMemo, updateMemo, deleteMemo, buildMemosIndex,
     pendingActivitiesForCompany, tasksForCompany, calendarEventsForCompany, upcomingCalendarEventsForCompany,
     DEAL_STAGES, setDealStage, setAssigneeUserId, addNeed, removeNeed, dismissNeedSuggestion, addSpecialNote, removeSpecialNote, setImportant, suggestNeedFor,
@@ -17833,8 +17849,47 @@ window.SHIN2_CRM_APP_INIT = function(){
     const root = document.getElementById('agreementModalRoot');
     if(root) root.innerHTML = '';
   }
-  // 질문지와 상담 기록은 같은 문서 레코드의 memo 필드에 저장한다. 별도의 메모 저장소를
-  // 만들지 않아 고객카드의 서류함에서도 해당 질문지를 찾았을 때 기록이 함께 남는다.
+  // 질문지와 상담 기록은 같은 문서 레코드에 저장한다(별도 저장소 없음). 문항별 답변은
+  // qaAnswers 필드에, 자유 서술 메모는 기존 memo 필드에 담아 고객카드 서류함에서도 함께
+  // 남는다. 2차 미팅 상담용 질문지 원문(섹션 A~E, Q1~Q8) — 문항 텍스트는 한 글자도
+  // 바꾸지 않는다(사용자 제공 원문 그대로).
+  const QUESTIONNAIRE_SESSION_QUESTIONS = [
+    { section:'A', sectionLabel:'시장이해도 확인', num:'Q1', key:'q1', type:'시장이해도',
+      text:'최근 1~2년간 관리사무소·입주자대표회의(입대의)를 직접 상대로 영업하신 아파트 현장이 몇 건 정도 되시나요? 보통 제안서 제출부터 계약까지 어떤 절차로 진행하시고, 결과는 주로 어땠는지도 궁금합니다.' },
+    { section:'A', sectionLabel:'시장이해도 확인', num:'Q2', key:'q2', type:'시장이해도',
+      text:'관리소장이나 입대의 미팅에서 가장 자주 받는 질문이나 어려움은 무엇인가요?' },
+    { section:'A', sectionLabel:'시장이해도 확인', num:'Q3', key:'q3', type:'시장이해도 · K-APT 심화',
+      text:'질문지에 K-APT 입찰 참여 경험이 있다고 답변해주셨는데, 최근 참여하신 입찰은 주로 제한경쟁·일반경쟁 중 어떤 형태가 많았나요? 결과는 주로 어떠셨나요(낙찰·실패 등)?' },
+    { section:'B', sectionLabel:'진정성 확인', num:'Q4', key:'q4', type:'진정성',
+      text:'지금 주력으로 쓰고 계신 공법이나 자재는 무엇이고, POUR와는 어떻게 병행하거나 대체하실 계획이신가요?' },
+    { section:'B', sectionLabel:'진정성 확인', num:'Q5', key:'q5', type:'진정성',
+      text:'협약 이후 POUR로 새롭게 도전해보고 싶은 목표가 있다면 어떤 건가요? 예를 들어 처음 시도해보는 공종이 될 수도 있고, POUR 활용에 따라 기대하시는 효과도 좋습니다.' },
+    { section:'C', sectionLabel:'전환 가능성 확인', num:'Q6', key:'q6', type:'전환가능성',
+      text:'현재 진행 중인 다른 공법 영업 건 중, POUR로 전환하거나 병행 제안할 수 있는 곳이 있을까요?' },
+    { section:'D', sectionLabel:'2차 미팅 준비 확인', num:'Q7', key:'q7', type:'2차미팅준비',
+      text:'다음 미팅에는 실제 제안·영업을 담당하시는 분들과 함께 자리하실 수 있을까요? 몇 분 정도 참여 가능하신지, 가능하면 대표님 포함 관련 담당자분들이 다 모이실 수 있는 날을 알려주시기 바랍니다.' },
+    { section:'E', sectionLabel:'마무리', num:'Q8', key:'q8', type:'리스크 파악',
+      text:'혹시 POUR와 관련해 궁금하신 점이나 걱정되는 부분이 있다면 편하게 말씀해주세요.' }
+  ];
+  function questionnaireQaFieldsHtml(doc){
+    const qa = doc.qaAnswers || {};
+    let html = '';
+    let lastSection = null;
+    QUESTIONNAIRE_SESSION_QUESTIONS.forEach(q=>{
+      if(q.section !== lastSection){
+        html += `<div class="questionnaire-qa-section">${esc(q.section)}. ${esc(q.sectionLabel)}</div>`;
+        lastSection = q.section;
+      }
+      const val = qa[q.key] || '';
+      html += `
+        <div class="questionnaire-qa-item">
+          <div class="questionnaire-qa-label">${esc(q.num)} · ${esc(q.type)}</div>
+          <div class="questionnaire-qa-text">${esc(q.text)}</div>
+          <textarea class="questionnaire-qa-answer" data-qa-key="${esc(q.key)}" placeholder="답변 입력">${esc(val)}</textarea>
+        </div>`;
+    });
+    return html;
+  }
   function closeQuestionnaireSession(){
     const root = document.getElementById('questionnaireSessionRoot');
     if(root) root.innerHTML = '';
@@ -17856,8 +17911,13 @@ window.SHIN2_CRM_APP_INIT = function(){
           <div class="pi-body questionnaire-session-body">
             <section class="questionnaire-viewer" id="questionnaireViewer"><div class="doc-preview-loading">질문서를 불러오는 중…</div></section>
             <section class="questionnaire-note-pane">
-              <label for="questionnaireConsultationMemo">상담 메모</label>
-              <textarea id="questionnaireConsultationMemo" placeholder="질문지를 보면서 상담 내용, 요청사항, 다음 조치를 바로 기록하세요.">${esc(doc.memo || '')}</textarea>
+              <div class="questionnaire-note-scroll" id="questionnaireNoteScroll">
+                ${questionnaireQaFieldsHtml(doc)}
+                <div class="questionnaire-qa-item questionnaire-qa-etc">
+                  <label for="questionnaireConsultationMemo">기타 메모</label>
+                  <textarea id="questionnaireConsultationMemo" placeholder="질문지를 보면서 상담 내용, 요청사항, 다음 조치를 바로 기록하세요.">${esc(doc.memo || '')}</textarea>
+                </div>
+              </div>
               <div class="questionnaire-note-footer"><span class="questionnaire-save-status" id="questionnaireSaveStatus">이 질문지에 함께 저장됩니다</span><button type="button" class="co-text-action primary" id="questionnaireMemoSave">저장</button></div>
             </section>
           </div>
@@ -17869,8 +17929,13 @@ window.SHIN2_CRM_APP_INIT = function(){
     const save = async ()=>{
       const btn = document.getElementById('questionnaireMemoSave');
       const text = document.getElementById('questionnaireConsultationMemo').value.trim();
+      const qaAnswers = {};
+      document.querySelectorAll('.questionnaire-qa-answer').forEach(ta=>{
+        qaAnswers[ta.getAttribute('data-qa-key')] = ta.value.trim();
+      });
       const status = document.getElementById('questionnaireSaveStatus');
       btn.disabled = true; status.textContent = '저장 중…';
+      D.setDocumentQaAnswers(doc.id, qaAnswers);
       D.setDocumentMemo(doc.id, text);
       const r = await confirmDocsCloudSave();
       btn.disabled = false;
@@ -17878,7 +17943,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(!r.ok) status.title = cloudSaveErrorMessage(r.err);
     };
     document.getElementById('questionnaireMemoSave').addEventListener('click', save);
-    document.getElementById('questionnaireConsultationMemo').addEventListener('keydown', e=>{
+    document.getElementById('questionnaireNoteScroll').addEventListener('keydown', e=>{
       if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){ e.preventDefault(); save(); }
     });
     const viewer = document.getElementById('questionnaireViewer');
