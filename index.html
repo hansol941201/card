@@ -27091,12 +27091,10 @@ window.SHIN2_CRM_APP_INIT = function(){
     }
     return '-';
   }
-  // buildExternalPdfRow: §보안 요구사항의 핵심 — 이 함수가 반환하는 3필드 객체가 외부용
-  // 문서가 실제로 접근할 수 있는 데이터의 전부다(위 라운드 헤더 주석 참고). §긴급 수정
-  // 라운드 — code 필드는 co.code를 그대로 노출하지 않고 mouPdfSafeCompanyCode()를 거친
-  // 값만 내보낸다(안전 형식이 아니면 '-').
+  // 외부용 PDF는 업체명·전화번호·주소만 출력한다. 업체코드는 내부 관리용이므로
+  // 외부용 명단에 포함하지 않는다.
   function buildExternalPdfRow(co, idx){
-    return { no: idx + 1, name: co.name || '-', code: mouPdfSafeCompanyCode(co), address: co.address || '-' };
+    return { no: idx + 1, name: co.name || '-', phone: co.phone || '-', address: co.address || '-' };
   }
   const MOU_PDF_INTERNAL_COLUMNS = ['no','code','name','repName','contactName','phone','email','address','grade','mouDate','techAdvice','activity','memo'];
   const MOU_PDF_INTERNAL_LABELS = {
@@ -27104,8 +27102,8 @@ window.SHIN2_CRM_APP_INIT = function(){
     email:'이메일', address:'주소', grade:'등급', mouDate:'MOU 체결일', techAdvice:'기술자문문의',
     activity:'최근 활동', memo:'최근 메모'
   };
-  const MOU_PDF_EXTERNAL_COLUMNS = ['no','name','code','address'];
-  const MOU_PDF_EXTERNAL_LABELS = { no:'번호', name:'업체명', code:'업체번호', address:'주소' };
+  const MOU_PDF_EXTERNAL_COLUMNS = ['no','name','phone','address'];
+  const MOU_PDF_EXTERNAL_LABELS = { no:'번호', name:'업체명', phone:'전화번호', address:'주소' };
   function mouPdfGenLabel(){
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
@@ -27209,7 +27207,7 @@ window.SHIN2_CRM_APP_INIT = function(){
           <div class="pi-body">
             <div class="mail-settings-help" style="margin-bottom:10px;">MOU 체결 협력사 ${count}건 기준(위 KPI 요약 바 "MOU 체결" 숫자와 동일 — 현재 화면의 검색·필터와 무관하게 전체 대상). 브라우저 인쇄로 PDF를 저장합니다.</div>
             <button type="button" class="co-text-action primary" style="display:block;width:100%;margin-bottom:8px;" id="mouPdfInternalBtn">1) 내부용 PDF — 사내관리용 전체 정보</button>
-            <button type="button" class="co-text-action" style="display:block;width:100%;" id="mouPdfExternalBtn">2) 외부용 PDF — 업체명 · 업체번호 · 주소만</button>
+            <button type="button" class="co-text-action" style="display:block;width:100%;" id="mouPdfExternalBtn">2) 외부용 PDF — 업체명 · 전화번호 · 주소만</button>
           </div>
         </div>
       </div>`;
