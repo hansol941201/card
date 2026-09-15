@@ -27108,10 +27108,11 @@ window.SHIN2_CRM_APP_INIT = function(){
      외부 API 전송·Firebase 업로드·실제 발송 기능은 전혀 없다.
 
      §외부용 화이트리스트 격리(보안 요구사항, §요청 원문 그대로) — 외부용 문서는
-     buildExternalPdfRow(co)가 반환하는 { name, code, address } 3필드 객체만 조회한다.
+     buildExternalPdfRow(co)가 반환하는 { name, phone, address } 3필드 객체만 조회한다
+     (§사내 타부서 공유용으로 용도가 재확인된 라운드에서 code → phone으로 교체됨).
      이 함수는 co를 통째로 넘기지 않고 딱 3개 필드를 리터럴로 골라 새 객체를 만들어
      반환하므로, 화면(display) 레이어에서 나머지 필드를 숨기는 방식이 아니라 애초에
-     원본 co나 담당자/전화/이메일/메모/등급/현장기록 등 다른 필드를 참조할 방법이 없다.
+     원본 co나 담당자/이메일/메모/등급/현장기록 등 다른 필드를 참조할 방법이 없다.
      내부용 렌더러(buildInternalPdfRow)와는 업체 선정(getMouSignedCompanies) 하나만
      공유하고, 행 데이터 생성·컬럼 정의·HTML 조립은 완전히 분리된 별도 함수/상수다 —
      내부용 템플릿을 나중에 고쳐도 외부용 코드 경로에는 영향이 없다.
@@ -27195,6 +27196,9 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 형태(하이픈 유무 모두, 지역번호/휴대폰 공통 0으로 시작하는 2~3자리 + 3~4자리 +
   // 4자리)를 명시적으로 걸러낸다.
   const MOU_PDF_PHONE_SHAPE_RE = /^0\d{1,2}-?\d{3,4}-?\d{4}$/;
+  // 현재 미사용: buildExternalPdfRow가 "업체명·전화번호·주소용"(사내 타부서 공유용 —
+  // 사용자 재확인, §위 커밋)으로 바뀌면서 이 함수를 더 이상 호출하지 않는다. 향후
+  // 업체코드를 다시 내보내야 하는 경로가 생길 경우를 대비해 함수/정규식은 그대로 남겨둔다.
   function mouPdfSafeCompanyCode(co){
     const candidates = [co.code, co.masterCode];
     for(const raw of candidates){
@@ -27207,9 +27211,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     return '-';
   }
   // 외부용 PDF는 업체명·전화번호·주소만 출력한다. 업체코드는 내부 관리용이므로
-  // 외부용 명단에 포함하지 않는다.
+  // 외부용 명단에 포함하지 않는다. 전화번호 폴백은 pdfExportResolveField의 'phone'
+  // 케이스(§26799 부근)와 동일한 체인(co.phone → co.mobile → co.partnerDashboard.phone)을
+  // 그대로 재사용해 일관성을 맞춘다.
   function buildExternalPdfRow(co, idx){
-    return { no: idx + 1, name: co.name || '-', phone: co.phone || '-', address: co.address || '-' };
+    const pd = co.partnerDashboard || {};
+    return { no: idx + 1, name: co.name || '-', phone: co.phone || co.mobile || pd.phone || '-', address: co.address || '-' };
   }
   const MOU_PDF_INTERNAL_COLUMNS = ['no','code','name','repName','contactName','phone','email','address','grade','mouDate','techAdvice','activity','memo'];
   const MOU_PDF_INTERNAL_LABELS = {
