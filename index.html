@@ -3451,11 +3451,11 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .revenue-combo-yr{ font-size:11.5px!important; color:var(--text-muted)!important; }
 .revenue-combo-yr-label{ font-size:10px!important; color:var(--text-faint)!important; font-weight:600!important; }
 .revenue-combo-total .revenue-cell-btn, .revenue-combo-yr .revenue-cell-btn{ font:inherit!important; color:inherit!important; }
-/* 실적↔매출 · 최근 흐름 병합 컬럼 — 예: "▲ 상승세 · 기여 보통". */
-.col-contrib-trend{ display:flex!important; align-items:center!important; gap:4px!important; min-width:0!important; font-size:12px!important; flex-wrap:nowrap!important; overflow:hidden!important; }
-.contrib-trend-dot{ color:var(--text-faint); flex:0 0 auto; }
-.contrib-trend-prefix{ font-size:10.5px; color:var(--text-faint); margin-right:2px; }
-.contrib-trend-trend, .contrib-trend-contrib{ min-width:0; overflow:hidden; text-overflow:ellipsis; }
+/* 실적↔매출 · 최근 흐름 병합 컬럼 — "총 매출 · 2026 매출" 칸과 같은 2줄 세로 배치
+   (§겹침 수정 라운드, 신규). 1번째 줄: 최근 흐름(▲ 상승세 등), 2번째 줄: "기여 보통". */
+.col-contrib-trend{ display:flex!important; flex-direction:column!important; gap:2px!important; min-width:0!important; font-size:12px!important; text-align:right!important; }
+.contrib-trend-line{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.contrib-trend-prefix{ font-size:10.5px; color:var(--text-faint); margin-right:3px; }
 /* §P1-1: 9열 → 6열이 되면서 좁은 화면(≤1180/1100/760px)에서 쓰던 옛 9칼럼
    grid-template-columns/min-width도 그대로 두면 새 마크업과 어긋나 깨진다 — 같은 6칼럼
    비율로 맞추고, 더 이상 가로 스크롤이 필요 없으므로 min-width 강제와 overflow-x:auto도
@@ -11412,10 +11412,14 @@ window.SHIN2_CRM_APP_INIT = function(){
           <div class="revenue-combo-line revenue-combo-total">${totalRevenueHtml}</div>
           <div class="revenue-combo-line revenue-combo-yr"><span class="revenue-combo-yr-label">2026년</span>${yrRevenueHtml}</div>
         </div>
+        <!-- §최근 흐름·실적↔매출 겹침 수정 라운드(신규) — 한 줄 flex(트렌드·기여 라벨·
+             값)로 욱여넣었더니 칸 폭이 좁을 때 "기여" 라벨이 줄바꿈되며 값과 겹쳐 보였다
+             (§요청 "서로 너무 엉겨있어"). "총 매출·2026 매출" 칸과 같은 2줄 세로 배치로
+             바꿔 겹침 자체가 생길 수 없게 한다 — 계산(trendHtml/contribHtml)은 그대로,
+             레이아웃만 변경. -->
         <div class="col-contrib-trend">
-          <span class="contrib-trend-trend">${trendHtml}</span>
-          <span class="contrib-trend-dot">·</span>
-          <span class="contrib-trend-contrib"><span class="contrib-trend-prefix">기여</span>${contribHtml}</span>
+          <div class="contrib-trend-line contrib-trend-trend">${trendHtml}</div>
+          <div class="contrib-trend-line contrib-trend-contrib"><span class="contrib-trend-prefix">기여</span>${contribHtml}</div>
         </div>
         <!-- §단계 진행상황 이전 라운드: 이 컬럼은 목록에서 뺐다(업무관리 화면으로 이전,
              stageStepperHtml 변수/buildStageStepperHtml 함수는 그대로 계산돼 있다 —
