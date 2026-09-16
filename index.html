@@ -614,7 +614,20 @@
   .workq-stage-progress{ width:150px; min-width:130px; }
   .workq-reason{ color:var(--text-muted); font-size:12px; }
   .workq-days{ white-space:nowrap; font-variant-numeric:tabular-nums; }
-  .workq-delay-badge{ display:inline-block; font-size:10px; font-weight:700; color:var(--orange, #C2670A); background:var(--orange-bg, #FFF7ED); border-radius:4px; padding:1px 5px; margin-left:5px; }
+  /* §P1-2 업무관리 표 열 압축 라운드(신규) — "현재 상태"/"관리 이유" 배지(단계 진행상황
+     열 안), "메일"+"서류 현황" 합친 "비고" 열. */
+  .workq-stage-badges{ display:flex; flex-wrap:wrap; gap:4px; margin-top:5px; }
+  .workq-state-badge{ display:inline-block; padding:2px 7px; border-radius:5px; font-size:10.5px; font-weight:700; color:var(--navy); background:#EEF2FA; border:1px solid #DCE5EF; white-space:nowrap; }
+  .workq-reason-badge{ display:inline-block; padding:2px 7px; border-radius:5px; font-size:10.5px; color:var(--text-muted); background:#F4F6F9; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .workq-remark{ display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
+  .workq-delay-badge{ display:inline-block; font-size:10px; font-weight:700; border-radius:4px; padding:1px 5px; margin-left:5px; }
+  /* §P1-3 경과일 배지 3단계 라운드(신규) — 진단 보고서 P1-3: 기존엔 7일 이상이면 전부
+     같은 빨간 "지연" 배지라 36건 중 거의 전부가 같은 색이었다(변별력 없음). 실제 경과일
+     계산 함수(daysUntil/days 산출 로직)는 전혀 안 바꿨다 — 여기 배지 렌더링만 계산된
+     값을 3구간(7일 미만/7~30일/30일 초과)으로 나눠 다른 색을 준다. */
+  .badge-fresh{ color:#0B5BD3; background:#EAF1FD; }
+  .badge-delayed{ color:var(--orange, #C2670A); background:var(--orange-bg, #FFF7ED); }
+  .badge-longterm{ color:#5B6472; background:#EEF0F3; }
   /* §업무관리 전체 업체 상시 표시 라운드(신규) — 할 일이 없는 업체(type:'none')의 "해야 할
      일" 칸: 기존 workq-action-btn(진한 남색 버튼)과 같은 자리지만 클릭할 동작이 없으므로
      버튼이 아니라 중립색 배지로만 보여준다(§ 새 시각 언어를 만들지 않고 기존 배지 톤 재사용). */
@@ -1011,6 +1024,20 @@
   }
   .co-form-field input:focus, .co-form-field textarea:focus{ border-color:#C7CEDB; }
   .co-form-field textarea{ min-height:56px; resize:vertical; }
+  /* §P1-6 신규 고객 등록 폼 2열화 라운드(신규) — 순수 레이아웃 클래스, 필드 id/제출
+     로직과는 무관. */
+  .co-form-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:12px 16px; max-width:640px; }
+  .co-form-grid2 .co-form-field{ margin-bottom:0; max-width:none; }
+  .co-form-row3{ grid-column:1 / -1; display:grid; grid-template-columns:repeat(3,1fr); gap:12px 16px; }
+  .co-form-span2{ grid-column:1 / -1; }
+  .co-form-more{ margin:4px 0 12px; max-width:640px; }
+  .co-form-more summary{ cursor:pointer; font-size:12.5px; font-weight:650; color:var(--text-muted); padding:6px 0; user-select:none; list-style:none; }
+  .co-form-more summary::-webkit-details-marker{ display:none; }
+  .co-form-more summary:hover{ color:var(--blue); }
+  .co-form-more[open] summary{ margin-bottom:4px; }
+  @media(max-width:520px){
+    .co-form-grid2, .co-form-row3{ grid-template-columns:1fr; }
+  }
 
   /* ---------- 서류함(4분류) — 고객별 파일 보관함 ---------- */
   .doc-blocked-note{ font-size:11.5px; color:#9A6B00; background:#FFF7E6; border:1px solid #F0DDA8; border-radius:6px; padding:8px 10px; margin-bottom:14px; }
@@ -3007,6 +3034,8 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .kpi-item.is-up .kpi-item-value{ color:#0F7A42; }
 .kpi-item.is-warn .kpi-item-value{ color:#B91C1C; }
 .kpi-item-label{ font-size:12px; color:var(--text-muted); font-weight:600; }
+/* §P1-4 KPI 카드 기준·비교 추가 라운드(신규) — 보조문구 한 줄(11px, 회색). */
+.kpi-item-sub{ display:block; margin-top:3px; font-size:11px; color:var(--text-faint); font-weight:500; }
 /* §PDF 내보내기(MOU 체결 협력사) 라운드(신규) — KPI 요약 바 레이아웃/카드 5개(전체
    고객/MOU 체결/상승 업체/L2→L3 전환율)는 전혀 안 건드리고, 그 옆에 버튼 하나만 얹기
    위해 얇은 flex 줄로만 감싼다(§요청 "기존 카드 레이아웃/디자인 방해 없이"). 버튼
@@ -3275,6 +3304,84 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .cloud-boot-retry-btn{ margin-top:12px; padding:7px 18px; border-radius:8px; border:1px solid var(--navy, #1E3A5F); background:#fff; color:var(--navy, #1E3A5F); font-size:12.5px; font-weight:700; cursor:pointer; }
 .cloud-boot-retry-btn:hover{ background:#F4F7FC; }
 
+/* §P1-7 PDF 카드 버튼 라운드(신규) — 외부용(안전)을 위/강조, 내부용(민감정보)을
+   아래/경고 배지로. */
+.mou-pdf-card{ display:block; width:100%; text-align:left; padding:12px 14px; border-radius:10px; border:1px solid var(--line); background:#fff; cursor:pointer; margin-bottom:10px; }
+.mou-pdf-card:last-child{ margin-bottom:0; }
+.mou-pdf-card-title{ display:flex; align-items:center; gap:6px; font-size:13.5px; font-weight:750; color:var(--text); }
+.mou-pdf-card-desc{ display:block; margin-top:4px; font-size:12px; color:var(--text-muted); }
+.mou-pdf-card-recommend{ border:1.5px solid var(--navy, #1E3A5F); background:#F3F7FF; box-shadow:0 1px 3px rgba(23,48,92,.08); }
+.mou-pdf-card-recommend .mou-pdf-card-title{ color:var(--navy, #1E3A5F); }
+.mou-pdf-card-recommend:hover{ background:#EAF1FE; }
+.mou-pdf-card-internal:hover{ background:#F9FAFB; }
+.mou-pdf-badge{ display:inline-block; font-size:10px; font-weight:700; border-radius:4px; padding:1px 6px; }
+.mou-pdf-badge-recommend{ color:#fff; background:var(--navy, #1E3A5F); }
+.mou-pdf-badge-warn{ color:#9A3412; background:#FFEDD5; }
+
+/* §P1-5 필터 칩 3그룹 분리 라운드(신규) — 상태 필터(칩 유지)/분석/정리(텍스트 링크)
+   시각적 구분. 클릭 위임(data-filter)과 필터링 로직은 전혀 안 바꿨다. */
+.list-filter-row{ display:flex!important; flex-wrap:wrap!important; align-items:center!important; column-gap:14px!important; row-gap:8px!important; }
+.list-filter-group{ display:flex!important; align-items:center!important; flex-wrap:wrap!important; gap:6px!important; }
+.list-filter-group-links{ padding-left:12px!important; border-left:1px solid var(--line)!important; }
+.list-filter-group-label{ font-size:10.5px!important; font-weight:700!important; color:var(--text-faint)!important; margin-right:2px!important; text-transform:uppercase!important; letter-spacing:.02em!important; }
+.list-filter-link{ display:inline-flex!important; align-items:center!important; gap:3px!important; position:relative; border:none!important; background:none!important; padding:2px 4px!important; font-size:12px!important; font-weight:600!important; color:var(--text-muted)!important; cursor:pointer; text-decoration:none; }
+.list-filter-link:hover{ color:var(--blue)!important; text-decoration:underline!important; }
+.list-filter-link.is-active{ color:var(--navy)!important; font-weight:800!important; text-decoration:underline!important; }
+.list-filter-link .link-count{ font-size:10.5px!important; color:var(--text-faint)!important; font-weight:600!important; }
+.list-filter-link .link-dot{ width:6px!important; height:6px!important; border-radius:50%!important; background:#D6483F!important; display:inline-block!important; margin-left:1px; }
+
+/* §P1-1 목록 열 재구성 라운드(신규) — 진단 보고서 P1-1: 9열(가로 스크롤로 마지막 열이
+   잘림) → 6열. "고객 성향"은 화면에서 뺐고(insightHtml 계산/고객카드 표시는 그대로),
+   "총 매출"+"2026 매출", "실적↔매출"+"최근 흐름"을 각각 한 컬럼으로 합쳤다. 클릭 핸들러/
+   데이터 계산은 전혀 안 바꿨다 — 기존 버튼을 새 wrapper 안으로 옮기고 그리드 폭만
+   다시 배분했다. 이 블록이 파일에서 가장 마지막에 오는 co-table-head/co-row 규칙이라
+   앞선 P0 라운드의 9열짜리 grid-template-columns(§2464 부근)를 그대로 덮어쓴다. */
+.co-table-head, .co-row{
+  grid-template-columns: minmax(240px,1.5fr) 150px 175px 58px 150px 190px !important;
+  gap:10px !important;
+}
+/* 협력사(업체명) 열 — 이 화면에서 가장 중요한 정보이므로 가장 크고 진하게(§요청). */
+.co-row .col-name, .co-row .co-name-text{ font-size:14px!important; font-weight:700!important; }
+.co-table-head .col-name{ font-size:13px!important; }
+/* 총 실적 숫자 — 업체명(14px/700)보다 반드시 작아야 위계가 맞는다(§요청). */
+.co-row .col-yr, .co-row .yr-cell-btn{ font-size:13px!important; font-weight:750!important; }
+/* 총 매출 · 2026 매출 병합 컬럼 — 2줄, 2026년 쪽은 작은 라벨을 덧붙인 보조 글자. */
+.col-revenue-combo{ display:flex!important; flex-direction:column!important; gap:2px!important; min-width:0!important; text-align:right!important; }
+.col-revenue-combo.col-total-revenue-head{ flex-direction:row!important; align-items:center!important; justify-content:flex-end!important; gap:4px!important; }
+.revenue-combo-line{ display:flex; justify-content:flex-end; align-items:baseline; gap:4px; min-width:0; }
+.revenue-combo-total{ font-size:13.5px!important; font-weight:750!important; color:#172d4d!important; }
+.revenue-combo-yr{ font-size:11.5px!important; color:var(--text-muted)!important; }
+.revenue-combo-yr-label{ font-size:10px!important; color:var(--text-faint)!important; font-weight:600!important; }
+.revenue-combo-total .revenue-cell-btn, .revenue-combo-yr .revenue-cell-btn{ font:inherit!important; color:inherit!important; }
+/* 실적↔매출 · 최근 흐름 병합 컬럼 — 예: "▲ 상승세 · 기여 보통". */
+.col-contrib-trend{ display:flex!important; align-items:center!important; gap:4px!important; min-width:0!important; font-size:12px!important; flex-wrap:nowrap!important; overflow:hidden!important; }
+.contrib-trend-dot{ color:var(--text-faint); flex:0 0 auto; }
+.contrib-trend-prefix{ font-size:10.5px; color:var(--text-faint); margin-right:2px; }
+.contrib-trend-trend, .contrib-trend-contrib{ min-width:0; overflow:hidden; text-overflow:ellipsis; }
+/* §P1-1: 9열 → 6열이 되면서 좁은 화면(≤1180/1100/760px)에서 쓰던 옛 9칼럼
+   grid-template-columns/min-width도 그대로 두면 새 마크업과 어긋나 깨진다 — 같은 6칼럼
+   비율로 맞추고, 더 이상 가로 스크롤이 필요 없으므로 min-width 강제와 overflow-x:auto도
+   함께 정리한다(§요청 "가로 스크롤 없어져야"). */
+@media(max-width:1180px){
+  .co-table-head, .co-row{ grid-template-columns: minmax(190px,1.4fr) 120px 150px 50px 130px 170px !important; }
+  .co-table-head, .co-list{ min-width:0 !important; }
+  #listView{ overflow-x:visible !important; }
+}
+@media(max-width:1100px){
+  .co-table-head, .co-row{ grid-template-columns: minmax(170px,1.3fr) 105px 130px 46px 118px 150px !important; }
+  .co-table-head, .co-list{ min-width:0 !important; }
+}
+@media(max-width:760px){
+  .co-table-head, .co-row{ grid-template-columns: minmax(70px,1fr) 42px 48px 26px 58px 52px !important; gap:5px !important; }
+  .co-table-head, .co-list{ min-width:0 !important; }
+  .col-name, .col-request, .col-pour, .col-yr, .col-revenue-combo, .col-contrib-trend{ min-width:0!important; overflow:hidden!important; }
+  .col-revenue-combo, .col-contrib-trend{ font-size:9.5px!important; }
+  .co-row .col-name, .co-row .co-name-text{ font-size:11.5px!important; }
+  .co-row .col-yr, .co-row .yr-cell-btn{ font-size:11px!important; }
+  .co-table-head{ font-size:9px!important; }
+  .co-table-head .col-name{ font-size:9.5px!important; }
+}
+
 </style>
 </head>
 <body>
@@ -3435,6 +3542,11 @@ table.pdf-doc-table thead{ background:var(--bg); }
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.4-7-11.5A7 7 0 0 1 19 9.5C19 14.6 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg>
           </span>지도 분포
         </button>
+        <!-- §P1-4 PDF 버튼 이동 라운드(신규) — 진단 보고서 P1-4: KPI 스트립 안(5번째 칸처럼
+             보이던 kpi-strip-row 구조)에 있던 "PDF 내보내기"를 목록 제목줄의 "관리 도구"/
+             "지도 분포" 버튼 옆으로 옮긴다. 클릭 핸들러(#crmMouPdfBtn 이벤트 바인딩)는
+             그대로 재사용 — 위치만 이동. -->
+        <button type="button" class="list-phone-btn" id="crmMouPdfBtn">PDF 내보내기</button>
         <!-- §전화 요청 기록 제거 라운드(신규) — "전화 요청 기록" 버튼을 화면에서 뺐다
              (§요청 "화면 기능만 제거, 이미 저장된 과거 기록은 그대로 둔다"). 기존
              customerActivities에 저장된 과거 전화요청 활동기록은 삭제하지 않았고, 그
@@ -3456,12 +3568,7 @@ table.pdf-doc-table thead{ background:var(--bg); }
          상승 업체/L2→L3 전환율 카드 4개, renderKpiStrip이 채움)은 그대로 두고, 얇은 flex
          줄(.kpi-strip-row)로만 감싸 옆에 버튼 하나를 추가한다(§요청 "카드 레이아웃/디자인
          방해 없이"). 클릭하면 내부용/외부용 2택 모달(#mouPdfMenuModalRoot)이 뜬다. -->
-    <div class="kpi-strip-row">
-      <div class="kpi-strip" id="crmKpiStrip"></div>
-      <div class="kpi-strip-actions">
-        <button type="button" class="co-text-action" id="crmMouPdfBtn">PDF 내보내기</button>
-      </div>
-    </div>
+    <div class="kpi-strip" id="crmKpiStrip"></div>
     <div class="analysis-panel analysis-panel-rising">
       <div class="analysis-panel-title">올해의 고객 흐름</div>
       <div class="rising-section" id="crmRisingSection"></div>
@@ -3525,11 +3632,15 @@ table.pdf-doc-table thead{ background:var(--bg); }
            데이터/계산(requestHistoryIndex 등)과 고객카드의 최근 요청/메모 기능은 전혀 안
            지웠다 — 이 목록 칸에서만 더 이상 렌더링하지 않을 뿐이다(§9 "화면 목록에서만
            숨기는 것"). -->
-      <div class="col-insight">고객 성향</div>
-      <div class="col-total-revenue col-total-revenue-head" id="totalRevenueSortHeader">총 매출 <span class="total-revenue-sort-arrow" id="totalRevenueSortArrow"></span></div>
-      <div class="col-yr-revenue">2026 매출</div>
-      <div class="col-contrib" title="실적 1건당 평균 매출을 전체 업체와 비교한 상대 순위(하위 30%=낮음·중간 40%=보통·상위 30%=높음). 클릭하면 근거를 볼 수 있습니다.">실적↔매출</div>
-      <div class="col-trend" title="POUR 시공실적 건수의 전년 대비 증감(작년 vs 재작년, ±10% 기준). 클릭하면 근거를 볼 수 있습니다.">최근 흐름</div>
+      <!-- §P1-1 목록 열 재구성 라운드(신규) — 진단 보고서 P1-1. "고객 성향" 열은 전 행이
+           "성향 미등록"으로 비어 있어 정보량이 없다는 지적에 따라 목록에서 뺐다(계산 함수
+           buildInsightListSummary·insightHtml 변수/고객카드 쪽 표시는 그대로 둠 — §9와 같은
+           "화면 목록에서만 숨기는 것" 관례). "총 매출"+"2026 매출"을 한 컬럼(2줄)으로,
+           "실적↔매출"+"최근 흐름"을 한 컬럼으로 합쳐 컬럼 수를 줄이고 가로 스크롤을
+           없앤다(계산/클릭 핸들러는 전혀 안 바꿈 — 기존 버튼을 새 wrapper div 안으로
+           옮기기만 했다). -->
+      <div class="col-revenue-combo col-total-revenue-head" id="totalRevenueSortHeader">총 매출 · 2026 매출 <span class="total-revenue-sort-arrow" id="totalRevenueSortArrow"></span></div>
+      <div class="col-contrib-trend" title="실적 1건당 평균 매출을 전체 업체와 비교한 상대 순위(하위 30%=낮음·중간 40%=보통·상위 30%=높음)와 POUR 시공실적 건수의 전년 대비 증감(작년 vs 재작년, ±10% 기준)을 함께 보여줍니다. 클릭하면 각 근거를 볼 수 있습니다.">최근 흐름 · 실적↔매출</div>
       <!-- §단계 진행상황 이전 라운드: "단계 진행상황"(4단계 stepper) 컬럼을 목록 화면에서
            뺐다(요청 "정보를 지우는 게 아니라 창에서 안 보이게, 업무관리 창으로 이전"—
            buildStageStepperHtml 함수/r.progress 데이터/§업무관리 화면 쪽 렌더링은 그대로
@@ -10427,6 +10538,14 @@ window.SHIN2_CRM_APP_INIT = function(){
     l2l3Manage: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="13" width="7" height="7" rx="1.5"/><path d="M10 7.5h5a2 2 0 0 1 2 2V13"/><path d="m14.5 10 2.5-2.5-2.5-2.5"/></svg>',
     caseByCase: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="8" r="3"/><circle cx="17" cy="8" r="3"/><path d="M2 20c0-3 2.2-5 5-5s5 2 5 5"/><path d="M12 20c0-3 2.2-5 5-5s5 2 5 5"/></svg>'
   };
+  // §P1-5 필터 칩 3그룹 분리 라운드(신규) — 진단 보고서 P1-5: 11개 칩이 전부 같은
+  // 모양으로 한 줄에 늘어서 2줄로 줄바꿈됐다. 클릭 핸들러/필터링 로직(matchesFilter,
+  // filterKey 대입, renderList 재호출)은 전혀 안 건드리고, 순수하게 3그룹으로 나눠
+  // 시각적으로만 구분한다: 상태 필터(칩 모양 유지)/분석(텍스트 링크)/정리(텍스트 링크,
+  // 처리 대기 있으면 빨간 점).
+  const FILTER_GROUP_STATE = ['all','agreementInProgress','mouDone','agreementTerminated'];
+  const FILTER_GROUP_ANALYSIS = ['newPartner','trendUp','l2l3Manage'];
+  const FILTER_GROUP_CLEANUP = ['subsidiary','deleted','caseByCase'];
   function renderFilterChips(counts){
     const wrap = document.getElementById('crmFilterRow');
     if(!wrap) return;
@@ -10435,9 +10554,25 @@ window.SHIN2_CRM_APP_INIT = function(){
     // .list-filter-chip 높이/폰트는 그대로 재사용, 새 크기 체계를 만들지 않았다).
     // §업체 삭제(휴지통) 라운드(신규) — "삭제된 업체" 탭도 같은 칩 UI/클릭 위임을 그대로
     // 재사용한다(DELETED_FILTER_DEF만 목록 끝에 덧붙임, 새 템플릿·새 이벤트 바인딩 없음).
-    wrap.innerHTML = FILTER_DEFS.concat([DELETED_FILTER_DEF, L2L3_MANAGE_FILTER_DEF, CASE_BY_CASE_FILTER_DEF]).map(([key,label])=>
-      `<button type="button" class="list-filter-chip${filterKey===key?' is-active':''}${key==='deleted'?' is-trash':''}" data-filter="${esc(key)}">${FILTER_ICON_SVG[key]||''}<span>${esc(label)}</span><span class="chip-count">${counts[key]||0}</span></button>`
-    ).join('');
+    const allDefs = FILTER_DEFS.concat([DELETED_FILTER_DEF, L2L3_MANAGE_FILTER_DEF, CASE_BY_CASE_FILTER_DEF]);
+    const defByKey = {}; allDefs.forEach(d=> defByKey[d[0]] = d);
+    const chipHtml = ([key,label])=>
+      `<button type="button" class="list-filter-chip${filterKey===key?' is-active':''}${key==='deleted'?' is-trash':''}" data-filter="${esc(key)}">${FILTER_ICON_SVG[key]||''}<span>${esc(label)}</span><span class="chip-count">${counts[key]||0}</span></button>`;
+    const linkHtml = ([key,label])=>
+      `<button type="button" class="list-filter-link${filterKey===key?' is-active':''}" data-filter="${esc(key)}"><span>${esc(label)}</span><span class="link-count">${counts[key]||0}</span>${counts[key] ? '<span class="link-dot" aria-hidden="true"></span>' : ''}</button>`;
+    wrap.innerHTML = `
+      <div class="list-filter-group list-filter-group-state">
+        ${FILTER_GROUP_STATE.filter(k=> defByKey[k]).map(k=> chipHtml(defByKey[k])).join('')}
+      </div>
+      <div class="list-filter-group list-filter-group-links">
+        <span class="list-filter-group-label">분석</span>
+        ${FILTER_GROUP_ANALYSIS.filter(k=> defByKey[k]).map(k=> linkHtml(defByKey[k])).join('')}
+      </div>
+      <div class="list-filter-group list-filter-group-links list-filter-group-cleanup">
+        <span class="list-filter-group-label">정리</span>
+        ${FILTER_GROUP_CLEANUP.filter(k=> defByKey[k]).map(k=> linkHtml(defByKey[k])).join('')}
+      </div>
+    `;
     wrap.querySelectorAll('[data-filter]').forEach(btn=> btn.addEventListener('click', ()=>{
       const nextKey = btn.getAttribute('data-filter');
       // §신규 협약사 탭 라운드(신규) — "신규 협약사" 탭에 들어가면 기본 정렬을 "90일
@@ -10465,20 +10600,28 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 계산하지 않고 L2→L3 전환관리 탭이 쓰는 computeL2L3ManageAnalysis(위, §요청과 동일한
   // 기본 기간 npCmpPeriodDays)를 그대로 재사용한다 — base/N이 그대로면 캐시를 반환하므로
   // (바로 위 l2l3ManageAnalysisCache 주석 참고) 검색·필터 클릭마다 매번 재스캔되지 않는다.
+  // §P1-4 KPI 카드 기준·비교 추가 라운드(신규) — 진단 보고서 P1-4: 카드 숫자만 있고
+  // 비교 기준이 없어 예를 들어 "L2→L3 전환율 30.4%"가 왜 경고색(is-warn, 50% 미만
+  // 규칙)인지 화면에 안 보였다. 새 통계를 계산하지 않고 이미 계산돼 있는 값(counts.all,
+  // computeL2L3ManageAnalysis의 result.total/converted.length — 재계산 없이 그대로
+  // 재사용)만 보조문구로 덧붙인다. "지난달 대비" 같은 전월 비교 데이터는 이 코드베이스에
+  // 아예 없어서(별도 스냅샷 저장 로직 없음) 새로 만들지 않고 스킵했다(§요청사항 "없으면
+  // 스킵, 없는 데이터를 새로 계산하는 대규모 로직 만들지 말 것").
   function renderKpiStrip(counts){
     const wrap = document.getElementById('crmKpiStrip');
     if(!wrap) return;
     const l2l3 = computeL2L3ManageAnalysis(npCmpPeriodDays);
     const items = [
-      { key:'all', label:'전체 고객', value: counts.all || 0, cls:'' },
-      { key:'mouDone', label:'MOU 체결', value: counts.mouDone || 0, cls:'' },
-      { key:'trendUp', label:'상승 업체', value: counts.trendUp || 0, cls:'is-up' },
-      { key:'l2l3Manage', label:'L2→L3 전환율', value: `${l2l3.rate}%`, cls: l2l3.rate < 50 ? 'is-warn' : '' }
+      { key:'all', label:'전체 고객', value: counts.all || 0, cls:'', sub:'' },
+      { key:'mouDone', label:'MOU 체결', value: counts.mouDone || 0, cls:'', sub: counts.all ? `전체 ${counts.all}곳 중` : '' },
+      { key:'trendUp', label:'상승 업체', value: counts.trendUp || 0, cls:'is-up', sub: counts.all ? `전체 ${counts.all}곳 중` : '' },
+      { key:'l2l3Manage', label:'L2→L3 전환율', value: `${l2l3.rate}%`, cls: l2l3.rate < 50 ? 'is-warn' : '', sub: `${l2l3.total}곳 중 ${l2l3.converted.length}곳 · 5/20 이후 협약 기준` }
     ];
     wrap.innerHTML = items.map(it=> `
       <button type="button" class="kpi-item ${it.cls}" data-kpi="${esc(it.key)}">
         <span class="kpi-item-value">${esc(it.value)}</span>
         <span class="kpi-item-label">${esc(it.label)}</span>
+        ${it.sub ? `<span class="kpi-item-sub">${esc(it.sub)}</span>` : ''}
       </button>`).join('');
     wrap.querySelectorAll('[data-kpi]').forEach(btn=> btn.addEventListener('click', ()=>{
       const key = btn.getAttribute('data-kpi');
@@ -10993,11 +11136,17 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="col-request">${nameRequestCellHtml}</div>
         <div class="col-pour">${lastActHtml}</div>
         <div class="col-yr">${yrHtml}</div>
-        <div class="col-insight">${insightHtml}</div>
-        <div class="col-total-revenue">${totalRevenueHtml}</div>
-        <div class="col-yr-revenue">${yrRevenueHtml}</div>
-        <div class="col-contrib">${contribHtml}</div>
-        <div class="col-trend">${trendHtml}</div>
+        <!-- §P1-1 목록 열 재구성 라운드(신규): "고객 성향" 열(col-insight)은 화면에서만
+             뺀다 — insightHtml 변수 계산과 고객카드 쪽 인사이트 표시는 그대로다. -->
+        <div class="col-revenue-combo">
+          <div class="revenue-combo-line revenue-combo-total">${totalRevenueHtml}</div>
+          <div class="revenue-combo-line revenue-combo-yr"><span class="revenue-combo-yr-label">2026년</span>${yrRevenueHtml}</div>
+        </div>
+        <div class="col-contrib-trend">
+          <span class="contrib-trend-trend">${trendHtml}</span>
+          <span class="contrib-trend-dot">·</span>
+          <span class="contrib-trend-contrib"><span class="contrib-trend-prefix">기여</span>${contribHtml}</span>
+        </div>
         <!-- §단계 진행상황 이전 라운드: 이 컬럼은 목록에서 뺐다(업무관리 화면으로 이전,
              stageStepperHtml 변수/buildStageStepperHtml 함수는 그대로 계산돼 있다 —
              §"데이터 제거가 아니라 숨김" 관례 그대로). -->
@@ -15330,7 +15479,10 @@ window.SHIN2_CRM_APP_INIT = function(){
   let workQueueSearch = '';
   // §경과일 짧은 업체 분리 보기 라운드: false=기존 그대로(오래된 순), true=경과일 적은
   // 업체가 위로(같은 행동 우선순위 안에서만 방향이 바뀐다 — 우선순위 자체는 안 바뀜).
-  let workQueueSortAsc = false;
+  // §P1-3 기본 정렬 변경 라운드(신규) — 진단 보고서 P1-3 "기본 정렬을 경과일 적은 순으로".
+  // 이미 있던 정렬 토글(workqSortToggle, §15530 근처)의 기본값만 바꾼다 — 정렬 로직
+  // 자체(위 a.days-b.days 비교)는 새로 만들지 않았다.
+  let workQueueSortAsc = true;
   // §실행형 업무관리 라운드 §3: 한 번에 하나의 행만 펼쳐진다 — companyId 기준(같은 업체가
   // 필터 전환으로 다시 나타나도 펼침 상태가 이어지게, type도 함께 저장해 어떤 업무의
   // 작업영역인지 구분).
@@ -15434,7 +15586,13 @@ window.SHIN2_CRM_APP_INIT = function(){
                2차→MOU 4단계 stepper)을 여기로 옮겼다(요청 "정보를 지우는 게 아니라 이 창을
                업무관리 창으로 이전"). buildStageStepperHtml/buildProgressStages 둘 다
                이미 있던 함수 그대로 재사용 — 새 판정 로직 없음. -->
-          <thead><tr><th>업체명</th><th>현재 상태</th><th>단계 진행상황</th><th>관리 이유</th><th>경과</th><th>해야 할 일</th><th>메일</th><th>서류 현황</th></tr></thead>
+          <!-- §P1-2 업무관리 표 열 압축 라운드(신규) — 진단 보고서 P1-2: "현재 상태"(전 행
+               "질문서 완료"로 동일)/"관리 이유"(전 행 거의 같은 문구)처럼 정보량 없이 폭만
+               차지하던 열을 없앴다. it.currentStateLabel/it.reasonText 계산은 그대로 두고
+               "단계 진행상황" 열 안에 작은 배지로 옮겨 붙였을 뿐이다(값 조회 로직 삭제 없음).
+               "메일"/"서류 현황"도 "비고" 한 열로 합쳤다(mailCellHtml·
+               buildAgreementDocSummary 호출은 그대로, 표시 위치만 이동). 8열 → 5열. -->
+          <thead><tr><th>업체명</th><th>단계 진행상황</th><th>경과</th><th>해야 할 일</th><th>비고</th></tr></thead>
           <tbody>
             ${filtered.map(it=> {
               const isOpen = workQueueExpanded && workQueueExpanded.companyId === it.co.id && workQueueExpanded.type === it.type;
@@ -15446,19 +15604,39 @@ window.SHIN2_CRM_APP_INIT = function(){
               const showMailBtn = it.type === 'm1';
               const mailInfo = showMailBtn ? m1MailButtonInfo(it.co) : null;
               const mailCellHtml = mailInfo && mailInfo.show
-                ? `<button type="button" class="workq-mail-btn${mailInfo.alreadySent ? ' is-sent' : ''}" data-workq-mail="${esc(it.co.id)}">${esc(mailInfo.label)}</button>`
-                : (showMailBtn ? `<span class="workq-mail-skip">${esc((mailInfo && mailInfo.reason) || '—')}</span>` : '—');
+                ? `<button type="button" class="workq-mail-btn${mailInfo.alreadySent ? ' is-sent' : ''}" data-workq-mail="${esc(it.co.id)}">📧 ${esc(mailInfo.label)}</button>`
+                : (showMailBtn ? `<span class="workq-mail-skip">📧 ${esc((mailInfo && mailInfo.reason) || '—')}</span>` : '<span class="workq-mail-skip">📧 없음</span>');
+              const docSummary = buildAgreementDocSummary(it.co.id, docsIdx);
+              // §P1-3 경과일 배지 3단계 라운드(신규) — it.days(각 분기에서 이미 계산된
+              // 경과일/예정일까지 남은 일수, 위 buildWorkQueueItem 계산은 안 건드림)를
+              // 그대로 조회만 해서 배지 색만 구간별로 나눈다. 예정 미팅이 이미 지난
+              // 음수(daysUntil<0)는 절대값 기준으로 같은 구간표를 적용한다(§요청 "실제
+              // 경과일 계산 함수는 건드리지 마세요" — 여기는 표시용 분기일 뿐).
+              let dayBadgeHtml = '';
+              if(it.days !== null){
+                const elapsedForBadge = it.days < 0 ? Math.abs(it.days) : it.days;
+                const tier = elapsedForBadge < 7 ? { cls:'badge-fresh', label:'신규' }
+                  : elapsedForBadge <= 30 ? { cls:'badge-delayed', label:'지연' }
+                  : { cls:'badge-longterm', label:'장기' };
+                dayBadgeHtml = `<span class="workq-delay-badge ${tier.cls}">${tier.label}</span>`;
+              }
               return `<tr>
                 <td><button type="button" class="workq-co-link" data-workq-open-co="${esc(it.co.id)}">${esc(it.co.name)}</button></td>
-                <td>${esc(it.currentStateLabel)}</td>
-                <td class="workq-stage-progress">${stageStepperHtml}</td>
-                <td class="workq-reason">${esc(it.reasonText)}</td>
-                <td class="workq-days">${it.days === null ? '—' : esc(it.days) + '일'}${it.isDelayed ? '<span class="workq-delay-badge">지연</span>' : ''}</td>
+                <td class="workq-stage-progress">
+                  ${stageStepperHtml}
+                  <div class="workq-stage-badges">
+                    <span class="workq-state-badge" title="현재 상태">${esc(it.currentStateLabel)}</span>
+                    ${it.reasonText ? `<span class="workq-reason-badge" title="관리 이유">${esc(it.reasonText)}</span>` : ''}
+                  </div>
+                </td>
+                <td class="workq-days">${it.days === null ? '—' : esc(it.days) + '일'}${dayBadgeHtml}</td>
                 <td>${it.noTask
                   ? `<span class="workq-notask-badge">${esc(it.actionLabel)}</span>`
                   : `<button type="button" class="workq-action-btn${isOpen ? ' is-open' : ''}" data-workq-toggle="${esc(it.co.id)}" data-workq-toggle-type="${esc(it.type)}">${esc(it.actionLabel)}</button>`}</td>
-                <td>${mailCellHtml}</td>
-                <td class="workq-doc-status">${esc(buildAgreementDocSummary(it.co.id, docsIdx).text)}</td>
+                <td class="workq-remark">
+                  ${mailCellHtml}
+                  <span class="workq-doc-status" title="서류 현황: ${esc(docSummary.text)}">📄 ${esc(docSummary.registeredCount)}/${esc(docSummary.total)}</span>
+                </td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -25440,6 +25618,11 @@ window.SHIN2_CRM_APP_INIT = function(){
       ['mobile','휴대전화'], ['phone','연락처'], ['fax','FAX'], ['email','Email'],
       ['website','홈페이지'], ['bizRegNo','사업자번호'], ['address','주소'], ['capital','자본금']
     ];
+    // §P1-6 신규 고객 등록 폼 2열화 라운드(신규) — 진단 보고서 P1-6: 24개 필드가 1열로
+    // 쌓여 세로 스크롤이 약 1488px였다. 입력 필드 id/name과 제출 로직(crmNewFSave)은
+    // 전혀 안 건드렸다 — CSS Grid 레이아웃과 필드 배치 순서만 바꿨다(§요청). 자주 안
+    // 쓰는 필드(FAX/홈페이지/자본금/비고)는 네이티브 <details><summary>로 접어 기본
+    // 숨김 처리한다(§요청 "완전히 새 아코디언 컴포넌트를 만들지 말고").
     wrap.innerHTML = `
       <div class="co-form-field">
         <label>지역(복수 선택 가능)</label>
@@ -25447,11 +25630,32 @@ window.SHIN2_CRM_APP_INIT = function(){
           ${COMPANY_REGIONS.map(r=> `<button type="button" class="list-filter-chip" data-region="${esc(r)}">${esc(r)}</button>`).join('')}
         </div>
       </div>
-      <div class="co-form-field"><label>상호 *</label><input type="text" id="crmNewF_name" /></div>
-      <div class="co-form-field"><label>업체코드(자동 생성)</label><input type="text" id="crmNewF_code" readonly title="업체코드는 자동으로 발급됩니다." /></div>
-      ${NEW_FIELD_LABELS.slice(1).map(([k,l])=> `<div class="co-form-field"><label>${esc(l)}</label><input type="text" id="crmNewF_${k}" /></div>`).join('')}
+      <div class="co-form-grid2">
+        <div class="co-form-field"><label>상호 *</label><input type="text" id="crmNewF_name" /></div>
+        <div class="co-form-field"><label>업체코드(자동 생성)</label><input type="text" id="crmNewF_code" readonly title="업체코드는 자동으로 발급됩니다." /></div>
+        <div class="co-form-row3">
+          <div class="co-form-field"><label>대표자</label><input type="text" id="crmNewF_repName" /></div>
+          <div class="co-form-field"><label>담당자</label><input type="text" id="crmNewF_contactName" /></div>
+          <div class="co-form-field"><label>직급</label><input type="text" id="crmNewF_position" /></div>
+        </div>
+        <div class="co-form-row3">
+          <div class="co-form-field"><label>휴대전화</label><input type="text" id="crmNewF_mobile" /></div>
+          <div class="co-form-field"><label>연락처</label><input type="text" id="crmNewF_phone" /></div>
+          <div class="co-form-field"><label>Email</label><input type="text" id="crmNewF_email" /></div>
+        </div>
+        <div class="co-form-field co-form-span2"><label>주소</label><input type="text" id="crmNewF_address" /></div>
+        <div class="co-form-field co-form-span2"><label>사업자번호</label><input type="text" id="crmNewF_bizRegNo" /></div>
+      </div>
+      <details class="co-form-more">
+        <summary>▸ 추가 정보(FAX · 홈페이지 · 자본금 · 비고)</summary>
+        <div class="co-form-grid2" style="margin-top:10px;">
+          <div class="co-form-field"><label>FAX</label><input type="text" id="crmNewF_fax" /></div>
+          <div class="co-form-field"><label>홈페이지</label><input type="text" id="crmNewF_website" /></div>
+          <div class="co-form-field co-form-span2"><label>자본금</label><input type="text" id="crmNewF_capital" /></div>
+          <div class="co-form-field co-form-span2"><label>비고</label><textarea id="crmNewF_note"></textarea></div>
+        </div>
+      </details>
       ${renderDealStageBlockHtml('addco', resolveDealStageFormValues(null))}
-      <div class="co-form-field"><label>비고</label><textarea id="crmNewF_note"></textarea></div>
       <div class="co-form-field">
         <label>사업자등록증 · 명함 이미지 첨부(선택)</label>
         <div class="ca-ocr-box" id="crmNewFImageBox" tabindex="0" role="button" aria-label="이미지를 이 영역에 끌어다 놓거나 클릭해서 첨부">
@@ -27996,8 +28200,19 @@ window.SHIN2_CRM_APP_INIT = function(){
           </div>
           <div class="pi-body">
             <div class="mail-settings-help" style="margin-bottom:10px;">MOU 체결 협력사 ${count}건 기준(위 KPI 요약 바 "MOU 체결" 숫자와 동일 — 현재 화면의 검색·필터와 무관하게 전체 대상). 브라우저 인쇄로 PDF를 저장합니다.</div>
-            <button type="button" class="co-text-action primary" style="display:block;width:100%;margin-bottom:8px;" id="mouPdfInternalBtn">1) 내부용 PDF — 사내관리용 전체 정보</button>
-            <button type="button" class="co-text-action" style="display:block;width:100%;" id="mouPdfExternalBtn">2) 외부용 PDF — 업체명 · 전화번호 · 주소만</button>
+            <!-- §P1-7 PDF 카드 버튼 라운드(신규) — 진단 보고서 P1-7: 민감정보가 많은
+                 내부용이 굵기 600 남색으로 더 강조돼 있었다. 순서를 뒤집어 안전한
+                 외부용을 위/강조(권장 배지)로, 내부용을 아래/경고 배지로 바꾼다. 클릭
+                 핸들러(doMouPdfSave('internal'|'external'))는 그대로, 시각적 스타일/
+                 순서만 바꿨다. -->
+            <button type="button" class="mou-pdf-card mou-pdf-card-recommend" id="mouPdfExternalBtn">
+              <span class="mou-pdf-card-title">외부용 PDF <span class="mou-pdf-badge mou-pdf-badge-recommend">권장</span></span>
+              <span class="mou-pdf-card-desc">업체명 · 전화번호 · 주소만</span>
+            </button>
+            <button type="button" class="mou-pdf-card mou-pdf-card-internal" id="mouPdfInternalBtn">
+              <span class="mou-pdf-card-title">내부용 PDF <span class="mou-pdf-badge mou-pdf-badge-warn">⚠ 사내 전용</span></span>
+              <span class="mou-pdf-card-desc">매출 · 미수금 포함 전체 정보</span>
+            </button>
           </div>
         </div>
       </div>`;
