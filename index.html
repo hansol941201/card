@@ -2775,6 +2775,12 @@ body.map-modal-lock{ overflow:hidden; }
   .mail-settings-panel{ padding:0 12px; }
   .mail-template-layout{ grid-template-columns:1fr; }
 }
+/* §메일 작성 영역 실폭 확대 라운드(신규) — 위 2열 그리드는 왼쪽 컬럼(.mail-template-left)
+   자체를 넓혔지만, 그 안의 제목/본문 wrapper가 공용 .co-form-field(다른 폼들과 공유,
+   max-width:520px)를 그대로 쓰고 있어서 실제 제목 input·본문 editor는 여전히 520px로
+   잘려 있었다(편집기 오른쪽에 큰 빈 공간이 남던 원인). 다른 화면의 .co-form-field는
+   건드리지 않고, 메일 설정 왼쪽 컬럼 안에서만 그 제한을 풀어 컬럼 폭을 그대로 쓰게 한다. */
+.mail-template-left .co-form-field{ max-width:none; width:100%; box-sizing:border-box; }
 /* §메일 설정 보기편한형태 라운드(신규) — 페이지 제목(workq-header-row)이 아래
    .mail-settings-panel(max-width:1360px, 중앙 정렬)과 다른 컨테이너라 화면 좌측에
    붙어 보이던 문제. 같은 폭·중앙 정렬을 제목에도 그대로 적용(다른 탭 제목과 동일한
