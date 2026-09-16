@@ -18008,6 +18008,11 @@ window.SHIN2_CRM_APP_INIT = function(){
       }).catch(err=>{
         const body = document.getElementById('docPreviewBody');
         if(!body) return;
+        // §로컬전용 파일 무한 로딩 수정(신규) — 질문지 뷰어와 동일한 이유로 재시도 버튼을 숨긴다.
+        if(err && err.code === 'LOCAL_FILE_MISSING'){
+          body.innerHTML = `<div class="doc-preview-fallback">이 파일은 업로드했던 컴퓨터에만 저장되어 있어 이 기기에서는 열 수 없습니다.<br/>업로드한 컴퓨터에서 다시 업로드(재등록)해 클라우드에 저장해주세요.</div>`;
+          return;
+        }
         const msg = (err && err.code === 'TIMEOUT')
           ? '시간이 너무 오래 걸려 불러오기를 멈췄습니다(시간 초과). 네트워크 연결을 확인해주세요.'
           : '파일을 불러오지 못했습니다(로그인 상태를 확인해주세요).';
@@ -18151,6 +18156,12 @@ window.SHIN2_CRM_APP_INIT = function(){
       }).catch(err=>{
         const viewer = document.getElementById('questionnaireViewer');
         if(!viewer) return;
+        // §로컬전용 파일 무한 로딩 수정(신규) — LOCAL_FILE_MISSING은 재시도해도 파일이
+        // 생기지 않으므로(다른 컴퓨터라 애초에 바이트가 없음) 재시도 버튼을 보여주지 않는다.
+        if(err && err.code === 'LOCAL_FILE_MISSING'){
+          viewer.innerHTML = `<div class="questionnaire-viewer-fallback">이 파일은 업로드했던 컴퓨터에만 저장되어 있어 이 기기에서는 열 수 없습니다.<br/>업로드한 컴퓨터에서 다시 업로드(재등록)해 클라우드에 저장해주세요.</div>`;
+          return;
+        }
         const msg = (err && err.code === 'TIMEOUT')
           ? '시간이 너무 오래 걸려 불러오기를 멈췄습니다(시간 초과). 네트워크 연결을 확인해주세요.'
           : '질문서를 불러오지 못했습니다. 로그인 상태나 네트워크 연결을 확인해주세요.';
@@ -24203,7 +24214,18 @@ window.SHIN2_CRM_APP_INIT = function(){
           const url = URL.createObjectURL(blob); docBlobUrlCache[doc.id] = url; return url;
         });
       }
-      return Promise.resolve(getDocObjectUrl(doc));
+      // §로컬전용 파일 "다른 컴퓨터에서 열면 무한 로딩" 수정(신규) — localOnly 파일은 원래
+      // 업로드했던 컴퓨터의 브라우저 localStorage(BLOB_KEY)에만 바이트가 있고 클라우드에는
+      // 올라가지 않는다. 다른 컴퓨터에서 같은 문서를 열면 D.getBlob이 찾지 못해
+      // getDocObjectUrl이 빈 문자열을 반환하는데, 이걸 그대로 resolve('')로 넘기면 호출부의
+      // `if(!url) return;` 이 성공도 실패도 아니게 조용히 멈춰버려 "불러오는 중…"에 영원히
+      // 머문다(Storage 요청 자체가 없으므로 위 DOC_URL_TIMEOUT_MS 타임아웃도 전혀 걸리지
+      // 않음). 이 경우를 명확한 실패로 reject해서 호출부 .catch가 항상 반응하게 한다.
+      const localUrl = getDocObjectUrl(doc);
+      if(!localUrl){
+        return Promise.reject(Object.assign(new Error('LOCAL_FILE_MISSING'), { code:'LOCAL_FILE_MISSING' }));
+      }
+      return Promise.resolve(localUrl);
     }
     const ST = window.SHIN2_STORAGE;
     if(!ST || !ST.isSignedIn || !ST.isSignedIn()){
