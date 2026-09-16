@@ -16111,7 +16111,13 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 그대로 재사용한다(새 Firebase 앱을 만들지 않음). 이 블록이 하는 일은 오직 "로그인 확인이
   // 끝나기 전/로그인 안 된 상태"에서 업로드 버튼·파일선택창이 눌리지 않게 화면을 잠그는
   // 것뿐 — uid 없이 D.uploadMailAssetFile을 호출하는 경로 자체를 아예 막는다.
-  let mailAuthGateReadyEverFired = false;
+  // APP_INIT은 로그인 성공 후에 시작되므로 firebase-ready 이벤트가 이 코드보다 먼저
+  // 지나갈 수 있다. 이벤트만 기다리면 첨부 영역이 영원히 "로그인 확인 중"에 잠긴다.
+  // 이미 로그인된 Storage가 있으면 현재 상태를 즉시 반영하고, 아직 준비 전이면 기존
+  // 이벤트 리스너가 이후 상태를 갱신하도록 둔다.
+  let mailAuthGateReadyEverFired = !!(window.SHIN2_STORAGE
+    && window.SHIN2_STORAGE.isSignedIn
+    && window.SHIN2_STORAGE.isSignedIn());
   function mailAssetAuthState(){
     const cfg = window.FIREBASE_CONFIG;
     if(!cfg || !cfg.projectId || cfg.projectId === 'YOUR_PROJECT_ID') return 'unavailable';
