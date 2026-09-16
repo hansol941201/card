@@ -755,6 +755,8 @@
   .lastpour-cell .lastpour-main{ font-weight:700; color:var(--text); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .lastpour-cell:hover:not(.lastpour-empty) .lastpour-main{ text-decoration:underline; }
   .lastpour-cell .lastpour-site{ color:var(--text-faint); font-weight:400; font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* §최근 실적·총 실적 병합 라운드(신규) — 총 실적 건수를 연도 앞에 파란색으로. */
+  .lastpour-total-count{ color:var(--blue); font-weight:800; }
   .col-stage{ flex:0 0 112px; font-size:12px; white-space:nowrap; } /* 더 이상 목록에 렌더링하지 않지만 클래스는 남겨둔다 */
   /* "최근 요청" 컬럼 — 첫 줄(작은 날짜)/둘째 줄(요청 내용), §10. */
   .col-request{ flex:0 0 150px; min-width:0; font-size:12px; }
@@ -3424,13 +3426,16 @@ table.pdf-doc-table thead{ background:var(--bg); }
    데이터 계산은 전혀 안 바꿨다 — 기존 버튼을 새 wrapper 안으로 옮기고 그리드 폭만
    다시 배분했다. 이 블록이 파일에서 가장 마지막에 오는 co-table-head/co-row 규칙이라
    앞선 P0 라운드의 9열짜리 grid-template-columns(§2464 부근)를 그대로 덮어쓴다. */
-/* §목록 열 간격 재배분 라운드(신규) — 협력사 열이 1.5fr로 잔여 폭을 혼자 다 흡수해서
+/* §목록 열 간격 재배분 라운드 — 협력사 열이 1.5fr로 잔여 폭을 혼자 다 흡수해서
    업체명이 짧은 행에서는 "협력사" 뒤로 큰 빈 공백이 생기고, 나머지 열(최근 요청~최근
    흐름)이 화면 오른쪽 끝에 몰려 보였다(§요청 "너무 오른쪽으로 몰려있어"). 잔여 폭을
-   6개 열 전체에 비례 배분해 한 열이 독차지하지 않게 한다 — 각 열의 최소폭(minmax 첫
-   값)과 열 순서/내용은 그대로, fr 비율만 조정. */
+   전체 열에 비례 배분해 한 열이 독차지하지 않게 한다 — 각 열의 최소폭(minmax 첫
+   값)과 열 순서/내용은 그대로, fr 비율만 조정.
+   §최근 실적·총 실적 병합 라운드(신규) — 두 열(minmax(165px,1fr)+minmax(60px,0.5fr))을
+   한 열(minmax(175px,1.4fr), 총 실적 숫자가 앞에 붙어 조금 더 필요해 최소폭도 살짝
+   키움)로 합쳐 6열 → 5열이 됐다. */
 .co-table-head, .co-row{
-  grid-template-columns: minmax(220px,1.3fr) minmax(140px,0.9fr) minmax(165px,1fr) minmax(60px,0.5fr) minmax(150px,1fr) minmax(180px,1.1fr) !important;
+  grid-template-columns: minmax(220px,1.3fr) minmax(140px,0.9fr) minmax(175px,1.4fr) minmax(150px,1fr) minmax(180px,1.1fr) !important;
   gap:10px !important;
 }
 /* 협력사(업체명) 열 — 이 화면에서 가장 중요한 정보이므로 가장 크고 진하게(§요청). */
@@ -3456,18 +3461,18 @@ table.pdf-doc-table thead{ background:var(--bg); }
    비율로 맞추고, 더 이상 가로 스크롤이 필요 없으므로 min-width 강제와 overflow-x:auto도
    함께 정리한다(§요청 "가로 스크롤 없어져야"). */
 @media(max-width:1180px){
-  .co-table-head, .co-row{ grid-template-columns: minmax(190px,1.4fr) 120px 150px 50px 130px 170px !important; }
+  .co-table-head, .co-row{ grid-template-columns: minmax(190px,1.4fr) 120px 200px 130px 170px !important; }
   .co-table-head, .co-list{ min-width:0 !important; }
   #listView{ overflow-x:visible !important; }
 }
 @media(max-width:1100px){
-  .co-table-head, .co-row{ grid-template-columns: minmax(170px,1.3fr) 105px 130px 46px 118px 150px !important; }
+  .co-table-head, .co-row{ grid-template-columns: minmax(170px,1.3fr) 105px 176px 118px 150px !important; }
   .co-table-head, .co-list{ min-width:0 !important; }
 }
 @media(max-width:760px){
-  .co-table-head, .co-row{ grid-template-columns: minmax(70px,1fr) 42px 48px 26px 58px 52px !important; gap:5px !important; }
+  .co-table-head, .co-row{ grid-template-columns: minmax(70px,1fr) 42px 74px 58px 52px !important; gap:5px !important; }
   .co-table-head, .co-list{ min-width:0 !important; }
-  .col-name, .col-request, .col-pour, .col-yr, .col-revenue-combo, .col-contrib-trend{ min-width:0!important; overflow:hidden!important; }
+  .col-name, .col-request, .col-pour, .col-revenue-combo, .col-contrib-trend{ min-width:0!important; overflow:hidden!important; }
   .col-revenue-combo, .col-contrib-trend{ font-size:9.5px!important; }
   .co-row .col-name, .co-row .co-name-text{ font-size:11.5px!important; }
   .co-row .col-yr, .co-row .yr-cell-btn{ font-size:11px!important; }
@@ -3736,7 +3741,6 @@ table.pdf-doc-table thead{ background:var(--bg); }
       <div class="col-name">협력사</div>
       <div class="col-request">최근 요청</div>
       <div class="col-pour">최근 실적</div>
-      <div class="col-yr">총 실적</div>
       <!-- §고객 성향 컬럼 라운드 — "최근 요청" 컬럼을 "고객 성향"으로 교체(§1). 최근 요청
            데이터/계산(requestHistoryIndex 등)과 고객카드의 최근 요청/메모 기능은 전혀 안
            지웠다 — 이 목록 칸에서만 더 이상 렌더링하지 않을 뿐이다(§9 "화면 목록에서만
@@ -11236,11 +11240,22 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 연도까지만 표시하고 월을 지어내지 않는다(§ "월을 추측하지 마세요").
       const latestPourRec = pourLatestIndex.get(co.id);
       const latestPourCats = latestPourRec ? String(latestPourRec.category || '').split('\n').map(s=> s.trim()).filter(Boolean) : [];
+      // §최근 실적·총 실적 병합 라운드(신규) — "최근 실적" 컬럼과 "총 실적" 컬럼을 한
+      // 칸으로 합쳐달라는 요청(§요청 "최근실적(총실적) 이런식으로"). 총 실적 건수(yr)를
+      // 연도 앞에 파란색으로 붙인다(§요청 "2026년 앞에 파란색으로"). 두 컬럼이 원래
+      // 클릭하던 곳(data-pour-detail/data-yr-detail)이 이미 완전히 같은 openConstruction
+      // Modal(co, null) 호출이었으므로(§확인) 버튼 하나로 합쳐도 동작 차이가 없다 — 계산
+      // (pourLatestIndex/getTotalPourCountForCompany)은 그대로, 표시만 합친다.
+      const totalCountHtml = yr == null ? '' : `<span class="lastpour-total-count">${esc(yr)}</span> `;
       const lastActHtml = latestPourRec
-        ? `<button type="button" class="lastpour-cell" data-pour-detail="${esc(co.id)}" title="${esc(latestPourRec.year)}${latestPourCats[0] ? ' · ' + latestPourCats[0] : ''}${latestPourRec.client ? ' · ' + latestPourRec.client : ''}">
-            <span class="lastpour-main">${esc(latestPourRec.year)}${latestPourCats[0] ? ' · ' + esc(latestPourCats[0]) : ''}</span>${latestPourRec.client ? `<span class="lastpour-site">${esc(latestPourRec.client)}</span>` : ''}
+        ? `<button type="button" class="lastpour-cell" data-pour-detail="${esc(co.id)}" title="${esc(latestPourRec.year)}${latestPourCats[0] ? ' · ' + latestPourCats[0] : ''}${latestPourRec.client ? ' · ' + latestPourRec.client : ''}${yr != null ? ' · 총 실적 ' + yr + '건' : ''}">
+            <span class="lastpour-main">${totalCountHtml}${esc(latestPourRec.year)}${latestPourCats[0] ? ' · ' + esc(latestPourCats[0]) : ''}</span>${latestPourRec.client ? `<span class="lastpour-site">${esc(latestPourRec.client)}</span>` : ''}
           </button>`
-        : '<span class="lastpour-cell lastpour-empty data-none">—</span>';
+        : (yr == null
+          ? '<span class="lastpour-cell lastpour-empty data-none">—</span>'
+          : `<button type="button" class="lastpour-cell" data-pour-detail="${esc(co.id)}" title="총 실적 ${yr}건">
+              <span class="lastpour-main">${totalCountHtml}<span class="data-none">최근 실적 없음</span></span>
+            </button>`);
       // §4~13: "최근 요청" 컬럼 — requestHistoryIndex(전체 업무기록을 한 번만 훑어 미리
       // 계산해 둔 인덱스, §22)에서 이 업체의 요청 이력을 조회해 가장 최근 1건만 보여준다.
       // 요청 라벨이 여러 개면 최대 2개까지만 " · "로 잇고 나머지는 "외 N"으로 줄인다(§11).
@@ -11391,7 +11406,6 @@ window.SHIN2_CRM_APP_INIT = function(){
         </div>
         <div class="col-request">${nameRequestCellHtml}</div>
         <div class="col-pour">${lastActHtml}</div>
-        <div class="col-yr">${yrHtml}</div>
         <!-- §P1-1 목록 열 재구성 라운드(신규): "고객 성향" 열(col-insight)은 화면에서만
              뺀다 — insightHtml 변수 계산과 고객카드 쪽 인사이트 표시는 그대로다. -->
         <div class="col-revenue-combo">
