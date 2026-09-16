@@ -649,12 +649,12 @@
   .workq-co-link:hover{ text-decoration-style:solid; }
   /* §단계 진행상황 이전 라운드 — 고객관리 목록에서 옮겨온 4단계 stepper 칸. 너무 넓게
      늘어나지 않도록 폭만 제한(.stage-stepper 자체 스타일은 그대로 재사용).
-     §라벨 겹침 수정 라운드(신규) — 폭이 130~150px일 때 "질문서/1차미팅/2차미팅/MOU"
-     4개 라벨(.stage-step-label, white-space:nowrap)이 각자의 flex 칸보다 넓어 옆 라벨과
-     겹쳐 보이는 버그(§요청 "글씨가 서로 엉겨")가 있었다. 표가 5열→4열로 줄면서 생긴
-     여유 폭을 이 칸에 배정해 겹침을 없앤다(라벨 텍스트/계산 로직은 그대로, 폭만 확장). */
+     §단계 진행상황 스텝 바 라운드(신규) — 원+연결선 방식일 때 있던 라벨 겹침 문제는
+     막대 구간과 라벨이 항상 정확히 25%씩 나뉘는 새 구조에서는 더 발생하지 않지만, 혹시
+     모를 좁은 폭에서도 안전하도록 줄바꿈은 허용해 둔다(라벨 텍스트/계산 로직은 그대로). */
   .workq-stage-progress{ width:220px; min-width:200px; }
-  .workq-stage-progress .stage-step-label{ white-space:normal; line-height:1.25; text-align:center; }
+  .workq-stage-progress .stage-stepper{ max-width:100%; }
+  .workq-stage-progress .stage-step-label{ white-space:normal; line-height:1.25; }
   .workq-reason{ color:var(--text-muted); font-size:12px; }
   .workq-days{ white-space:nowrap; font-variant-numeric:tabular-nums; }
   /* §P1-2 업무관리 표 열 압축 라운드 — "현재 상태"/"관리 이유" 배지(단계 진행상황 열 안),
@@ -910,23 +910,25 @@
   .pour-count:hover{ text-decoration:underline; }
   .pour-none{ font-size:13px; color:var(--text-faint); }
 
-  /* §단계 진행상황/다음 행동 컬럼 라운드 §4/§12: 4단계 가로 stepper + 다음 행동 chip 1개.
-     행 높이(min-height 50px)를 넘지 않도록 원 14px+라벨 9px로 작게 유지한다. */
+  /* §단계 진행상황 스텝 바(Step Bar) 라운드 — 기존 "원(dot)+연결선+체크" 타임라인을
+     얇은 4등분 progress bar로 교체한다(§요청 "동그라미 타임라인을 없애고 스텝 바 형태로").
+     buildStageStepperHtml()이 읽는 state/currentIdx 판정 로직은 전혀 안 바꾸고, 그 결과값을
+     막대 구간 색상(완료=navy/현재=blue/미진행=연한 회색)에만 매핑한다 — 체크 아이콘은
+     완전히 제거하고 색상만으로 완료 여부를 표현한다(§6). */
   .col-stage-progress{ flex:0 0 168px; min-width:0; }
   .col-next-action{ flex:0 0 106px; min-width:0; text-align:left; }
-  .stage-stepper{ display:flex; align-items:flex-start; width:100%; }
-  .stage-step{ position:relative; flex:1 1 0; display:flex; flex-direction:column; align-items:center; min-width:0; }
-  .stage-step-line{ position:absolute; top:6px; left:-50%; width:100%; height:2px; background:#E2E8F0; z-index:0; }
-  .stage-step:first-child .stage-step-line{ display:none; }
-  .stage-step-dot{
-    position:relative; z-index:1; width:18px; height:18px; flex:none; box-sizing:border-box; border-radius:50%;
-    display:flex; align-items:center; justify-content:center; background:#fff; border:2px solid #D7DEE8;
-    font-size:10px; line-height:1; color:#fff;
-  }
-  .stage-step-dot.done{ background:#079455; border-color:#079455; } /* 완료 — 초록 원 + 체크(§4) */
-  .stage-step-dot.current{ background:#fff; border-color:#F59E0B; } /* 현재 진행 단계 — 주황 테두리 + 흰 내부(§4) */
-  .stage-step-dot.pending{ background:#fff; border-color:#D7DEE8; } /* 미도달 — 회색 빈 원(§4) */
-  .stage-step-label{ margin-top:2px; font-size:11px; color:var(--text-faint); white-space:nowrap; }
+  .stage-stepper{ display:flex; flex-direction:column; width:100%; max-width:360px; }
+  .stage-bar{ display:flex; width:100%; height:11px; border-radius:999px; overflow:hidden; background:#E5EAF1; }
+  .stage-bar-seg{ flex:1 1 0; min-width:0; background:#E5EAF1; }
+  .stage-bar-seg + .stage-bar-seg{ border-left:1px solid #fff; }
+  .stage-bar-seg.is-done{ background:var(--navy); } /* 완료 — 남색(§3) */
+  .stage-bar-seg.is-current{ background:var(--blue); } /* 현재 진행 중 — 밝은 파랑(§4) */
+  .stage-bar-seg.is-pending{ background:#E5EAF1; } /* 미진행 — 연한 회색(§5) */
+  .stage-step-labels{ display:flex; width:100%; margin-top:4px; }
+  .stage-step-label{ flex:1 1 0; min-width:0; text-align:center; font-size:11px; color:var(--text-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .stage-step-label.is-done{ color:var(--text); } /* 완료 — 기본 텍스트색(§7) */
+  .stage-step-label.is-current{ color:var(--blue); font-weight:600; } /* 현재 — 파랑+굵게(§7) */
+  .stage-step-label.is-pending{ color:var(--text-faint); } /* 미진행 — 회색(§7) */
   .next-action-chip{
     display:inline-flex; align-items:center; height:22px; padding:0 8px; font-size:10.5px; font-weight:600;
     color:#fff; background:var(--navy); border:none; border-radius:5px; cursor:pointer; white-space:nowrap;
@@ -1572,14 +1574,14 @@
   .cdash-material-table td:nth-child(2){ white-space:nowrap; }
   select.cdash-material-status{ font-size:11px; padding:1px 4px; border:1px solid var(--line); border-radius:4px; color:var(--text); background:#fff; }
 
-  /* §고객카드 레이아웃 재배치 라운드 §4: "진행상황" — 메인 목록 컬럼과 같은
-     buildStageStepperHtml() 마크업(.stage-stepper/.stage-step/.stage-step-dot)을 그대로
-     재사용하되, 이 카드 안에서는 원/라벨을 더 크게 보이도록 스코프 override만 준다(로직
-     재구현 없음). */
+  /* §고객카드 레이아웃 재배치 라운드 §4 / §단계 진행상황 스텝 바 라운드(신규): "진행상황" —
+     업무관리 표와 같은 buildStageStepperHtml() 마크업(.stage-stepper/.stage-bar/
+     .stage-bar-seg)을 그대로 재사용하되, 이 카드 안에서는 막대/라벨을 조금 더 크게 보이도록
+     스코프 override만 준다(로직 재구현 없음). */
   .cdash-progress-stepper-wrap{ padding:14px 20px 6px; }
-  .cdash-progress-stepper-wrap .stage-step-dot{ width:22px; height:22px; font-size:11px; }
-  .cdash-progress-stepper-wrap .stage-step-line{ top:10px; }
-  .cdash-progress-stepper-wrap .stage-step-label{ margin-top:5px; font-size:12px; font-weight:600; }
+  .cdash-progress-stepper-wrap .stage-bar{ height:12px; }
+  .cdash-progress-stepper-wrap .stage-step-labels{ margin-top:6px; }
+  .cdash-progress-stepper-wrap .stage-step-label{ font-size:12px; }
 
   /* ---- 진행 기록 — 질문서→1차미팅→2차미팅→MOU 진행바(§진행 기록 라운드, 지금은 위
      .cdash-progress-stepper-wrap으로 대체되어 아래 카드형 버튼 스타일은 더 이상 화면에
@@ -14589,17 +14591,18 @@ window.SHIN2_CRM_APP_INIT = function(){
   const PROGRESS_STATUS_LABEL = { done:'완료', scheduled:'예정', waiting:'대기' };
 
   /* ==========================================================================
-     §단계 진행상황(stepper)/다음 행동 컬럼 라운드
+     §단계 진행상황(step bar)/다음 행동 컬럼 라운드
 
      둘 다 새 상태 계산을 하지 않고 위 buildProgressStages()가 이미 만들어 둔 progress
      (stages/currentIdx/hasAny)만 읽는다(§3 "실제 필드 재사용", 같은 상태 계산을 두 곳에
      중복 구현하지 않는다) — 메인 목록 renderList()가 각 행마다 이미 계산해 둔 r.progress를
      그대로 넘겨받는다.
 
-     [단계 stepper] 완료(state==='done')=초록 원+체크, 그 다음(index===currentIdx이고
-     미완료)=주황 테두리 원(현재 단계), 나머지=회색 빈 원(§4/§5). 원 사이 선은 항상 얇은
-     연회색 하나로 고정 — 완료 여부로 선 색을 바꾸지 않는다(요청 문구 그대로 "얇은 연회색
-     선").
+     [단계 step bar] §단계 진행상황 스텝 바 라운드(신규) — 기존 원(dot)+연결선+체크 타임라인
+     대신 4등분 가로 막대로 표현한다(§요청 "동그라미 없애고 스텝 바 형태로"). 판정 로직은
+     전혀 안 바꿨다 — 완료(state==='done')=남색 구간, 그 다음(index===currentIdx이고
+     미완료)=밝은 파랑 구간(현재 단계), 나머지=연한 회색 구간(§4/§5). 체크 아이콘은 완전히
+     제거하고 색상만으로 완료 여부를 표현한다(§6).
 
      [다음 행동] §8/§9 우선순위를 그대로 따른다 — 질문서 회신 완료 AND 1차미팅 미완료만
      "1차 미팅 제안", 1차미팅 완료 AND 2차미팅 미완료만 "2차 미팅 제안", 2차미팅 완료 AND
@@ -14611,17 +14614,19 @@ window.SHIN2_CRM_APP_INIT = function(){
      "—")을 그대로 쓴다.
      ========================================================================== */
   function buildStageStepperHtml(progress){
-    if(!progress.hasAny) return '<span class="data-none">데이터 없음</span>';
-    const stepsHtml = progress.stages.map((s,i)=>{
-      const cls = s.state === 'done' ? 'done' : (i === progress.currentIdx ? 'current' : 'pending');
-      const dotContent = cls === 'done' ? '✓' : '';
-      return `<div class="stage-step">
-          <span class="stage-step-line"></span>
-          <span class="stage-step-dot ${cls}">${dotContent}</span>
-          <span class="stage-step-label">${esc(s.label)}</span>
-        </div>`;
-    }).join('');
-    return `<div class="stage-stepper">${stepsHtml}</div>`;
+    // §단계 진행상황 스텝 바 라운드(신규) — progress 자체가 없거나 stages가 배열이 아닌
+    // 비정상 입력에서도 에러 없이 "데이터 없음"으로 방어한다(§9 "JS 오류 발생하지 않게").
+    if(!progress || !progress.hasAny || !Array.isArray(progress.stages) || !progress.stages.length){
+      return '<span class="data-none">데이터 없음</span>';
+    }
+    const currentIdx = Number.isInteger(progress.currentIdx) ? progress.currentIdx : -1;
+    const clsList = progress.stages.map((s,i)=> (s && s.state === 'done') ? 'done' : (i === currentIdx ? 'current' : 'pending'));
+    const barHtml = clsList.map(cls=> `<span class="stage-bar-seg is-${cls}"></span>`).join('');
+    const labelsHtml = progress.stages.map((s,i)=> `<span class="stage-step-label is-${clsList[i]}">${esc(s && s.label || '')}</span>`).join('');
+    return `<div class="stage-stepper">
+        <div class="stage-bar">${barHtml}</div>
+        <div class="stage-step-labels">${labelsHtml}</div>
+      </div>`;
   }
   function computeNextActionLabel(progress){
     if(!progress.hasAny) return null;
