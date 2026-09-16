@@ -5650,6 +5650,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   const DEFAULT_MAIL_SETTINGS = {
     emailjsPublicKey: '', emailjsServiceId: '', emailjsTemplateId: '',
     fromName: '(주)넷폼', fromEmail: 'netform@netformrnd.com',
+    accountUpdatedAt: null,
     subjectTemplate: '[POUR] {업체명} 1차 미팅 일정 제안드립니다',
     bodyTemplate: '안녕하세요, {업체명} {담당자}님.\n\n보내주신 질문서 잘 확인했습니다.\n협의를 위해 1차 미팅 일정을 제안드리고자 합니다.\n편하신 일정 알려주시면 조율하겠습니다.\n\n감사합니다.\n{보내는사람}'
   };
@@ -5712,20 +5713,25 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     const values = {};
     const errors = {};
     [
-      ['emailjsPublicKey', 'Public Key', null],
+      ['emailjsPublicKey', 'Public Key', /^[A-Za-z0-9_-]+$/],
       ['emailjsServiceId', 'Service ID', /^service_[A-Za-z0-9_-]+$/],
       ['emailjsTemplateId', 'Template ID', /^template_[A-Za-z0-9_-]+$/]
     ].forEach(([key, label, pattern])=>{
       const value = typeof (settings || {})[key] === 'string' ? settings[key].trim() : '';
       values[key] = value;
       if(!value) errors[key] = 'EmailJS ' + label + '가 설정되지 않았습니다.';
-      else if(pattern && !pattern.test(value)) errors[key] = 'EmailJS ' + label + '는 ' + (key === 'emailjsServiceId' ? 'service_' : 'template_') + '로 시작하는 ID여야 합니다. 이메일 주소가 아닌 EmailJS에서 발급한 ID를 입력해주세요.';
+      else if(pattern && !pattern.test(value)){
+        if(key === 'emailjsPublicKey') errors[key] = 'EmailJS Public Key 형식이 올바르지 않습니다. Account → API Keys의 Public Key만 공백이나 따옴표 없이 입력해주세요.';
+        else errors[key] = 'EmailJS ' + label + '는 ' + (key === 'emailjsServiceId' ? 'service_' : 'template_') + '로 시작하는 ID여야 합니다. 이메일 주소가 아닌 EmailJS에서 발급한 ID를 입력해주세요.';
+      }
     });
     return { values, errors, valid: Object.keys(errors).length === 0 };
   }
   function saveMailSettings(patch){
     const current = loadMailSettings();
     const next = Object.assign({}, current, patch);
+    const accountKeys = ['emailjsPublicKey', 'emailjsServiceId', 'emailjsTemplateId', 'fromName', 'fromEmail'];
+    if(patch && accountKeys.some(key=> Object.prototype.hasOwnProperty.call(patch, key))) next.accountUpdatedAt = nowIso();
     if(patch && patch.mailTemplates){
       next.mailTemplates = Object.assign({}, current.mailTemplates);
       Object.keys(patch.mailTemplates).forEach(key=>{
@@ -5750,14 +5756,36 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   //  - mailTemplates(MAIL_TEMPLATE_KEYS 4종)는 saveMailSettings가 patch마다 채워주는
   //    updatedAt(위 §5386 부근)을 기준으로 키별 last-write-wins — 클라우드와 로컬 중
   //    updatedAt이 더 최신인 쪽을 그 키에만 채택한다(다른 키는 서로 안 건드림).
-  //  - emailjsPublicKey/fromName 등 updatedAt이 없는 평면(계정 설정류) 필드는 클라우드에
-  //    값이 있으면 클라우드 우선, 없으면(빈 문자열/미설정) 로컬 값을 그대로 유지한다.
-  const MAIL_SETTINGS_FLAT_KEYS = ['emailjsPublicKey', 'emailjsServiceId', 'emailjsTemplateId', 'fromName', 'fromEmail', 'subjectTemplate', 'bodyTemplate'];
+  //  - EmailJS 계정 설정은 Public Key/Service ID/Template ID가 서로 다른 계정 값으로 섞이지
+  //    않도록 accountUpdatedAt 기준으로 다섯 필드를 한 묶음으로 병합한다.
+  const MAIL_ACCOUNT_KEYS = ['emailjsPublicKey', 'emailjsServiceId', 'emailjsTemplateId', 'fromName', 'fromEmail'];
+  const MAIL_SETTINGS_FLAT_KEYS = ['subjectTemplate', 'bodyTemplate'];
   window.SHIN2_CRM_MERGE_MAIL_SETTINGS_FROM_CLOUD = function(cloudData){
     if(!cloudData || typeof cloudData !== 'object') return;
     const localFull = loadMailSettings();
     const merged = Object.assign({}, localFull);
     let changed = false;
+    let needsPush = false;
+    const cloudAccountTime = cloudData.accountUpdatedAt ? Date.parse(cloudData.accountUpdatedAt) : NaN;
+    const localAccountTime = localFull.accountUpdatedAt ? Date.parse(localFull.accountUpdatedAt) : NaN;
+    const cloudHasLegacyAccount = MAIL_ACCOUNT_KEYS.some(key=> typeof cloudData[key] === 'string' && cloudData[key] !== '');
+    const useCloudAccount = Number.isFinite(cloudAccountTime)
+      ? (!Number.isFinite(localAccountTime) || cloudAccountTime > localAccountTime)
+      : (!Number.isFinite(localAccountTime) && cloudHasLegacyAccount);
+    if(useCloudAccount){
+      MAIL_ACCOUNT_KEYS.forEach(key=>{
+        if(typeof cloudData[key] === 'string' && cloudData[key] !== merged[key]){
+          merged[key] = cloudData[key];
+          changed = true;
+        }
+      });
+      if(cloudData.accountUpdatedAt && cloudData.accountUpdatedAt !== merged.accountUpdatedAt){
+        merged.accountUpdatedAt = cloudData.accountUpdatedAt;
+        changed = true;
+      }
+    } else if(Number.isFinite(localAccountTime) && (!Number.isFinite(cloudAccountTime) || localAccountTime > cloudAccountTime)){
+      needsPush = true;
+    }
     MAIL_SETTINGS_FLAT_KEYS.forEach(k=>{
       const cv = cloudData[k];
       if(typeof cv === 'string' && cv !== '' && cv !== localFull[k]){
@@ -5780,14 +5808,14 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
       }
     });
     merged.mailTemplates = mergedTemplates;
-    if(!changed) return;
-    const ok = writeObj(MAIL_SETTINGS_KEY, merged);
+    if(!changed && !needsPush) return;
+    const ok = changed ? writeObj(MAIL_SETTINGS_KEY, merged) : true;
     // 병합 결과를 다시 클라우드로 밀어둔다(§B2B 카운터의 bump→push와 같은 이유) — 로컬이
     // 더 최신이던 키(예: 평면 필드 미설정이라 로컬을 유지한 경우)까지 클라우드에 반영해
-    // 다음 스냅샷에서 다른 브라우저가 같은 값으로 수렴하게 한다. 변경이 없으면(=changed
-    // false) 애초에 여기까지 오지 않으므로 두 브라우저가 서로 밀어주는 무한 루프가 되지 않는다.
+    // 다음 스냅샷에서 다른 브라우저가 같은 값으로 수렴하게 한다. 계정 갱신 시각이 같아지면
+    // needsPush도 false가 되어 두 브라우저가 서로 밀어주는 무한 루프가 되지 않는다.
     if(ok){
-      try{ if(window.SHIN2_CRM_MAIL_SETTINGS_SYNC) window.SHIN2_CRM_MAIL_SETTINGS_SYNC.push(merged); }catch(e){}
+      try{ if(window.SHIN2_CRM_MAIL_SETTINGS_SYNC) window.SHIN2_CRM_MAIL_SETTINGS_SYNC.push(changed ? merged : localFull); }catch(e){}
     }
   };
   // §데이터 업데이트 성능 개선 라운드: patch를 레코드에 적용하는 순수 로직만 분리했다(값/
@@ -16255,7 +16283,7 @@ window.SHIN2_CRM_APP_INIT = function(){
           </button>
           <div class="mail-account-panel" id="mailAccountPanel" style="display:${mailSettingsUI.accountOpen?'block':'none'};">
             <div class="mail-settings-help">
-              이 값은 <b>이 브라우저에만</b> 저장됩니다(팀 공용 설정 아님, 다른 PC/브라우저에는 각자 따로 입력해야 합니다).
+              이 값은 로그인한 사용자 계정에 저장되어 같은 계정의 다른 브라우저와 동기화됩니다. 다섯 계정값은 한 묶음으로 저장되므로 서로 다른 EmailJS 계정의 값을 섞지 마세요.
               <a href="https://www.emailjs.com/" target="_blank" rel="noopener">EmailJS</a>에 무료 가입 후, 메일 계정을
               Custom SMTP(발신 서버) 서비스로 연결하고 아래 값을 붙여넣어 주세요. 하이웍스 SMTP 정보는 하이웍스
               관리자센터의 "메일 환경설정 → POP3/SMTP" 메뉴에서 확인할 수 있습니다. 비밀번호는 EmailJS 쪽에만
@@ -17267,6 +17295,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       });
     }
     const sendBtn = document.getElementById('mailComposeSendBtn');
+    const sendBtnOriginalText = sendBtn.textContent;
     if(questionnaireBlocked) sendBtn.disabled = true;
     // §요청 [7] 발송 전 최종 확인 — [메일 발송]을 누르면 바로 안 보내고, 종류/받는사람/
     // 참조/제목/첨부/기존 발송기록을 한 번 더 보여주는 확인창을 먼저 띄운다. 실제 발송
@@ -17285,20 +17314,52 @@ window.SHIN2_CRM_APP_INIT = function(){
         message: sanitizeMailBodyHtml(document.getElementById('mailComposeBody').innerHTML)
       };
     }
-    function doSend(toEmail, ccEmails){
+    function emailJsErrorMessage(error){
+      const status = error && error.status != null ? String(error.status) : '';
+      const detail = error && typeof error.text === 'string' && error.text.trim()
+        ? error.text.trim()
+        : (error && typeof error.message === 'string' && error.message.trim() ? error.message.trim() : '알 수 없는 오류');
+      const base = (status ? `EmailJS ${status}: ` : 'EmailJS: ') + detail;
+      return /public key is invalid/i.test(detail)
+        ? base + ' EmailJS Account → API Keys의 Public Key를 다시 복사한 뒤 메일 설정에서 발송 계정 저장을 눌러주세요.'
+        : base;
+    }
+    function validateMailConnection(settings, toEmail){
+      const emailJsValidation = D.validateEmailJsSettings(settings);
+      const errors = Object.values(emailJsValidation.errors);
+      const fromName = String((settings && settings.fromName) || '').trim();
+      const fromEmail = stripInvisibleChars((settings && settings.fromEmail) || '').trim();
+      const recipient = stripInvisibleChars(toEmail || '').trim();
+      if(!fromName) errors.push('보내는사람 이름이 설정되지 않았습니다.');
+      if(!fromEmail) errors.push('보내는사람 이메일이 설정되지 않았습니다.');
+      else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail)) errors.push('보내는사람 이메일 형식이 올바르지 않습니다.');
+      if(!recipient) errors.push('받는사람 이메일이 설정되지 않았습니다.');
+      else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) errors.push('받는사람 이메일 형식이 올바르지 않습니다.');
+      return { valid:errors.length === 0, errors, emailJsValidation, fromName, fromEmail, recipient };
+    }
+    function restoreMailSendButton(){
+      sendBtn.disabled = !!questionnaireBlocked;
+      sendBtn.textContent = sendBtnOriginalText;
+    }
+    async function doSend(toEmail, ccEmails){
       const statusEl = document.getElementById('mailComposeStatus');
       const latestSettings = D.loadMailSettings();
-      const validation = D.validateEmailJsSettings(latestSettings);
-      if(!validation.valid){
-        statusEl.textContent = Object.values(validation.errors).join(' ');
+      const ready = validateMailConnection(latestSettings, toEmail);
+      const validation = ready.emailJsValidation;
+      if(!ready.valid){
+        console.info('[EMAIL-SEND] validation: FAIL');
+        statusEl.textContent = ready.errors.join(' ');
         statusEl.classList.add('is-err');
-        return;
+        restoreMailSendButton();
+        return { ok:false, validationFailed:true };
       }
+      console.info('[EMAIL-SEND] validation: PASS');
       statusEl.classList.remove('is-err');
       statusEl.textContent = '발송 중…';
       // §요청 [7] "중복 클릭 방지를 위해 발송 중에는 모든 발송 버튼을 비활성화" —
       // 최종확인 버튼과 이 팝업의 발송 버튼을 함께 잠근다.
       sendBtn.disabled = true;
+      sendBtn.textContent = '발송 중...';
       // §첨부파일(공통 발송자료) 라운드(신규) — 공통 문서/동영상은 실제 첨부가 아니라
       // 다운로드/시청 링크를 본문 끝에 덧붙여 보낸다(§확정: sendForm 재구조화 없이
       // 진행). 링크를 못 가져오면(로그인 끊김/Storage 규칙 미적용 등) 이메일 자체를
@@ -17312,128 +17373,150 @@ window.SHIN2_CRM_APP_INIT = function(){
       // (로그인 끊김·규칙 미적용 등) "꼭 첨부"가 지켜질 수 없으므로 다른 첨부자료와
       // 똑같이 발송 자체를 막는다(§요청 "링크 접근 불가능하면 발송 전 차단"과 동일 원칙).
       const globalImgFetch = globalImg ? D.getMailAssetFileURL(globalImg.storagePath) : Promise.resolve(null);
-      Promise.all([Promise.all(linkFetches), globalImgFetch])
-        .catch(()=>{ throw Object.assign(new Error('공통 발송자료 또는 전체 공통 이미지 링크를 불러오지 못했습니다 — 로그인 상태 또는 Storage 공유 규칙을 확인해주세요.'), { code:'ASSET_LINK_FAILED' }); })
-        .then(([links, globalImgUrl])=>{
-          const params = buildMailSendParams(toEmail, ccEmails, latestSettings);
-          // §본문 이미지 첨부 라운드(신규) — params.message는 이제 항상 mailComposeBody의
-          // innerHTML(진짜 HTML)이므로, 덧붙이는 링크/이미지도 <br>/<a> 형식으로 통일한다
-          // (예전 평문 시절의 \n 이어붙이기는 더 이상 맞지 않는다).
-          if(links.length) params.message += '<br><br>' + links.map(l=> `${esc(l.label)}: <a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a>`).join('<br>');
-          if(globalImgUrl) params.message += `<br><br><img src="${esc(globalImgUrl)}" alt="" style="max-width:100%;height:auto;display:block;" />`;
-          emailAttempted = true;
-          return loadEmailJsSdk()
-            .then(emailjs=> emailjs.send(validation.values.emailjsServiceId, validation.values.emailjsTemplateId, params, validation.values.emailjsPublicKey))
-            .then(res=> ({ res, params }));
-        })
-        .then(async ({res, params})=>{
-          statusEl.textContent = '발송 완료';
-          appendM1MailLog(co.id, {
-            mailType, sentAt: new Date().toISOString(), to: toEmail, cc: ccEmails, status:'sent',
-            sentBy: crmCurrentUserLabel(), isResend: alreadySent,
-            subject: params.subject,
-            attachmentName: attachDoc ? (attachDoc.fileName || attachDoc.originalFileName || null) : (commonDoc ? commonDoc.fileName : null),
-            hasVideoLink: !!(tpl.videoUrl || commonVideo),
-            emailjsStatus: res && res.status != null ? res.status : null
-          });
-          D.addActivity(co.id, `${MAIL_TYPE_SUCCESS_LOG_TEXT[mailType]} (받는사람: ${toEmail})`);
-          // §요청 3 "메일 기록"도 Firestore 확인 대상 — 단, 메일은 이미 실제로 발송된
-          // 뒤라 여기서 확인이 실패해도 "발송 실패"로 되돌리지 않는다(실제로 보냈는데
-          // 실패라고 말하면 거짓 안내가 된다). 기록 저장 확인만 별도로 안내한다.
-          const [companiesR, actR] = await Promise.all([confirmCloudSave('companies'), confirmCloudSave('customerActivities')]);
-          if(!companiesR.ok || !actR.ok) statusEl.textContent = '발송 완료(기록 저장 확인 실패 — 새로고침 후 기록을 확인해주세요)';
-          if(typeof renderWorkQueueView === 'function' && document.getElementById('workQueueView') && document.getElementById('workQueueView').style.display === 'block') renderWorkQueueView();
-          if(currentCompanyId === co.id && cardView.style.display === 'block' && typeof refreshChart === 'function') refreshChart();
-          if(typeof opts.onSent === 'function') opts.onSent();
-          setTimeout(closeMailComposeModal, 900);
-        })
-        .catch(err=>{
-          sendBtn.disabled = false;
-          statusEl.classList.add('is-err');
-          const errMsg = err && (err.text || err.message) ? (err.text || err.message) : '알 수 없는 오류';
-          statusEl.textContent = (err && err.code === 'ASSET_LINK_FAILED') ? errMsg : ('발송 실패: ' + errMsg + ' — EmailJS 연동 정보와 발신 서버 연결 상태를 확인해주세요.');
-          // §요청 [9] "실패 시 성공 기록을 남기지 않고, 실패일시·사유를 기록하고 다시
-          // 시도 버튼을 제공" — 다시 시도는 같은 팝업의 [메일 발송] 버튼을 다시 누르면
-          // 되므로(팝업이 안 닫힘) 별도 버튼을 새로 만들지 않는다. 링크 확보 실패는
-          // 애초에 EmailJS를 호출하지 않았으므로(emailAttempted===false) 발송기록을
-          // 남기지 않는다(§ 실제 시도 안 한 걸 실패로 남기지 않는다).
-          if(emailAttempted){
-            appendM1MailLog(co.id, {
-              mailType, sentAt: new Date().toISOString(), to: toEmail, cc: ccEmails, status:'failed',
-              sentBy: crmCurrentUserLabel(), isResend: alreadySent, error: errMsg
-            });
-          }
+      try{
+        let links, globalImgUrl;
+        try{
+          [links, globalImgUrl] = await Promise.all([Promise.all(linkFetches), globalImgFetch]);
+        }catch(assetError){
+          throw Object.assign(new Error('공통 발송자료 또는 전체 공통 이미지 링크를 불러오지 못했습니다 — 로그인 상태 또는 Storage 공유 규칙을 확인해주세요.'), { code:'ASSET_LINK_FAILED' });
+        }
+        const params = buildMailSendParams(toEmail, ccEmails, latestSettings);
+        // §본문 이미지 첨부 라운드(신규) — params.message는 이제 항상 mailComposeBody의
+        // innerHTML(진짜 HTML)이므로, 덧붙이는 링크/이미지도 <br>/<a> 형식으로 통일한다.
+        if(links.length) params.message += '<br><br>' + links.map(l=> `${esc(l.label)}: <a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a>`).join('<br>');
+        if(globalImgUrl) params.message += `<br><br><img src="${esc(globalImgUrl)}" alt="" style="max-width:100%;height:auto;display:block;" />`;
+        const emailjs = await loadEmailJsSdk();
+        emailAttempted = true;
+        console.info('[EMAIL-SEND] request start');
+        const res = await emailjs.send(validation.values.emailjsServiceId, validation.values.emailjsTemplateId, params, validation.values.emailjsPublicKey);
+        const responseStatus = Number(res && res.status);
+        if(!Number.isFinite(responseStatus) || responseStatus < 200 || responseStatus >= 300) throw (res || new Error('EmailJS 성공 응답을 확인할 수 없습니다.'));
+        console.info('[EMAIL-SEND] request success');
+        statusEl.textContent = '메일이 정상적으로 발송되었습니다.';
+        appendM1MailLog(co.id, {
+          mailType, sentAt: new Date().toISOString(), to: toEmail, cc: ccEmails, status:'sent',
+          sentBy: crmCurrentUserLabel(), isResend: alreadySent,
+          subject: params.subject,
+          attachmentName: attachDoc ? (attachDoc.fileName || attachDoc.originalFileName || null) : (commonDoc ? commonDoc.fileName : null),
+          hasVideoLink: !!(tpl.videoUrl || commonVideo),
+          emailjsStatus: res.status
         });
+        D.addActivity(co.id, `${MAIL_TYPE_SUCCESS_LOG_TEXT[mailType]} (받는사람: ${toEmail})`);
+        // 이메일 성공과 발송기록 저장 확인은 구분한다. 기록 저장 실패로 이미 발송된 메일을
+        // 실패처럼 표시하거나 다시 보내도록 유도하지 않는다.
+        const [companiesR, actR] = await Promise.all([confirmCloudSave('companies'), confirmCloudSave('customerActivities')]);
+        if(!companiesR.ok || !actR.ok) statusEl.textContent = '메일이 정상적으로 발송되었습니다. (발송 이력 저장 확인 실패 — 새로고침 후 기록을 확인해주세요)';
+        if(typeof renderWorkQueueView === 'function' && document.getElementById('workQueueView') && document.getElementById('workQueueView').style.display === 'block') renderWorkQueueView();
+        if(currentCompanyId === co.id && cardView.style.display === 'block' && typeof refreshChart === 'function') refreshChart();
+        if(typeof opts.onSent === 'function') opts.onSent();
+        setTimeout(closeMailComposeModal, 1200);
+        return { ok:true, response:res };
+      }catch(err){
+        console.error('[EMAIL-SEND] request failed', {
+          status: err && err.status != null ? err.status : null,
+          message: err && (err.text || err.message) ? String(err.text || err.message) : '알 수 없는 오류'
+        });
+        restoreMailSendButton();
+        statusEl.classList.add('is-err');
+        const errMsg = err && err.code === 'ASSET_LINK_FAILED' ? err.message : emailJsErrorMessage(err);
+        statusEl.textContent = '메일 발송 실패 · ' + errMsg;
+        // 실패 시 작성 모달과 입력 상태는 그대로 둔다. 실제 EmailJS 요청을 시도한 경우만
+        // 기존 실패 이력을 유지한다.
+        if(emailAttempted){
+          appendM1MailLog(co.id, {
+            mailType, sentAt: new Date().toISOString(), to: toEmail, cc: ccEmails, status:'failed',
+            sentBy: crmCurrentUserLabel(), isResend: alreadySent, error: errMsg
+          });
+        }
+        return { ok:false, error:err };
+      }
     }
     // §연결 진단 라운드(신규) — 실제 메일을 보내지 않고 "지금 이 상태로 [메일 발송]을
     // 누르면 실제로 어떤 값이 나가는지"만 읽기 전용으로 보여준다. buildMailSendParams를
     // 그대로 호출해 실제 발송 로직과 100% 같은 값을 쓴다(§요청 "매개변수 생성 로직을
     // 재사용"). Public Key는 원문을 절대 표시하지 않고 설정 여부만 boolean으로 보여준다.
-    document.getElementById('mailComposeDiagBtn').addEventListener('click', ()=>{
+    const diagBtn = document.getElementById('mailComposeDiagBtn');
+    const diagBtnOriginalText = diagBtn.textContent;
+    diagBtn.addEventListener('click', async (event)=>{
+      event.preventDefault();
+      event.stopPropagation();
+      console.info('[EMAIL-DIAG] click');
       const panel = document.getElementById('mailDiagPanel');
-      const latestSettings = D.loadMailSettings();
-      const toRaw = document.getElementById('mailComposeTo').value;
-      const toTrimmed = toRaw.trim();
-      const toClean = stripInvisibleChars(toTrimmed);
-      const ccRaw = document.getElementById('mailComposeCc').value;
-      const ccList = ccRaw.trim() ? ccRaw.trim().split(',').map(s=> stripInvisibleChars(s.trim())).filter(Boolean) : [];
-      const params = buildMailSendParams(toClean, ccList, latestSettings);
-      const toEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toClean);
-      // stripInvisibleChars(=INVISIBLE_CHARS_RE 기반)로 이미 제거해봤을 때 길이가
-      // 줄어들면 숨은 문자가 있었다는 뜻 — g 플래그 정규식을 .test()로 반복 호출하면
-      // lastIndex가 남아 오탐이 생길 수 있어 .replace() 기반 stripInvisibleChars만 쓴다.
-      const invisibleFound = stripInvisibleChars(toTrimmed).length !== toTrimmed.length;
-      const rows = [
-        ['Service ID(저장값)', latestSettings.emailjsServiceId || '(미설정)'],
-        ['Template ID(저장값)', latestSettings.emailjsTemplateId || '(미설정)'],
-        ['Public Key 설정 여부', latestSettings.emailjsPublicKey ? '설정됨' : '(미설정)'],
-        ['받는사람 원본 길이', String(toRaw.length)],
-        ['받는사람 정제 후(trim+숨은문자 제거) 길이', String(toClean.length)],
-        ['숨은 문자(제로폭 등) 발견 여부', invisibleFound ? '있음 — 제거됨' : '없음'],
-        ['받는사람 형식 검증(정제 후)', toEmailValid ? '통과' : '실패'],
-        ['실제 전달 파라미터 to_email', params.to_email || '(비어있음)'],
-        ['실제 전달 파라미터 cc_email', params.cc_email || '(비어있음)'],
-        ['실제 전달 파라미터 reply_to', params.reply_to || '(비어있음)'],
-        ['실제 전달 파라미터 from_name', params.from_name || '(비어있음)'],
-        ['실제 전달 파라미터 subject 길이', String(params.subject.length) + '자']
-      ];
-      const diagText = rows.map(([k,v])=> `${k}: ${v}`).join('\n');
       panel.style.display = 'block';
-      panel.innerHTML = `
-        <div class="mail-diag-title">연결 진단 결과 <span class="mail-diag-hint">(실제 메일은 보내지 않았습니다)</span></div>
-        <table class="mail-diag-table">${rows.map(([k,v])=> `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table>
-        <button type="button" class="co-text-action" id="mailDiagCopyBtn">진단 결과 복사</button>
-        <span id="mailDiagCopyMsg" class="mail-diag-copy-msg"></span>
-      `;
-      document.getElementById('mailDiagCopyBtn').addEventListener('click', ()=>{
-        const msgEl = document.getElementById('mailDiagCopyMsg');
-        const done = (ok)=>{ msgEl.textContent = ok ? '복사됨' : '복사 실패 — 직접 선택해 복사해주세요.'; setTimeout(()=>{ msgEl.textContent=''; }, 2000); };
-        if(navigator.clipboard && navigator.clipboard.writeText){
-          navigator.clipboard.writeText(diagText).then(()=> done(true)).catch(()=> done(false));
-        } else done(false);
-      });
+      panel.innerHTML = '<div class="mail-diag-title">연결 진단 중…</div>';
+      panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
+      diagBtn.disabled = true;
+      diagBtn.textContent = '진단 중...';
+      try{
+        const latestSettings = D.loadMailSettings();
+        const toClean = stripInvisibleChars(document.getElementById('mailComposeTo').value).trim();
+        const ready = validateMailConnection(latestSettings, toClean);
+        let sdkOk = false;
+        let sdkError = null;
+        try{
+          const sdk = await loadEmailJsSdk();
+          sdkOk = !!(sdk && typeof sdk.send === 'function');
+          if(!sdkOk) sdkError = new Error('EmailJS SDK에 send 함수가 없습니다.');
+        }catch(err){ sdkError = err; }
+        console.info('[EMAIL-DIAG] SDK: ' + (sdkOk ? 'OK' : 'FAIL'));
+        console.info('[EMAIL-DIAG] settings: ' + (ready.valid ? 'OK' : 'FAIL'));
+        const checks = [
+          { ok:sdkOk, label:'EmailJS SDK', error:sdkError ? (sdkError.message || String(sdkError)) : '' },
+          { ok:!ready.emailJsValidation.errors.emailjsPublicKey, label:'Public Key 로컬 형식', okText:`형식 정상 · ${ready.emailJsValidation.values.emailjsPublicKey.length}자 (서버 유효성은 발송 응답에서 확인)`, error:ready.emailJsValidation.errors.emailjsPublicKey || '' },
+          { ok:!ready.emailJsValidation.errors.emailjsServiceId, label:'Service ID 설정', error:ready.emailJsValidation.errors.emailjsServiceId || '' },
+          { ok:!ready.emailJsValidation.errors.emailjsTemplateId, label:'Template ID 설정', error:ready.emailJsValidation.errors.emailjsTemplateId || '' },
+          { ok:!!ready.fromName && !!ready.fromEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ready.fromEmail), label:'보내는사람 설정', error:ready.errors.find(msg=> msg.indexOf('보내는사람') === 0) || '' },
+          { ok:!!ready.recipient && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ready.recipient), label:'받는사람 설정', error:ready.errors.find(msg=> msg.indexOf('받는사람') === 0) || '' }
+        ];
+        const allOk = checks.every(item=> item.ok);
+        const rows = checks.map(item=> [item.ok ? '✓' : '✕', item.label, item.ok ? (item.okText || '정상') : (item.error || '확인 필요')]);
+        const diagText = [allOk ? '연결 진단 완료' : '연결 진단 실패'].concat(rows.map(([mark,label,value])=> `${mark} ${label}: ${value}`)).join('\n');
+        panel.innerHTML = `
+          <div class="mail-diag-title">${allOk ? '연결 진단 완료' : '연결 진단 실패'} <span class="mail-diag-hint">(실제 메일은 보내지 않았습니다)</span></div>
+          <table class="mail-diag-table">${rows.map(([mark,label,value])=> `<tr><td>${mark}</td><td>${esc(label)}</td><td>${esc(value)}</td></tr>`).join('')}</table>
+          <button type="button" class="co-text-action" id="mailDiagCopyBtn">진단 결과 복사</button>
+          <span id="mailDiagCopyMsg" class="mail-diag-copy-msg"></span>
+        `;
+        document.getElementById('mailDiagCopyBtn').addEventListener('click', ()=>{
+          const msgEl = document.getElementById('mailDiagCopyMsg');
+          const done = (ok)=>{ msgEl.textContent = ok ? '복사됨' : '복사 실패 — 직접 선택해 복사해주세요.'; setTimeout(()=>{ msgEl.textContent=''; }, 2000); };
+          if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(diagText).then(()=> done(true)).catch(()=> done(false));
+          else done(false);
+        });
+      }catch(err){
+        console.info('[EMAIL-DIAG] SDK: FAIL');
+        console.info('[EMAIL-DIAG] settings: FAIL');
+        panel.innerHTML = `<div class="mail-diag-title">연결 진단 실패</div><div class="mail-compose-warn">${esc(emailJsErrorMessage(err))}</div>`;
+      }finally{
+        diagBtn.disabled = false;
+        diagBtn.textContent = diagBtnOriginalText;
+        panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
+      }
     });
-    sendBtn.addEventListener('click', ()=>{
+    sendBtn.addEventListener('click', (event)=>{
+      event.preventDefault();
+      event.stopPropagation();
+      console.info('[EMAIL-SEND] click');
       if(questionnaireBlocked) return; // 방어적 재확인 — disabled 속성이 이미 클릭 자체를 막는다.
       const statusEl = document.getElementById('mailComposeStatus');
-      const validation = D.validateEmailJsSettings(D.loadMailSettings());
-      if(!validation.valid){
-        statusEl.textContent = Object.values(validation.errors).join(' ');
-        statusEl.classList.add('is-err');
-        return;
-      }
-      statusEl.textContent = '';
-      statusEl.classList.remove('is-err');
       // §수신자 주소 오류 조사 라운드 — 형식 검사 전에 제로폭 문자류를 먼저 제거한다.
       // 화면에는 정상으로 보여도 이 문자가 섞여 있으면 정규식(\s 기준)과 .trim()을 둘 다
       // 통과해 그대로 EmailJS로 전달되던 문제를 막는다(위 stripInvisibleChars 참고).
       const toEmail = stripInvisibleChars(document.getElementById('mailComposeTo').value.trim());
-      if(!toEmail){ statusEl.textContent = '받는사람 이메일을 입력해주세요.'; statusEl.classList.add('is-err'); return; }
-      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)){ statusEl.textContent = '받는사람 이메일 형식을 확인해주세요.'; statusEl.classList.add('is-err'); return; }
+      const ready = validateMailConnection(D.loadMailSettings(), toEmail);
+      if(!ready.valid){
+        console.info('[EMAIL-SEND] validation: FAIL');
+        statusEl.textContent = ready.errors.join(' ');
+        statusEl.classList.add('is-err');
+        return;
+      }
       const ccRaw = document.getElementById('mailComposeCc').value.trim();
       const ccEmails = ccRaw ? ccRaw.split(',').map(s=> stripInvisibleChars(s.trim())).filter(Boolean) : [];
       const badCc = ccEmails.find(e=> !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
-      if(badCc){ statusEl.textContent = `참조 이메일 형식을 확인해주세요: ${badCc}`; statusEl.classList.add('is-err'); return; }
+      if(badCc){ console.info('[EMAIL-SEND] validation: FAIL'); statusEl.textContent = `참조 이메일 형식을 확인해주세요: ${badCc}`; statusEl.classList.add('is-err'); return; }
+      console.info('[EMAIL-SEND] validation: PASS');
+      statusEl.textContent = '';
+      statusEl.classList.remove('is-err');
       // §요청 [6] 수신거부 업체 발송 경고 — 명시적 확인 없이는 보내지 않는다.
       if(co.mailOptOut && !confirm(`${co.name}은(는) 메일 수신거부 상태입니다. 그래도 발송하시겠습니까?`)) return;
       openMailFinalConfirmModal({
@@ -17507,9 +17590,31 @@ window.SHIN2_CRM_APP_INIT = function(){
     function closeConfirm(){ const el = document.getElementById('mailFinalConfirmOverlay'); if(el) el.remove(); }
     document.getElementById('mailFinalCancelBtn').addEventListener('click', closeConfirm);
     bindSafeBackdropClose(document.getElementById('mailFinalConfirmOverlay'), closeConfirm);
-    document.getElementById('mailFinalSendBtn').addEventListener('click', ()=>{
-      closeConfirm();
-      info.onConfirm();
+    document.getElementById('mailFinalSendBtn').addEventListener('click', async (event)=>{
+      event.preventDefault();
+      event.stopPropagation();
+      const finalBtn = event.currentTarget;
+      const cancelBtn = document.getElementById('mailFinalCancelBtn');
+      finalBtn.disabled = true;
+      finalBtn.textContent = '발송 중...';
+      if(cancelBtn) cancelBtn.disabled = true;
+      try{
+        const result = await info.onConfirm();
+        closeConfirm();
+        if(!result || !result.ok){
+          const composeSendBtn = document.getElementById('mailComposeSendBtn');
+          if(composeSendBtn) composeSendBtn.focus();
+        }
+      }catch(err){
+        console.error('[EMAIL-SEND] request failed', { message:err && err.message ? String(err.message) : '알 수 없는 오류' });
+        closeConfirm();
+        const statusEl = document.getElementById('mailComposeStatus');
+        const status = err && err.status != null ? `EmailJS ${err.status}: ` : 'EmailJS: ';
+        const detail = err && (err.text || err.message) ? String(err.text || err.message) : '알 수 없는 오류';
+        if(statusEl){ statusEl.classList.add('is-err'); statusEl.textContent = '메일 발송 실패 · ' + status + detail; }
+        const composeSendBtn = document.getElementById('mailComposeSendBtn');
+        if(composeSendBtn){ composeSendBtn.disabled = false; composeSendBtn.textContent = '메일 발송'; }
+      }
     });
   }
   // §업무관리 탭 1차 구축 라운드 §1/§2 — 세 최상위 view(listView/cardView/workQueueView)
