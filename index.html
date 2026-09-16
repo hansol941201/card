@@ -4426,6 +4426,10 @@ window.SHIN2_CRM_OCR = (function(){
           try{ localRev = parseInt(localStorage.getItem(docSyncLocalRevKey()) || '0', 10) || 0; }catch(e){}
           const snapRev = (typeof payload.localRev === 'number') ? payload.localRev : 0;
           if(localRev && localRev > snapRev) return; // 이 기기의 아직 반영 안 된 최신 변경(삭제 포함)을 되돌리지 않는다.
+          // 이 기기에서 이미 낙관적으로 localStorage에 반영한 저장의 확인 스냅샷은 같은
+          // localRev로 돌아온다. 데이터가 이미 같으므로 전체 documents 배열을 다시
+          // stringify하고 서류 목록 7종을 다시 그리는 이벤트를 발생시키지 않는다.
+          if(localRev && snapRev === localRev) return;
           try{ localStorage.setItem(DOC_SYNC_STORAGE_KEY, JSON.stringify(payload.value)); }catch(e){}
           window.dispatchEvent(new CustomEvent('shin2-crm-docs-cloud-update'));
         }, (err)=> console.warn('[CRM/Firebase] 서류함 메타데이터 구독 실패', err));
@@ -5383,7 +5387,9 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   function writeArr(key, arr, opts){
     opts = opts || {};
     if(!Array.isArray(arr)){ storageProblem('저장하려는 값이 목록 형식이 아닙니다(' + key + ')'); return false; }
-    var have = diskArrLen(key);
+    // 호출부가 방금 같은 배열을 정상 파싱한 직후라면 그 길이를 재사용해 대용량 배열을
+    // 저장 직전에 다시 JSON.parse하지 않는다. 값이 없을 때는 기존 보호 검사를 그대로 쓴다.
+    var have = Number.isInteger(opts.knownExistingLength) ? opts.knownExistingLength : diskArrLen(key);
     if(have === -1){
       // 기존 값이 있는데 읽지 못하는 상태. 여기서 덮어쓰면 복구 단서까지 사라진다.
       storageProblem('기존 데이터를 읽지 못해 덮어쓰기를 막았습니다(' + key + ')');
@@ -5917,10 +5923,13 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   // 전달자" 경로에 의존하지 않고 이 함수를 호출하는 모든 지점(추가/이름변경/메모/삭제/
   // 공용전환)에서 항상 직접 동기화된다.
   function saveDocuments(list, opts){
+    opts = opts || {};
     // 로컬 저장이 막히거나 실패했으면 클라우드로도 내보내지 않는다 — 로컬과 클라우드가
     // 어긋난 상태(로컬은 옛 값, 클라우드는 새 값)를 만드는 것이 유실을 키웠다.
     if(!writeArr(DOC_KEY, list, opts)) return false;
-    try{ if(window.SHIN2_CRM_DOCS_SYNC && window.SHIN2_CRM_DOCS_SYNC.push) window.SHIN2_CRM_DOCS_SYNC.push(list); }catch(e){}
+    if(!opts.skipCloudPush){
+      try{ if(window.SHIN2_CRM_DOCS_SYNC && window.SHIN2_CRM_DOCS_SYNC.push) window.SHIN2_CRM_DOCS_SYNC.push(list); }catch(e){}
+    }
     return true;
   }
   function documentsForCompany(companyId, type){
@@ -6164,6 +6173,27 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     const list = loadDocuments(); const rec = list.find(d=> d.id===id); if(!rec) return;
     rec.qaAnswers = Object.assign({}, rec.qaAnswers || {}, qaAnswers || {});
     rec.updatedAt = nowIso(); saveDocuments(list);
+  }
+  // 질문지 상담 자동 저장 전용 묶음 갱신. 예전에는 qaAnswers와 memo를 각각 저장해
+  // documents 전체 배열을 두 번 parse/stringify했다. 한 번 읽어 두 필드를 함께 바꾸며,
+  // 내용이 같으면 어떤 로컬/클라우드 저장도 만들지 않는다. 호출부가 같은 배열로 즉시
+  // 클라우드 저장을 확인하므로 여기서는 500ms 예약 push도 만들지 않는다.
+  function setDocumentConsultation(id, memo, qaAnswers){
+    const list = loadDocuments();
+    const rec = list.find(d=> d.id===id);
+    if(!rec) return { ok:false, changed:false, reason:'NOT_FOUND' };
+    const nextMemo = memo || '';
+    const nextQa = Object.assign({}, rec.qaAnswers || {}, qaAnswers || {});
+    const sameMemo = (rec.memo || '') === nextMemo;
+    const prevQa = rec.qaAnswers || {};
+    const qaKeys = new Set(Object.keys(prevQa).concat(Object.keys(nextQa)));
+    const sameQa = Array.from(qaKeys).every(key=> (prevQa[key] || '') === (nextQa[key] || ''));
+    if(sameMemo && sameQa) return { ok:true, changed:false, rec, list };
+    rec.memo = nextMemo;
+    rec.qaAnswers = nextQa;
+    rec.updatedAt = nowIso();
+    const ok = saveDocuments(list, { skipCloudPush:true, knownExistingLength:list.length });
+    return { ok, changed:ok, rec, list, reason:ok ? null : 'LOCAL_SAVE_FAILED' };
   }
   // §협약서류 체크리스트 라운드(신규) — 사용자 확정 지시 [3]: verificationStatus 등
   // 신규 메타데이터를 문서 레코드에 얹는다(새 저장소 아님, 기존 documents 배열의 필드만
@@ -8338,7 +8368,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     loadActivities, addActivity, updateActivityText, deleteActivity, activitiesForCompany, classifyActivity, buildActivitiesIndex,
     loadSheetRequests, buildSheetRequestsIndex, latestSheetRequestForCompany,
     loadCaseByCaseCompanies, loadExclusionAudit, caseByCaseIdForNormName, exclusionIdForNormName, findCaseByCaseByNormName, findCaseByCaseById, isUserExcludedNormName,
-    loadDocuments, documentsForCompany, buildDocumentsIndex, addDocument, updateDocumentExtracted, getBlob, getLocalDocFile, renameDocument, setDocumentMemo, setDocumentQaAnswers, setDocumentVerification, deleteDocument, findDocument, migrateDocumentToCloud,
+    loadDocuments, documentsForCompany, buildDocumentsIndex, addDocument, updateDocumentExtracted, getBlob, getLocalDocFile, renameDocument, setDocumentMemo, setDocumentQaAnswers, setDocumentConsultation, setDocumentVerification, deleteDocument, findDocument, migrateDocumentToCloud,
     loadMemos, memosFor, addMemo, updateMemo, deleteMemo, buildMemosIndex,
     pendingActivitiesForCompany, tasksForCompany, calendarEventsForCompany, upcomingCalendarEventsForCompany,
     DEAL_STAGES, setDealStage, setAssigneeUserId, addNeed, removeNeed, dismissNeedSuggestion, addSpecialNote, removeSpecialNote, setImportant, suggestNeedFor,
@@ -8821,10 +8851,10 @@ window.SHIN2_CRM_APP_INIT = function(){
   }
   // customerDocuments(서류함)는 SHARED_ARRAY_KEYS와 별개인 자체 동기화 경로다(§조사
   // 결과 — 회사 전체가 공유하는 서류함이라 v2 시절부터 항상 로그인만 되면 바로 동기화).
-  async function confirmDocsCloudSave(){
+  async function confirmDocsCloudSave(documents){
     try{
       if(!window.SHIN2_CRM_DOCS_SYNC || !window.SHIN2_CRM_DOCS_SYNC.pushAsync) throw new Error('SYNC_UNAVAILABLE');
-      await window.SHIN2_CRM_DOCS_SYNC.pushAsync(D.loadDocuments());
+      await window.SHIN2_CRM_DOCS_SYNC.pushAsync(documents || D.loadDocuments());
       return { ok:true };
     }catch(err){ return { ok:false, err }; }
   }
@@ -13374,11 +13404,10 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 로직 없음). 문서가 여러 건이면 questionnaireWorkHtml과 동일하게 docs[0](가장 최근
   // 등록·교체된 것) 하나만 본다. 문항 텍스트/라벨은 QUESTIONNAIRE_SESSION_QUESTIONS
   // 상수를 그대로 읽어 한 글자도 새로 하드코딩하지 않는다.
-  function renderQuestionnaireSummaryCard(co){
+  function renderQuestionnaireSummaryCard(co, questionnaireDoc){
     const wrap = document.getElementById('cdashQuestionnaireCard');
     if(!wrap) return;
-    const docs = D.documentsForCompany(co.id, 'questionnaire');
-    const doc = docs[0];
+    const doc = questionnaireDoc || D.documentsForCompany(co.id, 'questionnaire')[0];
     const qa = (doc && doc.qaAnswers) || {};
     const answered = QUESTIONNAIRE_SESSION_QUESTIONS.filter(q=> String(qa[q.key] || '').trim());
     const openBtnHtml = doc ? `<button type="button" class="co-text-action" id="cdashQuestionnaireOpenBtn" style="font-size:11px;padding:2px 8px;white-space:nowrap;">질문지 상담 기록 열기</button>` : '';
@@ -18416,36 +18445,144 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 다름, cardView 자체는 그대로 살아있음) 닫힐 때 현재 열려있는 고객카드가 같은
     // 업체라면 "질문지 상담 요약" 카드만 다시 그려 최신 qaAnswers를 즉시 반영한다(카드
     // 전체를 새로고침하지 않음 — 새 재조회 로직 없이 기존 renderQuestionnaireSummaryCard 재사용).
-    const refreshSummaryCard = ()=>{
+    const refreshSummaryCard = (questionnaireDoc)=>{
       if(currentCompanyId === companyId){
-        const freshCo = D.findCompany(companyId);
-        if(freshCo) renderQuestionnaireSummaryCard(freshCo);
+        renderQuestionnaireSummaryCard(co, questionnaireDoc);
       }
     };
-    const close = ()=>{ closeQuestionnaireSession(); refreshSummaryCard(); };
+    let flushPendingSave = ()=> false;
+    const close = ()=>{
+      const saving = flushPendingSave();
+      closeQuestionnaireSession();
+      if(!saving) refreshSummaryCard();
+    };
     document.getElementById('questionnaireSessionClose').addEventListener('click', close);
     bindSafeBackdropClose(document.getElementById('questionnaireSessionOverlay'), close);
-    const save = async ()=>{
-      const btn = document.getElementById('questionnaireMemoSave');
-      const text = document.getElementById('questionnaireConsultationMemo').value.trim();
+    // 상담 입력은 DOM에 즉시 반영하고, 650ms 동안 추가 입력이 없을 때 한 번만 저장한다.
+    // Firestore 요청 중 새 입력이 생기면 진행 중인 요청을 기다린 뒤 최신 스냅샷만 이어서
+    // 저장해 이전 응답이 최신 입력을 최종값으로 덮지 못하게 한다.
+    const saveBtn = document.getElementById('questionnaireMemoSave');
+    const noteScroll = document.getElementById('questionnaireNoteScroll');
+    const saveStatus = document.getElementById('questionnaireSaveStatus');
+    const normalizeQaAnswers = (source)=>{
       const qaAnswers = {};
-      document.querySelectorAll('.questionnaire-qa-answer').forEach(ta=>{
+      QUESTIONNAIRE_SESSION_QUESTIONS.forEach(q=>{
+        qaAnswers[q.key] = String((source && source[q.key]) || '').trim();
+      });
+      return qaAnswers;
+    };
+    const readDraft = ()=>{
+      const qaAnswers = {};
+      noteScroll.querySelectorAll('.questionnaire-qa-answer').forEach(ta=>{
         qaAnswers[ta.getAttribute('data-qa-key')] = ta.value.trim();
       });
-      const status = document.getElementById('questionnaireSaveStatus');
-      btn.disabled = true; status.textContent = '저장 중…';
-      D.setDocumentQaAnswers(doc.id, qaAnswers);
-      D.setDocumentMemo(doc.id, text);
-      refreshSummaryCard(); // §질문지 상담 기록 요약 라운드: 팝업을 닫기 전에도 카드 요약이 바로 최신값을 보여준다.
-      const r = await confirmDocsCloudSave();
-      btn.disabled = false;
-      status.textContent = r.ok ? `저장됨 · ${fmtDate(new Date())}` : '이 기기에는 저장됨 · 클라우드 저장 확인 실패';
-      if(!r.ok) status.title = cloudSaveErrorMessage(r.err);
-      showMiniSaveToast(r.ok ? '저장됨' : '이 기기에만 저장됨');
+      return {
+        memo: document.getElementById('questionnaireConsultationMemo').value.trim(),
+        qaAnswers: normalizeQaAnswers(qaAnswers)
+      };
     };
-    document.getElementById('questionnaireMemoSave').addEventListener('click', save);
-    document.getElementById('questionnaireNoteScroll').addEventListener('keydown', e=>{
-      if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){ e.preventDefault(); save(); }
+    const draftSignature = draft=> JSON.stringify([
+      draft.memo,
+      QUESTIONNAIRE_SESSION_QUESTIONS.map(q=> draft.qaAnswers[q.key] || '')
+    ]);
+    const initialDraft = { memo:(doc.memo || '').trim(), qaAnswers:normalizeQaAnswers(doc.qaAnswers || {}) };
+    let lastSavedSignature = draftSignature(initialDraft);
+    let pendingDraft = initialDraft;
+    let pendingSignature = lastSavedSignature;
+    let editRevision = 0;
+    let debounceTimer = null;
+    let statusHideTimer = null;
+    let inFlight = null;
+    const setSaveStatus = (text, isError)=>{
+      const el = document.getElementById('questionnaireSaveStatus');
+      if(!el) return;
+      el.textContent = text;
+      el.style.color = isError ? '#B3261E' : '';
+      if(!isError) el.title = '';
+    };
+    const showSavedStatus = (revision)=>{
+      setSaveStatus('저장됨');
+      clearTimeout(statusHideTimer);
+      statusHideTimer = setTimeout(()=>{
+        if(editRevision === revision && !inFlight) setSaveStatus('이 질문지에 함께 저장됩니다');
+      }, 1500);
+    };
+    const persistLatest = ()=>{
+      if(inFlight) return inFlight;
+      const draft = pendingDraft;
+      const signature = pendingSignature;
+      const revision = editRevision;
+      if(signature === lastSavedSignature){
+        showSavedStatus(revision);
+        return Promise.resolve({ ok:true, skipped:true });
+      }
+      clearTimeout(debounceTimer); debounceTimer = null;
+      clearTimeout(statusHideTimer);
+      setSaveStatus('저장 중…');
+      const requestStarted = performance.now();
+      console.info('[MEMO-SAVE] request start');
+      inFlight = (async ()=>{
+        const localStarted = performance.now();
+        const localResult = D.setDocumentConsultation(doc.id, draft.memo, draft.qaAnswers);
+        if(!localResult || !localResult.ok) throw new Error((localResult && localResult.reason) || 'LOCAL_SAVE_FAILED');
+        console.info(`[MEMO-SAVE] local complete: ${Math.round(performance.now() - localStarted)}ms`);
+        const renderStarted = performance.now();
+        refreshSummaryCard(localResult.rec);
+        console.info(`[MEMO-SAVE] render: ${Math.round(performance.now() - renderStarted)}ms`);
+        const cloudResult = await confirmDocsCloudSave(localResult.list);
+        if(!cloudResult.ok) throw cloudResult.err || new Error('CLOUD_SAVE_FAILED');
+        lastSavedSignature = signature;
+        console.info(`[MEMO-SAVE] request complete: ${Math.round(performance.now() - requestStarted)}ms`);
+        if(pendingSignature === signature){
+          showSavedStatus(revision);
+          showMiniSaveToast('저장됨');
+        }
+        return { ok:true };
+      })().catch(err=>{
+        console.warn(`[MEMO-SAVE] request failed: ${Math.round(performance.now() - requestStarted)}ms`);
+        if(pendingSignature === signature){
+          setSaveStatus('저장 실패 - 다시 시도', true);
+          if(saveStatus) saveStatus.title = cloudSaveErrorMessage(err);
+          showMiniSaveToast('저장 실패 - 다시 시도');
+        }
+        return { ok:false, err };
+      }).finally(()=>{
+        inFlight = null;
+        if(pendingSignature !== signature) persistLatest();
+      });
+      return inFlight;
+    };
+    const queueSave = (immediate)=>{
+      const draft = readDraft();
+      const signature = draftSignature(draft);
+      const samePending = signature === pendingSignature;
+      pendingDraft = draft;
+      pendingSignature = signature;
+      if(!samePending) editRevision++;
+      clearTimeout(statusHideTimer);
+      if(signature === lastSavedSignature && !inFlight){
+        clearTimeout(debounceTimer); debounceTimer = null;
+        setSaveStatus('저장됨');
+        return false;
+      }
+      if(inFlight) return true;
+      if(immediate){ persistLatest(); return true; }
+      if(samePending && debounceTimer) return true;
+      clearTimeout(debounceTimer);
+      setSaveStatus('변경사항 저장 대기…');
+      console.info('[MEMO-SAVE] debounce start');
+      debounceTimer = setTimeout(persistLatest, 650);
+      return true;
+    };
+    flushPendingSave = ()=> queueSave(true);
+    const handleDraftChange = e=>{
+      if(e.target.matches('.questionnaire-qa-answer, #questionnaireConsultationMemo')) queueSave(false);
+    };
+    noteScroll.addEventListener('input', handleDraftChange);
+    noteScroll.addEventListener('change', handleDraftChange);
+    saveBtn.addEventListener('click', ()=> queueSave(true));
+    noteScroll.addEventListener('keydown', e=>{
+      if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){ e.preventDefault(); queueSave(true); }
     });
     const isImage = (doc.mimeType || '').startsWith('image/');
     const isPdf = (doc.mimeType || '') === 'application/pdf';
