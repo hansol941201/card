@@ -641,8 +641,13 @@
   .workq-co-link{ background:none; border:none; padding:0; font:inherit; font-weight:700; color:var(--navy); cursor:pointer; }
   .workq-co-link:hover{ text-decoration-style:solid; }
   /* §단계 진행상황 이전 라운드 — 고객관리 목록에서 옮겨온 4단계 stepper 칸. 너무 넓게
-     늘어나지 않도록 폭만 제한(.stage-stepper 자체 스타일은 그대로 재사용). */
-  .workq-stage-progress{ width:150px; min-width:130px; }
+     늘어나지 않도록 폭만 제한(.stage-stepper 자체 스타일은 그대로 재사용).
+     §라벨 겹침 수정 라운드(신규) — 폭이 130~150px일 때 "질문서/1차미팅/2차미팅/MOU"
+     4개 라벨(.stage-step-label, white-space:nowrap)이 각자의 flex 칸보다 넓어 옆 라벨과
+     겹쳐 보이는 버그(§요청 "글씨가 서로 엉겨")가 있었다. 표가 5열→4열로 줄면서 생긴
+     여유 폭을 이 칸에 배정해 겹침을 없앤다(라벨 텍스트/계산 로직은 그대로, 폭만 확장). */
+  .workq-stage-progress{ width:220px; min-width:200px; }
+  .workq-stage-progress .stage-step-label{ white-space:normal; line-height:1.25; text-align:center; }
   .workq-reason{ color:var(--text-muted); font-size:12px; }
   .workq-days{ white-space:nowrap; font-variant-numeric:tabular-nums; }
   /* §P1-2 업무관리 표 열 압축 라운드 — "현재 상태"/"관리 이유" 배지(단계 진행상황 열 안),
