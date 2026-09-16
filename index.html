@@ -12099,8 +12099,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     }) : analysis.rows;
 
     const filtered = l2l3SubFilter === 'all' ? searched : searched.filter(it=> it.bucket === l2l3SubFilter);
+    // §요청 "전환일 있는 업체 먼저 보이는 목록으로 변경" — 전환 완료(converted, 최초 L3
+    // 전환일이 채워진 버킷)를 맨 위로 올린다. 버킷 판정 로직 자체(computeL2L3ManageAnalysis)는
+    // 전혀 안 건드리고, 이 목록의 정렬 우선순위만 바꾼다.
     filtered.sort((a,b)=>{
-      const bucketOrder = { needsAttention:0, observing:1, converted:2 };
+      const bucketOrder = { converted:0, needsAttention:1, observing:2 };
       const oa = bucketOrder[a.bucket], ob = bucketOrder[b.bucket];
       if(oa !== ob) return oa - ob;
       const da = a.days == null ? -1 : a.days, db = b.days == null ? -1 : b.days;
