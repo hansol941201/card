@@ -747,16 +747,27 @@
      시작 위치가 동일하다(§4 "정렬 통일"). 첫 줄(연도·공종)/둘째 줄(현장명) 2줄 고정, 첫
      줄은 진한 텍스트·둘째 줄은 연한 회색(§4). */
   .col-pour{ flex:0 0 150px; min-width:0; font-size:12px; }
+  /* §B 총 실적 박스 분리 라운드(신규) — 진단 보고서 B: "132 2026·슬라브"처럼 총 실적
+     숫자(파란색)가 연도/공종 텍스트와 한 줄에 붙어 헷갈리던 문제. .lastpour-cell을
+     세로 1열 텍스트에서 가로 flex(박스 + 상세)로 바꾼다. 계산값(yr/latestPourRec)·
+     클릭 핸들러(data-pour-detail)는 전혀 안 건드리고 마크업 구조와 스타일만 바꾼다. */
   .lastpour-cell{
-    display:flex; flex-direction:column; gap:1px; line-height:1.3; min-width:0; max-width:100%; text-align:left;
+    display:flex; flex-direction:row; align-items:center; gap:14px; min-width:0; max-width:100%; text-align:left;
     background:none; border:none; padding:0; cursor:pointer; font-family:inherit; width:100%;
   }
   .lastpour-cell.lastpour-empty{ cursor:default; }
+  .lastpour-detail{ display:flex; flex-direction:column; gap:1px; line-height:1.3; min-width:0; flex:1 1 auto; }
   .lastpour-cell .lastpour-main{ font-weight:700; color:var(--text); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .lastpour-cell:hover:not(.lastpour-empty) .lastpour-main{ text-decoration:underline; }
   .lastpour-cell .lastpour-site{ color:var(--text-faint); font-weight:400; font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  /* §최근 실적·총 실적 병합 라운드(신규) — 총 실적 건수를 연도 앞에 파란색으로. */
-  .lastpour-total-count{ color:var(--blue); font-weight:800; }
+  /* 총 실적 박스 — width~76px, 옅은 파란 배경/테두리, 상단 라벨(작게)+하단 숫자(굵고 크게, 파랑). */
+  .lastpour-total-box{
+    flex:0 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    width:76px; min-width:76px; padding:6px 4px; border-radius:7px;
+    border:1px solid #C7DBFA; background:#F1F6FF; line-height:1.25;
+  }
+  .lastpour-total-label{ font-size:10.5px; font-weight:600; color:var(--navy); }
+  .lastpour-total-num{ font-size:17px; font-weight:800; color:var(--blue); }
   .col-stage{ flex:0 0 112px; font-size:12px; white-space:nowrap; } /* 더 이상 목록에 렌더링하지 않지만 클래스는 남겨둔다 */
   /* "최근 요청" 컬럼 — 첫 줄(작은 날짜)/둘째 줄(요청 내용), §10. */
   .col-request{ flex:0 0 150px; min-width:0; font-size:12px; }
@@ -2975,7 +2986,12 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .mail-preview-body{ font-size:12.5px; color:var(--text); white-space:pre-wrap; line-height:1.5; margin-bottom:6px; }
 /* §본문 이미지 첨부 라운드(신규) */
 .mail-body-toolbar{ display:flex; align-items:center; gap:10px; margin-bottom:6px; flex-wrap:wrap; }
-.mail-body-editor{ min-height:220px; max-height:480px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:12px 14px; font-size:14px; line-height:1.7; color:var(--text); background:#fff; font-family:inherit; }
+/* §A-5 본문 편집기 폭/높이 라운드(신규) — 진단 보고서 A-5: 편집기 높이가 min-height
+   220px로 낮아 PC 화면에서도 본문을 몇 줄만 써도 스크롤이 생기던 문제. 좌측 컬럼이
+   이미 minmax(0,1fr)로 넓게 잡혀 있어(§메일 설정 2열 레이아웃 라운드) 폭은 그대로
+   따라가고, 높이만 430~500px 권장 구간으로 올린다(내부 스크롤은 유지 — max-height
+   상한도 함께 올려 한 화면에서 훨씬 더 많은 본문이 보이게 한다). */
+.mail-body-editor{ min-height:460px; max-height:680px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:12px 14px; font-size:14px; line-height:1.7; color:var(--text); background:#fff; font-family:inherit; }
 /* §메일 설정 보기편한형태 라운드(신규) — 붙여넣기 등으로 본문에 남아있는 형광펜류
    배경 하이라이트(노란색)의 출처는 사용자가 직접 입력/붙여넣은 인라인 스타일이고
    앱이 어떤 서류명을 자동으로 강조하는 로직은 이 파일 어디에도 없다(§확인 완료 —
@@ -3454,6 +3470,56 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .list-filter-link .link-count{ font-size:10.5px!important; color:var(--text-faint)!important; font-weight:600!important; }
 .list-filter-link .link-dot{ width:6px!important; height:6px!important; border-radius:50%!important; background:#D6483F!important; display:inline-block!important; margin-left:1px; }
 
+/* §P2 보조 필터 원형 버튼 + 팝오버 라운드(신규) — "분석"/"정리" 6개 항목을 텍스트
+   링크로 항상 노출하는 대신 작은 원형 버튼 하나로 접어 넣는다. #crmFilterRow로
+   범위를 제한해 다른 화면(업무관리 탭 등)의 동일 클래스 재사용과 겹치지 않게 한다.
+   기능(클릭 시 실행되는 필터/카운트 계산)은 전혀 안 건드리고 배치·스타일만 다룬다. */
+/* §삭제 업체 휴지통 분리 라운드(신규) — 더보기 원형 버튼과 같은 크기/톤의 독립
+   휴지통 아이콘. 미선택 시 회색/연회색(경고색 아님 — 삭제 자체가 위험 동작이 아니라
+   이미 삭제된 걸 보는 화면), 선택(현재 이 필터 보는 중) 시 파란 강조. */
+#crmFilterRow .list-filter-trash-btn{
+  position:relative!important; width:32px!important; height:32px!important; border-radius:50%!important;
+  display:inline-flex!important; align-items:center!important; justify-content:center!important;
+  border:1.3px solid #B9C7DE!important; background:#FAFBFE!important; color:#6B7A93!important;
+  cursor:pointer!important; padding:0!important; box-shadow:none!important; transition:background .12s,border-color .12s,color .12s!important;
+}
+#crmFilterRow .list-filter-trash-btn:hover{ background:#E7F0FF!important; border-color:var(--blue)!important; color:var(--navy)!important; }
+#crmFilterRow .list-filter-trash-btn.is-active{ background:#E7F0FF!important; border-color:var(--navy)!important; color:var(--navy)!important; }
+#crmFilterRow .list-filter-trash-btn .trash-btn-count{
+  position:absolute!important; top:-5px!important; right:-5px!important; min-width:16px!important; height:16px!important;
+  padding:0 3px!important; border-radius:8px!important; background:var(--navy)!important; color:#fff!important;
+  font-size:9.5px!important; font-weight:700!important; line-height:16px!important; text-align:center!important;
+}
+#crmFilterRow .list-filter-more{ position:relative!important; display:inline-flex!important; }
+#crmFilterRow .list-filter-more-btn{
+  width:32px!important; height:32px!important; border-radius:50%!important;
+  display:inline-flex!important; align-items:center!important; justify-content:center!important;
+  border:1.3px solid #B9C7DE!important; background:#FAFBFE!important; color:var(--navy)!important;
+  cursor:pointer!important; padding:0!important; box-shadow:none!important; transition:background .12s,border-color .12s!important;
+}
+#crmFilterRow .list-filter-more-btn:hover,
+#crmFilterRow .list-filter-more-btn.is-open{ background:#E7F0FF!important; border-color:var(--blue)!important; }
+#crmFilterRow .list-filter-popover{
+  position:absolute!important; top:calc(100% + 6px)!important; right:0!important; left:auto!important;
+  min-width:230px!important; max-width:280px!important; background:#fff!important;
+  border:1px solid var(--line)!important; border-radius:10px!important;
+  box-shadow:0 4px 16px rgba(8,47,103,.12)!important; padding:8px 6px!important; z-index:60!important;
+}
+#crmFilterRow .list-filter-popover.align-right-edge{ right:auto!important; left:0!important; }
+#crmFilterRow .list-filter-popover-label{
+  font-size:10.5px!important; font-weight:700!important; color:var(--text-faint)!important;
+  text-transform:uppercase!important; letter-spacing:.02em!important; padding:6px 8px 2px!important;
+}
+#crmFilterRow .list-filter-popover-item{
+  display:flex!important; width:100%!important; align-items:center!important; justify-content:space-between!important;
+  gap:10px!important; border:none!important; background:none!important; padding:7px 8px!important;
+  border-radius:6px!important; font-size:12.5px!important; font-weight:600!important; color:#26334A!important; cursor:pointer!important; text-align:left!important;
+}
+#crmFilterRow .list-filter-popover-item:hover{ background:#EEF3FC!important; }
+#crmFilterRow .list-filter-popover-item.is-active{ color:var(--navy)!important; font-weight:800!important; background:#E7F0FF!important; }
+#crmFilterRow .list-filter-popover-item .popover-item-count{ font-size:11.5px!important; color:var(--text-faint)!important; font-weight:700!important; }
+#crmFilterRow .list-filter-popover-divider{ height:1px!important; background:var(--line)!important; margin:5px 4px!important; }
+
 /* §P1-1 목록 열 재구성 라운드(신규) — 진단 보고서 P1-1: 9열(가로 스크롤로 마지막 열이
    잘림) → 6열. "고객 성향"은 화면에서 뺐고(insightHtml 계산/고객카드 표시는 그대로),
    "총 매출"+"2026 매출", "실적↔매출"+"최근 흐름"을 각각 한 컬럼으로 합쳤다. 클릭 핸들러/
@@ -3468,8 +3534,20 @@ table.pdf-doc-table thead{ background:var(--bg); }
    §최근 실적·총 실적 병합 라운드(신규) — 두 열(minmax(165px,1fr)+minmax(60px,0.5fr))을
    한 열(minmax(175px,1.4fr), 총 실적 숫자가 앞에 붙어 조금 더 필요해 최소폭도 살짝
    키움)로 합쳐 6열 → 5열이 됐다. */
+/* §P2 컬럼 여백 재조정 라운드(신규) — "최근 실적" 열이 fr 1.4로 잔여 폭 성장분을
+   과도하게 흡수해서(내용은 좌측 정렬 짧은 텍스트라 실제로 채워지지 않음) 열 자체가
+   넓어지고, 그 뒤에 이어지는 "총 매출·2026 매출"/"최근 흐름" 열이 오른쪽으로 밀려
+   보이는 게 원인이었다(§요청 "매출/흐름 정보가 오른쪽으로 몰려 보임"). 열 순서·개수·
+   min-width·내용은 그대로 두고, 성장 비율(fr)만 최근 실적(1.4→0.8)에서 줄여 매출
+   (1→1.25)·흐름(1.1→1.3) 쪽으로 재배분 — 결과적으로 매출 열이 왼쪽으로 당겨진다. */
+/* §B/C 총 실적 박스 도입 후 컬럼 재점검 라운드(신규) — "최근 실적" 셀 내부에 고정폭
+   총 실적 박스(76px)+gap(14px)가 새로 들어가서(§B), 기존 min-width 175px로는 상세
+   텍스트가 너무 좁게 눌렸다(§C-2/C-3 "안 잘림/충분한 폭"). 이 열 min-width만 205px로
+   올리고, 그만큼의 fr 비중은 낮춰(0.8→0.72) "총 매출·2026 매출" 열의 min-width·fr을
+   올려(150→160px, 1.25→1.35) 왼쪽으로 당긴다(§C-1). 열 순서·개수·다른 열 내용은
+   그대로. */
 .co-table-head, .co-row{
-  grid-template-columns: minmax(220px,1.3fr) minmax(140px,0.9fr) minmax(175px,1.4fr) minmax(150px,1fr) minmax(180px,1.1fr) !important;
+  grid-template-columns: minmax(220px,1.2fr) minmax(140px,0.85fr) minmax(205px,0.72fr) minmax(160px,1.35fr) minmax(180px,1.28fr) !important;
   gap:10px !important;
 }
 /* 협력사(업체명) 열 — 이 화면에서 가장 중요한 정보이므로 가장 크고 진하게(§요청). */
@@ -10799,7 +10877,10 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 처리 대기 있으면 빨간 점).
   const FILTER_GROUP_STATE = ['all','agreementInProgress','mouDone','agreementTerminated'];
   const FILTER_GROUP_ANALYSIS = ['newPartner','trendUp','l2l3Manage'];
-  const FILTER_GROUP_CLEANUP = ['subsidiary','deleted','caseByCase'];
+  // §삭제 업체 휴지통 분리 라운드(신규) — "삭제된 업체"만 정리 팝오버에서 빼서 별도
+  // 휴지통 아이콘 버튼으로 뺀다(§요청 "삭제 업체는 따로 빼서 휴지통 아이콘으로"). 나머지
+  // 두 항목(이전 상호/건바이건 업체)은 그대로 팝오버 "정리" 그룹에 남긴다.
+  const FILTER_GROUP_CLEANUP = ['subsidiary','caseByCase'];
   function renderFilterChips(counts){
     const wrap = document.getElementById('crmFilterRow');
     if(!wrap) return;
@@ -10812,19 +10893,37 @@ window.SHIN2_CRM_APP_INIT = function(){
     const defByKey = {}; allDefs.forEach(d=> defByKey[d[0]] = d);
     const chipHtml = ([key,label])=>
       `<button type="button" class="list-filter-chip${filterKey===key?' is-active':''}${key==='deleted'?' is-trash':''}" data-filter="${esc(key)}">${FILTER_ICON_SVG[key]||''}<span>${esc(label)}</span><span class="chip-count">${counts[key]||0}</span></button>`;
-    const linkHtml = ([key,label])=>
-      `<button type="button" class="list-filter-link${filterKey===key?' is-active':''}" data-filter="${esc(key)}"><span>${esc(label)}</span><span class="link-count">${counts[key]||0}</span>${counts[key] ? '<span class="link-dot" aria-hidden="true"></span>' : ''}</button>`;
+    // §P2 보조 필터 원형 버튼 라운드(신규) — 진단 보고서 §2: "분석"(신규 협약사/
+    // 최근흐름 상승세/L2→L3 전환관리)·"정리"(이전 상호/삭제된 업체/건바이건 업체) 6개
+    // 텍스트 링크가 메인 탭(상태 4칩) 옆에 항상 늘어서 있어 상단이 산만했다(§요청
+    // "그 뒤 항목들을 평소 화면에서 숨김"). 기능은 하나도 빼지 않고 DOM 위치만
+    // 원형 더보기 버튼 뒤 팝오버로 옮긴다 — data-filter 속성/클릭 위임(아래
+    // wrap.querySelectorAll('[data-filter]') 한 곳)과 filterKey/sortMode 로직은 100%
+    // 그대로 재사용, 카운트도 새로 계산하지 않고 그대로 받은 counts[key]를 쓴다.
+    const popoverItemHtml = ([key,label])=>
+      `<button type="button" class="list-filter-popover-item${filterKey===key?' is-active':''}" data-filter="${esc(key)}" role="menuitem"><span class="popover-item-label">${esc(label)}</span><span class="popover-item-count">${counts[key]||0}</span></button>`;
     wrap.innerHTML = `
       <div class="list-filter-group list-filter-group-state">
         ${FILTER_GROUP_STATE.filter(k=> defByKey[k]).map(k=> chipHtml(defByKey[k])).join('')}
       </div>
-      <div class="list-filter-group list-filter-group-links">
-        <span class="list-filter-group-label">분석</span>
-        ${FILTER_GROUP_ANALYSIS.filter(k=> defByKey[k]).map(k=> linkHtml(defByKey[k])).join('')}
-      </div>
-      <div class="list-filter-group list-filter-group-links list-filter-group-cleanup">
-        <span class="list-filter-group-label">정리</span>
-        ${FILTER_GROUP_CLEANUP.filter(k=> defByKey[k]).map(k=> linkHtml(defByKey[k])).join('')}
+      <!-- §삭제 업체 휴지통 분리 라운드(신규) — 정리 팝오버에 묻혀있던 "삭제된 업체"를
+           독립된 휴지통 아이콘 버튼으로 뺀다. data-filter="deleted"는 기존 클릭 위임
+           (아래 wrap.querySelectorAll('[data-filter]'))에 그대로 잡히므로 새 핸들러 없음. -->
+      <button type="button" class="list-filter-trash-btn${filterKey==='deleted'?' is-active':''}" data-filter="deleted" title="삭제된 업체">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4.8c0-.44.36-.8.8-.8h4.4c.44 0 .8.36.8.8V7"/><path d="M6.5 7 7.3 19.2c.04.6.55 1.05 1.15 1.05h6.1c.6 0 1.11-.45 1.15-1.05L16.5 7"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+        ${counts.deleted ? `<span class="trash-btn-count">${counts.deleted}</span>` : ''}
+      </button>
+      <div class="list-filter-more" id="crmFilterMore">
+        <button type="button" class="list-filter-more-btn" id="crmFilterMoreBtn" title="추가 관리 항목" aria-haspopup="true" aria-expanded="false">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <div class="list-filter-popover" id="crmFilterPopover" role="menu" hidden>
+          <div class="list-filter-popover-label">분석</div>
+          ${FILTER_GROUP_ANALYSIS.filter(k=> defByKey[k]).map(k=> popoverItemHtml(defByKey[k])).join('')}
+          <div class="list-filter-popover-divider"></div>
+          <div class="list-filter-popover-label">정리</div>
+          ${FILTER_GROUP_CLEANUP.filter(k=> defByKey[k]).map(k=> popoverItemHtml(defByKey[k])).join('')}
+        </div>
       </div>
     `;
     wrap.querySelectorAll('[data-filter]').forEach(btn=> btn.addEventListener('click', ()=>{
@@ -10838,8 +10937,51 @@ window.SHIN2_CRM_APP_INIT = function(){
       else if(nextKey !== 'newPartner' && sortMode.indexOf('newPartner') === 0) sortMode = 'yearPour';
       filterKey = nextKey;
       currentPage = 1;
+      closeCrmFilterPopover();
       renderList();
     }));
+    // 원형 버튼 열기/닫기(토글) — 팝오버 자체는 매 renderList마다 innerHTML로 새로
+    // 만들어지므로(항목 클릭 시 자연스럽게 닫힌 상태로 재생성됨) 여기서는 열기 토글과
+    // 화면 밖 잘림 방지만 처리한다. 외부 클릭/ESC 닫기는 document 레벨에 한 번만
+    // 바인딩되는 아래 전역 리스너가 담당한다(§매 렌더마다 중복 바인딩 금지).
+    const moreBtn = wrap.querySelector('#crmFilterMoreBtn');
+    const pop = wrap.querySelector('#crmFilterPopover');
+    if(moreBtn && pop){
+      moreBtn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const willOpen = pop.hasAttribute('hidden');
+        closeCrmFilterPopover();
+        if(willOpen){
+          pop.removeAttribute('hidden');
+          moreBtn.setAttribute('aria-expanded','true');
+          moreBtn.classList.add('is-open');
+          pop.classList.remove('align-right-edge');
+          const r = pop.getBoundingClientRect();
+          if(r.right > (window.innerWidth - 8)) pop.classList.add('align-right-edge');
+        }
+      });
+    }
+  }
+  // §P2 팝오버 전역 닫기 — 외부 클릭/ESC로 닫는다. renderFilterChips가 renderList마다
+  // 반복 호출되므로, document 리스너는 세션당 한 번만 등록한다(window 플래그로 가드).
+  function closeCrmFilterPopover(){
+    const pop = document.getElementById('crmFilterPopover');
+    const btn = document.getElementById('crmFilterMoreBtn');
+    if(pop) pop.setAttribute('hidden','');
+    if(btn){ btn.setAttribute('aria-expanded','false'); btn.classList.remove('is-open'); }
+  }
+  if(!window.__crmFilterPopoverBound){
+    window.__crmFilterPopoverBound = true;
+    document.addEventListener('click', (e)=>{
+      const pop = document.getElementById('crmFilterPopover');
+      const more = document.getElementById('crmFilterMore');
+      if(!pop || pop.hasAttribute('hidden')) return;
+      if(more && more.contains(e.target)) return;
+      closeCrmFilterPopover();
+    });
+    document.addEventListener('keydown', (e)=>{
+      if(e.key === 'Escape') closeCrmFilterPopover();
+    });
   }
   // §전면 리디자인 라운드(신규) — "KPI 요약 바": 전체 고객/MOU 체결/상승 업체/관리 필요를
   // 카드 4개가 아니라 1px 세로 구분선을 쓴 가로 스트립 하나로 보여준다. 값은 전부 이미
@@ -11280,15 +11422,19 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 클릭하던 곳(data-pour-detail/data-yr-detail)이 이미 완전히 같은 openConstruction
       // Modal(co, null) 호출이었으므로(§확인) 버튼 하나로 합쳐도 동작 차이가 없다 — 계산
       // (pourLatestIndex/getTotalPourCountForCompany)은 그대로, 표시만 합친다.
-      const totalCountHtml = yr == null ? '' : `<span class="lastpour-total-count">${esc(yr)}</span> `;
+      // §B 총 실적 박스 분리 라운드(신규) — "132 2026·슬라브"처럼 붙어 있던 총 실적
+      // 숫자를 별도 박스(.lastpour-total-box)로, 연도·공종·현장명은 옆의 상세
+      // 영역(.lastpour-detail)으로 완전히 분리한다. yr(getTotalPourCountForCompany)·
+      // latestPourRec(pourLatestIndex) 계산값은 그대로, HTML 구조만 바꾼다.
+      const totalBoxHtml = yr == null ? '' : `<span class="lastpour-total-box"><span class="lastpour-total-label">총 실적</span><span class="lastpour-total-num">${esc(yr)}건</span></span>`;
       const lastActHtml = latestPourRec
         ? `<button type="button" class="lastpour-cell" data-pour-detail="${esc(co.id)}" title="${esc(latestPourRec.year)}${latestPourCats[0] ? ' · ' + latestPourCats[0] : ''}${latestPourRec.client ? ' · ' + latestPourRec.client : ''}${yr != null ? ' · 총 실적 ' + yr + '건' : ''}">
-            <span class="lastpour-main">${totalCountHtml}${esc(latestPourRec.year)}${latestPourCats[0] ? ' · ' + esc(latestPourCats[0]) : ''}</span>${latestPourRec.client ? `<span class="lastpour-site">${esc(latestPourRec.client)}</span>` : ''}
+            ${totalBoxHtml}<span class="lastpour-detail"><span class="lastpour-main">${esc(latestPourRec.year)}${latestPourCats[0] ? ' · ' + esc(latestPourCats[0]) : ''}</span>${latestPourRec.client ? `<span class="lastpour-site">${esc(latestPourRec.client)}</span>` : ''}</span>
           </button>`
         : (yr == null
           ? '<span class="lastpour-cell lastpour-empty data-none">—</span>'
           : `<button type="button" class="lastpour-cell" data-pour-detail="${esc(co.id)}" title="총 실적 ${yr}건">
-              <span class="lastpour-main">${totalCountHtml}<span class="data-none">최근 실적 없음</span></span>
+              ${totalBoxHtml}<span class="lastpour-detail"><span class="data-none">최근 실적 없음</span></span>
             </button>`);
       // §4~13: "최근 요청" 컬럼 — requestHistoryIndex(전체 업무기록을 한 번만 훑어 미리
       // 계산해 둔 인덱스, §22)에서 이 업체의 요청 이력을 조회해 가장 최근 1건만 보여준다.
