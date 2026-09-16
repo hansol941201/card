@@ -8226,6 +8226,37 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     if(!g) return null;
     return { total: g.total, byType: g.byType, rows: g.rows };
   }
+  // §CRM 미등록 업체 MOU 분류 라운드 — 첨부 원본
+  // "마스터통합명단_v3_코드부여.xlsx"의 실제 컬럼 "통합 대표 업체명"과
+  // "체결일(협약일)"을 읽어 만든 읽기 전용 기준 스냅샷이다. 데이터행 352개는 정규화
+  // 후에도 352개로 중복이 없었고, 실제 날짜가 있는 업체 237개/날짜가 없거나 '-'인 업체
+  // 115개였다. CRM companies/caseByCaseCompanies에는 이 값을 저장하거나 덮어쓰지 않는다.
+  const MOU_MASTER_SIGNED_NORMS = new Set(["sh","가나랜드","가온건설산업","가은건설","강명건설","강진건설","건양산업","경기이앤에스","경창산업개발","경하이앤씨","광명건설","국일구조","국제특수건설","극동에이앤씨","금보","금환기업","기림이앤씨","나노지음","나원","네오텍건설","다수건설","다온","다우산업","다원건설","다인건설","대길건설","대길산업개발","대로건설","대륜씨엔씨","대명이엔씨","대성이앤씨","대승이앤씨","대신엘엔씨건설","대신하우징","대표건설","대하cd","대하씨엔디","대한진단건설","대흥씨앤씨","더원산업개발","더이스트코리아","더자람","덕수건설","도경","도방건설","도시이앤씨","도원씨엔씨","도은건설","동강건설","동심건설","동일산건","동해건업","동현이앤씨","두레이엔씨","두루빌엔지니어링","두영이앤씨","드림종합건설","디아이산업","디엘씨앤씨","레인보우테크","로운건설","로이스","루아이앤씨","명가건설유","명가종합건설","명하씨앤씨","모두건설","모아씨앤에스","무한하우징","미르건축","미사건설","미성건설","미화건설","바름피앤에스","방수존건설","백승","베스트건설","보고넷","보라씨엔씨","보람씨앤씨","본이앤씨","본주건설","부apt건설","부광이앤씨","부성도장","부영씨엔씨","비전씨앤씨","삼성리페어링","삼우건설","삼원건설","삼인유엔아이","삼정아이엔지건설","삼정엔지니어링","삼창엔지니어링","삼호종합건설","삼흥티에스건설","상미건설","새로이건설","새성건설","새움산업개발","색채산업개발","샤인하우징","서강건설","서현건설","석민이앤씨","석암산업","석진건설","선진기술공사","성림건설","성심건설","성일피앤씨","성진에스솔루션","성훈종합건설","세림산업","세영건설","세오엔지니어링","세원","세원산업개발","수산기업","수안건설","수주건설","신양아이엔지건설","신정이엔씨","신한건설산업","신화건설","쌍용조겅","쌍용조경","씨에스청산건설","아우리","아트텍","알지씨앤씨","어썸코퍼레이션","에스에이치","에스엠에이","에이치디건설","에이치제이건설","에이플러스건설","에이피티건설","엘에스도장건설","엘케이개발","엠에스이앤지","여름건설","영성건설","영성조경","예랑건설","예신건설","예운","예은건설","오연건설","와이티파트너스","우단건설","우리방재건설","우성건업","우영엘디아이","우주티엔아이","위즈페인팅","유광씨앤씨","유니드건설","유복건설","유진에코","유현건설","은성이엔씨","은천","은화","이두건설","이로건설","이루미건설","이산건설","이원건설","이음건설","인경건설","일성기업","일오삼지앤씨","일진건설","자연담은건설","자오건설","장수씨앤씨","적산건설","정광이엔씨","정담","정문씨앤씨","정민씨앤씨","정원아이앤디","제이비이엔씨","제이지성신건설","제일도장","제일특수케미칼","종명건설","주태건설","지앤필드종합건설","지호건설","진성이앤지","진수이앤씨","진웅건설","진원피앤씨","창건설산업","창대이엔씨","창도건설","창일건설","채도건설","천강건설","청람건설","청명이앤디","청우엔지니어링","청익","초담건설","케이씨건설","케이원씨앤씨","케이탑건설","코지건설","탑이앤씨","태강건설","태림이앤씨","태영건설","태영씨엔씨","태온산업개발","토형건설","파가니건설","퍼펙트방수","포스이앤씨","푸른종합건설","풍산씨앤씨","피앤텍이엔지","하린이앤씨","하은건설","한국전문건설","한별이앤씨","한빛","해원건설","현대도건","현덕건설","혜성씨앤씨","호연상사케이탑건설","효덕산업","효성씨앤씨","희민건설","희영컴퍼니"]);
+  const MOU_MASTER_UNSIGNED_NORMS = new Set(["kb건설","sg건설산업","가온알앤씨","강남이앤알","건영이앤씨","건인씨엔알","건진개발","경동하우징","경성기업","경원포장건설","광일포장건설","근영건설","금강건설공사","나눔종합건설","나이스원건설","뉴월드건설","다빈치건설","다산종합건설","대건건설","대경건설","대길포장건설","대로건설화학","대림도장","대보특수방수","대성건업","대성종합관리","대안이엔씨","대진건설","대한페인트공사","더베스트이앤비","더블유종합건설","더세움","덕경","덕산기업","덕일산업","도경이엔지","동건씨앤씨","동명기산","동성로라","동양에폭시","동은건설","두영건설","디노종합건설","라인탑케이에스","만보건설","명서건설","미래건축","보천건설","본이엔씨","비이건설","삼강기업","삼동건설","삼은기업","삼화건설산업","삼흥환경건설","서린건설","서영이엔씨","서전enc","세원티엠","세정이엔지","송주종합건설","수지씨앤에스","스타건설","시스텍이앤씨","신원이앤씨","신창건업","썬시카방수","썬위드이엔씨","씨앤엠건설","에스에스건설","에이원건설","엠지건설","연합특수방수","영광건설산업","예화건설","와이비엘","우인건설","원투쓰리방수","유가인건설","유대광건설산업","유일건설","윤산씨앤씨","은광비엠씨","이스턴퍼시픽","인석건설","정훈라이테크","제네시스광고기획","제비표페인트","제이에이치건설","제이제이eng","조광피엔텍","조양도장산업","조이건설","중앙공사","지건씨앤씨","지온산업","청학건설","케이하우징","태동건설","태형산업개발","탱크마스타","토탈엔지니어링","풍전이엔씨","하나건설공사","하얀건설","하진건설","한림제코","헤븐","현네트웍스","현일건설","현지이앤씨","호남아스콘산업","황소홀딩스","효원이엔씨","흥산건설산업"]);
+  function normCompanyNameForMouMaster(value){
+    if(!value) return '';
+    return String(value).normalize('NFKC').toLowerCase().trim()
+      .replace(/\(\s*주\s*\)|주식회사|㈜/g, '')
+      .replace(/[^\p{L}\p{N}]/gu, '');
+  }
+  function classifyUnregisteredCompaniesByMouMaster(list){
+    const mou = [], caseByCase = [], seen = new Set();
+    (list || []).forEach(item=>{
+      const norm = normCompanyNameForMouMaster(item && item.name);
+      if(!norm || seen.has(norm)) return;
+      seen.add(norm);
+      const matched = MOU_MASTER_SIGNED_NORMS.has(norm) || MOU_MASTER_UNSIGNED_NORMS.has(norm);
+      const classified = Object.assign({}, item, {
+        mouMasterNorm: norm,
+        mouMasterMatched: matched,
+        mouMasterHasAgreementDate: MOU_MASTER_SIGNED_NORMS.has(norm),
+        mouClassification: MOU_MASTER_SIGNED_NORMS.has(norm) ? 'mouDone' : 'caseByCase'
+      });
+      if(classified.mouClassification === 'mouDone') mou.push(classified);
+      else caseByCase.push(classified);
+    });
+    return { mou, caseByCase, total: mou.length + caseByCase.length };
+  }
   // §미등록 업체 확인 제외 라운드: 사용자가 partner-dashboard(pourservice.github.io)에서
   // 직접 이름으로 검색해 "협력업체 리스트에 없는 업체"라고 확정해 준 매출자료 표기들이다
   // (2026-08-27 확인). 원래 오타로 다른 등록 업체와 헷갈릴 뻔한 후보였지만(§오타 후보 조사
@@ -8532,7 +8563,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     addRequestedMaterial, addRequestedMaterialIfNew, removeRequestedMaterial, setRequestedMaterialStatus, extractRequestedMaterialsFromActivities,
     normCompanyName, findSimilarCompanySuggestions,
     buildUnregisteredCompanies, getCompany2025Revenue, getCompany2024Revenue, getCompanyTotalRevenueAllYears,
-    buildRevenue2026Index, getCompany2026Revenue, buildUnregisteredCompanies2026,
+    buildRevenue2026Index, getCompany2026Revenue, buildUnregisteredCompanies2026, classifyUnregisteredCompaniesByMouMaster,
     getCompanyReceivable, buildReceivableCompanies,
     getLatestPourRecordForCompany, getAllPourRecordsForCompany, buildPourLatestIndex, invalidatePourRecordIndexCache,
     buildRequestHistory, buildRequestHistoryIndex,
@@ -10910,6 +10941,36 @@ window.SHIN2_CRM_APP_INIT = function(){
     return hay.includes(q);
   }
 
+  // 엑셀 기준으로 분류됐지만 아직 CRM에는 등록되지 않은 업체를 기존 탭 안에 표시하는
+  // 공용 표. 원본 매출 파생값을 그대로 보여주며 행 클릭은 기존 미등록 업체 화면과 동일하게
+  // 업체명만 미리 채운 고객 등록 화면을 연다. 저장/자동 등록은 전혀 하지 않는다.
+  function classifiedUnregisteredTableHtml(rows, title, classificationLabel){
+    if(!rows || !rows.length) return '';
+    return `
+      <section class="np2-note" data-classified-unregistered-section style="margin:12px 0;padding:12px;">
+        <div style="font-weight:700;margin-bottom:4px;">${esc(title)} ${rows.length}곳</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">CRM 미등록 업체입니다. 업체명을 누르면 기존 고객 등록 화면이 열립니다.</div>
+        <div style="overflow-x:auto;">
+          <table class="pi-sample-table" style="width:100%;margin:0;">
+            <thead><tr><th>업체명</th><th>2026 매출</th><th>최근 매출일</th><th>최근 현장명</th><th>상태</th></tr></thead>
+            <tbody>${rows.map(x=> `
+              <tr data-classified-unreg-name="${esc(x.name)}" style="cursor:pointer;">
+                <td>${esc(x.name)}</td>
+                <td>${esc(fmtKrwCompact(x.revenue2026))}</td>
+                <td>${x.latestDate ? esc(fmtDate(x.latestDate)) : '—'}</td>
+                <td>${x.latestSite ? esc(x.latestSite) : '—'}</td>
+                <td><span style="color:#B91C1C;font-weight:600;">CRM 미등록</span> · ${esc(classificationLabel)}</td>
+              </tr>`).join('')}</tbody>
+          </table>
+        </div>
+      </section>`;
+  }
+  function bindClassifiedUnregisteredRows(scope){
+    (scope || document).querySelectorAll('[data-classified-unreg-name]').forEach(row=>{
+      row.addEventListener('click', ()=> openAddCompanyForm(row.getAttribute('data-classified-unreg-name')));
+    });
+  }
+
   function renderList(){
     // §총 매출 Popover 전환 라운드: 필터/검색/정렬/페이지가 바뀌면 목록 DOM이 통째로
     // 새로 그려져 popover가 붙어있던 버튼이 사라진다 — 열려있던 popover가 엉뚱한 위치에
@@ -10935,6 +10996,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     const coTableHeadEl = document.getElementById('crmCoTableHead');
     if(coTableHeadEl) coTableHeadEl.hidden = (filterKey === 'deleted' || filterKey === 'newPartner' || filterKey === 'l2l3Manage' || filterKey === 'caseByCase');
     const companies = D.loadActiveCompanies(); // §업체 삭제(휴지통) 라운드 — 소프트 삭제된 업체를 일반 목록/신규 협약사/협약 진행/MOU체결 탭에서 뺀다(§요청 10)
+    const unregisteredClassification = D.classifyUnregisteredCompaniesByMouMaster(D.buildUnregisteredCompanies2026());
+    // 기존 건바이건 컬렉션과 엑셀 분류 결과에 같은 업체가 있으면 한 번만 표시한다.
+    const activeCaseByCaseCompanies = D.loadCaseByCaseCompanies().filter(r=> !r.convertedToCompanyId);
+    const activeCaseByCaseClassified = D.classifyUnregisteredCompaniesByMouMaster(activeCaseByCaseCompanies);
+    const activeCaseByCaseNorms = new Set(activeCaseByCaseClassified.mou.concat(activeCaseByCaseClassified.caseByCase).map(r=> r.mouMasterNorm));
+    const classifiedCaseByCaseRows = unregisteredClassification.caseByCase.filter(r=> !activeCaseByCaseNorms.has(r.mouMasterNorm));
     listTitle.textContent = '고객 ' + companies.length;
     // §미등록 업체 관리 라운드: 별도 저장소 없이 매번 다시 계산한다(§ "등록 후" 요구사항 —
     // 사용자가 업체를 등록하면 다음 renderList()에서 자동으로 줄어든다).
@@ -11006,7 +11073,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     filterCounts.l2l3Manage = buildL2L3AnalysisBase().rows.length;
     // §확인 필요 복원/3단계 분류 라운드(신규, §요청 5) — 이미 협약사로 전환된 건바이건
     // 업체(convertedToCompanyId 있음)는 이 탭 카운트/목록에서 빠진다(§요청 8 "카운트 전환").
-    filterCounts.caseByCase = D.loadCaseByCaseCompanies().filter(r=> !r.convertedToCompanyId).length;
+    filterCounts.caseByCase = activeCaseByCaseCompanies.length + classifiedCaseByCaseRows.length;
     renderFilterChips(filterCounts);
     // §신규 협약사 탭 라운드(신규) — "90일 임박순"/"최근 체결순" 옵션은 이 탭에서만
     // 보이게 하고, 정렬 드롭다운 표시값도 현재 sortMode와 항상 맞춰 둔다(탭 클릭
@@ -11066,7 +11133,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 전용 화면으로 갈아탄다. companies 배열과 무관한 별도 데이터(caseByCaseCompanies)라
     // enriched를 넘길 필요가 없다.
     if(filterKey === 'caseByCase'){
-      renderCaseByCaseTab();
+      renderCaseByCaseTab(classifiedCaseByCaseRows);
       return;
     }
 
@@ -11085,11 +11152,15 @@ window.SHIN2_CRM_APP_INIT = function(){
       })() : null));
     applySort(rows, contribIndex);
 
+    const classifiedMouRows = filterKey === 'mouDone'
+      ? unregisteredClassification.mou.filter(x=> !searchQuery || [x.name, x.latestSite, x.latestDate].join(' ').toLowerCase().includes(searchQuery.toLowerCase()))
+      : [];
+
     const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
     if(currentPage > totalPages) currentPage = totalPages;
     const pageRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-    if(!rows.length){
+    if(!rows.length && !classifiedMouRows.length){
       // §고객관리카드 단일 원본 전환 라운드(신규) — companies가 아직 0건일 때, 정말로
       // "등록된 고객이 없습니다"인지 아니면 클라우드에서 아직 못 받아온 것뿐인지 구분한다
       // (§요청 5). 검색어로 걸러져서 0건이 된 경우(companies.length>0)는 건드리지 않는다.
@@ -11337,6 +11408,10 @@ window.SHIN2_CRM_APP_INIT = function(){
              §"데이터 제거가 아니라 숨김" 관례 그대로). -->
       </div>${terminatedInfoHtml}`;
     }).join('');
+    if(filterKey === 'mouDone' && currentPage === 1 && classifiedMouRows.length){
+      listEl.insertAdjacentHTML('afterbegin', classifiedUnregisteredTableHtml(classifiedMouRows, '엑셀 기준 MOU 체결 · CRM 미등록', 'MOU 체결'));
+      bindClassifiedUnregisteredRows(listEl);
+    }
     // §실적↔매출 실제 구현 라운드: "실적↔매출" 클릭 -> 실적·매출 분석 Drawer(다른 컬럼과
     // 같은 패턴, 옛 popover 방식은 없앰). 행 클릭(고객카드 열기)으로 전파되지 않도록
     // stopPropagation.
@@ -12533,7 +12608,8 @@ window.SHIN2_CRM_APP_INIT = function(){
      (D.loadActiveCompanies() 기준)에는 처음부터 안 들어간다 — 그 계산 로직은 이 라운드에서
      전혀 건드리지 않았다(§요청 7).
      ========================================================================== */
-  function renderCaseByCaseTab(){
+  function renderCaseByCaseTab(classifiedUnregisteredRows){
+    classifiedUnregisteredRows = classifiedUnregisteredRows || [];
     const all = D.loadCaseByCaseCompanies();
     const active = all.filter(r=> !r.convertedToCompanyId); // 이미 협약사로 전환된 건 제외(§요청 8)
     const reqIndex = D.buildSheetRequestsIndex();
@@ -12550,7 +12626,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       return { cbc, reqs, bySource, firstAt: first ? first.requestDate : cbc.firstSeenAt, lastAt: last ? last.requestDate : cbc.lastSeenAt, total: reqs.length };
     }).sort((a,b)=> new Date(b.lastAt||0) - new Date(a.lastAt||0));
 
-    const totalCompanies = active.length;
+    const totalCompanies = active.length + classifiedUnregisteredRows.length;
     const totalRequests = rows.reduce((s,r)=> s + r.total, 0);
     const newThisMonth = active.filter(cbc=> cbc.firstSeenAt && new Date(cbc.firstSeenAt).getTime() >= monthStart).length;
     const recent30dCompanies = rows.filter(r=> r.lastAt && new Date(r.lastAt).getTime() >= day30Ago).length;
@@ -12561,7 +12637,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     L2L3_ALL_SOURCE_SHEETS.forEach(s=> sourceTotals[s] = rows.reduce((sum,r)=> sum + (r.bySource[s]||0), 0));
 
     renderPagination(0);
-    if(!active.length){
+    if(!active.length && !classifiedUnregisteredRows.length){
       listEl.innerHTML = `
         <div class="empty-note">건바이건 업체가 없습니다 — "확인 필요" 목록에서 [②건바이건 업체로 등록]을 눌러야만 여기 나타납니다(자동 분류 없음).</div>`;
       return;
@@ -12576,9 +12652,9 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="kpi-item"><span class="kpi-item-value">${convertedCount}</span><span class="kpi-item-label">협약사로 전환됨</span></div>
       </div>
       <div class="np2-note" style="margin-bottom:8px;color:#666;font-size:12.5px;">
-        요청 유형별 건수 — ${L2L3_ALL_SOURCE_SHEETS.map(s=> `${esc(s)} ${sourceTotals[s]||0}`).join(' · ')}
+        요청 유형별 건수 — ${L2L3_ALL_SOURCE_SHEETS.map(s=> `${esc(s)} ${sourceTotals[s]||0}`).join(' · ')} · 엑셀 기준 CRM 미등록 ${classifiedUnregisteredRows.length}
       </div>
-      <div class="deleted-co-table" style="overflow-x:auto;">
+      ${rows.length ? `<div class="deleted-co-table" style="overflow-x:auto;">
         <div class="deleted-co-row" data-cbc-row="${''}" style="display:grid;grid-template-columns:1.4fr .9fr .9fr .6fr repeat(5,.6fr) .7fr .7fr 1fr 1.4fr .8fr;gap:6px;font-weight:600;background:#f6f7f9;">
           <span>업체명</span><span>최초 요청일</span><span>최근 요청일</span><span>전체</span>
           <span>기술자문</span><span>컨설팅</span><span>샘플·카탈로그</span><span>공법설명회</span><span>기타문의</span>
@@ -12602,13 +12678,15 @@ window.SHIN2_CRM_APP_INIT = function(){
             <span>건바이건</span>
           </div>
         `).join('')}
-      </div>
+      </div>` : ''}
+      ${classifiedUnregisteredTableHtml(classifiedUnregisteredRows, '엑셀 기준 건바이건 · CRM 미등록', '건바이건')}
     `;
     listEl.querySelectorAll('[data-cbc-row]').forEach(row=>{
       const id = row.getAttribute('data-cbc-row');
       if(!id) return;
       row.addEventListener('click', ()=> openCaseByCaseDetailModal(id));
     });
+    bindClassifiedUnregisteredRows(listEl);
   }
 
   /* §확인 필요 복원/3단계 분류 라운드(신규) — 업체명 클릭 → 시간순 전체 요청 이력.
@@ -18977,25 +19055,38 @@ window.SHIN2_CRM_APP_INIT = function(){
       // FileList는 input을 비우기 전에 별도 변수로 잡아야 선택 파일이 사라지지 않는다.
       const file = e.target.files && e.target.files[0]; e.target.value = '';
       if(!file) return;
-      // §질문지 업로드 무반응 버그 수정 라운드(신규) — 실사용자 보고 "질문지 버튼누르고
-      // 파일 눌렀는데. 삽입이 안돼": 재현해보니 saveDocumentFile이 이 순간 클라우드
-      // 로그인 상태를 아직 확인 못 했을 때(예: 세션 갱신 중 잠깐 SHIN2_STORAGE.isSignedIn()
-      // 이 false) waitForCloudReady(4000)로 최대 4초를 기다리는데, 그동안 버튼(label)에
-      // 아무 표시도 없어 사용자가 "삽입이 안 됐다"고 오인하고 이탈했을 가능성이 가장 크다
-      // (실제로는 4초 뒤 정상 등록됨 — alert도 없어서 실패로 착각하기 더 쉬웠다). 저장
-      // 성공/실패 판정 로직(§7772cf9의 LOCAL_STORAGE_FULL throw 등 안전장치)은 전혀
-      // 건드리지 않고, 클릭 즉시 label에 "저장 중..." 표시만 더한다 — 성공 시엔 바로 아래
-      // renderAgreementPopupBody가 label을 통째로 다시 그리고, 실패 시엔 restoreLabels로
-      // 원래 문구로 되돌려 재시도 가능한 상태를 유지한다.
+      // 질문지 업로드 상태는 파일 전송 진행률을 직접 보여준다. Storage 업로드와 로컬
+      // 메타데이터 저장이 끝나면 바로 등록 화면을 갱신하고, 서버 메타데이터 확인은 화면을
+      // 막지 않고 뒤에서 수행한다. 실패 시에는 기존 문구로 복구해 다시 선택할 수 있다.
       const labels = Array.from(document.querySelectorAll('label[for="agreementQuestionnaireInput"]'));
       const labelOriginals = labels.map(l=> l.textContent);
-      labels.forEach(l=>{ l.textContent = '저장 중...'; l.style.pointerEvents = 'none'; l.style.opacity = '0.6'; });
+      const uploadStarted = performance.now();
+      const setUploadLabel = text=> labels.forEach(l=>{ l.textContent = text; });
+      labels.forEach(l=>{ l.textContent = '업로드 준비 중...'; l.style.pointerEvents = 'none'; l.style.opacity = '0.6'; });
       const restoreLabels = ()=> labels.forEach((l,i)=>{ l.textContent = labelOriginals[i]; l.style.pointerEvents = ''; l.style.opacity = ''; });
-      D.addDocument(companyId, 'questionnaire', file).then(async ()=>{
-        const r = await confirmDocsCloudSave();
-        if(!r.ok) alert('질문서 정보 저장 확인에 실패했습니다(파일은 등록됨) — ' + cloudSaveErrorMessage(r.err));
+      console.info('[QUESTIONNAIRE-UPLOAD] request start');
+      D.addDocument(companyId, 'questionnaire', file, pct=>{
+        setUploadLabel('업로드 중... ' + pct + '%');
+      }).then(()=>{
+        // Storage 업로드와 로컬 메타데이터 기록이 끝난 시점에 즉시 등록 화면을 갱신한다.
+        // Firestore setDoc은 연결이 끊긴 동안 Promise가 오래 대기할 수 있으므로 이 확인을
+        // 화면 갱신보다 먼저 await하면 파일이 이미 저장됐어도 "저장 중..."에 무기한 남는다.
+        // saveDocuments가 예약한 기존 클라우드 push는 유지하며, 즉시 확인 요청도 백그라운드로
+        // 실행해 실패한 경우에만 사용자에게 알린다.
+        console.info(`[QUESTIONNAIRE-UPLOAD] file complete: ${Math.round(performance.now() - uploadStarted)}ms`);
         renderAgreementPopupBody(companyId);
-      }).catch(err=>{ restoreLabels(); alert(documentUploadErrorMessage(err && err.code)); });
+        confirmDocsCloudSave().then(r=>{
+          if(r.ok) console.info(`[QUESTIONNAIRE-UPLOAD] metadata complete: ${Math.round(performance.now() - uploadStarted)}ms`);
+          else{
+            console.warn('[QUESTIONNAIRE-UPLOAD] metadata failed');
+            alert('질문서 정보 저장 확인에 실패했습니다(파일은 등록됨) — ' + cloudSaveErrorMessage(r.err));
+          }
+        });
+      }).catch(err=>{
+        console.warn(`[QUESTIONNAIRE-UPLOAD] request failed: ${Math.round(performance.now() - uploadStarted)}ms`);
+        restoreLabels();
+        alert(documentUploadErrorMessage(err && err.code));
+      });
     });
     document.querySelectorAll('[data-questionnaire-session]').forEach(btn=> btn.addEventListener('click', ()=> openQuestionnaireSession(companyId, btn.getAttribute('data-questionnaire-session'))));
   }
@@ -20230,6 +20321,8 @@ window.SHIN2_CRM_APP_INIT = function(){
     const root = document.getElementById('unregModalRoot');
     if(!root) return;
     const list = D.buildUnregisteredCompanies2026();
+    const classified = D.classifyUnregisteredCompaniesByMouMaster(list);
+    const classificationByName = new Map(classified.mou.concat(classified.caseByCase).map(x=> [x.name, x]));
     root.innerHTML = `
       <div class="pi-overlay" id="unregOverlay">
         <div class="pi-panel" role="dialog" aria-modal="true" aria-label="매출자료 미등록 업체">
@@ -20246,18 +20339,20 @@ window.SHIN2_CRM_APP_INIT = function(){
             <div class="pi-note">"미등록 업체"는 2026년 매출현황(컨설팅+기술자문료+특허료+자재판매) 데이터에는 매출 기록이 있는데, CRM 고객 목록에는 등록되어 있지 않은 업체를 뜻합니다.</div>
             <div class="pi-note" style="margin-top:6px;">판정 기준: 매출현황 업체명과 CRM 업체명을 정규화(법인 표기·공백·괄호·점·하이픈 등 제거, 대소문자 무시)해서 완전히 일치할 때만 "등록됨"으로 봅니다. 이름이 비슷하다는 이유만으로는 자동으로 연결하지 않으며, 별도로 저장하지 않고 화면을 열 때마다 다시 계산하므로 CRM에 등록하는 즉시 목록에서 빠집니다.</div>
             <div class="pi-note" style="margin-top:6px;">업체명을 클릭하면 고객 등록 화면이 열리고 업체명만 미리 입력됩니다 — 매출금액은 자동 저장되지 않으며, 확인 후 직접 저장해야 등록됩니다.</div>
+            <div class="pi-note" style="margin-top:6px;">첨부 엑셀 기준 자동 분류: MOU 체결 ${classified.mou.length}곳 · 건바이건 ${classified.caseByCase.length}곳. 엑셀에 없거나 체결일이 없는 업체는 건바이건으로 분류합니다.</div>
             ${list.length ? `
               <table class="pi-sample-table" style="margin-top:10px;">
-                <thead><tr><th>업체명</th><th>2026 매출</th><th>최근 매출일</th><th>최근 현장명</th><th>상태</th></tr></thead>
+                <thead><tr><th>업체명</th><th>2026 매출</th><th>최근 매출일</th><th>최근 현장명</th><th>상태</th><th>분류</th></tr></thead>
                 <tbody>
-                  ${list.map(x=> `
+                  ${list.map(x=> { const c = classificationByName.get(x.name); return `
                     <tr class="unreg-row" data-name="${esc(x.name)}" style="cursor:pointer;">
                       <td>${esc(x.name)}</td>
                       <td>${esc(fmtKrwCompact(x.revenue2026))}</td>
                       <td>${x.latestDate ? esc(fmtDate(x.latestDate)) : '—'}</td>
                       <td>${x.latestSite ? esc(x.latestSite) : '—'}</td>
                       <td><span style="color:#B91C1C;font-weight:600;">CRM 미등록</span></td>
-                    </tr>`).join('')}
+                      <td>${c && c.mouClassification === 'mouDone' ? 'MOU 체결' : '건바이건'}</td>
+                    </tr>`; }).join('')}
                 </tbody>
               </table>
             ` : `<div class="pi-note" style="margin-top:10px;">미등록 업체가 없습니다.</div>`}
