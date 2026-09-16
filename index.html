@@ -572,6 +572,13 @@
   .cat-dist-row:last-child{ border-bottom:none; }
   .cat-dist-name{ font-size:13px; font-weight:600; color:var(--text); }
   .cat-dist-count{ font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; }
+  /* §요청 팝오버 겹침/잘림 수정 라운드(신규) — 최근 요청 팝오버(#requestPopover)의 행은
+     다른 .cat-dist-row 사용처(카테고리 분포 등, 짧은 숫자라 nowrap이 맞음)와 달리 날짜+
+     "요청종류 · 현장명" 문구가 길어 nowrap이면 300px 폭 팝오버 밖으로 잘려 보였다. 이
+     팝오버 전용 클래스에만 줄바꿈을 허용해 잘리지 않고 아래로 자연스럽게 넘어가게 한다. */
+  .req-pop-row{ align-items:flex-start; gap:8px; }
+  .req-pop-date{ flex:0 0 auto; color:var(--text-faint); white-space:nowrap; }
+  .req-pop-text{ flex:1 1 auto; min-width:0; text-align:right; font-weight:500; white-space:normal; word-break:keep-all; line-height:1.5; }
   .cat-cell{ background:none; border:none; padding:0; font:inherit; color:inherit; cursor:pointer; }
   /* §시공실적 Drawer 통합 라운드: "최근 실적"/"주요 공종" Drawer를 하나로 합친 화면 전용
      스타일 — 그래프/차트/아이콘/과한 색 없이 칩(공종+건수)과 3열 표(연도/현장명/공종)만
@@ -11198,7 +11205,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       const nameRequestCellHtml = latestRequestItem
         ? (latestRequestItem.kind === 'gsheet'
           ? `<button type="button" class="request-cell request-cell-gsheet" data-name-request-detail="${esc(co.id)}" title="${esc(latestRequestItem.text)}">
-              <span class="request-gsheet-text">${esc(latestRequestItem.text)}</span>
+              <span class="request-gsheet-text">${esc(latestRequestItem.sourceTab || latestRequestItem.text)}</span>
             </button>`
           : `<button type="button" class="request-cell request-cell-date-only" data-name-request-detail="${esc(co.id)}" title="${esc(latestRequestItem.text)}">
               <span class="request-date">${esc(fmtDate(latestRequestItem.createdAtIso))}</span>
@@ -22467,12 +22474,22 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(!root) return;
     requestPopoverCompanyId = co.id;
     const items = buildRequestListItems(co).slice(0, 3); // 최근 3건만 — 나머지는 "전체 기록 보기"로
-    const bodyHtml = items.length ? items.map(it=> `
-      <div class="cat-dist-row" style="align-items:flex-start;">
-        <span class="cat-dist-name" style="flex:0 0 auto;color:var(--text-faint);">${esc(fmtDate(it.createdAtIso))}</span>
-        <span class="cat-dist-count" style="text-align:right;font-weight:500;">${esc(it.text)}</span>
+    // §요청 팝오버 겹침/잘림 수정 라운드(신규) — 날짜를 왼쪽 칸에 이미 보여주는데, gsheet
+    // 항목의 it.text에도 같은 날짜가 다시 들어있어("기술자문문의 · 2026.09.15 · 현장명")
+    // "2026.09.15기술자문문의·2026.09.15·현장명"처럼 겹쳐 보였다. gsheet는 sourceTab·
+    // siteName만(날짜 중복 제거) 조합하고, 그 외 종류(memo/material)는 기존 text 그대로
+    // 쓴다 — 계산/저장 로직은 안 건드리고 이 팝오버의 표시 조합만 바꾼다.
+    const bodyHtml = items.length ? items.map(it=>{
+      const displayText = it.kind === 'gsheet'
+        ? [it.sourceTab, it.siteName].filter(Boolean).join(' · ')
+        : it.text;
+      return `
+      <div class="cat-dist-row req-pop-row">
+        <span class="cat-dist-name req-pop-date">${esc(fmtDate(it.createdAtIso))}</span>
+        <span class="cat-dist-count req-pop-text">${esc(displayText)}</span>
       </div>
-    `).join('') : `<div class="rev-pop-note">최근 요청/메모 기록이 없습니다.</div>`;
+    `;
+    }).join('') : `<div class="rev-pop-note">최근 요청/메모 기록이 없습니다.</div>`;
     root.innerHTML = `
       <div class="rev-popover" id="requestPopover">
         <div class="rev-pop-head">
@@ -25545,7 +25562,12 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(it.siteName) parts.push(it.siteName);
       items.push({
         id: 'gsheet:' + (it.legacy ? 'act' : 'sheetreq') + ':' + it.sourceUniqueId + ':' + it.ts,
-        kind:'gsheet', text: parts.join(' · '), ts: it.ts, createdAtIso: it.ts
+        // §요청 종류만 짧게 보여달라 라운드(신규) — text(전체 문구, 기존 그대로 유지 —
+        // 툴팁/전체 기록 보기 등 기존 사용처는 안 바꿈)와 별도로 sourceTab/siteName을
+        // 필드로 남긴다. 목록 셀은 sourceTab만, 요청 팝오버는 날짜 중복 없이
+        // sourceTab·siteName만 조합해 쓴다(§아래 두 사용처).
+        kind:'gsheet', text: parts.join(' · '), sourceTab: it.sourceTab, siteName: it.siteName || '',
+        ts: it.ts, createdAtIso: it.ts
       });
     });
     items.sort((a,b)=> new Date(b.ts) - new Date(a.ts));
