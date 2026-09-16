@@ -645,12 +645,17 @@
   .workq-stage-progress{ width:150px; min-width:130px; }
   .workq-reason{ color:var(--text-muted); font-size:12px; }
   .workq-days{ white-space:nowrap; font-variant-numeric:tabular-nums; }
-  /* §P1-2 업무관리 표 열 압축 라운드(신규) — "현재 상태"/"관리 이유" 배지(단계 진행상황
-     열 안), "메일"+"서류 현황" 합친 "비고" 열. */
+  /* §P1-2 업무관리 표 열 압축 라운드 — "현재 상태"/"관리 이유" 배지(단계 진행상황 열 안),
+     "메일"+"서류 현황" 합친 "비고" 열. §업무관리 표 캡션/비고열 제거 라운드(신규)에서
+     workq-stage-badges/workq-remark 렌더링 자체를 없앴다 — 클래스 정의는 다른 화면 영향
+     없이 죽은 CSS로 남겨둔다(요청 범위가 "렌더링만" 이라 스타일시트 삭제까지는 안 함). */
   .workq-stage-badges{ display:flex; flex-wrap:wrap; gap:4px; margin-top:5px; }
   .workq-state-badge{ display:inline-block; padding:2px 7px; border-radius:5px; font-size:10.5px; font-weight:700; color:var(--navy); background:#EEF2FA; border:1px solid #DCE5EF; white-space:nowrap; }
   .workq-reason-badge{ display:inline-block; padding:2px 7px; border-radius:5px; font-size:10.5px; color:var(--text-muted); background:#F4F6F9; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .workq-remark{ display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
+  /* §업무관리 표 캡션/비고열 제거 라운드(신규) — "해야 할 일" 열: 액션 버튼(1차미팅 잡기 등)
+     아래에 메일 버튼(있는 경우)을 세로로 쌓는다. */
+  .workq-task-cell{ display:flex; flex-direction:column; align-items:flex-start; gap:5px; }
   .workq-delay-badge{ display:inline-block; font-size:10px; font-weight:700; border-radius:4px; padding:1px 5px; margin-left:5px; }
   /* §P1-3 경과일 배지 3단계 라운드(신규) — 진단 보고서 P1-3: 기존엔 7일 이상이면 전부
      같은 빨간 "지연" 배지라 36건 중 거의 전부가 같은 색이었다(변별력 없음). 실제 경과일
@@ -15720,13 +15725,17 @@ window.SHIN2_CRM_APP_INIT = function(){
                2차→MOU 4단계 stepper)을 여기로 옮겼다(요청 "정보를 지우는 게 아니라 이 창을
                업무관리 창으로 이전"). buildStageStepperHtml/buildProgressStages 둘 다
                이미 있던 함수 그대로 재사용 — 새 판정 로직 없음. -->
-          <!-- §P1-2 업무관리 표 열 압축 라운드(신규) — 진단 보고서 P1-2: "현재 상태"(전 행
+          <!-- §P1-2 업무관리 표 열 압축 라운드 — 진단 보고서 P1-2: "현재 상태"(전 행
                "질문서 완료"로 동일)/"관리 이유"(전 행 거의 같은 문구)처럼 정보량 없이 폭만
-               차지하던 열을 없앴다. it.currentStateLabel/it.reasonText 계산은 그대로 두고
-               "단계 진행상황" 열 안에 작은 배지로 옮겨 붙였을 뿐이다(값 조회 로직 삭제 없음).
-               "메일"/"서류 현황"도 "비고" 한 열로 합쳤다(mailCellHtml·
-               buildAgreementDocSummary 호출은 그대로, 표시 위치만 이동). 8열 → 5열. -->
-          <thead><tr><th>업체명</th><th>단계 진행상황</th><th>경과</th><th>해야 할 일</th><th>비고</th></tr></thead>
+               차지하던 열을 없앴다. it.currentStateLabel/it.reasonText 계산은 그대로 두었다
+               (값 조회 로직 삭제 없음) — 단, §업무관리 표 캡션/비고열 제거 라운드(신규)에서
+               이 값들을 화면에 그리던 workq-stage-badges 줄 자체를 없앴다(계산은 유지, 표시만
+               삭제). "메일"/"서류 현황"을 합쳤던 "비고" 열도 이번 라운드에서 통째로 없앴다 —
+               mailCellHtml(메일 버튼)은 삭제 대신 "해야 할 일" 열의 액션 버튼 아래로 옮겨
+               재사용했고(§요청 "메일보내기는 1차미팅잡기 밑이나 옆에 배치"), 서류 현황
+               (buildAgreementDocSummary)은 이 표에서 더는 표시하지 않는다(계산 함수 자체는
+               다른 화면에서 쓸 수 있어 그대로 둠). 5열 → 4열. -->
+          <thead><tr><th>업체명</th><th>단계 진행상황</th><th>경과</th><th>해야 할 일</th></tr></thead>
           <tbody>
             ${filtered.map(it=> {
               const isOpen = workQueueExpanded && workQueueExpanded.companyId === it.co.id && workQueueExpanded.type === it.type;
@@ -15737,10 +15746,13 @@ window.SHIN2_CRM_APP_INIT = function(){
               // '미팅을 하지 않았다'는 메일을 보내지 말 것" 요구사항 그대로.
               const showMailBtn = it.type === 'm1';
               const mailInfo = showMailBtn ? m1MailButtonInfo(it.co) : null;
+              // §업무관리 표 캡션/비고열 제거 라운드(신규) — 사용자 요청: 비고 열(메일
+              // 아이콘/서류 현황) 전체 삭제, 메일 버튼은 "해야 할 일" 열 액션 버튼 아래로
+              // 이동. mailCellHtml은 showMailBtn(type==='m1')인 업체만 계속 만든다 — 기존
+              // §요청 [8] "1차미팅이 아직 안 잡힌 업체에만 노출" 조건 그대로, 위치만 이동.
               const mailCellHtml = mailInfo && mailInfo.show
                 ? `<button type="button" class="workq-mail-btn${mailInfo.alreadySent ? ' is-sent' : ''}" data-workq-mail="${esc(it.co.id)}">📧 ${esc(mailInfo.label)}</button>`
-                : (showMailBtn ? `<span class="workq-mail-skip">📧 ${esc((mailInfo && mailInfo.reason) || '—')}</span>` : '<span class="workq-mail-skip">📧 없음</span>');
-              const docSummary = buildAgreementDocSummary(it.co.id, docsIdx);
+                : '';
               // §P1-3 경과일 배지 3단계 라운드(신규) — it.days(각 분기에서 이미 계산된
               // 경과일/예정일까지 남은 일수, 위 buildWorkQueueItem 계산은 안 건드림)를
               // 그대로 조회만 해서 배지 색만 구간별로 나눈다. 예정 미팅이 이미 지난
@@ -15758,18 +15770,13 @@ window.SHIN2_CRM_APP_INIT = function(){
                 <td><button type="button" class="workq-co-link" data-workq-open-co="${esc(it.co.id)}">${esc(it.co.name)}</button></td>
                 <td class="workq-stage-progress">
                   ${stageStepperHtml}
-                  <div class="workq-stage-badges">
-                    <span class="workq-state-badge" title="현재 상태">${esc(it.currentStateLabel)}</span>
-                    ${it.reasonText ? `<span class="workq-reason-badge" title="관리 이유">${esc(it.reasonText)}</span>` : ''}
-                  </div>
                 </td>
                 <td class="workq-days">${it.days === null ? '—' : esc(it.days) + '일'}${dayBadgeHtml}</td>
-                <td>${it.noTask
-                  ? `<span class="workq-notask-badge">${esc(it.actionLabel)}</span>`
-                  : `<button type="button" class="workq-action-btn${isOpen ? ' is-open' : ''}" data-workq-toggle="${esc(it.co.id)}" data-workq-toggle-type="${esc(it.type)}">${esc(it.actionLabel)}</button>`}</td>
-                <td class="workq-remark">
+                <td class="workq-task-cell">
+                  ${it.noTask
+                    ? `<span class="workq-notask-badge">${esc(it.actionLabel)}</span>`
+                    : `<button type="button" class="workq-action-btn${isOpen ? ' is-open' : ''}" data-workq-toggle="${esc(it.co.id)}" data-workq-toggle-type="${esc(it.type)}">${esc(it.actionLabel)}</button>`}
                   ${mailCellHtml}
-                  <span class="workq-doc-status" title="서류 현황: ${esc(docSummary.text)}">📄 ${esc(docSummary.registeredCount)}/${esc(docSummary.total)}</span>
                 </td>
               </tr>`;
             }).join('')}
