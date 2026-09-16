@@ -18005,10 +18005,13 @@ window.SHIN2_CRM_APP_INIT = function(){
         if(isImage) body.innerHTML = `<img src="${esc(url)}" class="doc-preview-img" alt="" />`;
         else if(isPdf) body.innerHTML = `<iframe src="${esc(url)}" class="doc-preview-iframe" title="PDF 미리보기"></iframe>`;
         else body.innerHTML = `<div class="doc-preview-fallback">이 형식은 미리보기를 지원하지 않습니다.<br/><a href="${esc(url)}" target="_blank" rel="noopener" download="${esc(fileName)}">다운로드해서 확인</a></div>`;
-      }).catch(()=>{
+      }).catch(err=>{
         const body = document.getElementById('docPreviewBody');
         if(!body) return;
-        body.innerHTML = `<div class="doc-preview-fallback">파일을 불러오지 못했습니다(로그인 상태를 확인해주세요).<br/><button type="button" class="co-text-action primary" id="docPreviewRetryBtn">다시 시도</button></div>`;
+        const msg = (err && err.code === 'TIMEOUT')
+          ? '시간이 너무 오래 걸려 불러오기를 멈췄습니다(시간 초과). 네트워크 연결을 확인해주세요.'
+          : '파일을 불러오지 못했습니다(로그인 상태를 확인해주세요).';
+        body.innerHTML = `<div class="doc-preview-fallback">${msg}<br/><button type="button" class="co-text-action primary" id="docPreviewRetryBtn">다시 시도</button></div>`;
         const retryBtn = document.getElementById('docPreviewRetryBtn');
         if(retryBtn) retryBtn.addEventListener('click', loadPreview);
       });
@@ -18145,10 +18148,13 @@ window.SHIN2_CRM_APP_INIT = function(){
         if(isImage) viewer.innerHTML = `<img src="${esc(url)}" alt="${esc(fileName)}" />`;
         else if(isPdf) viewer.innerHTML = `<iframe src="${esc(url)}" title="질문지 미리보기"></iframe>`;
         else viewer.innerHTML = `<div class="questionnaire-viewer-fallback">이 파일 형식은 화면에서 바로 볼 수 없습니다.<br/><a href="${esc(url)}" target="_blank" rel="noopener" download="${esc(fileName)}">질문서 열기 또는 다운로드</a></div>`;
-      }).catch(()=>{
+      }).catch(err=>{
         const viewer = document.getElementById('questionnaireViewer');
         if(!viewer) return;
-        viewer.innerHTML = `<div class="questionnaire-viewer-fallback">질문서를 불러오지 못했습니다. 로그인 상태나 네트워크 연결을 확인해주세요.<br/><button type="button" class="co-text-action primary" id="questionnaireViewerRetryBtn">다시 시도</button></div>`;
+        const msg = (err && err.code === 'TIMEOUT')
+          ? '시간이 너무 오래 걸려 불러오기를 멈췄습니다(시간 초과). 네트워크 연결을 확인해주세요.'
+          : '질문서를 불러오지 못했습니다. 로그인 상태나 네트워크 연결을 확인해주세요.';
+        viewer.innerHTML = `<div class="questionnaire-viewer-fallback">${msg}<br/><button type="button" class="co-text-action primary" id="questionnaireViewerRetryBtn">다시 시도</button></div>`;
         const retryBtn = document.getElementById('questionnaireViewerRetryBtn');
         if(retryBtn) retryBtn.addEventListener('click', loadQuestionnaireFile);
       });
@@ -24155,6 +24161,32 @@ window.SHIN2_CRM_APP_INIT = function(){
   // id의 storagePath가 바뀌면(예: 향후 코드 변경) 자동으로 캐시를 무효화하고 새로 받아온다.
   // 실패한 요청은 절대 캐시하지 않는다 — 재시도 버튼을 눌렀을 때 같은 실패가 그대로 캐시에서
   // 튀어나오면 안 되기 때문(§요청 6 무한 로딩·영구 실패 방지).
+  //
+  // §긴급 회귀 수정(신규) — 위 "실패는 캐시 안 함" 전제가 실제로는 "reject되는 실패"에만
+  // 성립했다. 실사용자 운영 환경에서 ST.getFileURL(Storage getDownloadURL())이 reject도
+  // resolve도 하지 않고 영원히 pending 상태로 멈추는 사례가 보고됐는데, 이 경우
+  // entry.promise가 절대 settle되지 않으니 위 .catch()가 호출될 기회 자체가 없어 캐시에서
+  // 안 지워지고, "다시 시도" 버튼도 못 뜬 채 "불러오는 중…"에 영원히 머문다(§요청 6이
+  // 실제로 지켜지려면 타임아웃이 반드시 있어야 하는데 직전 라운드에 빠져 있었다). 아래
+  // DOC_URL_TIMEOUT_MS로 감싸서, 응답이 그 시간 안에 안 오면 강제로 reject시키고 캐시를
+  // 지워 재시도가 항상 새 요청을 다시 보낼 수 있게 한다. 정상적으로 빠르게 끝나는 요청은
+  // Promise.race에서 실제 응답이 먼저 settle되므로 지연이 전혀 없다.
+  const DOC_URL_TIMEOUT_MS = 15000;
+  function withDocUrlTimeout(promise){
+    return new Promise((resolve, reject)=>{
+      let settled = false;
+      const timer = setTimeout(()=>{
+        if(settled) return;
+        settled = true;
+        reject(Object.assign(new Error('TIMEOUT'), { code:'TIMEOUT' }));
+      }, DOC_URL_TIMEOUT_MS);
+      promise.then(v=>{
+        if(settled) return; settled = true; clearTimeout(timer); resolve(v);
+      }, err=>{
+        if(settled) return; settled = true; clearTimeout(timer); reject(err);
+      });
+    });
+  }
   const cloudDocUrlCache = {};
   function invalidateDocUrlCache(id){ delete cloudDocUrlCache[id]; }
   // getDocUrl: 보기/다운로드/미리보기가 실제로 쓰는 유일한 진입점(Promise). 로컬 전용 파일은
@@ -24183,7 +24215,11 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(cached.promise) return cached.promise; // 같은 파일을 거의 동시에 두 번 클릭해도 Storage 요청은 한 번만 나간다.
     }
     const entry = { storagePath: doc.storagePath, promise: null, url: null };
-    entry.promise = ST.getFileURL(doc.storagePath).then(url=>{
+    // withDocUrlTimeout로 감싸도 실제 ST.getFileURL 요청은 백그라운드에서 계속 진행되며,
+    // 늦게라도 성공하면 그 결과는 그냥 버려진다(이 entry는 이미 캐시에서 지워진 뒤이므로
+    // 다음 호출은 새 요청을 새로 보낸다) — 응답이 없는 요청을 취소할 방법은 없지만, 화면이
+    // 그 요청을 영원히 기다리게 두지는 않는다.
+    entry.promise = withDocUrlTimeout(ST.getFileURL(doc.storagePath)).then(url=>{
       entry.url = url; entry.promise = null;
       return url;
     }).catch(err=>{
