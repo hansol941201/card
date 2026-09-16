@@ -2764,16 +2764,23 @@ body.map-modal-lock{ overflow:hidden; }
 .workq-mail-btn:hover{ background:#EEF2FA; }
 .workq-mail-btn.is-sent{ color:#0F7A42; border-color:#0F7A42; }
 .workq-mail-skip{ font-size:11px; color:var(--text-muted); }
-/* §메일 설정 2열 레이아웃 라운드(신규) — .app이 이미 1580px까지 넓은데 이 패널만
-   640px로 좁아서 넓은 화면 오른쪽이 빈 채로 남던 문제. 화면 폭에 맞춰 넓히고,
-   탭 아래 내용은 왼쪽(제목/본문 등 입력)·오른쪽(첨부/미리보기/저장) 2열 그리드로
-   나눠서 넓어진 폭을 실제로 활용한다. 발송 계정 설정·탭바는 기존처럼 전체 폭. */
-.mail-settings-panel{ max-width:1360px; width:100%; margin:0 auto; padding:0 24px; }
-.mail-template-layout{ display:grid; grid-template-columns:minmax(0,1fr) minmax(320px,380px); gap:24px; align-items:start; }
-.mail-template-left, .mail-template-right{ min-width:0; }
-@media (max-width:900px){
-  .mail-settings-panel{ padding:0 12px; }
+/* §메일 설정 레이아웃 전면 개편 라운드(신규, 최종 확정 시안) — .app이 이미 1480px까지
+   넓은데 이 패널이 그보다 더 좁게 잡혀 있어 오른쪽이 비던 문제. .app의 폭을 그대로
+   쓰도록 내부 max-width/padding 이중 제한을 없애고, 탭 아래 내용은 왼쪽(제목/본문 등
+   입력)·오른쪽(첨부/미리보기/저장) 2열 그리드로 나눠서 넓어진 폭을 실제로 활용한다.
+   발송 계정 설정·탭바는 기존처럼 전체 폭. */
+.mail-settings-panel{ max-width:1500px; width:100%; margin:0 auto; padding:0; box-sizing:border-box; }
+/* 오른쪽 첨부자료는 320~350px 고정, 왼쪽 메일 작성 영역이 나머지 폭을 전부 사용한다
+   (요청 [8] "왼쪽 editor 520px + 가운데 빈 공간 + 오른쪽 첨부자료" 구조 금지). */
+.mail-template-layout{ display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:20px; align-items:start; }
+.mail-template-left, .mail-template-right{ min-width:0; box-sizing:border-box; }
+/* §요청 [9][18] 왼쪽 메일 작성 영역·오른쪽 첨부자료 설정을 각각 하나의 흰 카드로 묶고,
+   두 카드의 상단(y축)을 정확히 맞춘다(2열 grid의 align-items:start가 이를 보장). */
+.mail-template-left{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px; }
+.mail-template-right{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px; display:flex; flex-direction:column; }
+@media (max-width:1000px){
   .mail-template-layout{ grid-template-columns:1fr; }
+  .mail-template-right{ width:100%; }
 }
 /* §메일 작성 영역 실폭 확대 라운드(신규) — 위 2열 그리드는 왼쪽 컬럼(.mail-template-left)
    자체를 넓혔지만, 그 안의 제목/본문 wrapper가 공용 .co-form-field(다른 폼들과 공유,
@@ -2781,20 +2788,27 @@ body.map-modal-lock{ overflow:hidden; }
    잘려 있었다(편집기 오른쪽에 큰 빈 공간이 남던 원인). 다른 화면의 .co-form-field는
    건드리지 않고, 메일 설정 왼쪽 컬럼 안에서만 그 제한을 풀어 컬럼 폭을 그대로 쓰게 한다. */
 .mail-template-left .co-form-field{ max-width:none; width:100%; box-sizing:border-box; }
+/* §요청 [10] 제목 input이 카드 폭 대부분을 쓰도록: 라벨+input을 한 줄 grid로 두지
+   않고(기존 개별 변수 버튼 구조를 유지해야 한다는 지시에 따라 배치만 정돈), input
+   자체가 카드 안에서 100% 폭을 그대로 채우게만 한다(위 max-width:none으로 이미 보장). */
+.mail-template-left .co-form-field input[type="text"]{ width:100%; box-sizing:border-box; }
+/* §요청 [7] 카드 아래 설명 + "이 메일 사용"은 2단 레이아웃 밖에서 전체 폭을 사용한다. */
+.mail-tpl-top-row{ margin-bottom:16px; }
 /* §메일 설정 보기편한형태 라운드(신규) — 페이지 제목(workq-header-row)이 아래
-   .mail-settings-panel(max-width:1360px, 중앙 정렬)과 다른 컨테이너라 화면 좌측에
-   붙어 보이던 문제. 같은 폭·중앙 정렬을 제목에도 그대로 적용(다른 탭 제목과 동일한
-   중앙 컨테이너를 따르게). 제목 자체의 폰트/마진 등은 기존 .workq-header 그대로 둔다. */
-.mail-settings-header-wrap{ max-width:1360px; width:100%; margin:0 auto; padding:0 24px; box-sizing:border-box; }
-@media (max-width:900px){
-  .mail-settings-header-wrap{ padding:0 12px; }
-}
-/* 발송 계정 설정(EmailJS 연결) 접힘 헤더 — 부차 설정인데 화면 전체 폭(1360px)을
-   그대로 차지해 이 화면에서 가장 큰 요소처럼 보이던 문제. 토글 버튼·펼침 패널의
-   너비를 본문 폭 정도로 줄이고, 패딩도 살짝 낮춘다(기능/열림·닫힘 로직은 그대로). */
-.mail-account-section{ max-width:640px; }
+   .mail-settings-panel과 다른 컨테이너라 화면 좌측에 붙어 보이던 문제. 같은 폭·정렬을
+   제목에도 그대로 적용한다. 제목 크기는 §요청 [3] 사양(24~28px/700)으로 이 화면
+   안에서만 덮어쓴다(다른 화면의 .workq-title은 그대로 22px/800 유지). */
+.mail-settings-header-wrap{ max-width:1500px; width:100%; margin:0 auto; padding:0; box-sizing:border-box; margin-bottom:18px; }
+.mail-settings-header-wrap .workq-title{ font-size:26px; font-weight:700; }
+.mail-settings-header-wrap .workq-subtitle{ font-size:13px; }
+/* 발송 계정 설정(EmailJS 연결) 접힘 헤더 — §요청 [4] 화면 상단에 가로로 긴 한 줄 카드로
+   배치(전체 폭), 높이 약 42~48px. 펼침/접힘 기능·EmailJS 로직은 그대로 둔다. */
+.mail-account-section{ margin-bottom:16px; }
 .mail-settings-section{ border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:14px; background:var(--surface); }
 .mail-settings-section-title{ font-size:13px; font-weight:700; color:var(--text); margin-bottom:8px; }
+/* §요청 [19] 첨부자료 카드 제목만 크게(17~19px)·남색으로 — 다른 곳의 공용
+   .mail-settings-section-title(발송 계정 설정 등)은 그대로 둔다. */
+.mail-template-right > .mail-settings-section-title{ font-size:18px; font-weight:700; color:var(--navy); margin-bottom:4px; }
 .mail-settings-help{ font-size:11.5px; color:var(--text-muted); line-height:1.5; margin-bottom:10px; }
 .mail-settings-help code{ background:#F0F3F9; padding:1px 4px; border-radius:4px; }
 .mail-settings-save-msg{ font-size:12px; color:#0F7A42; margin-bottom:8px; }
@@ -2866,23 +2880,25 @@ body.map-modal-lock{ overflow:hidden; }
    패널(사용여부/시점안내/제목/본문/자리표시자/첨부자료/동영상/미리보기/저장). 기존
    .mail-settings-section/.co-form-field/.mail-settings-help 토큰은 그대로 재사용. */
 .mail-account-section{ margin-bottom:14px; }
-.mail-account-toggle{ display:flex; align-items:center; gap:6px; width:100%; text-align:left; background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 12px; font-size:12.5px; font-weight:700; color:var(--navy); cursor:pointer; }
+.mail-account-toggle{ display:flex; align-items:center; gap:6px; width:100%; min-height:44px; box-sizing:border-box; text-align:left; background:#fff; border:1px solid #dbe4ef; border-radius:9px; padding:8px 14px; font-size:13px; font-weight:700; color:var(--navy); cursor:pointer; }
 .mail-account-chevron{ display:inline-block; font-size:10px; color:var(--text-muted); transition:transform .12s; }
 .mail-account-chevron.is-open{ transform:rotate(90deg); }
 .mail-account-panel{ border:1px solid var(--line); border-top:0; border-radius:0 0 8px 8px; padding:12px; background:#fff; }
 /* §메일 설정 상단 카드형 선택 라운드(신규) — 사용자 확정 지시: 텍스트 탭 대신
    4개의 가로형 선택 카드로. data-mail-tab 클릭 위임·키보드 좌우이동(§기존
    tabsBar 리스너)은 .mail-tab-btn 클래스/속성 이름을 그대로 유지해 손대지 않았다. */
-.mail-tabs-bar{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px; }
-.mail-tab-btn-wrap{ display:flex; flex:1 1 220px; min-width:200px; }
+/* §요청 [5] PC에서는 반드시 4개가 한 줄에 보이도록 grid로 고정(예전 flex-wrap은 화면이
+   좁아지는 중간 폭에서 3+1로 줄바꿈될 수 있었다). */
+.mail-tabs-bar{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:12px; margin-bottom:16px; }
+.mail-tab-btn-wrap{ display:flex; min-width:0; }
 .mail-tab-btn{
-  position:relative; display:flex; align-items:flex-start; gap:9px; width:100%;
-  padding:12px 14px; text-align:left; white-space:normal;
+  position:relative; display:flex; align-items:flex-start; gap:9px; width:100%; min-height:76px;
+  padding:14px 16px; text-align:left; white-space:normal; box-sizing:border-box;
   background:#fff; border:1px solid var(--line); border-radius:10px;
   color:var(--text); cursor:pointer; font-size:13px; font-weight:400;
 }
 .mail-tab-btn:hover{ border-color:#B9C8DE; }
-.mail-tab-btn.is-active{ background:#EEF3FC; border-color:var(--navy); }
+.mail-tab-btn.is-active{ background:#EEF3FC; border:1.5px solid var(--navy); padding:13.5px 15.5px; }
 .mail-tab-btn:focus-visible{ outline:2px solid var(--navy); outline-offset:1px; }
 .mail-type-card-icon{ flex:0 0 auto; width:16px; height:16px; margin-top:2px; color:var(--text-muted); }
 .mail-tab-btn.is-active .mail-type-card-icon{ color:var(--navy); }
@@ -2891,7 +2907,8 @@ body.map-modal-lock{ overflow:hidden; }
 .mail-tab-btn.is-active .mail-type-card-title{ color:var(--navy); }
 .mail-type-card-sub{ font-size:11px; color:var(--text-muted); }
 .mail-tab-dirty-dot{ display:inline-block; width:6px; height:6px; border-radius:50%; background:#E0862B; margin-left:5px; vertical-align:middle; }
-@media (max-width:560px){ .mail-tab-btn-wrap{ flex:1 1 100%; } }
+@media (max-width:700px){ .mail-tabs-bar{ grid-template-columns:1fr 1fr; } }
+@media (max-width:420px){ .mail-tabs-bar{ grid-template-columns:1fr; } }
 .mail-tab-rename-btn{ background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:12px; padding:4px 6px; border-radius:5px; }
 .mail-tab-rename-btn:hover{ background:var(--bg); color:var(--navy); }
 .mail-tab-rename-input{ font-size:12.5px; padding:5px 6px; border:1px solid var(--navy); border-radius:5px; width:150px; }
@@ -2985,7 +3002,7 @@ table.pdf-doc-table{ width:100%; border-collapse:collapse; font-size:11px; }
 table.pdf-doc-table th, table.pdf-doc-table td{ border:1px solid var(--line); padding:4px 6px; text-align:left; word-break:break-all; vertical-align:top; }
 table.pdf-doc-table thead{ background:var(--bg); }
 .pdf-doc-empty{ text-align:center; color:var(--text-muted); }
-.mail-tpl-preview-row{ display:flex; align-items:center; gap:10px; margin:6px 0; flex-wrap:wrap; }
+.mail-tpl-preview-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:6px 0; flex-wrap:wrap; }
 .mail-tpl-preview-row .co-text-action{ white-space:nowrap; }
 .mail-preview-box{ background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:10px; }
 .mail-preview-subject{ font-size:13px; font-weight:700; color:var(--text); margin-bottom:6px; }
@@ -2997,7 +3014,10 @@ table.pdf-doc-table thead{ background:var(--bg); }
    이미 minmax(0,1fr)로 넓게 잡혀 있어(§메일 설정 2열 레이아웃 라운드) 폭은 그대로
    따라가고, 높이만 430~500px 권장 구간으로 올린다(내부 스크롤은 유지 — max-height
    상한도 함께 올려 한 화면에서 훨씬 더 많은 본문이 보이게 한다). */
-.mail-body-editor{ min-height:460px; max-height:680px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:12px 14px; font-size:14px; line-height:1.7; color:var(--text); background:#fff; font-family:inherit; }
+/* §요청 [14][15] 본문 편집기 — 왼쪽 카드의 거의 전체 폭(§레이아웃 개편 라운드로 카드
+   자체가 넓어져 있음)을 그대로 쓰고, 높이는 500~560px 권장 구간(600~650px에서 내부
+   스크롤)으로 키운다. */
+.mail-body-editor{ width:100%; max-width:none; min-width:0; min-height:520px; max-height:640px; overflow-y:auto; box-sizing:border-box; border:1px solid var(--line); border-radius:8px; padding:12px 14px; font-size:14px; line-height:1.7; color:var(--text); background:#fff; font-family:inherit; }
 /* §메일 설정 보기편한형태 라운드(신규) — 붙여넣기 등으로 본문에 남아있는 형광펜류
    배경 하이라이트(노란색)의 출처는 사용자가 직접 입력/붙여넣은 인라인 스타일이고
    앱이 어떤 서류명을 자동으로 강조하는 로직은 이 파일 어디에도 없다(§확인 완료 —
@@ -3028,7 +3048,11 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .mail-preview-body-html img{ max-width:100%; height:auto; display:block; margin:8px 0; border-radius:4px; }
 .mail-preview-global-img{ font-size:11.5px; color:var(--text-muted); margin-bottom:6px; }
 .mail-preview-global-img img{ max-width:100%; height:auto; border-radius:4px; border:1px solid var(--line); }
-.mail-tpl-save-bar{ display:flex; align-items:center; gap:10px; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
+/* §요청 [26][27] 첨부자료 카드 하단 저장 버튼 — 카드 폭에 맞춘 넓은 남색 버튼. 카드가
+   display:flex; flex-direction:column이라(§레이아웃 개편 라운드) margin-top:auto로
+   저장 바를 억지 여백 없이 카드 맨 아래에 자연스럽게 붙인다. */
+.mail-tpl-save-bar{ display:flex; flex-direction:column; align-items:stretch; gap:8px; margin-top:auto; padding-top:14px; border-top:1px solid var(--line); }
+.mail-tpl-save-bar .btn-primary-action{ width:100%; box-sizing:border-box; height:48px; border-radius:8px; font-size:14px; font-weight:700; }
 .mail-dirty-note{ font-size:11.5px; color:#B5620A; }
 @media (max-width: 640px){
   .mail-tab-rename-input{ width:110px; }
@@ -16668,10 +16692,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 전혀 안 바꿨고 배치만 옮겼다(§요청, 넓은 화면 오른쪽 여백 활용).
     return `
       <div class="mail-tab-panel" data-mail-panel="${esc(key)}" style="display:${mailSettingsUI.activeTab===key?'block':'none'};">
+        <div class="mail-tpl-top-row">
+          <div class="mail-tpl-timing">${esc(MAIL_TEMPLATE_TIMING_TEXT[key])}</div>
+          <label class="mail-tpl-enable" style="float:none; display:inline-flex; margin-bottom:0;"><input type="checkbox" id="mailSetEnabled_${key}" ${tpl.enabled!==false?'checked':''} /> 이 메일 사용</label>
+        </div>
         <div class="mail-template-layout">
           <div class="mail-template-left">
-            <div class="mail-tpl-timing">${esc(MAIL_TEMPLATE_TIMING_TEXT[key])}</div>
-            <label class="mail-tpl-enable" style="float:none; display:inline-flex; margin-bottom:10px;"><input type="checkbox" id="mailSetEnabled_${key}" ${tpl.enabled!==false?'checked':''} /> 이 메일 사용</label>
             <div class="co-form-field"><label>제목</label><input type="text" id="mailSetSubject_${key}" value="${esc(tpl.subjectTemplate)}" /></div>
             ${placeholderRow('mailSetSubject_' + key, '제목')}
             <div class="co-form-field">
@@ -16693,11 +16719,11 @@ window.SHIN2_CRM_APP_INIT = function(){
             ${mailAssetListHtml(key, asset, meta)}
             ${attachSelectHtml}
             ${hiddenVideoInput}
-            <div class="mail-settings-updated-at">${updatedText}</div>
             <div class="mail-tpl-preview-row">
+              <span class="mail-settings-updated-at" style="margin-top:0;">${updatedText}</span>
               <button type="button" class="co-text-action" id="mailPreviewBtn_${key}">미리보기</button>
-              <span class="mail-settings-help">미리보기는 예시 업체정보로만 표시되며 실제로 발송되지 않습니다.</span>
             </div>
+            <div class="mail-settings-help" style="margin-top:-4px;">미리보기는 예시 업체정보로만 표시되며 실제로 발송되지 않습니다.</div>
             <div class="mail-preview-box" id="mailPreviewBox_${key}" style="display:none;"></div>
             <div class="mail-tpl-save-bar">
               <button type="button" class="btn-primary-action" id="mailTplSaveBtn_${key}">변경사항 저장</button>
