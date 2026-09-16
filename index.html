@@ -2758,7 +2758,7 @@ body.map-modal-lock{ overflow:hidden; }
    탭 아래 내용은 왼쪽(제목/본문 등 입력)·오른쪽(첨부/미리보기/저장) 2열 그리드로
    나눠서 넓어진 폭을 실제로 활용한다. 발송 계정 설정·탭바는 기존처럼 전체 폭. */
 .mail-settings-panel{ max-width:1360px; width:100%; margin:0 auto; padding:0 24px; }
-.mail-template-layout{ display:grid; grid-template-columns:minmax(0,1.8fr) minmax(320px,1fr); gap:24px; align-items:start; }
+.mail-template-layout{ display:grid; grid-template-columns:minmax(0,1fr) minmax(320px,380px); gap:24px; align-items:start; }
 .mail-template-left, .mail-template-right{ min-width:0; }
 @media (max-width:900px){
   .mail-settings-panel{ padding:0 12px; }
@@ -2853,12 +2853,28 @@ body.map-modal-lock{ overflow:hidden; }
 .mail-account-chevron{ display:inline-block; font-size:10px; color:var(--text-muted); transition:transform .12s; }
 .mail-account-chevron.is-open{ transform:rotate(90deg); }
 .mail-account-panel{ border:1px solid var(--line); border-top:0; border-radius:0 0 8px 8px; padding:12px; background:#fff; }
-.mail-tabs-bar{ display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; margin-bottom:12px; border-bottom:1px solid var(--line); }
-.mail-tab-btn-wrap{ display:inline-flex; align-items:center; gap:2px; flex:0 0 auto; }
-.mail-tab-btn{ position:relative; white-space:nowrap; padding:9px 14px; font-size:12.5px; font-weight:650; color:var(--text-muted); background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; }
-.mail-tab-btn.is-active{ color:var(--navy); border-bottom-color:var(--navy); }
+/* §메일 설정 상단 카드형 선택 라운드(신규) — 사용자 확정 지시: 텍스트 탭 대신
+   4개의 가로형 선택 카드로. data-mail-tab 클릭 위임·키보드 좌우이동(§기존
+   tabsBar 리스너)은 .mail-tab-btn 클래스/속성 이름을 그대로 유지해 손대지 않았다. */
+.mail-tabs-bar{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px; }
+.mail-tab-btn-wrap{ display:flex; flex:1 1 220px; min-width:200px; }
+.mail-tab-btn{
+  position:relative; display:flex; align-items:flex-start; gap:9px; width:100%;
+  padding:12px 14px; text-align:left; white-space:normal;
+  background:#fff; border:1px solid var(--line); border-radius:10px;
+  color:var(--text); cursor:pointer; font-size:13px; font-weight:400;
+}
+.mail-tab-btn:hover{ border-color:#B9C8DE; }
+.mail-tab-btn.is-active{ background:#EEF3FC; border-color:var(--navy); }
 .mail-tab-btn:focus-visible{ outline:2px solid var(--navy); outline-offset:1px; }
+.mail-type-card-icon{ flex:0 0 auto; width:16px; height:16px; margin-top:2px; color:var(--text-muted); }
+.mail-tab-btn.is-active .mail-type-card-icon{ color:var(--navy); }
+.mail-type-card-body{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.mail-type-card-title{ font-size:13px; font-weight:700; color:var(--text); display:inline-flex; align-items:center; gap:5px; }
+.mail-tab-btn.is-active .mail-type-card-title{ color:var(--navy); }
+.mail-type-card-sub{ font-size:11px; color:var(--text-muted); }
 .mail-tab-dirty-dot{ display:inline-block; width:6px; height:6px; border-radius:50%; background:#E0862B; margin-left:5px; vertical-align:middle; }
+@media (max-width:560px){ .mail-tab-btn-wrap{ flex:1 1 100%; } }
 .mail-tab-rename-btn{ background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:12px; padding:4px 6px; border-radius:5px; }
 .mail-tab-rename-btn:hover{ background:var(--bg); color:var(--navy); }
 .mail-tab-rename-input{ font-size:12.5px; padding:5px 6px; border:1px solid var(--navy); border-radius:5px; width:150px; }
@@ -2905,6 +2921,23 @@ body.map-modal-lock{ overflow:hidden; }
 .mail-asset-authgate.is-blocked{ background:#FDECEC; color:#B3261E; }
 .mail-asset-dropzone.is-locked, [data-mail-global-img-drop].is-locked{ opacity:.55; cursor:not-allowed; }
 [data-mail-body-img-add].is-locked{ opacity:.5; cursor:not-allowed; }
+/* §첨부자료 UI 통합 라운드(신규) — 문서·이미지 박스/동영상 박스 2개를 등록 파일
+   한 목록(.mail-asset-list)으로 합쳤다. 저장 필드·업로드 함수는 그대로이고(§요청
+   "백엔드/저장 구조는 변경 금지"), 화면에서만 한 목록·한 추가영역으로 보이게
+   한다. .mail-asset-add에도 기존 .mail-asset-dropzone 클래스를 함께 달아
+   로그인 잠금(is-locked)·포커스 스타일을 그대로 재사용했다. */
+.mail-asset-list{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+.mail-asset-row{ display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; font-size:12.5px; color:var(--text); }
+.mail-asset-row-icon{ flex:0 0 auto; width:15px; height:15px; color:var(--text-muted); display:flex; }
+.mail-asset-row-name{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mail-asset-row-size{ flex:0 0 auto; color:var(--text-muted); font-size:11px; white-space:nowrap; }
+.mail-asset-row-btn{ flex:0 0 auto; background:none; border:none; cursor:pointer; color:var(--text-muted); font-size:13px; padding:3px 5px; border-radius:5px; line-height:1; }
+.mail-asset-row-btn:hover{ background:var(--bg); color:var(--navy); }
+.mail-asset-row-btn.danger:hover{ background:var(--bg); color:#B3261E; }
+.mail-asset-add{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:10px 12px; font-size:12px; margin-bottom:8px; text-align:left; }
+.mail-asset-add-plus{ font-weight:700; color:var(--navy); }
+.mail-asset-add-hint{ font-size:11px; color:var(--text-muted); }
+.mail-asset-limit-line{ margin-bottom:8px; }
 /* §고객관리 목록 출력(PDF) 라운드(신규) — 목록 공개 범위 체크박스 */
 .dist-list-row{ display:flex; flex-wrap:wrap; gap:12px; }
 .dist-list-check{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--text); font-weight:400; }
@@ -2976,7 +3009,6 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .mail-tpl-save-bar{ display:flex; align-items:center; gap:10px; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
 .mail-dirty-note{ font-size:11.5px; color:#B5620A; }
 @media (max-width: 640px){
-  .mail-tabs-bar{ flex-wrap:nowrap; }
   .mail-tab-rename-input{ width:110px; }
 }
 .mail-compose-panel .pi-body{ max-height:70vh; overflow-y:auto; }
@@ -16239,10 +16271,33 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 없으면(=한 번도 이름을 안 바꿈) 이 기본값을 쓴다. 내부 키(questionnaire 등)와
   // 업무관리/등록 연결 지점은 이름을 바꿔도 전혀 변하지 않는다(아래 8번 참고).
   const MAIL_TEMPLATE_TAB_LABEL_DEFAULT = {
-    questionnaire: '1차 메일 · 질문서',
-    firstMeeting: '2차 메일 · 1차 미팅 제안',
-    postSecondMeeting: '3차 메일 · 2차 미팅 후 안내',
-    documentRequest: '서류 요청'
+    questionnaire: '질문서',
+    firstMeeting: '1차 미팅 제안',
+    postSecondMeeting: '2차 미팅 제안',
+    documentRequest: 'MOU 체결 서류 요청'
+  };
+  // §메일 설정 상단 카드형 선택 라운드(신규) — 카드 보조 문구(사용자 확정 문구
+  // 그대로). MAIL_TEMPLATE_TIMING_TEXT(왼쪽 패널의 긴 안내문)와는 다른 자리에
+  // 쓰는 짧은 문구라 별도 상수로 둔다(기존 문구는 그대로 유지).
+  const MAIL_TYPE_CARD_SUBTITLE = {
+    questionnaire: '신규 업체 등록 시',
+    firstMeeting: '미팅 일정 조율',
+    postSecondMeeting: '당사 직접 방문',
+    documentRequest: '협약 진행'
+  };
+  // 카드 왼쪽의 작은 심플 아이콘(§요청 "필요하면") — 단색 선 아이콘, currentColor로
+  // 선택/미선택 색이 자동으로 따라간다.
+  const MAIL_TYPE_CARD_ICON = {
+    questionnaire: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h6l3 3v9H4z"/><path d="M9 2v3h3"/><path d="M6 9h5M6 11.3h3.4"/></svg>',
+    firstMeeting: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.3" width="12" height="10.2" rx="1.3"/><path d="M2 6.3h12M5 1.8v3M11 1.8v3"/></svg>',
+    postSecondMeeting: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="10" height="12.5" rx="1"/><path d="M6 5h1.2M8.8 5H10M6 7.5h1.2M8.8 7.5H10M6 10h1.2M8.8 10H10"/></svg>',
+    documentRequest: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h6l3 3v9H4z"/><path d="M9 2v3h3"/><path d="M6.1 9.4l1.3 1.3 2.6-2.9"/></svg>'
+  };
+  // 첨부자료 한 줄 카드의 파일종류 아이콘(§요청 [6]) — 문서/이미지 슬롯(attachmentDoc)과
+  // 동영상 슬롯(video) 두 가지만 구분하면 된다(assetKind 자체는 기존 그대로).
+  const MAIL_ASSET_ROW_ICON = {
+    doc: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1.5h6l3 3v10h-9z"/><path d="M10 1.5v3h3"/></svg>',
+    video: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="3.3" width="13" height="9.4" rx="1.3"/><path d="M6.5 6.2l4 1.8-4 1.8z" fill="currentColor" stroke="none"/></svg>'
   };
   // 발송 시점 안내 — 새 판정 로직이 아니라 각 템플릿이 실제로 연결된 지점(§8 원문:
   // 신규 등록→questionnaire / 1차미팅 대상→firstMeeting / 2차미팅완료→postSecondMeeting /
@@ -16382,53 +16437,74 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="mail-diag-panel" id="mailGlobalImgDiag" style="display:none;"></div>
       </div>`;
   }
-  function mailAssetBoxHtml(key, assetKind, asset, meta){
+  // §첨부자료 UI 통합 라운드(신규) — 등록된 파일 한 줄 카드(파일종류 아이콘 + 파일명 +
+  // 파일크기 + 삭제 X, §요청 [6]). rec가 없으면 아무것도 렌더링하지 않는다(빈 상태
+  // 문구는 mailAssetListHtml에서 attachmentDoc/video 둘 다 없을 때만 한 번 보여준다).
+  // data-mail-asset-open/-remove/-kind 속성은 기존 mailAssetBoxHtml이 쓰던 것과 완전히
+  // 동일 — bindMailSettingsView의 기존 위임 클릭 핸들러를 손대지 않고 그대로 재사용한다.
+  function mailAssetRowHtml(key, assetKind, asset){
     const rec = asset && asset[assetKind];
+    if(!rec) return '';
     const isVideo = assetKind === 'video';
-    const label = isVideo ? '동영상' : '문서·이미지';
-    const shareBadge = meta.externalShareConfirmed
-      ? `<span class="mail-asset-share-badge is-ok">외부 공유 가능</span>`
-      : `<span class="mail-asset-share-badge is-warn">공유 설정 필요</span>`;
-    const limitText = `허용 형식: ${(D.MAIL_ASSET_ALLOWED_EXT[assetKind]||[]).join(', ')} · 최대 ${mailAssetSizeLabel(D.MAIL_ASSET_MAX_CLOUD_BYTES[assetKind])}`;
-    const fileRow = rec ? `
-        <div class="mail-asset-file-row">
-          <span class="mail-asset-file-name">${esc(rec.fileName)}</span>
-          <span class="mail-asset-file-meta">${esc(mailAssetSizeLabel(rec.size))} · ${esc(fmtDate(rec.uploadedAt))}</span>
-        </div>
-        <div class="mail-asset-file-actions">
-          <button type="button" class="co-text-action" data-mail-asset-open="${esc(key)}" data-mail-asset-kind="${assetKind}">${isVideo ? '재생 확인' : '미리보기/다운로드'}</button>
-          <button type="button" class="co-text-action" data-mail-asset-replace="${esc(key)}" data-mail-asset-kind="${assetKind}">교체</button>
-          <button type="button" class="co-text-action danger" data-mail-asset-remove="${esc(key)}" data-mail-asset-kind="${assetKind}">제거</button>
-        </div>
-        <div class="mail-asset-send-note">${isVideo ? '동영상은 이메일 첨부가 아닌 시청 링크로 발송됩니다.' : '이메일 첨부가 아닌 다운로드 링크로 발송됩니다.'}</div>
-      ` : `<div class="mail-asset-empty">등록된 ${label} 파일이 없습니다.</div>`;
+    const label = isVideo ? '재생 확인' : '미리보기/다운로드';
     return `
-      <div class="mail-asset-box" data-mail-asset-box="${esc(key)}" data-mail-asset-kind="${assetKind}">
-        <div class="mail-asset-box-head"><span>${label} 파일</span>${shareBadge}</div>
-        <div class="mail-asset-limit-text">${esc(limitText)}</div>
-        <span data-mail-authgate style="display:${mailAssetAuthNoticeHtml() ? 'block' : 'none'};">${mailAssetAuthNoticeHtml()}</span>
-        ${fileRow}
-        <div class="mail-asset-dropzone" data-mail-asset-drop="${esc(key)}" data-mail-asset-kind="${assetKind}" tabindex="0" role="button" aria-label="${label} 파일 선택 또는 드래그하여 업로드">
-          파일을 여기로 끌어다 놓거나 클릭해서 선택
-          <input type="file" class="mail-asset-file-input" id="mailAssetInput_${assetKind}_${key}" style="display:none;" accept="${(D.MAIL_ASSET_ALLOWED_EXT[assetKind]||[]).map(e=>'.'+e).join(',')}" />
-        </div>
-        <div class="mail-asset-progress" id="mailAssetProgress_${assetKind}_${key}" style="display:none;"></div>
-        <div class="mail-asset-status" id="mailAssetStatus_${assetKind}_${key}"></div>
-        <div class="mail-diag-panel" id="mailAssetDiag_${assetKind}_${key}" style="display:none;"></div>
+      <div class="mail-asset-row" data-mail-asset-kind="${assetKind}">
+        <span class="mail-asset-row-icon" aria-hidden="true">${isVideo ? MAIL_ASSET_ROW_ICON.video : MAIL_ASSET_ROW_ICON.doc}</span>
+        <span class="mail-asset-row-name" title="${esc(rec.fileName)}">${esc(rec.fileName)}</span>
+        <span class="mail-asset-row-size">${esc(mailAssetSizeLabel(rec.size))}</span>
+        <button type="button" class="mail-asset-row-btn" data-mail-asset-open="${esc(key)}" data-mail-asset-kind="${assetKind}" title="${label}" aria-label="${label}">↗</button>
+        <button type="button" class="mail-asset-row-btn danger" data-mail-asset-remove="${esc(key)}" data-mail-asset-kind="${assetKind}" title="삭제" aria-label="삭제">×</button>
       </div>`;
   }
+  // 문서(attachmentDoc)·동영상(video) 확장자를 하나의 accept 목록으로 합친다 —
+  // 업로드/검증 로직(D.isAllowedMailAssetFile, MAIL_ASSET_MAX_CLOUD_BYTES)은 그대로
+  // assetKind별로 따로 있고, 이건 파일선택창에 보여줄 확장자 힌트만 합친 것(§요청 [7]
+  // "백엔드/저장 구조는 변경하지 말고 화면에서만 하나처럼").
+  function mailAssetCombinedAcceptAttr(){
+    const exts = [].concat(D.MAIL_ASSET_ALLOWED_EXT.attachmentDoc||[], D.MAIL_ASSET_ALLOWED_EXT.video||[]);
+    return exts.map(e=> '.'+e).join(',');
+  }
+  // 드롭/선택된 파일이 문서인지 동영상인지 확장자로만 판별해 기존 assetKind별 업로드
+  // 함수(mailAssetHandleUpload → D.uploadMailAssetFile)로 그대로 넘긴다 — 새 업로드
+  // 경로를 만들지 않는다(§요청 [7]). 둘 다 아닌 확장자면 attachmentDoc 검증 로직을
+  // 타게 해서(기존과 동일하게) "허용되지 않는 파일 형식" 오류가 뜨게 한다.
+  function mailAssetDetectKind(file){
+    const ext = (file && file.name || '').split('.').pop().toLowerCase();
+    return (D.MAIL_ASSET_ALLOWED_EXT.video||[]).indexOf(ext) !== -1 ? 'video' : 'attachmentDoc';
+  }
+  function mailAssetListHtml(key, asset, meta){
+    const rows = mailAssetRowHtml(key, 'attachmentDoc', asset) + mailAssetRowHtml(key, 'video', asset);
+    const empty = (!asset || (!asset.attachmentDoc && !asset.video)) ? `<div class="mail-asset-empty">등록된 파일이 없습니다.</div>` : '';
+    const limitTitle = `문서·이미지: ${(D.MAIL_ASSET_ALLOWED_EXT.attachmentDoc||[]).join(', ')} · 최대 ${mailAssetSizeLabel(D.MAIL_ASSET_MAX_CLOUD_BYTES.attachmentDoc)} / 동영상: ${(D.MAIL_ASSET_ALLOWED_EXT.video||[]).join(', ')} · 최대 ${mailAssetSizeLabel(D.MAIL_ASSET_MAX_CLOUD_BYTES.video)}`;
+    return `
+      <span data-mail-authgate style="display:${mailAssetAuthNoticeHtml() ? 'block' : 'none'};">${mailAssetAuthNoticeHtml()}</span>
+      <div class="mail-asset-list">${rows}${empty}</div>
+      <div class="mail-asset-dropzone mail-asset-add" data-mail-asset-add="${esc(key)}" tabindex="0" role="button" aria-label="첨부파일 추가 또는 드래그하여 업로드">
+        <span class="mail-asset-add-plus" aria-hidden="true">+</span> 파일 추가
+        <span class="mail-asset-add-hint">또는 이 영역에 끌어다 놓으세요</span>
+        <input type="file" class="mail-asset-file-input" id="mailAssetAddInput_${key}" style="display:none;" accept="${mailAssetCombinedAcceptAttr()}" />
+      </div>
+      <div class="mail-asset-progress" id="mailAssetProgress_${key}" style="display:none;"></div>
+      <div class="mail-asset-status" id="mailAssetStatus_${key}"></div>
+      <div class="mail-diag-panel" id="mailAssetDiag_${key}" style="display:none;"></div>
+      <div class="mail-settings-help mail-asset-limit-line" title="${esc(limitTitle)}">허용 형식: PDF · 이미지 · 문서 · 동영상 / 등록된 파일만 실제 메일에 첨부됩니다.</div>`;
+  }
   function mailTabPanelHtml(key, tpl, asset, meta){
-    // documentRequest는 첨부 문서 슬롯 하나를 고정 지정하는 대신 발송 시점에 사용자가
-    // 미등록/재요청 서류를 직접 골라 본문에 자동으로 채운다(§7, 기존 로직 그대로) —
-    // 그래서 "서류함 종류" select는 questionnaire/firstMeeting/postSecondMeeting에만.
+    // §첨부자료 UI 단순화 라운드(신규) — 사용자 확정 지시: 오른쪽의 "서류함 종류(선택)"
+    // 드롭다운과 "기존 동영상 링크" 입력란을 화면에서 제거(왼쪽에서 이미 메일 종류를
+    // 고르므로 중복 UI로 보임). 단, 코드 확인 결과 이 두 값(attachmentDocType/videoUrl)은
+    // 지금도 미리보기·발송 로직(mailTabPanelHtml 밖 openMailComposeModal 등)에서 실제로
+    // 읽혀 쓰이고 있어 필드 자체를 지우면 기존 저장 데이터가 저장할 때마다 null로
+    // 덮어써질 위험이 있다(§요청 [15] "기존 저장 데이터 파괴 금지") — 그래서 입력 UI만
+    // 화면에서 숨기고(display:none), 기존 값을 그대로 담은 채 DOM에는 남겨서
+    // saveMailTplTab이 지금까지 저장된 값을 그대로 다시 저장하게 둔다(완전 삭제가
+    // 아니라 숨김 처리).
     const attachSelectHtml = key === 'documentRequest' ? '' : `
-      <div class="co-form-field"><label>서류함 종류(선택, 기존 기능)</label>
-        <select id="mailSetAttach_${key}">
-          <option value="">선택 안 함</option>
-          ${DOC_TYPES.map(([type,label])=> `<option value="${esc(type)}" ${tpl.attachmentDocType===type?'selected':''}>${esc(label)}</option>`).join('')}
-        </select>
-        <div class="mail-settings-help">참고: 이건 그 업체 자신의 서류함에서 찾는 기존 기능입니다. 아래 "공통 발송자료"는 모든 업체에 공통으로 보내는 별도의 자료입니다 — 고객별 민감 서류(사업자등록증·통장사본 등)를 자동으로 가져오지 않습니다.</div>
-      </div>`;
+      <select id="mailSetAttach_${key}" style="display:none;" aria-hidden="true">
+        <option value="">선택 안 함</option>
+        ${DOC_TYPES.map(([type,label])=> `<option value="${esc(type)}" ${tpl.attachmentDocType===type?'selected':''}>${esc(label)}</option>`).join('')}
+      </select>`;
+    const hiddenVideoInput = `<input type="text" id="mailSetVideo_${key}" style="display:none;" aria-hidden="true" value="${esc(tpl.videoUrl||'')}" />`;
     const updatedText = tpl.updatedAt ? `마지막 저장: ${esc(fmtDateTimeSmart(tpl.updatedAt))}` : '아직 저장한 적 없음(기본값 사용 중)';
     // §메일 설정 보기편한형태 라운드(신규) — 변수 칩이 제목 아래·본문 아래 두 번
     // 나와 "중복"처럼 보이던 문제. 실제로는 각각 다른 삽입 대상(data-ph-target)이라
@@ -16461,10 +16537,10 @@ window.SHIN2_CRM_APP_INIT = function(){
           </div>
           <div class="mail-template-right">
             <div class="mail-settings-section-title">첨부자료 설정</div>
+            <div class="mail-settings-help" style="margin-top:-4px;">이 메일 종류에만 연결된 자료입니다. 등록된 파일만 실제 메일에 첨부됩니다.</div>
+            ${mailAssetListHtml(key, asset, meta)}
             ${attachSelectHtml}
-            ${mailAssetBoxHtml(key, 'attachmentDoc', asset, meta)}
-            ${mailAssetBoxHtml(key, 'video', asset, meta)}
-            <div class="co-form-field"><label>또는 기존 동영상 링크(선택, 업로드 파일이 없을 때만 사용됨)</label><input type="text" id="mailSetVideo_${key}" placeholder="https://..." value="${esc(tpl.videoUrl||'')}" /></div>
+            ${hiddenVideoInput}
             <div class="mail-settings-updated-at">${updatedText}</div>
             <div class="mail-tpl-preview-row">
               <button type="button" class="co-text-action" id="mailPreviewBtn_${key}">미리보기</button>
@@ -16481,6 +16557,24 @@ window.SHIN2_CRM_APP_INIT = function(){
       </div>`;
   }
   function mailTabDisplayName(tpl, key){ return (tpl && tpl.displayName) ? tpl.displayName : MAIL_TEMPLATE_TAB_LABEL_DEFAULT[key]; }
+  // §메일 설정 상단 카드형 선택 라운드(신규) — 4개 카드 버튼 하나의 마크업을 여기
+  // 한 곳에만 두고 renderMailSettingsView(전체 렌더)·renderMailTabButtonWrap(버튼 하나만
+  // 다시 그리는 부분 렌더) 둘 다 재사용한다. 카드 전체(버튼 하나)가 클릭 대상이라
+  // data-mail-tab 하나로 충분 — 기존 연필(✎) 이름수정 버튼은 그리지 않는다(§요청 [3]
+  // "카드 자체가 선택/편집 대상이므로 불필요" — mailStartTabRename 자체는 지우지 않고
+  // 남겨뒀지만 이제 호출할 진입점이 없다).
+  function mailTypeCardButtonHtml(key, tpl){
+    const active = mailSettingsUI.activeTab === key;
+    const name = mailTabDisplayName(tpl, key);
+    return `
+      <button type="button" class="mail-tab-btn${active?' is-active':''}" role="tab" aria-selected="${active?'true':'false'}" data-mail-tab="${key}" id="mailTabBtn_${key}">
+        <span class="mail-type-card-icon" aria-hidden="true">${MAIL_TYPE_CARD_ICON[key]||''}</span>
+        <span class="mail-type-card-body">
+          <span class="mail-type-card-title">${esc(name)}<span class="mail-tab-dirty-dot" data-mail-tab-dirty-dot="${key}" style="display:${mailSettingsUI.dirty[key]?'inline-block':'none'};" title="${mailSettingsUI.dirty[key]?'저장하지 않은 변경사항이 있습니다':''}"></span></span>
+          <span class="mail-type-card-sub">${esc(MAIL_TYPE_CARD_SUBTITLE[key]||'')}</span>
+        </span>
+      </button>`;
+  }
   function renderMailSettingsView(){
     const wrap = document.getElementById('mailSettingsView');
     if(!wrap) return;
@@ -16525,14 +16619,7 @@ window.SHIN2_CRM_APP_INIT = function(){
           </div>
         </div>
         <div class="mail-tabs-bar" role="tablist" id="mailTabsBar">
-          ${MAIL_TEMPLATE_KEYS.map(key=> `
-            <span class="mail-tab-btn-wrap" id="mailTabWrap_${key}">
-              <button type="button" class="mail-tab-btn${mailSettingsUI.activeTab===key?' is-active':''}" role="tab" aria-selected="${mailSettingsUI.activeTab===key?'true':'false'}" data-mail-tab="${key}" id="mailTabBtn_${key}">
-                ${esc(mailTabDisplayName(s.mailTemplates[key], key))}
-                <span class="mail-tab-dirty-dot" data-mail-tab-dirty-dot="${key}" style="display:${mailSettingsUI.dirty[key]?'inline-block':'none'};" title="${mailSettingsUI.dirty[key]?'저장하지 않은 변경사항이 있습니다':''}"></span>
-              </button>
-              <button type="button" class="mail-tab-rename-btn" data-mail-tab-rename="${key}" aria-label="${esc(mailTabDisplayName(s.mailTemplates[key], key))} 탭 이름 수정" title="탭 이름 수정">✎</button>
-            </span>`).join('')}
+          ${MAIL_TEMPLATE_KEYS.map(key=> `<span class="mail-tab-btn-wrap" id="mailTabWrap_${key}">${mailTypeCardButtonHtml(key, s.mailTemplates[key])}</span>`).join('')}
         </div>
         <div class="mail-tab-panels" id="mailTabPanels">
           ${MAIL_TEMPLATE_KEYS.map(key=> mailTabPanelHtml(key, s.mailTemplates[key], assetByKey[key], meta)).join('')}
@@ -16670,8 +16757,14 @@ window.SHIN2_CRM_APP_INIT = function(){
       ['가장 최근 서류함 업로드', lastDoc ? `${esc(fmtDate(lastDoc.uploadedAt))} · ${lastDoc.localOnly ? '이 기기에만 저장(로컬)' : '클라우드 저장됨'}` : '(업로드 기록 없음)']
     ];
   }
+  // §첨부자료 UI 통합 라운드(신규) — 문서·동영상 박스가 하나의 목록으로 합쳐지면서
+  // 진단/상태/진행률 표시 자리도 assetKind별(mailAssetDiag_{kind}_{key})이 아니라
+  // 템플릿 키 하나(mailAssetDiag_{key})만 쓴다 — 업로드는 한 번에 파일 하나씩만
+  // 일어나므로 자리를 assetKind로 나눌 필요가 없다. 업로드/검증/저장 로직 자체(아래
+  // D.uploadMailAssetFile 호출부)는 그대로다 — 여기서 바뀐 건 결과를 "어디에 표시할지"
+  // DOM id뿐이다.
   function renderMailAssetUploadDiag(key, assetKind, err, path){
-    const el = document.getElementById(`mailAssetDiag_${assetKind}_${key}`);
+    const el = document.getElementById(`mailAssetDiag_${key}`);
     if(!el) return;
     const rows = buildMailAssetUploadDiagRows(err, path);
     el.style.display = 'block';
@@ -16682,9 +16775,9 @@ window.SHIN2_CRM_APP_INIT = function(){
   }
   function mailAssetHandleUpload(key, assetKind, file){
     if(!file) return;
-    const statusEl = document.getElementById(`mailAssetStatus_${assetKind}_${key}`);
-    const progEl = document.getElementById(`mailAssetProgress_${assetKind}_${key}`);
-    const diagEl = document.getElementById(`mailAssetDiag_${assetKind}_${key}`);
+    const statusEl = document.getElementById(`mailAssetStatus_${key}`);
+    const progEl = document.getElementById(`mailAssetProgress_${key}`);
+    const diagEl = document.getElementById(`mailAssetDiag_${key}`);
     if(diagEl) diagEl.style.display = 'none';
     if(!D.isAllowedMailAssetFile(assetKind, file)){
       if(statusEl){ statusEl.textContent = '허용되지 않는 파일 형식입니다.'; statusEl.classList.add('is-err'); }
@@ -17140,12 +17233,16 @@ window.SHIN2_CRM_APP_INIT = function(){
         }
         return;
       }
-      const dropzone = e.target.closest('[data-mail-asset-drop]');
-      if(dropzone && !e.target.closest('.mail-asset-file-input')){
-        const key = dropzone.getAttribute('data-mail-asset-drop');
-        const kind = dropzone.getAttribute('data-mail-asset-kind');
-        if(mailAssetBlockIfLocked(`mailAssetStatus_${kind}_${key}`)) return;
-        document.getElementById(`mailAssetInput_${kind}_${key}`).click();
+      // §첨부자료 UI 통합 라운드(신규) — 문서·동영상 박스 각각의 드롭존을 하나의
+      // "+ 파일 추가" 영역(data-mail-asset-add)으로 합쳤다. assetKind는 더 이상 화면에서
+      // 미리 고르지 않고, 실제 선택/드롭된 파일의 확장자로 mailAssetDetectKind가 판별해
+      // 기존 mailAssetHandleUpload(key, kind, file)로 그대로 넘긴다(업로드·검증·저장
+      // 로직은 100% 기존 그대로, §요청 [7]).
+      const addZone = e.target.closest('[data-mail-asset-add]');
+      if(addZone && !e.target.closest('.mail-asset-file-input')){
+        const key = addZone.getAttribute('data-mail-asset-add');
+        if(mailAssetBlockIfLocked(`mailAssetStatus_${key}`)) return;
+        document.getElementById(`mailAssetAddInput_${key}`).click();
         return;
       }
       const openBtn = e.target.closest('[data-mail-asset-open]');
@@ -17156,17 +17253,9 @@ window.SHIN2_CRM_APP_INIT = function(){
         const rec = asset && asset[kind];
         if(!rec) return;
         D.getMailAssetFileURL(rec.storagePath).then(url=> window.open(url, '_blank')).catch(()=>{
-          const statusEl = document.getElementById(`mailAssetStatus_${kind}_${key}`);
+          const statusEl = document.getElementById(`mailAssetStatus_${key}`);
           if(statusEl){ statusEl.textContent = '링크를 불러오지 못했습니다(로그인 상태 또는 Storage 규칙을 확인해주세요).'; statusEl.classList.add('is-err'); }
         });
-        return;
-      }
-      const replaceBtn = e.target.closest('[data-mail-asset-replace]');
-      if(replaceBtn){
-        const key = replaceBtn.getAttribute('data-mail-asset-replace');
-        const kind = replaceBtn.getAttribute('data-mail-asset-kind');
-        if(mailAssetBlockIfLocked(`mailAssetStatus_${kind}_${key}`)) return;
-        document.getElementById(`mailAssetInput_${kind}_${key}`).click();
         return;
       }
       const removeBtn = e.target.closest('[data-mail-asset-remove]');
@@ -17186,25 +17275,24 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 위임 3: 드래그앤드롭 — dragover는 반드시 preventDefault해야 drop이 도달한다(§기존
     // 서류함 드래그앤드롭 라운드의 교훈, 이 파일 다른 곳과 동일 패턴).
     panels.addEventListener('dragover', (e)=>{
-      const dz = e.target.closest('[data-mail-asset-drop]');
+      const dz = e.target.closest('[data-mail-asset-add]');
       if(!dz) return;
       e.preventDefault();
       dz.classList.add('drag-over');
     });
     panels.addEventListener('dragleave', (e)=>{
-      const dz = e.target.closest('[data-mail-asset-drop]');
+      const dz = e.target.closest('[data-mail-asset-add]');
       if(dz) dz.classList.remove('drag-over');
     });
     panels.addEventListener('drop', (e)=>{
-      const dz = e.target.closest('[data-mail-asset-drop]');
+      const dz = e.target.closest('[data-mail-asset-add]');
       if(!dz) return;
       e.preventDefault();
       dz.classList.remove('drag-over');
-      const key = dz.getAttribute('data-mail-asset-drop');
-      const kind = dz.getAttribute('data-mail-asset-kind');
-      if(mailAssetBlockIfLocked(`mailAssetStatus_${kind}_${key}`)) return;
+      const key = dz.getAttribute('data-mail-asset-add');
+      if(mailAssetBlockIfLocked(`mailAssetStatus_${key}`)) return;
       const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-      mailAssetHandleUpload(key, kind, file);
+      if(file) mailAssetHandleUpload(key, mailAssetDetectKind(file), file);
     });
     panels.addEventListener('change', (e)=>{
       // §본문 이미지 첨부 라운드(신규) — mailBodyImgInput_{key} 파일 입력 처리.
@@ -17224,13 +17312,13 @@ window.SHIN2_CRM_APP_INIT = function(){
         return;
       }
       if(!e.target.classList.contains('mail-asset-file-input')) return;
-      const id = e.target.id; // mailAssetInput_{kind}_{key}
-      const m = /^mailAssetInput_([^_]+)_(.+)$/.exec(id);
+      const id = e.target.id; // mailAssetAddInput_{key}
+      const m = /^mailAssetAddInput_(.+)$/.exec(id);
       if(!m) return;
-      const kind = m[1], key = m[2];
+      const key = m[1];
       const file = e.target.files && e.target.files[0];
       e.target.value = '';
-      mailAssetHandleUpload(key, kind, file);
+      if(file) mailAssetHandleUpload(key, mailAssetDetectKind(file), file);
     });
     // §본문 이미지 첨부 라운드(신규) — 이미지 추가 버튼을 mousedown 시점에
     // preventDefault해서 contenteditable 에디터의 커서/선택 영역이 그대로 유지되게
@@ -17245,18 +17333,9 @@ window.SHIN2_CRM_APP_INIT = function(){
   // renderMailSettingsView() 대신 이 버튼 하나만 바꿔치기한다.
   function renderMailTabButtonWrap(key){
     const s = D.loadMailSettings();
-    // §버그 수정: 이름수정 모드 중엔 mailTabBtn_{key} 버튼 자체가 DOM에 없어(입력창으로
-    // 바뀐 상태) closest()로 wrap을 못 찾았다 — wrap 자체의 고정 id로 직접 찾는다.
     const wrap = document.getElementById('mailTabWrap_' + key);
     if(!wrap) return;
-    const name = mailTabDisplayName(s.mailTemplates[key], key);
-    wrap.innerHTML = `
-      <button type="button" class="mail-tab-btn${mailSettingsUI.activeTab===key?' is-active':''}" role="tab" aria-selected="${mailSettingsUI.activeTab===key?'true':'false'}" data-mail-tab="${key}" id="mailTabBtn_${key}">
-        ${esc(name)}
-        <span class="mail-tab-dirty-dot" data-mail-tab-dirty-dot="${key}" style="display:${mailSettingsUI.dirty[key]?'inline-block':'none'};" title="${mailSettingsUI.dirty[key]?'저장하지 않은 변경사항이 있습니다':''}"></span>
-      </button>
-      <button type="button" class="mail-tab-rename-btn" data-mail-tab-rename="${key}" aria-label="${esc(name)} 탭 이름 수정" title="탭 이름 수정">✎</button>
-    `;
+    wrap.innerHTML = mailTypeCardButtonHtml(key, s.mailTemplates[key]);
   }
   function mailStartTabRename(key){
     const wrap = document.getElementById('mailTabWrap_' + key);
