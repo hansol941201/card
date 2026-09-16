@@ -5658,14 +5658,13 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     return true;
   }
   // ---- 1차미팅 메일 설정(§1차미팅 메일 자동발송 라운드) ----
-  // §공용메일 기본값 라운드(신규): 사용자가 EmailJS에 로그인한 SMTP 계정은 개인 하이웍스
-  // 계정이지만, 실제로 밖으로 보이는 "보내는사람" 표시는 공용메일((주)넷폼
-  // <netform@netformrnd.com>, 사용자가 스크린샷으로 직접 확인해 준 값)로 나가길 원해서
-  // 기본값을 아예 이 값으로 채워둔다 — 이미 메일 설정 탭에서 다른 값을 저장해 둔
-  // 브라우저는 readObj(MAIL_SETTINGS_KEY)에 저장값이 있으므로 이 기본값에 영향받지 않는다.
+  // SMTP 실제 발신 계정과 Reply-To를 동일하게 유지한다. 이전 기본값
+  // (netform@netformrnd.com)은 loadMailSettings에서 새 주소로 호환 변환한다.
+  const MAIL_FROM_EMAIL = 'netformb2b@netformrnd.com';
+  const LEGACY_MAIL_FROM_EMAIL = 'netform@netformrnd.com';
   const DEFAULT_MAIL_SETTINGS = {
     emailjsPublicKey: '', emailjsServiceId: '', emailjsTemplateId: '',
-    fromName: '(주)넷폼', fromEmail: 'netform@netformrnd.com',
+    fromName: '(주)넷폼', fromEmail: MAIL_FROM_EMAIL,
     accountUpdatedAt: null,
     subjectTemplate: '[POUR] {업체명} 1차 미팅 일정 제안드립니다',
     bodyTemplate: '안녕하세요, {업체명} {담당자}님.\n\n보내주신 질문서 잘 확인했습니다.\n협의를 위해 1차 미팅 일정을 제안드리고자 합니다.\n편하신 일정 알려주시면 조율하겠습니다.\n\n감사합니다.\n{보내는사람}'
@@ -5708,6 +5707,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   function loadMailSettings(){
     const stored = readObj(MAIL_SETTINGS_KEY) || {};
     const merged = Object.assign({}, DEFAULT_MAIL_SETTINGS, stored);
+    if(String(merged.fromEmail || '').trim().toLowerCase() === LEGACY_MAIL_FROM_EMAIL) merged.fromEmail = MAIL_FROM_EMAIL;
     const storedTemplates = (stored && stored.mailTemplates) || {};
     const templates = {};
     MAIL_TEMPLATE_KEYS.forEach(key=>{
@@ -16006,6 +16006,38 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
     return tmp.innerHTML;
   }
+  // 작성 UI는 이미지·링크 편집을 위해 HTML을 유지하지만 EmailJS의 message 템플릿 변수는
+  // 일반 텍스트로 전달한다. <br>/블록 요소는 실제 개행으로, 링크·이미지는 접근 가능한 URL
+  // 텍스트로 바꿔 수신 메일에 HTML 태그가 문자 그대로 노출되지 않게 한다.
+  function mailBodyHtmlToPlainText(html){
+    const tmp = document.createElement('div');
+    tmp.innerHTML = sanitizeMailBodyHtml(html);
+    const blockTags = new Set(['ADDRESS','ARTICLE','ASIDE','BLOCKQUOTE','DIV','FOOTER','H1','H2','H3','H4','H5','H6','HEADER','LI','MAIN','NAV','P','PRE','SECTION','TR']);
+    function nodeToText(node){
+      if(node.nodeType === 3) return node.nodeValue || '';
+      if(node.nodeType !== 1) return '';
+      const tag = node.tagName;
+      if(tag === 'BR') return '\n';
+      if(tag === 'IMG'){
+        const src = String(node.getAttribute('src') || '').trim();
+        return src ? `\n이미지: ${src}\n` : '';
+      }
+      let text = Array.from(node.childNodes).map(nodeToText).join('');
+      if(tag === 'A'){
+        const href = String(node.getAttribute('href') || '').trim();
+        const label = text.trim();
+        if(href && label && label !== href) text = `${label} (${href})`;
+        else if(href && !label) text = href;
+      }
+      if(tag === 'LI') text = '- ' + text;
+      return blockTags.has(tag) ? text + '\n' : text;
+    }
+    return Array.from(tmp.childNodes).map(nodeToText).join('')
+      .replace(/\r\n?/g, '\n')
+      .replace(/\u00a0/g, ' ')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n$/, '');
+  }
   // §수신자 주소 오류 조사 라운드(신규) — "The recipients address is corrupted" 오류 재현
   // 조사 결과: 화면에는 정상 주소로 보여도 문자열 안에 폭이 0인 유니코드 문자(제로폭
   // 공백 U+200B 등)가 섞여 있으면 .trim()과 이메일 형식 정규식(\s 제외 규칙)을 둘 다
@@ -17327,9 +17359,9 @@ window.SHIN2_CRM_APP_INIT = function(){
         to_email: toEmail,
         cc_email: ccEmails.join(','),
         from_name: (latestSettings.fromName || '').trim(),
-        reply_to: stripInvisibleChars(latestSettings.fromEmail || ''),
+        reply_to: stripInvisibleChars(latestSettings.fromEmail || '').trim(),
         subject: document.getElementById('mailComposeSubject').value.trim(),
-        message: sanitizeMailBodyHtml(document.getElementById('mailComposeBody').innerHTML)
+        message: mailBodyHtmlToPlainText(document.getElementById('mailComposeBody').innerHTML)
       };
     }
     function emailJsErrorMessage(error){
@@ -17399,10 +17431,10 @@ window.SHIN2_CRM_APP_INIT = function(){
           throw Object.assign(new Error('공통 발송자료 또는 전체 공통 이미지 링크를 불러오지 못했습니다 — 로그인 상태 또는 Storage 공유 규칙을 확인해주세요.'), { code:'ASSET_LINK_FAILED' });
         }
         const params = buildMailSendParams(toEmail, ccEmails, latestSettings);
-        // §본문 이미지 첨부 라운드(신규) — params.message는 이제 항상 mailComposeBody의
-        // innerHTML(진짜 HTML)이므로, 덧붙이는 링크/이미지도 <br>/<a> 형식으로 통일한다.
-        if(links.length) params.message += '<br><br>' + links.map(l=> `${esc(l.label)}: <a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a>`).join('<br>');
-        if(globalImgUrl) params.message += `<br><br><img src="${esc(globalImgUrl)}" alt="" style="max-width:100%;height:auto;display:block;" />`;
+        // EmailJS 템플릿의 message는 일반 텍스트 변수이므로 첨부 링크도 HTML 태그 없이
+        // 실제 개행과 URL로 덧붙인다.
+        if(links.length) params.message += '\n\n' + links.map(l=> `${l.label}: ${l.url}`).join('\n');
+        if(globalImgUrl) params.message += `\n\n이미지: ${globalImgUrl}`;
         const emailjs = await loadEmailJsSdk();
         emailAttempted = true;
         console.info('[EMAIL-SEND] request start');
