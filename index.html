@@ -17824,6 +17824,8 @@ window.SHIN2_CRM_APP_INIT = function(){
         actions.querySelector('[data-agr-del-cancel]').addEventListener('click', refresh);
         actions.querySelector('[data-agr-del-confirm]').addEventListener('click', async (e)=>{
           e.currentTarget.disabled = true;
+          revokeDocObjectUrl(id);
+          invalidateDocUrlCache(id);
           D.deleteDocument(id);
           const r = await confirmDocsCloudSave();
           if(!r.ok) alert(cloudSaveErrorMessage(r.err));
@@ -17990,16 +17992,28 @@ window.SHIN2_CRM_APP_INIT = function(){
     document.addEventListener('keydown', docPreviewEscHandler);
     const isImage = (doc.mimeType||'').startsWith('image/');
     const isPdf = (doc.mimeType||'') === 'application/pdf';
-    getDocUrl(doc).then(url=>{
+    // §질문서 PDF 열기 속도 개선 라운드(신규) — §요청 6 "실패하면 오류 안내와 재시도 버튼,
+    // 무한 로딩 금지": loadPreview를 재시도 버튼이 다시 부를 수 있도록 이름 붙은 함수로
+    // 뺐다. getDocUrl 자체가 실패를 캐시하지 않으므로(위 getDocUrl 주석 참고) 재시도는
+    // 항상 새로 Storage에 다시 요청한다.
+    function loadPreview(){
       const body = document.getElementById('docPreviewBody');
-      if(!body || !url) return;
-      if(isImage) body.innerHTML = `<img src="${esc(url)}" class="doc-preview-img" alt="" />`;
-      else if(isPdf) body.innerHTML = `<iframe src="${esc(url)}" class="doc-preview-iframe" title="PDF 미리보기"></iframe>`;
-      else body.innerHTML = `<div class="doc-preview-fallback">이 형식은 미리보기를 지원하지 않습니다.<br/><a href="${esc(url)}" target="_blank" rel="noopener" download="${esc(fileName)}">다운로드해서 확인</a></div>`;
-    }).catch(()=>{
-      const body = document.getElementById('docPreviewBody');
-      if(body) body.innerHTML = `<div class="doc-preview-fallback">파일을 불러오지 못했습니다(로그인 상태를 확인해주세요).</div>`;
-    });
+      if(body) body.innerHTML = `<div class="doc-preview-loading">불러오는 중…</div>`;
+      getDocUrl(doc).then(url=>{
+        const body = document.getElementById('docPreviewBody');
+        if(!body || !url) return;
+        if(isImage) body.innerHTML = `<img src="${esc(url)}" class="doc-preview-img" alt="" />`;
+        else if(isPdf) body.innerHTML = `<iframe src="${esc(url)}" class="doc-preview-iframe" title="PDF 미리보기"></iframe>`;
+        else body.innerHTML = `<div class="doc-preview-fallback">이 형식은 미리보기를 지원하지 않습니다.<br/><a href="${esc(url)}" target="_blank" rel="noopener" download="${esc(fileName)}">다운로드해서 확인</a></div>`;
+      }).catch(()=>{
+        const body = document.getElementById('docPreviewBody');
+        if(!body) return;
+        body.innerHTML = `<div class="doc-preview-fallback">파일을 불러오지 못했습니다(로그인 상태를 확인해주세요).<br/><button type="button" class="co-text-action primary" id="docPreviewRetryBtn">다시 시도</button></div>`;
+        const retryBtn = document.getElementById('docPreviewRetryBtn');
+        if(retryBtn) retryBtn.addEventListener('click', loadPreview);
+      });
+    }
+    loadPreview();
   }
 
   function closeAgreementPopup(){
@@ -18115,15 +18129,31 @@ window.SHIN2_CRM_APP_INIT = function(){
     document.getElementById('questionnaireNoteScroll').addEventListener('keydown', e=>{
       if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){ e.preventDefault(); save(); }
     });
-    const viewer = document.getElementById('questionnaireViewer');
     const isImage = (doc.mimeType || '').startsWith('image/');
     const isPdf = (doc.mimeType || '') === 'application/pdf';
-    getDocUrl(doc).then(url=>{
-      if(!url || !viewer) return;
-      if(isImage) viewer.innerHTML = `<img src="${esc(url)}" alt="${esc(fileName)}" />`;
-      else if(isPdf) viewer.innerHTML = `<iframe src="${esc(url)}" title="질문지 미리보기"></iframe>`;
-      else viewer.innerHTML = `<div class="questionnaire-viewer-fallback">이 파일 형식은 화면에서 바로 볼 수 없습니다.<br/><a href="${esc(url)}" target="_blank" rel="noopener" download="${esc(fileName)}">질문서 열기 또는 다운로드</a></div>`;
-    }).catch(()=>{ if(viewer) viewer.innerHTML = '<div class="questionnaire-viewer-fallback">질문서를 불러오지 못했습니다. 로그인 상태를 확인해주세요.</div>'; });
+    // §질문서 PDF 열기 속도 개선 라운드(신규) — §요청 6 "클릭 즉시 로딩 표시, 실패 시 오류+
+    // 재시도, 무한 로딩 금지": 팝업을 여는 순간(위 root.innerHTML)에 이미 "질문서를 불러오는
+    // 중…"이 즉시 뜨고, 여기서는 그 뒤 실제 로딩만 담당한다. loadQuestionnaireFile을 이름
+    // 붙은 함수로 빼서 재시도 버튼이 같은 로직을 다시 부를 수 있게 했다 — getDocUrl은 실패를
+    // 캐시하지 않으므로(§요청 4 캐시 추가와 별개로) 재시도가 그대로 새 요청으로 이어진다.
+    function loadQuestionnaireFile(){
+      const viewer = document.getElementById('questionnaireViewer');
+      if(viewer) viewer.innerHTML = `<div class="doc-preview-loading">질문서를 불러오는 중…</div>`;
+      getDocUrl(doc).then(url=>{
+        const viewer = document.getElementById('questionnaireViewer');
+        if(!url || !viewer) return;
+        if(isImage) viewer.innerHTML = `<img src="${esc(url)}" alt="${esc(fileName)}" />`;
+        else if(isPdf) viewer.innerHTML = `<iframe src="${esc(url)}" title="질문지 미리보기"></iframe>`;
+        else viewer.innerHTML = `<div class="questionnaire-viewer-fallback">이 파일 형식은 화면에서 바로 볼 수 없습니다.<br/><a href="${esc(url)}" target="_blank" rel="noopener" download="${esc(fileName)}">질문서 열기 또는 다운로드</a></div>`;
+      }).catch(()=>{
+        const viewer = document.getElementById('questionnaireViewer');
+        if(!viewer) return;
+        viewer.innerHTML = `<div class="questionnaire-viewer-fallback">질문서를 불러오지 못했습니다. 로그인 상태나 네트워크 연결을 확인해주세요.<br/><button type="button" class="co-text-action primary" id="questionnaireViewerRetryBtn">다시 시도</button></div>`;
+        const retryBtn = document.getElementById('questionnaireViewerRetryBtn');
+        if(retryBtn) retryBtn.addEventListener('click', loadQuestionnaireFile);
+      });
+    }
+    loadQuestionnaireFile();
   }
   function questionnaireWorkHtml(companyId){
     const docs = D.documentsForCompany(companyId, 'questionnaire');
@@ -24115,9 +24145,24 @@ window.SHIN2_CRM_APP_INIT = function(){
     docBlobUrlCache[doc.id] = url;
     return url;
   }
-  // getDocUrl: 보기/다운로드가 실제로 쓰는 진입점(Promise). 로컬 전용 파일은 기존 object URL
-  // 경로 그대로(§ 이미 있던 로컬 파일이 깨지지 않도록), 클라우드 파일은 Storage에서 매번 새
-  // 다운로드 URL을 요청한다(캐시하지 않음 — 보안규칙 상 로그인 상태 변화에 항상 최신이어야 함).
+  // §질문서 PDF 열기 속도 개선 라운드(신규) — doc.id → { storagePath, url, promise } 캐시.
+  // 실사용자 보고 "다른 컴퓨터에서 열면 너무 오래 걸린다"를 코드로 추적한 결과, 클라우드
+  // 문서는 getDocUrl을 부를 때마다(같은 파일을 다시 열 때도) Storage getDownloadURL()을
+  // 매번 새로 왕복해서 받아오고 있었다 — 열기/다운로드/미리보기 모두 이 함수 하나를 거치므로
+  // 클릭할 때마다 불필요한 네트워크 왕복이 반복됐다(§요청 2/4). storagePath는 addDocument가
+  // 매번 새 문서 id를 만들기 때문에(§요청 8 "교체는 새 레코드") 같은 id의 storagePath가
+  // 나중에 바뀌는 경우는 없지만, 방어적으로 storagePath까지 캐시 키에 포함해 혹시라도 같은
+  // id의 storagePath가 바뀌면(예: 향후 코드 변경) 자동으로 캐시를 무효화하고 새로 받아온다.
+  // 실패한 요청은 절대 캐시하지 않는다 — 재시도 버튼을 눌렀을 때 같은 실패가 그대로 캐시에서
+  // 튀어나오면 안 되기 때문(§요청 6 무한 로딩·영구 실패 방지).
+  const cloudDocUrlCache = {};
+  function invalidateDocUrlCache(id){ delete cloudDocUrlCache[id]; }
+  // getDocUrl: 보기/다운로드/미리보기가 실제로 쓰는 유일한 진입점(Promise). 로컬 전용 파일은
+  // 기존 object URL 경로 그대로(§ 이미 있던 로컬 파일이 깨지지 않도록), 클라우드 파일은
+  // Storage 다운로드 URL을 한 번 받아오면 같은 문서를 다시 열 때 재사용한다(로그인 상태
+  // 자체는 매 호출 시 다시 확인하므로, 로그아웃 이후에는 캐시가 있어도 새로 받아온 URL이
+  // 그대로 유효한 한 계속 재사용 가능 — Storage 보안규칙은 URL의 다운로드 토큰이 아니라
+  // 업로드/삭제 시점에 적용되므로 캐시가 권한을 우회하지 않는다, §요청 7).
   function getDocUrl(doc){
     if(doc.localOnly){
       if(doc.localIndexedDb){
@@ -24132,7 +24177,21 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(!ST || !ST.isSignedIn || !ST.isSignedIn()){
       return Promise.reject(Object.assign(new Error('NOT_AUTHENTICATED'), { code:'NOT_AUTHENTICATED' }));
     }
-    return ST.getFileURL(doc.storagePath);
+    const cached = cloudDocUrlCache[doc.id];
+    if(cached && cached.storagePath === doc.storagePath){
+      if(cached.url) return Promise.resolve(cached.url);
+      if(cached.promise) return cached.promise; // 같은 파일을 거의 동시에 두 번 클릭해도 Storage 요청은 한 번만 나간다.
+    }
+    const entry = { storagePath: doc.storagePath, promise: null, url: null };
+    entry.promise = ST.getFileURL(doc.storagePath).then(url=>{
+      entry.url = url; entry.promise = null;
+      return url;
+    }).catch(err=>{
+      if(cloudDocUrlCache[doc.id] === entry) delete cloudDocUrlCache[doc.id];
+      throw err;
+    });
+    cloudDocUrlCache[doc.id] = entry;
+    return entry.promise;
   }
   function revokeDocObjectUrl(id){
     if(docBlobUrlCache[id]){ try{ URL.revokeObjectURL(docBlobUrlCache[id]); }catch(e){} delete docBlobUrlCache[id]; }
@@ -24326,6 +24385,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         btn.disabled = true; btn.textContent = '업로드 중…';
         D.migrateDocumentToCloud(id, (pct)=>{ btn.textContent = '업로드 중 ' + pct + '%'; }).then(()=>{
           revokeDocObjectUrl(id);
+          invalidateDocUrlCache(id);
           renderDocList(co, type);
           renderDocCounts(co);
         }).catch((err)=>{
@@ -24350,6 +24410,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         item.querySelector('[data-del-confirm]').addEventListener('click', async (e)=>{
           e.currentTarget.disabled = true;
           revokeDocObjectUrl(id);
+          invalidateDocUrlCache(id);
           D.deleteDocument(id);
           const r = await confirmDocsCloudSave();
           if(!r.ok) alert(cloudSaveErrorMessage(r.err));
