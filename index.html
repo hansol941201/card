@@ -22,7 +22,7 @@
     --navy-hover: #223A6B;
     --text: #1E293B;
     --text-muted: #64748B;
-    --text-faint: #94A3B8;
+    --text-faint: #627087;
     --line: #E2E8F0;
     /* §고객관리 CRM 첫화면 대시보드 개편 라운드: 상승/유지/감소/경고 4색 규칙 — 화면 전체에서
        이 네 토큰만 재사용한다(동전/별 아이콘 대신 색+텍스트로만 구분, §1). */
@@ -790,9 +790,9 @@
      "스크롤 중에도 찾기 쉽게"). .cdash-body가 실제 스크롤 컨테이너라 bottom:0 기준으로
      그 안에서 붙는다. */
   .insight-edit-save-bar{
-    position:sticky; bottom:-1px; margin-top:4px; padding:10px 0 4px;
-    display:flex; justify-content:flex-end;
-    background:linear-gradient(to top, #fff 55%, rgba(255,255,255,0));
+    position:sticky; bottom:-1px; margin-top:8px; padding:0 0;
+    display:flex; align-items:center; justify-content:flex-end;
+    height:64px; background:#fff; border-top:1px solid #DFE7F1;
   }
   .insight-view-group{ margin-bottom:10px; }
   .insight-view-group-title{ font-size:10.5px; color:var(--text-muted); margin-bottom:3px; font-weight:650; }
@@ -856,14 +856,14 @@
   .stage-step-line{ position:absolute; top:6px; left:-50%; width:100%; height:2px; background:#E2E8F0; z-index:0; }
   .stage-step:first-child .stage-step-line{ display:none; }
   .stage-step-dot{
-    position:relative; z-index:1; width:14px; height:14px; flex:none; box-sizing:border-box; border-radius:50%;
+    position:relative; z-index:1; width:18px; height:18px; flex:none; box-sizing:border-box; border-radius:50%;
     display:flex; align-items:center; justify-content:center; background:#fff; border:2px solid #D7DEE8;
-    font-size:8px; line-height:1; color:#fff;
+    font-size:10px; line-height:1; color:#fff;
   }
   .stage-step-dot.done{ background:#079455; border-color:#079455; } /* 완료 — 초록 원 + 체크(§4) */
   .stage-step-dot.current{ background:#fff; border-color:#F59E0B; } /* 현재 진행 단계 — 주황 테두리 + 흰 내부(§4) */
   .stage-step-dot.pending{ background:#fff; border-color:#D7DEE8; } /* 미도달 — 회색 빈 원(§4) */
-  .stage-step-label{ margin-top:2px; font-size:9px; color:var(--text-faint); white-space:nowrap; }
+  .stage-step-label{ margin-top:2px; font-size:11px; color:var(--text-faint); white-space:nowrap; }
   .next-action-chip{
     display:inline-flex; align-items:center; height:22px; padding:0 8px; font-size:10.5px; font-weight:600;
     color:#fff; background:var(--navy); border:none; border-radius:5px; cursor:pointer; white-space:nowrap;
@@ -964,6 +964,45 @@
   .co-text-action.danger:hover{ color:#B91C1C; }
   .co-text-action.primary{ color:var(--navy); font-weight:600; }
 
+  /* ---- P0-1: 실버튼 3종(Primary/Secondary/Danger 링크) — 기존 버튼 클래스를 재활용하지
+     않고 새로 도입. 클릭 핸들러는 그대로 두고 class/스타일만 이 버튼들로 교체한다. ---- */
+  .btn-primary-action{
+    display:inline-flex; align-items:center; justify-content:center; height:40px; padding:0 20px;
+    background:#082F67; color:#fff; font-size:13.5px; font-weight:700; border:0; border-radius:8px;
+    cursor:pointer; font-family:inherit; white-space:nowrap;
+  }
+  .btn-primary-action:hover{ background:#0A3B80; }
+  .btn-primary-action:disabled{ opacity:.6; cursor:default; }
+  .btn-secondary-action{
+    display:inline-flex; align-items:center; justify-content:center; height:40px; padding:0 20px;
+    background:#fff; border:1px solid #DFE7F1; color:#13243E; font-size:13.5px; font-weight:600;
+    border-radius:8px; cursor:pointer; font-family:inherit; white-space:nowrap;
+  }
+  .btn-secondary-action:hover{ background:#F7F9FC; }
+  .btn-danger-link{
+    display:inline-flex; align-items:center; justify-content:center; height:32px; padding:0 4px;
+    background:transparent; border:0; color:#B3261E; font-size:12.5px; font-weight:600;
+    text-decoration:underline; cursor:pointer; font-family:inherit;
+  }
+  .btn-danger-link:hover{ color:#8f1d17; }
+  @media(max-width:480px){
+    .btn-primary-action, .btn-secondary-action{ padding:0 14px; font-size:13px; }
+  }
+
+  /* ---- P0-2: 팝업 하단 고정 액션 바. 각 팝업의 실제 스크롤 컨테이너(.pi-body 등)
+     내부의 마지막 자식으로 넣어 position:sticky로 스크롤 끝까지 따라가지 않고 항상
+     보이게 한다. ---- */
+  .popup-action-bar{
+    position:sticky; bottom:0; left:0; right:0; margin:16px -18px -16px -18px;
+    height:64px; background:#fff; border-top:1px solid #DFE7F1; display:flex;
+    align-items:center; justify-content:space-between; padding:0 20px; z-index:10;
+  }
+  .popup-action-bar-status{ font-size:12px; color:var(--text-muted); }
+  .popup-action-bar-buttons{ display:flex; align-items:center; gap:8px; margin-left:auto; }
+  @media(max-width:480px){
+    .popup-action-bar{ margin:16px -14px -16px -14px; padding:0 12px; }
+  }
+
   .co-form-field{ margin-bottom:12px; max-width:520px; }
   .co-form-field label{ display:block; font-size:11.5px; color:var(--text-muted); margin-bottom:4px; }
   .co-form-field input, .co-form-field textarea{
@@ -975,10 +1014,15 @@
 
   /* ---------- 서류함(4분류) — 고객별 파일 보관함 ---------- */
   .doc-blocked-note{ font-size:11.5px; color:#9A6B00; background:#FFF7E6; border:1px solid #F0DDA8; border-radius:6px; padding:8px 10px; margin-bottom:14px; }
+  /* P0-3: 평시(로그인+동기화 정상)에는 경고가 아니므로 11px 회색 1줄로 축소 */
+  .doc-blocked-note.is-plain{ font-size:11px; color:var(--text-muted); background:none; border:none; padding:0 0 8px; margin-bottom:8px; }
   /* §서류함 컴팩트 그리드 라운드: 세로로 길게 쌓이던 7개 박스를 사용자 요청대로 정사각형에
      가까운 타일로 만들어 한 줄에 최대한 많이 들어가게 한다(auto-fill). 업로드/드래그드롭/
      열기/다운로드/삭제 기능과 데이터는 전혀 바꾸지 않았고 크기/배치만 컴팩트하게 줄였다. */
-  .doc-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(148px, 1fr)); gap:8px; }
+  /* P0-3: 예전엔 auto-fill 타일 그리드(여러 열)라 "체크리스트"처럼 안 보였다 — 스펙이
+     요구하는 "한 줄 카드형 목록"에 맞춰 1열 스택으로 바꿨다. 업로드/드래그드롭/클릭
+     핸들러(각 .doc-category에 그대로 바인딩)는 손대지 않았다. */
+  .doc-grid{ display:flex; flex-direction:column; gap:6px; }
   .doc-category{ position:relative; border:1px solid var(--line); border-radius:8px; padding:8px 9px; background:var(--surface); cursor:pointer; min-width:0; }
   .doc-category.drag-over{ border-color:var(--navy); border-width:2px; padding:7px 8px; background:#F0F3F9; }
   .doc-cat-head{ display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:4px; }
@@ -1768,7 +1812,7 @@
     --navy-hover:#214274;
     --text:#17233A;
     --text-muted:#64748B;
-    --text-faint:#94A3B8;
+    --text-faint:#627087;
     --line:#DFE6EF;
     --soft-blue:#F1F6FC;
     --soft-blue-2:#EAF2FB;
@@ -2199,14 +2243,40 @@
   .cdash-pour-table th{ padding:3px 5px; }
   .cdash-pour-table td{ padding:4px 5px; }
   .cdash-quad{ grid-template-columns:1fr; margin-bottom:0; }
-  .cdash-header-popover{
-    display:none; position:relative; margin:-1px 0 8px; padding:10px 12px; background:#fff;
-    border:1px solid #DDE5EF; border-radius:8px; box-shadow:0 7px 20px rgba(15,23,42,.10);
+  /* P0-4: "팝업 안 팝업" 제거 — 예전엔 position:relative로 .cdash-body(카드 스크롤 영역)
+     문서 흐름 안에 그대로 끼어들어 본문 높이가 늘어나고(846px→1571px 실측) 스크롤 위치가
+     튀고, 카드 자체의 닫기(×)와 이 팝오버의 닫기(×)가 동시에 화면에 보였다. openHeaderSection/
+     closeHeaderSection과 그 안을 채우는 renderInsightBlock/renderReactionsCol/
+     renderDocStatusBlock은 한 글자도 바꾸지 않고, CSS만 position:fixed 중앙 모달(이미 이
+     앱 여러 곳에서 쓰는 .pi-overlay/.pi-panel과 같은 성격)로 바꿔 문서 흐름에서 완전히
+     빼냈다 — 같은 DOM 노드이므로 새 렌더 로직이 전혀 필요 없다. */
+  .cdash-header-popover{ display:none; }
+  .cdash-header-popover.is-open{
+    /* 진짜 전체화면 dim 배경(실제 엘리먼트라 뒤 카드 클릭도 막는다, .pi-overlay와 같은
+       성격) — position:fixed라 .cdash-body 스크롤 흐름과 완전히 분리되고, 카드 자체의
+       × 버튼도 이 배경에 가려 "닫기 × 2개"로 보이던 문제가 함께 없어진다. */
+    display:flex; position:fixed; inset:0; z-index:360; align-items:center; justify-content:center;
+    margin:0; padding:20px; background:rgba(20,24,34,.45);
   }
-  .cdash-header-popover.is-open{ display:block; }
-  .cdash-header-popover-close{ position:absolute; top:7px; right:9px; border:0; background:none; color:var(--text-muted); font-size:18px; cursor:pointer; }
-  .cdash-header-popover-section{ display:none; padding-right:22px; }
-  .cdash-header-popover-section.is-open{ display:block; }
+  .cdash-header-popover-close{
+    position:fixed; top:24px; right:28px; z-index:361; border:0; background:#fff;
+    color:var(--text-muted); font-size:19px; cursor:pointer; width:32px; height:32px;
+    border-radius:50%; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 2px 8px rgba(15,23,42,.18);
+  }
+  .cdash-header-popover-close:hover{ color:var(--text); }
+  .cdash-header-popover-section{ display:none; }
+  .cdash-header-popover-section.is-open{
+    /* 실제 흰 패널(.pi-panel과 같은 성격) — 열린 section 하나만 이 스타일로 중앙에 뜬다. */
+    display:block; background:#fff; border-radius:12px; padding:20px 22px;
+    max-width:640px; width:100%; max-height:86vh; overflow-y:auto;
+    box-shadow:0 20px 50px rgba(17,24,39,.22);
+  }
+  @media(max-width:480px){
+    .cdash-header-popover.is-open{ padding:12px; }
+    .cdash-header-popover-close{ top:16px; right:16px; }
+    .cdash-header-popover-section.is-open{ padding:16px 14px; max-height:90vh; }
+  }
   #cdashBasicInfoCol{ padding:8px 12px; }
 
   @media(max-width:1100px){
@@ -2331,7 +2401,7 @@
    ======================================================================== */
 :root{
   --bg:#F7F9FC; --surface:#FFFFFF; --navy:#17305C; --navy-hover:#213D70;
-  --text:#172033; --text-muted:#66758D; --text-faint:#98A5B7; --line:#E6EBF2;
+  --text:#172033; --text-muted:#66758D; --text-faint:#627087; --line:#E6EBF2;
   --up:#169B62; --up-bg:#EDF9F3; --flat:#2E78D2; --flat-bg:#EEF6FF;
   --down:#D85858; --down-bg:#FFF1F1; --warn:#D08A28; --warn-bg:#FFF7E9;
 }
@@ -2409,7 +2479,7 @@ html,body{background:radial-gradient(circle at 75% -10%,rgba(11,91,211,.055),tra
 .co-table-head .col-insight{ font-size:13px!important; } /* 12 -> 13 */
 .co-table-head .col-total-revenue{ font-size:13.5px!important; } /* 12.5 -> 13.5 */
 .co-table-head .col-yr-revenue{ font-size:12.5px!important; } /* 11.5 -> 12.5 */
-.co-table-head .col-contrib{ font-size:11px!important; } /* 10 -> 11 */
+.co-table-head .col-contrib{ font-size:12px!important; } /* P0-5: 10 -> 11 -> 12 */
 .co-table-head .col-trend{ font-size:12px!important; } /* 11 -> 12 */
 .co-row .col-name, .co-row .co-name-text{ font-size:12.5px!important; } /* 업체명: 11.5 -> 12.5 */
 .co-row .col-name-relation, .co-row .col-name-relation-name{ font-size:12px!important; } /* 관계사 보조문구: 11 -> 12 */
@@ -2422,10 +2492,12 @@ html,body{background:radial-gradient(circle at 75% -10%,rgba(11,91,211,.055),tra
 .co-row .insight-tag{ font-size:11.5px!important; } /* 10.5 -> 11.5 */
 .co-row .col-total-revenue{ font-size:13.5px!important; } /* 총 매출 값: 12.5 -> 13.5 */
 .co-row .col-yr-revenue{ font-size:12.5px!important; } /* 2026 매출 값: 11.5 -> 12.5 */
-.co-row .col-contrib, .co-row .contrib-cell{ font-size:11px!important; } /* 실적↔매출 배지 기본값: 10 -> 11 */
+.co-row .col-contrib, .co-row .contrib-cell{ font-size:12px!important; } /* 실적↔매출 배지 기본값: P0-5, 11 -> 12 */
 .co-row .contrib-level{ font-size:11.5px!important; } /* 낮음/보통/높음 텍스트: 10.5 -> 11.5 */
 .co-row .col-trend, .co-row .trend-cell{ font-size:12px!important; } /* 최근 흐름 배지: 11 -> 12 */
-.co-row .stage-step-label{ font-size:10px!important; } /* 단계 진행상황 라벨: 9 -> 10 */
+.co-row .stage-step-label{ font-size:11px!important; } /* 단계 진행상황 라벨: P0-5, 9 -> 11 */
+#cdashInsightToggle{ font-size:12px!important; } /* P0-5: 고객 인사이트 팝업 "완료"(헤더) 10.5 -> 12 */
+.req-row-actions .cdash-mini-edit{ font-size:13px; } /* P0-5: 상담 메모(요청자료) 팝업 "취소" 10.5 -> 13 */
 .co-row .grade-badge{ font-size:10.5px!important; } /* 등급 배지: 9.5 -> 10.5 */
 
 /* ==========================================================================
@@ -2669,7 +2741,10 @@ body.map-modal-lock{ overflow:hidden; }
    칩 스타일로 새로 만든다. */
 .cdash-delete-co-btn{ color:#B91C1C; background:#FEF2F2; border:1px solid #FCD5D5; border-radius:8px; padding:6px 14px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; }
 .cdash-delete-co-btn:hover{ background:#FEE2E2; border-color:#FCA5A5; }
-.cdash-danger-zone{ margin-top:8px; }
+/* P0-1: "업체 삭제"를 눈에 띄는 배경 버튼에서 낮은 위계의 텍스트 링크로 내리고, 카드
+   최하단 고정 푸터(#cdashFooterBar, 스크롤 밖)로 옮겼다 — 실수 클릭 방지 목적. */
+.cdash-danger-zone{ margin-top:8px; padding-top:8px; border-top:1px dashed #FCD5D5; display:flex; align-items:center; gap:10px; }
+.cdash-danger-zone-label{ font-size:10.5px; color:#B3261E; font-weight:700; }
 .delete-co-modal-name{ font-weight:700; font-size:14px; color:var(--text); margin-bottom:6px; }
 .delete-co-modal-note{ font-size:12.5px; color:#B91C1C; background:#FEF2F2; border:1px solid #FCD5D5; border-radius:8px; padding:8px 10px; margin-bottom:14px; }
 .delete-co-modal-field{ margin-bottom:12px; }
@@ -12738,9 +12813,6 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="cdash2-info-strip-spacer"></div>
         <button type="button" class="co-text-action" id="cdashInfoEditBtn">✎ 고객 정보 수정</button>
       </div>
-      <div class="cdash-danger-zone">
-        <button type="button" class="cdash-delete-co-btn" id="cdashDeleteCoBtn">🗑 업체 삭제</button>
-      </div>
     `;
     document.getElementById('cdashInfoEditBtn').addEventListener('click', ()=>{
       cardState.accordionOpen.info = true;
@@ -12749,9 +12821,6 @@ window.SHIN2_CRM_APP_INIT = function(){
       renderBasicInfoForm(co);
       openHeaderSection('info');
     });
-    // §업체 삭제(휴지통) 라운드(신규) — "수정 영역 아래" 빨간 버튼(§요청 1). 클릭 즉시
-    // 삭제하지 않고 확인 모달만 연다(§요청 2).
-    document.getElementById('cdashDeleteCoBtn').addEventListener('click', ()=> openDeleteCompanyModal(co.id));
   }
 
   /* ==========================================================================
@@ -13241,7 +13310,12 @@ window.SHIN2_CRM_APP_INIT = function(){
           <button type="button" class="co-text-action" id="cdashFooterMemoBtn">메모 추가</button>
         </div>
       </div>
+      <div class="cdash-danger-zone">
+        <span class="cdash-danger-zone-label">위험 영역</span>
+        <button type="button" class="btn-danger-link" id="cdashDeleteCoBtn">업체 삭제</button>
+      </div>
     `;
+    document.getElementById('cdashDeleteCoBtn').addEventListener('click', ()=> openDeleteCompanyModal(co.id));
     document.getElementById('cdashFooterDocsBtn').addEventListener('click', ()=>{
       cardState.accordionOpen.docs = true;
       // §Firebase 인증 사용자 미생성 원인 조사 라운드(신규) — 기존 버그 발견: renderDocCounts
@@ -13512,7 +13586,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       <button type="button" class="co-text-action" id="relcardRestoreBtn" style="margin-top:6px;">협약 종료 취소</button>
       <div id="relcardRestoreConfirm" hidden></div>
     ` : `
-      <button type="button" class="co-text-action danger" id="relcardTerminateBtn">협약 종료 처리</button>
+      <button type="button" class="btn-danger-link" id="relcardTerminateBtn">협약 종료 처리</button>
       <div id="relcardTerminateForm" hidden></div>
     `;
     wrap.innerHTML = `
@@ -15096,9 +15170,9 @@ window.SHIN2_CRM_APP_INIT = function(){
         </div>
         <textarea class="workq-memo-input" id="workqMemo_${esc(item.type)}_${esc(co.id)}" placeholder="메모"></textarea>
         <div class="workq-btn-row">
-          <button type="button" class="workq-btn primary" data-workq-do="save-schedule">일정 저장</button>
-          <button type="button" class="workq-btn" data-workq-do="uncertain">연락했지만 미확정</button>
-          <button type="button" class="workq-btn muted" data-workq-do="hold-open">보류</button>
+          <button type="button" class="btn-primary-action" data-workq-do="save-schedule">일정 저장</button>
+          <button type="button" class="btn-secondary-action" data-workq-do="uncertain">연락했지만 미확정</button>
+          <button type="button" class="btn-secondary-action" data-workq-do="hold-open">보류</button>
         </div>
         <div class="workq-hold-panel" style="display:none;">
           <div class="workq-hold-row">
@@ -15856,7 +15930,7 @@ window.SHIN2_CRM_APP_INIT = function(){
             </div>
             <div class="mail-preview-box" id="mailPreviewBox_${key}" style="display:none;"></div>
             <div class="mail-tpl-save-bar">
-              <button type="button" class="co-text-action primary" id="mailTplSaveBtn_${key}">변경사항 저장</button>
+              <button type="button" class="btn-primary-action" id="mailTplSaveBtn_${key}">변경사항 저장</button>
               <span class="mail-dirty-note" id="mailDirtyNote_${key}" style="display:none;">저장하지 않은 변경사항이 있습니다</span>
               <span id="mailTplSaveMsg_${key}" class="mail-settings-save-msg" style="display:none;">저장했습니다.</span>
             </div>
@@ -17622,7 +17696,10 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 유형·새 저장 구조를 만들지 않는다(§요청 [4]). 6종만: 명함/사업자등록증/통장사본/
   // 회사 로고/체결서(mouAgreement)/기본물품공급서(supplyContract) — "질문서"는
   // DOC_TYPES(7종)에 있지만 이 체크리스트에는 포함하지 않는다(요청 목록에 없음). ----
-  const AGREEMENT_DOC_LABEL_OVERRIDE = { logo:'회사 로고', supplyContract:'기본물품공급서' };
+  // P0-3: 표시 라벨만 DOC_TYPES와 통일(documentType 저장값 'supplyContract'는 그대로) — 예전엔
+  // 이 팝업(협약 진행관리 체크리스트)만 "기본물품공급서"라고 표시해 고객카드 드롭존의
+  // "물품공급계약서"와 이름이 달라 같은 서류처럼 안 보였다.
+  const AGREEMENT_DOC_LABEL_OVERRIDE = { logo:'회사 로고' };
   function agreementDocTypesList(){
     // DOC_TYPES는 이 함수보다 한참 아래(서류함 섹션)에서 정의되지만, 이 함수가
     // "호출되는 시점"(팝업을 열 때)에는 이미 스크립트 전체가 다 실행된 뒤라 안전하다
@@ -18097,7 +18174,7 @@ window.SHIN2_CRM_APP_INIT = function(){
                   <textarea id="questionnaireConsultationMemo" placeholder="질문지를 보면서 상담 내용, 요청사항, 다음 조치를 바로 기록하세요.">${esc(doc.memo || '')}</textarea>
                 </div>
               </div>
-              <div class="questionnaire-note-footer"><span class="questionnaire-save-status" id="questionnaireSaveStatus">이 질문지에 함께 저장됩니다</span><button type="button" class="co-text-action primary" id="questionnaireMemoSave">저장</button></div>
+              <div class="questionnaire-note-footer"><span class="questionnaire-save-status" id="questionnaireSaveStatus">이 질문지에 함께 저장됩니다</span><button type="button" class="btn-primary-action" id="questionnaireMemoSave" style="height:34px;padding:0 16px;">저장</button></div>
             </section>
           </div>
         </div>
@@ -23088,7 +23165,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         </div>` : ''}
       </div>
       <div class="insight-edit-save-bar">
-        <button type="button" class="co-text-action primary" id="ciSaveBtn">저장</button>
+        <button type="button" class="btn-primary-action" id="ciSaveBtn">저장</button>
       </div>
     ` : '';
     // §1차미팅 메모 자동정리 라운드 §"핵심 UX"/"기존 체크박스는 고급 수정으로 이동" —
@@ -23101,8 +23178,8 @@ window.SHIN2_CRM_APP_INIT = function(){
         <textarea id="ciRawNoteQuickInput" rows="8" placeholder="생각나는 대로 자유롭게 적어주세요. 예: 기존 신축아파트 하다가 유지보수로 전환. 지인소개. 현장 출신 대표...">${esc(draft.rawMeetingNote)}</textarea>
       </div>
       <div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;">
-        <button type="button" class="co-text-action primary" id="ciAutoParseBtn">인사이트 자동 정리</button>
-        <button type="button" class="co-text-action" id="ciQuickSaveBtn">저장</button>
+        <button type="button" class="btn-secondary-action" id="ciAutoParseBtn">인사이트 자동 정리</button>
+        <button type="button" class="btn-primary-action" id="ciQuickSaveBtn">저장</button>
       </div>
       <div class="insight-expand-row" style="text-align:left;margin-top:10px;">
         <button type="button" class="co-text-action" id="ciAdvancedToggleBtn">${cardState.insightAdvancedOpen ? '세부 태그 직접 수정 ▲' : '세부 태그 직접 수정 ▼'}</button>
@@ -23846,20 +23923,15 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="cdash-doc-status-total" style="margin-left:auto;">${registered} / ${list.length} 등록</div>
       </div>
       <div class="cdash-accordion-body" id="cdashDocsAccBody" style="${open ? '' : 'display:none;'}">
-        <div class="cdash-doc-status-chips">
-          ${list.map(d=> `<span class="cdash-doc-status-chip${d.count ? ' is-on' : ''}">${esc(d.label)} ${esc(d.statusText)}</span>`).join('')}
-        </div>
         ${mouMismatch ? `<div class="cdash-doc-status-note">MOU 체결서 미등록 (진행상태는 협약 완료로 표시됨)</div>` : ''}
-        <!-- §고객관리 사진·서류 통합 라운드(신규) — 업무관리 협약 진행관리 팝업과 같은
-             체크리스트(명함/사업자등록증/통장사본/회사 로고/체결서/기본물품공급서 6종)를
-             카드+썸네일 형태로 여기 추가한다. 아래 기존 "서류"(질문서 포함 7종 드래그앤드롭
-             업로드)는 하나도 안 바꾸고 그대로 둔다(§ "기존 등록·수정 흐름은 유지") — 두 UI가
-             같은 D.documentsForCompany/addDocument를 읽고 쓰므로 어느 쪽에서 등록해도 즉시
-             서로 반영된다. -->
-        <div class="chart-section-title" style="margin-top:12px;">서류 체크리스트</div>
-        <div id="cdashDocChecklist"></div>
-        <div class="chart-section-title" style="margin-top:12px;">서류(전체, 질문서 포함)</div>
-        <div id="chartDocCounts"></div>
+        <!-- §P0-3(서류 현황 1벌 통합) — 예전에는 이 자리에 칩 줄(.cdash-doc-status-chips)과
+             "서류 체크리스트"(cdashDocChecklist, questionnaire 제외 6종) 카드가 실제 업로드
+             UI(#crmDocsSection, questionnaire 포함 7종 드래그앤드롭)와 나란히 중복 표시됐다
+             (같은 D.documentsForCompany를 각자 다시 세어 서로 다른 카운터를 보여줌). 셋 다
+             같은 데이터를 보여주기만 할 뿐 업로드 로직은 #crmDocsSection(renderDocsSection)
+             하나에만 있었으므로, 칩 줄과 체크리스트 카드는 지우고 실제 업로드 기능이 있는
+             드롭존 1벌만 남긴다 — renderDocsSection/renderDocList/handleDocFiles 등 업로드·
+             미리보기·삭제 로직은 한 글자도 바꾸지 않았다. -->
         <div id="crmDocsSection"></div>
       </div>
     `;
@@ -23867,7 +23939,6 @@ window.SHIN2_CRM_APP_INIT = function(){
       cardState.accordionOpen.docs = !open;
       refreshChart();
     });
-    if(open) renderCustomerCardDocChecklist(co.id);
   }
 
   // ---- [미팅 기록] 버튼 패널(§14) — 이 업체와 연결된 캘린더 일정 전체(예정+지난 일정 모두,
@@ -24111,25 +24182,28 @@ window.SHIN2_CRM_APP_INIT = function(){
     // §12: 실제 공용 클라우드 동기화(업로드+실시간 수신)가 이 기기에서 확인된 뒤에만 짧은 안내로 교체한다.
     return '업로드된 서류는 회사 공용으로 저장되며 모든 사용자가 확인할 수 있습니다.';
   }
+  // P0-3: 위 세 상태 중 마지막(정상/평시) 상태일 때만 노란 경고 배너 대신 11px 회색 1줄로
+  // 보여준다 — 로그인 안 됨/동기화 중 같은 실제 경고 상태는 기존처럼 눈에 띄게 유지한다.
+  function docNoteIsPlain(){ return crmCloudReady() && docsSyncReady(); }
   // 로그인 시도가 실패로 확정되는 순간에도 안내 문구를 즉시 갱신한다(§1 진단 정보를
   // 최대한 빨리 화면에 반영 — shin2-crm-firebase-ready는 auth 상태 변화 시에만 오고,
   // 로그인 실패 자체는 그와 별개 이벤트라 따로 듣는다).
   window.addEventListener('shin2-crm-auth-error', ()=>{
     const note = document.getElementById('crmDocNote');
-    if(note) note.textContent = docNoteText();
+    if(note){ note.textContent = docNoteText(); note.classList.toggle('is-plain', docNoteIsPlain()); }
   });
   // 로그인/동기화 상태 변화 시점에 안내 문구만 갱신한다(자동 업로드/마이그레이션 아님 —
   // 단순 텍스트 갱신, §수동 액션 원칙 위반 아님). 카드 화면이 열려 있지 않으면 조용히 무시된다.
   window.addEventListener('shin2-crm-firebase-ready', ()=>{
     const note = document.getElementById('crmDocNote');
-    if(note) note.textContent = docNoteText();
+    if(note){ note.textContent = docNoteText(); note.classList.toggle('is-plain', docNoteIsPlain()); }
   });
   // 다른 직원의 기기에서 올리거나 지운 서류함 메타데이터가 클라우드에서 도착했을 때, 지금
   // 열려있는 카드가 그 회사면 목록을 바로 다시 그린다(§5 전 직원 공유가 "새로고침해야만
   // 보인다"가 아니라 실제로 실시간이 되도록).
   window.addEventListener('shin2-crm-docs-cloud-update', ()=>{
     const note = document.getElementById('crmDocNote');
-    if(note) note.textContent = docNoteText();
+    if(note){ note.textContent = docNoteText(); note.classList.toggle('is-plain', docNoteIsPlain()); }
     const openId = window.__crmOpenCompanyId;
     if(!openId || !document.getElementById('crmDocsSection')) return;
     const co = D.findCompany(openId);
@@ -24262,7 +24336,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   function renderDocsSection(co){
     const wrap = document.getElementById('crmDocsSection');
     wrap.innerHTML = `
-      <div class="doc-blocked-note" id="crmDocNote">${esc(docNoteText())}</div>
+      <div class="doc-blocked-note${docNoteIsPlain() ? ' is-plain' : ''}" id="crmDocNote">${esc(docNoteText())}</div>
       <div class="doc-grid">
         ${DOC_TYPES.map(([type,label])=> `
           <div class="doc-category" data-doc-cat="${type}">
@@ -24833,8 +24907,8 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="req-row-edit-body">
         <textarea id="memoDraftInput" placeholder="요청자료 내용을 입력하세요"></textarea>
         <div class="req-row-actions">
-          <button type="button" class="cdash-mini-edit" id="memoDraftCancel">취소</button>
-          <button type="button" class="co-text-action primary" id="memoDraftSave" style="font-size:11px;padding:2px 8px;">저장</button>
+          <button type="button" class="btn-secondary-action" id="memoDraftCancel" style="height:30px;padding:0 12px;font-size:12px;">취소</button>
+          <button type="button" class="btn-primary-action" id="memoDraftSave" style="height:30px;padding:0 12px;font-size:12px;">저장</button>
         </div>
       </div>
     </div>`;
@@ -25340,7 +25414,13 @@ window.SHIN2_CRM_APP_INIT = function(){
            확인까지 기다린 뒤에만 닫도록 바꾼다(§크게 실패해도 로컬에는 이미 저장돼
            있어 데이터가 사라지지 않는다 — 아래 스크립트 주석 참고). -->
       <div id="crmNewFSaveErr" style="display:none;color:#B91C1C;font-size:12px;margin-top:8px;"></div>
-      <button type="button" class="co-text-action primary" id="crmNewFSave">등록</button>
+      <div class="popup-action-bar">
+        <span class="popup-action-bar-status"></span>
+        <div class="popup-action-bar-buttons">
+          <button type="button" class="btn-secondary-action" id="crmNewFCancel">취소</button>
+          <button type="button" class="btn-primary-action" id="crmNewFSave">등록</button>
+        </div>
+      </div>
     `;
     document.getElementById('crmNewF_code').value = genCompanyCode();
     if(prefillName) document.getElementById('crmNewF_name').value = prefillName;
@@ -25552,6 +25632,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
       handleImageFile(file);
     });
+    document.getElementById('crmNewFCancel').addEventListener('click', closeAddCompanyForm);
     document.getElementById('crmNewFSave').addEventListener('click', async ()=>{
       const saveBtn = document.getElementById('crmNewFSave');
       const saveErrEl = document.getElementById('crmNewFSaveErr');
