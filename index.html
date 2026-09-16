@@ -2753,6 +2753,18 @@ body.map-modal-lock{ overflow:hidden; }
   .mail-settings-panel{ padding:0 12px; }
   .mail-template-layout{ grid-template-columns:1fr; }
 }
+/* §메일 설정 보기편한형태 라운드(신규) — 페이지 제목(workq-header-row)이 아래
+   .mail-settings-panel(max-width:1360px, 중앙 정렬)과 다른 컨테이너라 화면 좌측에
+   붙어 보이던 문제. 같은 폭·중앙 정렬을 제목에도 그대로 적용(다른 탭 제목과 동일한
+   중앙 컨테이너를 따르게). 제목 자체의 폰트/마진 등은 기존 .workq-header 그대로 둔다. */
+.mail-settings-header-wrap{ max-width:1360px; width:100%; margin:0 auto; padding:0 24px; box-sizing:border-box; }
+@media (max-width:900px){
+  .mail-settings-header-wrap{ padding:0 12px; }
+}
+/* 발송 계정 설정(EmailJS 연결) 접힘 헤더 — 부차 설정인데 화면 전체 폭(1360px)을
+   그대로 차지해 이 화면에서 가장 큰 요소처럼 보이던 문제. 토글 버튼·펼침 패널의
+   너비를 본문 폭 정도로 줄이고, 패딩도 살짝 낮춘다(기능/열림·닫힘 로직은 그대로). */
+.mail-account-section{ max-width:640px; }
 .mail-settings-section{ border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:14px; background:var(--surface); }
 .mail-settings-section-title{ font-size:13px; font-weight:700; color:var(--text); margin-bottom:8px; }
 .mail-settings-help{ font-size:11.5px; color:var(--text-muted); line-height:1.5; margin-bottom:10px; }
@@ -2826,7 +2838,7 @@ body.map-modal-lock{ overflow:hidden; }
    패널(사용여부/시점안내/제목/본문/자리표시자/첨부자료/동영상/미리보기/저장). 기존
    .mail-settings-section/.co-form-field/.mail-settings-help 토큰은 그대로 재사용. */
 .mail-account-section{ margin-bottom:14px; }
-.mail-account-toggle{ display:flex; align-items:center; gap:6px; width:100%; text-align:left; background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:13px; font-weight:700; color:var(--navy); cursor:pointer; }
+.mail-account-toggle{ display:flex; align-items:center; gap:6px; width:100%; text-align:left; background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 12px; font-size:12.5px; font-weight:700; color:var(--navy); cursor:pointer; }
 .mail-account-chevron{ display:inline-block; font-size:10px; color:var(--text-muted); transition:transform .12s; }
 .mail-account-chevron.is-open{ transform:rotate(90deg); }
 .mail-account-panel{ border:1px solid var(--line); border-top:0; border-radius:0 0 8px 8px; padding:12px; background:#fff; }
@@ -2843,7 +2855,8 @@ body.map-modal-lock{ overflow:hidden; }
 .mail-tab-rename-save{ color:#1E7A34; }
 .mail-tab-rename-cancel{ color:#B3261E; }
 .mail-tpl-timing{ font-size:12px; color:var(--text-muted); background:var(--bg); border-radius:6px; padding:7px 10px; margin-bottom:10px; }
-.mail-placeholder-row{ display:flex; flex-wrap:wrap; gap:5px; margin:-4px 0 10px; }
+.mail-placeholder-row{ display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin:-4px 0 10px; }
+.mail-placeholder-row-label{ font-size:11px; color:var(--text-muted); margin-right:2px; }
 .mail-placeholder-btn{ font-size:11px; padding:3px 8px; border:1px solid var(--line); border-radius:12px; background:#fff; color:var(--text); cursor:pointer; }
 .mail-placeholder-btn:hover{ border-color:var(--navy); color:var(--navy); }
 .mail-asset-box{ border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:10px; background:#fff; }
@@ -2866,6 +2879,18 @@ body.map-modal-lock{ overflow:hidden; }
 /* §메일 설정 첨부파일 업로드 인증 연결 라운드(신규) */
 .mail-asset-authgate{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:11.5px; padding:7px 9px; border-radius:6px; margin-bottom:6px; }
 .mail-asset-authgate.is-checking{ background:var(--bg); color:var(--text-muted); }
+/* §메일 설정 보기편한형태 라운드(신규) — "로그인 확인 중…"이 그냥 회색 텍스트만
+   있어 멈춘 것처럼 보이던 문제. 작은 회전 스피너를 붙여 로딩 중임을 시각적으로
+   드러낸다(로그인 확인 로직 자체는 손대지 않음 — 상태 문구 옆 장식 요소만 추가). */
+.mail-asset-authgate-spinner{
+  display:inline-block; width:11px; height:11px; flex:none; border-radius:50%;
+  border:2px solid var(--line); border-top-color:var(--text-muted);
+  animation:mailAuthgateSpin .8s linear infinite;
+}
+@keyframes mailAuthgateSpin{ to{ transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce){
+  .mail-asset-authgate-spinner{ animation:none; }
+}
 .mail-asset-authgate.is-blocked{ background:#FDECEC; color:#B3261E; }
 .mail-asset-dropzone.is-locked, [data-mail-global-img-drop].is-locked{ opacity:.55; cursor:not-allowed; }
 [data-mail-body-img-add].is-locked{ opacity:.5; cursor:not-allowed; }
@@ -2906,7 +2931,26 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .mail-preview-body{ font-size:12.5px; color:var(--text); white-space:pre-wrap; line-height:1.5; margin-bottom:6px; }
 /* §본문 이미지 첨부 라운드(신규) */
 .mail-body-toolbar{ display:flex; align-items:center; gap:10px; margin-bottom:6px; flex-wrap:wrap; }
-.mail-body-editor{ min-height:220px; max-height:480px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:13px; line-height:1.6; color:var(--text); background:#fff; font-family:inherit; }
+.mail-body-editor{ min-height:220px; max-height:480px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:12px 14px; font-size:14px; line-height:1.7; color:var(--text); background:#fff; font-family:inherit; }
+/* §메일 설정 보기편한형태 라운드(신규) — 붙여넣기 등으로 본문에 남아있는 형광펜류
+   배경 하이라이트(노란색)의 출처는 사용자가 직접 입력/붙여넣은 인라인 스타일이고
+   앱이 어떤 서류명을 자동으로 강조하는 로직은 이 파일 어디에도 없다(§확인 완료 —
+   자동 키워드 강조 기능 아님). 그래서 강조 자체(그 단어가 중요하다는 의미)는
+   지우지 않되, 튀는 원색 대신 절제된 옅은 배경+밑줄로만 톤을 낮춘다. */
+.mail-body-editor mark,
+.mail-body-editor [style*="background-color: yellow" i],
+.mail-body-editor [style*="background-color:yellow" i],
+.mail-body-editor [style*="background: yellow" i],
+.mail-body-editor [style*="background:yellow" i],
+.mail-body-editor [style*="ffff00" i],
+.mail-preview-body-html mark,
+.mail-preview-body-html [style*="background-color: yellow" i],
+.mail-preview-body-html [style*="background-color:yellow" i],
+.mail-preview-body-html [style*="background: yellow" i],
+.mail-preview-body-html [style*="background:yellow" i],
+.mail-preview-body-html [style*="ffff00" i]{
+  background-color:#FDF3D7 !important; color:inherit; text-decoration:underline; text-decoration-color:#D8A93F; text-underline-offset:2px;
+}
 .mail-body-editor:focus{ outline:none; border-color:var(--navy); }
 .mail-body-editor img{ max-width:100%; height:auto; display:block; margin:8px 0; border-radius:4px; cursor:pointer; }
 .mail-body-img-placeholder{ display:inline-block; padding:4px 10px; font-size:11.5px; color:var(--navy); background:var(--bg); border:1px dashed var(--navy); border-radius:6px; margin:4px 0; }
@@ -16136,7 +16180,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   function mailAssetAuthNoticeHtml(){
     const st = mailAssetAuthState();
     if(st === 'ready') return '';
-    if(st === 'checking') return `<div class="mail-asset-authgate is-checking">로그인 확인 중…</div>`;
+    if(st === 'checking') return `<div class="mail-asset-authgate is-checking"><span class="mail-asset-authgate-spinner" aria-hidden="true"></span>로그인 확인 중…</div>`;
     if(st === 'unavailable') return `<div class="mail-asset-authgate is-blocked">클라우드 저장 기능을 사용할 수 없습니다(Firebase 설정 없음) — 이 화면에서는 파일을 등록할 수 없습니다.</div>`;
     return `<div class="mail-asset-authgate is-blocked" data-mail-authgate-idle>
       <span>로그인이 풀렸습니다 — 다시 로그인해주세요.</span>
@@ -16273,7 +16317,11 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="mail-settings-help">참고: 이건 그 업체 자신의 서류함에서 찾는 기존 기능입니다. 아래 "공통 발송자료"는 모든 업체에 공통으로 보내는 별도의 자료입니다 — 고객별 민감 서류(사업자등록증·통장사본 등)를 자동으로 가져오지 않습니다.</div>
       </div>`;
     const updatedText = tpl.updatedAt ? `마지막 저장: ${esc(fmtDateTimeSmart(tpl.updatedAt))}` : '아직 저장한 적 없음(기본값 사용 중)';
-    const placeholderRow = (targetId)=> `<div class="mail-placeholder-row">${MAIL_PLACEHOLDER_BUTTONS.map(([ph,label])=> `<button type="button" class="mail-placeholder-btn" data-ph-target="${targetId}" data-ph-value="${esc(ph)}">${esc(label)}</button>`).join('')}</div>`;
+    // §메일 설정 보기편한형태 라운드(신규) — 변수 칩이 제목 아래·본문 아래 두 번
+    // 나와 "중복"처럼 보이던 문제. 실제로는 각각 다른 삽입 대상(data-ph-target)이라
+    // 기능은 서로 다르다 — 둘 다 실제로 쓰이는 자리라 하나를 없애지 않고, 앞에 짧은
+    // 안내 문구를 붙여 "지금 누르면 어디에 들어가는지"를 명확히만 한다.
+    const placeholderRow = (targetId, insertLabel)=> `<div class="mail-placeholder-row"><span class="mail-placeholder-row-label">${esc(insertLabel)}에 삽입:</span>${MAIL_PLACEHOLDER_BUTTONS.map(([ph,label])=> `<button type="button" class="mail-placeholder-btn" data-ph-target="${targetId}" data-ph-value="${esc(ph)}">${esc(label)}</button>`).join('')}</div>`;
     // §메일 설정 2열 레이아웃 라운드(신규) — 탭 아래를 왼쪽(제목·본문 등 실제로 쓰는
     // 글) / 오른쪽(첨부자료·미리보기·저장) 2열로 나눴다. 필드 id·저장/미리보기 로직은
     // 전혀 안 바꿨고 배치만 옮겼다(§요청, 넓은 화면 오른쪽 여백 활용).
@@ -16284,7 +16332,7 @@ window.SHIN2_CRM_APP_INIT = function(){
             <div class="mail-tpl-timing">${esc(MAIL_TEMPLATE_TIMING_TEXT[key])}</div>
             <label class="mail-tpl-enable" style="float:none; display:inline-flex; margin-bottom:10px;"><input type="checkbox" id="mailSetEnabled_${key}" ${tpl.enabled!==false?'checked':''} /> 이 메일 사용</label>
             <div class="co-form-field"><label>제목</label><input type="text" id="mailSetSubject_${key}" value="${esc(tpl.subjectTemplate)}" /></div>
-            ${placeholderRow('mailSetSubject_' + key)}
+            ${placeholderRow('mailSetSubject_' + key, '제목')}
             <div class="co-form-field">
               <label>본문</label>
               <div class="mail-body-toolbar">
@@ -16295,7 +16343,7 @@ window.SHIN2_CRM_APP_INIT = function(){
               <div class="mail-body-editor" id="mailSetBody_${key}" contenteditable="true" data-mail-panel-key="${key}">${mailBodyToEditorHtml(tpl.bodyTemplate)}</div>
               <span id="mailBodyImgStatus_${key}" class="mail-asset-status"></span>
             </div>
-            ${placeholderRow('mailSetBody_' + key)}
+            ${placeholderRow('mailSetBody_' + key, '본문')}
             ${key==='documentRequest' ? `<div class="mail-settings-help">본문의 {요청서류목록} 자리에 발송 시 선택한 미등록·재요청 서류명이 자동으로 들어갑니다.</div>` : ''}
           </div>
           <div class="mail-template-right">
@@ -16329,10 +16377,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     const meta = D.getMailAssetsMeta();
     const globalAsset = D.getGlobalMailAsset();
     wrap.innerHTML = `
-      <div class="workq-header-row">
-        <div class="workq-header">
-          <div class="workq-title">메일 설정</div>
-          <div class="workq-subtitle">메일 종류별 탭을 눌러 그 메일의 설정만 확인·수정합니다. 제목·본문·첨부는 탭마다 독립적으로 저장됩니다.</div>
+      <div class="mail-settings-header-wrap">
+        <div class="workq-header-row">
+          <div class="workq-header">
+            <div class="workq-title">메일 설정</div>
+            <div class="workq-subtitle">메일 종류별 탭을 눌러 그 메일의 설정만 확인·수정합니다. 제목·본문·첨부는 탭마다 독립적으로 저장됩니다.</div>
+          </div>
         </div>
       </div>
       <div class="mail-settings-panel">
@@ -16366,9 +16416,9 @@ window.SHIN2_CRM_APP_INIT = function(){
             <span class="mail-tab-btn-wrap" id="mailTabWrap_${key}">
               <button type="button" class="mail-tab-btn${mailSettingsUI.activeTab===key?' is-active':''}" role="tab" aria-selected="${mailSettingsUI.activeTab===key?'true':'false'}" data-mail-tab="${key}" id="mailTabBtn_${key}">
                 ${esc(mailTabDisplayName(s.mailTemplates[key], key))}
-                <span class="mail-tab-dirty-dot" data-mail-tab-dirty-dot="${key}" style="display:${mailSettingsUI.dirty[key]?'inline-block':'none'};"></span>
+                <span class="mail-tab-dirty-dot" data-mail-tab-dirty-dot="${key}" style="display:${mailSettingsUI.dirty[key]?'inline-block':'none'};" title="${mailSettingsUI.dirty[key]?'저장하지 않은 변경사항이 있습니다':''}"></span>
               </button>
-              <button type="button" class="mail-tab-rename-btn" data-mail-tab-rename="${key}" aria-label="${esc(mailTabDisplayName(s.mailTemplates[key], key))} 탭 이름 수정">✎</button>
+              <button type="button" class="mail-tab-rename-btn" data-mail-tab-rename="${key}" aria-label="${esc(mailTabDisplayName(s.mailTemplates[key], key))} 탭 이름 수정" title="탭 이름 수정">✎</button>
             </span>`).join('')}
         </div>
         <div class="mail-tab-panels" id="mailTabPanels">
@@ -16892,7 +16942,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       const key = panel.getAttribute('data-mail-panel');
       mailSettingsUI.dirty[key] = true;
       const dot = document.querySelector(`[data-mail-tab-dirty-dot="${key}"]`);
-      if(dot) dot.style.display = 'inline-block';
+      if(dot){ dot.style.display = 'inline-block'; dot.title = '저장하지 않은 변경사항이 있습니다'; }
       const note = document.getElementById('mailDirtyNote_' + key);
       if(note) note.style.display = 'inline';
     });
@@ -16902,7 +16952,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       const key = panel.getAttribute('data-mail-panel');
       mailSettingsUI.dirty[key] = true;
       const dot = document.querySelector(`[data-mail-tab-dirty-dot="${key}"]`);
-      if(dot) dot.style.display = 'inline-block';
+      if(dot){ dot.style.display = 'inline-block'; dot.title = '저장하지 않은 변경사항이 있습니다'; }
       const note = document.getElementById('mailDirtyNote_' + key);
       if(note) note.style.display = 'inline';
     });
@@ -17090,9 +17140,9 @@ window.SHIN2_CRM_APP_INIT = function(){
     wrap.innerHTML = `
       <button type="button" class="mail-tab-btn${mailSettingsUI.activeTab===key?' is-active':''}" role="tab" aria-selected="${mailSettingsUI.activeTab===key?'true':'false'}" data-mail-tab="${key}" id="mailTabBtn_${key}">
         ${esc(name)}
-        <span class="mail-tab-dirty-dot" data-mail-tab-dirty-dot="${key}" style="display:${mailSettingsUI.dirty[key]?'inline-block':'none'};"></span>
+        <span class="mail-tab-dirty-dot" data-mail-tab-dirty-dot="${key}" style="display:${mailSettingsUI.dirty[key]?'inline-block':'none'};" title="${mailSettingsUI.dirty[key]?'저장하지 않은 변경사항이 있습니다':''}"></span>
       </button>
-      <button type="button" class="mail-tab-rename-btn" data-mail-tab-rename="${key}" aria-label="${esc(name)} 탭 이름 수정">✎</button>
+      <button type="button" class="mail-tab-rename-btn" data-mail-tab-rename="${key}" aria-label="${esc(name)} 탭 이름 수정" title="탭 이름 수정">✎</button>
     `;
   }
   function mailStartTabRename(key){
