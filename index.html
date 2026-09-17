@@ -28128,6 +28128,28 @@ window.SHIN2_CRM_APP_INIT = function(){
   function normSigunguForApt(region, city){
     return [region, city].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
   }
+  // §공종 필터 포함 매칭 라운드(신규) — 기존엔 공종 필터가 e.categories.includes(선택값)로
+  // 완전 일치만 봤다. 실제 임베디드 스냅샷(window.SHIN2_POUR_TRACK_RECORD_SNAPSHOT, 1149건)
+  // 조사 결과, 원본 category 셀이 줄바꿈("금속기와\n슬라브")으로 합쳐진 경우는 buildAptEntry가
+  // 이미 개별 값으로 쪼개 놓지만(§split(/\n+/)), 쉼표로 합쳐진 경우("슬라브,재도장",
+  // "싱글,슬라브")는 그대로 한 덩어리 문자열로 남아 있어 "슬라브"만 선택하면 이 항목들이
+  // 완전 일치 실패로 전부 빠졌다 — 사용자가 보고한 "금속기와 슬라브 선택 시 0건"과 같은
+  // 부류의 문제(구분자 표기 차이로 인한 과도하게 엄격한 비교)임을 실제 데이터로 확인했다.
+  // "슬라브"만 특별 취급하지 않고, 공종 비교 전체에 공통으로 적용하는 정규화+포함 관계
+  // 매칭으로 바꾼다 — 단어 단위로 쪼개지 않고(§요청 "관련 없는 공종까지 매칭 금지"), 이미
+  // 존재하는 공종 값(선택지/저장값) 단위끼리만 포함 관계를 비교한다.
+  function normAptCategoryToken(s){
+    return String(s || '').replace(/[\s,\/+·\n]+/g, '').toLowerCase();
+  }
+  function aptCategoryMatches(entryCategories, selected){
+    if(!selected || selected === 'all') return true;
+    const normSelected = normAptCategoryToken(selected);
+    if(!normSelected) return true;
+    return entryCategories.some(c=>{
+      const normC = normAptCategoryToken(c);
+      return !!normC && (normC.includes(normSelected) || normSelected.includes(normC));
+    });
+  }
   // 업체별 POUR 실적(getTotalPourRecordsForCompany, 기존 판정·중복제거 기준 그대로)을
   // 훑어서 "아파트 그룹"으로 다시 묶는다 — 같은 아파트가 여러 업체/여러 실적에 걸쳐
   // 나오면 하나의 그룹(history 배열)에 합쳐진다(§7 "동일 아파트에 서로 다른 연도·공종의
@@ -28218,7 +28240,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   }
   function aptEntryMatchesFilter(e, state){
     if(state.year !== 'all' && !e.years.includes(parseInt(state.year, 10))) return false;
-    if(state.category !== 'all' && !e.categories.includes(state.category)) return false;
+    if(state.category !== 'all' && !aptCategoryMatches(e.categories, state.category)) return false;
     if(state.region !== 'all' && e.region !== state.region) return false;
     if(state.households !== 'all'){
       const h = e.households;
