@@ -29183,9 +29183,17 @@ window.SHIN2_CRM_APP_INIT = function(){
       currentEntries = entries;
       renderClusterLayer(entries);
     }
+    // §지도 클러스터 클릭 버그 수정 — 클러스터 버블을 클릭하면 focusClusterGroup이
+    // map.setBounds()로 지도를 그 영역으로 이동/확대만 하고 끝났다(§요청 "클릭하면
+    // 오른쪽 목록에 쫙 떠야하는데 안 뜸", 사용자 스크린샷으로 재현). setBounds는 'idle'
+    // 이벤트를 발생시키지만, 이 idle 리스너(refreshVisible)는 지금까지 마커/클러스터
+    // 레이어만 다시 그리고 오른쪽 정보 패널(renderAptInfoPanel)은 전혀 다시 그리지
+    // 않았다 — 시공사 탭의 대응 함수(refreshVisibleList, §28773)는 이미 idle마다
+    // renderMapInfoPanel을 같이 불러 이 문제가 없었다. 같은 패턴으로 맞춘다.
     function refreshVisible(){
       if(!mapModalOpen || mapActiveTab !== 'apartment') return;
       renderClusterLayer(currentEntries);
+      renderAptInfoPanel(allEntries);
     }
     kakao.maps.event.addListener(map, 'idle', refreshVisible);
 
@@ -29213,6 +29221,14 @@ window.SHIN2_CRM_APP_INIT = function(){
 
     aptCanvasState = {
       map, clusterer,
+      // §지도 클러스터 클릭 버그 수정 — 시공사 탭의 getVisibleEntries(§28786)와 동일
+      // 패턴. renderAptInfoPanel이 이 함수가 있으면 "필터 결과 전체"가 아니라 "현재
+      // 지도 화면 안에 보이는 아파트"만 목록에 보여줄 수 있게 한다.
+      getVisibleEntries(){
+        const bounds = map.getBounds();
+        if(!bounds) return [];
+        return applyAptFilters(allEntries).filter(e=> e.hasCoords && bounds.contain(new kakao.maps.LatLng(e.lat, e.lng)));
+      },
       // §시공사 탭에서 발견된 버그(초기 idle 리스너가 인스턴스 destroy 이후에도 남아있던
       // 문제, 위 initMapCanvas 주석 참고)와 같은 조치를 여기도 대칭으로 적용 — 안전장치
       // 이중화, 새 문제 발견은 아님.
@@ -29287,21 +29303,29 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(!infoCol) return;
     const unlocated = filtered.filter(e=> !e.hasCoords && e.geocodeStatus === 'failed');
     const pending = filtered.filter(e=> e.geocodeStatus === 'pending');
-    // §근처 아파트 검색 라운드: nearCenter가 활성화돼 있으면 목록 제목과 각 행에
-    // 가까운 순서·거리(km)를 함께 보여준다(applyAptFilters가 이미 가까운 순으로
-    // 정렬해 둔 상태라 목록도 자동으로 그 순서를 따른다).
+    // §지도 클러스터 클릭 버그 수정 — 지금까지 이 목록은 항상 "필터 결과 전체(최대
+    // 300곳)"였고 지도 화면과 무관했다. 클러스터 버블을 클릭해 지도가 그 영역으로
+    // 확대돼도(focusClusterGroup→map.setBounds) 오른쪽 목록은 그대로였던 것이 사용자가
+    // 보고한 버그의 실제 원인이다(§요청 "클릭하면 오른쪽 목록에 쫙 떠야하는데 안 뜸").
+    // 시공사 탭의 "현재 지도 내 업체"(§28411 getVisibleEntries)와 동일하게, 근처
+    // 검색 모드가 아닐 때는 현재 지도 화면 안에 보이는 아파트만 보여준다 — 근처 검색은
+    // 거리순 정렬이라는 별도 목적이 있어 그대로 전체 필터 결과를 유지한다.
+    const visibleEntries = (aptCanvasState && typeof aptCanvasState.getVisibleEntries === 'function')
+      ? aptCanvasState.getVisibleEntries()
+      : filtered;
+    const listSource = aptFilterState.nearCenter ? filtered : visibleEntries;
     const listTitle = aptFilterState.nearCenter
-      ? `근처 시공 아파트${filtered.length > 300 ? '(상위 300곳)' : ''}`
-      : `시공 아파트 목록${filtered.length > 300 ? '(상위 300곳 — 검색·필터로 좁혀보세요)' : ''}`;
+      ? `근처 시공 아파트${listSource.length > 300 ? '(상위 300곳)' : ''}`
+      : `현재 지도 내 아파트 (${listSource.length}곳)${listSource.length > 300 ? ' — 상위 300곳' : ''}`;
     infoCol.innerHTML = `
       <div>
         <div class="map-info-block-title">${esc(listTitle)}</div>
-        ${filtered.length ? filtered.slice(0, 300).map(e=> `
+        ${listSource.length ? listSource.slice(0, 300).map(e=> `
           <div class="map-apt-row" data-apt-key="${esc(e.key)}">
             <div class="map-apt-row-name"><span>${esc(e.name)}</span><span class="map-apt-row-hh">${typeof e.distanceKm === 'number' ? esc(e.distanceKm.toFixed(1)) + 'km' : esc(fmtAptHouseholds(e.households))}</span></div>
             <div class="map-apt-row-sub">${esc([e.region, e.city].filter(Boolean).join(' ') || '지역 미확인')} · ${esc(e.years.length ? e.years[0] + '년' : '연도 미상')} · ${esc(e.categories[0] || '—')} · ${esc(e.companies.length === 1 ? e.companies[0].name : (e.companies.length ? e.companies.length + '개 시공사' : '시공사 미연결'))}${typeof e.distanceKm === 'number' ? ' · ' + esc(fmtAptHouseholds(e.households)) : ''}</div>
           </div>
-        `).join('') : `<div class="map-modal-empty" style="padding:8px 0;">${esc(emptyMsg)}</div>`}
+        `).join('') : `<div class="map-modal-empty" style="padding:8px 0;">${esc(!aptFilterState.nearCenter && filtered.length > 0 ? '현재 지도 화면에 보이는 아파트가 없습니다(지도를 축소하거나 이동해 보세요).' : emptyMsg)}</div>`}
       </div>
       ${unlocated.length ? `<div class="map-unlocated-summary">위치 확인 필요 ${esc(unlocated.length)}곳(주소 검색 실패 또는 정보 부족)</div>` : ''}
       ${pending.length ? `<div class="map-unlocated-summary">위치 확인 중 ${esc(pending.length)}곳…</div>` : ''}
