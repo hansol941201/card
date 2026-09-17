@@ -16578,13 +16578,101 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
     return tmp.innerHTML;
   }
-  // 작성 UI는 이미지·링크 편집을 위해 HTML을 유지하지만 EmailJS의 message 템플릿 변수는
-  // 일반 텍스트로 전달한다. <br>/블록 요소는 실제 개행으로, 링크·이미지는 접근 가능한 URL
-  // 텍스트로 바꿔 수신 메일에 HTML 태그가 문자 그대로 노출되지 않게 한다.
+  // EmailJS HTML 본문에는 작성기의 innerHTML을 그대로 전달하지 않는다. 메일에 필요한
+  // 태그/인라인 스타일만 새 DOM으로 복사하고, 위험한 태그·이벤트 속성·javascript: URL은
+  // 버린다. 브라우저 편집 명령이 만드는 legacy <font>도 안전한 <span style>로 바꾼다.
+  function sanitizeMailBodyForEmailHtml(html){
+    const source = document.createElement('div');
+    source.innerHTML = sanitizeMailBodyHtml(html);
+    const doc = source.ownerDocument || document;
+    const allowedTags = new Set(['P','DIV','BR','STRONG','B','EM','I','U','SPAN','UL','OL','LI','A','IMG']);
+    const discardedTags = new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','LINK','META','TEMPLATE','SVG','MATH','FORM','INPUT','BUTTON','SELECT','TEXTAREA']);
+    const fontSizeMap = { '1':'10px', '2':'13px', '3':'16px', '4':'18px', '5':'24px', '6':'32px', '7':'48px' };
+    const headingSizeMap = { H1:'32px', H2:'26px', H3:'22px', H4:'18px', H5:'16px', H6:'14px' };
+    const colorPattern = /^(?:#[0-9a-f]{3,8}|(?:rgb|rgba|hsl|hsla)\([^<>]*\)|[a-z]{1,24}|transparent)$/i;
+    function safeUrl(raw, image){
+      const value = String(raw || '').trim();
+      if(!value || /[\u0000-\u001f\u007f]/.test(value)) return '';
+      return (image ? /^https?:\/\//i : /^(?:https?:\/\/|mailto:|tel:)/i).test(value) ? value : '';
+    }
+    function safeStyleValue(name, raw){
+      const value = String(raw || '').trim();
+      if(!value || /(?:url\s*\(|expression\s*\(|javascript:|[<>])/i.test(value)) return '';
+      if(name === 'font-size') return /^(?:[8-9]|[1-6]\d|7[0-2])(?:\.\d+)?(?:px|pt)$|^(?:0?\.\d+|[1-5](?:\.\d+)?)(?:em|rem)$|^(?:[1-9]\d?|[12]\d\d|300)%$|^(?:xx-small|x-small|small|medium|large|x-large|xx-large)$/i.test(value) ? value : '';
+      if(name === 'font-weight') return /^(?:normal|bold|bolder|lighter|[1-9]00)$/i.test(value) ? value : '';
+      if(name === 'font-style') return /^(?:normal|italic|oblique)$/i.test(value) ? value : '';
+      if(name === 'text-decoration') return /^(?:none|underline|line-through|underline line-through|line-through underline)$/i.test(value) ? value : '';
+      if(name === 'color' || name === 'background-color') return colorPattern.test(value) ? value : '';
+      if(name === 'text-align') return /^(?:left|right|center|justify|start|end)$/i.test(value) ? value : '';
+      if(name === 'line-height') return /^(?:normal|(?:0?[.]\d+|[1-2](?:[.]\d+)?|3)(?:em|rem)?|(?:[1-9]\d?|1\d\d|200)%|(?:[8-9]|[1-6]\d|7[0-2])(?:[.]\d+)?(?:px|pt))$/i.test(value) ? value : '';
+      return '';
+    }
+    function appendAllowedStyles(from, to, extra){
+      ['font-size','font-weight','font-style','text-decoration','color','background-color','text-align','line-height'].forEach(name=>{
+        const value = safeStyleValue(name, from.style && from.style.getPropertyValue(name));
+        if(value) to.style.setProperty(name, value);
+      });
+      Object.entries(extra || {}).forEach(([name, raw])=>{
+        const value = safeStyleValue(name, raw);
+        if(value && !to.style.getPropertyValue(name)) to.style.setProperty(name, value);
+      });
+    }
+    function copyNode(node){
+      if(node.nodeType === 3) return doc.createTextNode(node.nodeValue || '');
+      if(node.nodeType !== 1 || discardedTags.has(node.tagName)) return null;
+      const originalTag = node.tagName;
+      let tag = originalTag;
+      const extraStyles = {};
+      if(originalTag === 'FONT'){
+        tag = 'SPAN';
+        const size = fontSizeMap[String(node.getAttribute('size') || '').trim()];
+        if(size) extraStyles['font-size'] = size;
+        if(node.getAttribute('color')) extraStyles.color = node.getAttribute('color');
+      }else if(originalTag === 'MARK'){
+        tag = 'SPAN';
+        extraStyles['background-color'] = '#fff59d';
+      }else if(headingSizeMap[originalTag]){
+        tag = 'DIV';
+        extraStyles['font-size'] = headingSizeMap[originalTag];
+        extraStyles['font-weight'] = '700';
+      }
+      if(!allowedTags.has(tag)){
+        const fragment = doc.createDocumentFragment();
+        Array.from(node.childNodes).forEach(child=>{ const clean = copyNode(child); if(clean) fragment.appendChild(clean); });
+        return fragment;
+      }
+      const clean = doc.createElement(tag.toLowerCase());
+      appendAllowedStyles(node, clean, extraStyles);
+      if(tag === 'STRONG' || tag === 'B') clean.style.fontWeight = '700';
+      if(tag === 'EM' || tag === 'I') clean.style.fontStyle = 'italic';
+      if(tag === 'U') clean.style.textDecoration = 'underline';
+      if(tag === 'P') clean.style.margin = '0 0 1em';
+      if(tag === 'UL' || tag === 'OL') clean.setAttribute('style', `${clean.getAttribute('style') || ''}margin:0 0 1em;padding-left:1.5em;`);
+      if(tag === 'A'){
+        const href = safeUrl(node.getAttribute('href'), false);
+        if(href){ clean.setAttribute('href', href); clean.setAttribute('target', '_blank'); clean.setAttribute('rel', 'noopener noreferrer'); }
+      }
+      if(tag === 'IMG'){
+        const src = safeUrl(node.getAttribute('src'), true);
+        if(!src) return null;
+        clean.setAttribute('src', src);
+        clean.setAttribute('alt', String(node.getAttribute('alt') || '본문 이미지').slice(0, 200));
+        clean.setAttribute('style', 'max-width:100%;height:auto;display:block;margin:8px 0;');
+      }
+      Array.from(node.childNodes).forEach(child=>{ const childClean = copyNode(child); if(childClean) clean.appendChild(childClean); });
+      return clean;
+    }
+    const body = doc.createElement('div');
+    body.setAttribute('style', "font-family:Arial,'Malgun Gothic',sans-serif;font-size:14px;line-height:1.65;color:#1f2937;");
+    Array.from(source.childNodes).forEach(node=>{ const clean = copyNode(node); if(clean) body.appendChild(clean); });
+    return body.outerHTML;
+  }
+  // HTML 메일을 지원하지 않는 곳과 기존 EmailJS 템플릿을 위한 plain text fallback이다.
+  // <br>/블록 요소는 실제 개행으로, 링크·이미지는 접근 가능한 URL 텍스트로 변환한다.
   function mailBodyHtmlToPlainText(html){
     const tmp = document.createElement('div');
     tmp.innerHTML = sanitizeMailBodyHtml(html);
-    const blockTags = new Set(['ADDRESS','ARTICLE','ASIDE','BLOCKQUOTE','DIV','FOOTER','H1','H2','H3','H4','H5','H6','HEADER','LI','MAIN','NAV','P','PRE','SECTION','TR']);
+    const paragraphTags = new Set(['ADDRESS','ARTICLE','ASIDE','BLOCKQUOTE','DIV','FOOTER','H1','H2','H3','H4','H5','H6','HEADER','MAIN','NAV','P','PRE','SECTION','TR']);
     function nodeToText(node){
       if(node.nodeType === 3) return node.nodeValue || '';
       if(node.nodeType !== 1) return '';
@@ -16601,14 +16689,20 @@ window.SHIN2_CRM_APP_INIT = function(){
         if(href && label && label !== href) text = `${label} (${href})`;
         else if(href && !label) text = href;
       }
-      if(tag === 'LI') text = '- ' + text;
-      return blockTags.has(tag) ? text + '\n' : text;
+      if(tag === 'LI'){
+        const ordered = node.parentElement && node.parentElement.tagName === 'OL';
+        const marker = ordered ? `${Array.from(node.parentElement.children).indexOf(node) + 1}. ` : '- ';
+        return marker + text.replace(/\n+$/g, '') + '\n';
+      }
+      if(tag === 'UL' || tag === 'OL') return text.replace(/\n+$/g, '') + '\n\n';
+      return paragraphTags.has(tag) ? text.replace(/\n+$/g, '') + '\n\n' : text;
     }
     return Array.from(tmp.childNodes).map(nodeToText).join('')
       .replace(/\r\n?/g, '\n')
       .replace(/\u00a0/g, ' ')
       .replace(/[ \t]+\n/g, '\n')
-      .replace(/\n$/, '');
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/\n+$/, '');
   }
   // §수신자 주소 오류 조사 라운드(신규) — "The recipients address is corrupted" 오류 재현
   // 조사 결과: 화면에는 정상 주소로 보여도 문자열 안에 폭이 0인 유니코드 문자(제로폭
@@ -16990,7 +17084,7 @@ window.SHIN2_CRM_APP_INIT = function(){
             <div class="co-form-field"><label for="mailSetPublicKey">EmailJS Public Key</label><input type="text" id="mailSetPublicKey" value="${esc(s.emailjsPublicKey)}" placeholder="EmailJS Public Key" aria-describedby="mailSetPublicKeyHelp mailSetPublicKeyError" /><div class="mail-settings-help" id="mailSetPublicKeyHelp">EmailJS → Account → API Keys의 Public Key</div><div class="mail-compose-warn" id="mailSetPublicKeyError" role="alert" style="display:none;"></div></div>
             <div class="co-form-field"><label for="mailSetServiceId">EmailJS Service ID</label><input type="text" id="mailSetServiceId" value="${esc(s.emailjsServiceId)}" placeholder="service_xxxxx" aria-describedby="mailSetServiceIdHelp mailSetServiceIdError" /><div class="mail-settings-help" id="mailSetServiceIdHelp">EmailJS → Email Services의 Service ID입니다. 이메일 주소를 입력하지 마세요.</div><div class="mail-compose-warn" id="mailSetServiceIdError" role="alert" style="display:none;"></div></div>
             <div class="co-form-field"><label for="mailSetTemplateId">EmailJS Template ID</label><input type="text" id="mailSetTemplateId" value="${esc(s.emailjsTemplateId)}" placeholder="template_xxxxx" aria-describedby="mailSetTemplateIdHelp mailSetTemplateIdError" /><div class="mail-settings-help" id="mailSetTemplateIdHelp">EmailJS → Email Templates → 해당 템플릿 → Settings의 Template ID</div><div class="mail-compose-warn" id="mailSetTemplateIdError" role="alert" style="display:none;"></div></div>
-            <div class="mail-settings-help">EmailJS 템플릿 화면에서는 변수명을 <code>to_email</code>, <code>subject</code>, <code>message</code>, <code>reply_to</code>, <code>from_name</code>으로 맞춰주세요.</div>
+            <div class="mail-settings-help">EmailJS 템플릿 화면에서는 변수명을 <code>to_email</code>, <code>subject</code>, <code>message_html</code>, <code>message_text</code>, <code>reply_to</code>, <code>from_name</code>으로 맞춰주세요. HTML 본문 영역에는 반드시 <code>{{{message_html}}}</code>을 사용해야 서식이 적용됩니다.</div>
             <div class="co-form-field"><label>보내는사람 이름</label><input type="text" id="mailSetFromName" value="${esc(s.fromName)}" /></div>
             <div class="co-form-field"><label>보내는사람 이메일</label><input type="text" id="mailSetFromEmail" value="${esc(s.fromEmail)}" /></div>
             <label class="mail-tpl-enable"><input type="checkbox" id="mailAssetsShareConfirm" ${meta.externalShareConfirmed?'checked':''} /> 공통 발송자료 외부 공유용 Storage 규칙을 적용 완료했습니다</label>
@@ -17988,14 +18082,49 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 이미 stripInvisibleChars+trim을 거친 값을 넘긴다(발송 시엔 sendBtn 핸들러가,
     // 진단 시엔 진단 버튼 핸들러가 각각 같은 방식으로 만들어 넘김 — 로직 중복 없음).
     function buildMailSendParams(toEmail, ccEmails, latestSettings){
+      const messageHtml = sanitizeMailBodyForEmailHtml(document.getElementById('mailComposeBody').innerHTML);
+      const messageText = mailBodyHtmlToPlainText(messageHtml);
       return {
         to_email: toEmail,
         cc_email: ccEmails.join(','),
         from_name: (latestSettings.fromName || '').trim(),
         reply_to: stripInvisibleChars(latestSettings.fromEmail || '').trim(),
         subject: document.getElementById('mailComposeSubject').value.trim(),
-        message: mailBodyHtmlToPlainText(document.getElementById('mailComposeBody').innerHTML)
+        message_html: messageHtml,
+        message_text: messageText,
+        // 기존 {{message}} 템플릿도 대시보드 수정 전까지 평문으로 계속 동작하게 한다.
+        message: messageText
       };
+    }
+    function appendMailAssetsToParams(params, links, globalImgUrl){
+      const textParts = [];
+      const htmlParts = [];
+      (links || []).forEach(link=>{
+        const label = String(link.label || '').trim();
+        const url = String(link.url || '').trim();
+        if(!url) return;
+        textParts.push(`${label}: ${url}`);
+        htmlParts.push(`<div><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label || url)}</a></div>`);
+      });
+      if(globalImgUrl){
+        textParts.push(`이미지: ${globalImgUrl}`);
+        htmlParts.push(`<div><img src="${esc(globalImgUrl)}" alt="첨부 이미지" style="max-width:100%;height:auto;display:block;margin:8px 0;"></div>`);
+      }
+      if(textParts.length){
+        const suffix = '\n\n' + textParts.join('\n');
+        params.message_text += suffix;
+        params.message += suffix;
+      }
+      if(htmlParts.length){
+        const holder = document.createElement('div');
+        holder.innerHTML = params.message_html;
+        const body = holder.firstElementChild || holder;
+        const assets = document.createElement('div');
+        assets.innerHTML = sanitizeMailBodyForEmailHtml(htmlParts.join(''));
+        const assetsBody = assets.firstElementChild;
+        while(assetsBody && assetsBody.firstChild) body.appendChild(assetsBody.firstChild);
+        params.message_html = holder.innerHTML;
+      }
     }
     function emailJsErrorMessage(error){
       const status = error && error.status != null ? String(error.status) : '';
@@ -18064,10 +18193,9 @@ window.SHIN2_CRM_APP_INIT = function(){
           throw Object.assign(new Error('공통 발송자료 또는 전체 공통 이미지 링크를 불러오지 못했습니다 — 로그인 상태 또는 Storage 공유 규칙을 확인해주세요.'), { code:'ASSET_LINK_FAILED' });
         }
         const params = buildMailSendParams(toEmail, ccEmails, latestSettings);
-        // EmailJS 템플릿의 message는 일반 텍스트 변수이므로 첨부 링크도 HTML 태그 없이
-        // 실제 개행과 URL로 덧붙인다.
-        if(links.length) params.message += '\n\n' + links.map(l=> `${l.label}: ${l.url}`).join('\n');
-        if(globalImgUrl) params.message += `\n\n이미지: ${globalImgUrl}`;
+        // 첨부 링크/공통 이미지는 HTML 본문과 plain text fallback 양쪽에 같은 내용으로
+        // 덧붙인다. HTML 쪽 링크와 이미지는 발송용 허용 목록을 다시 통과한다.
+        appendMailAssetsToParams(params, links, globalImgUrl);
         const emailjs = await loadEmailJsSdk();
         emailAttempted = true;
         console.info('[EMAIL-SEND] request start');
