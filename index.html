@@ -27354,6 +27354,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     updateMapMarkers = null;
     focusMapRegion = null;
     focusMapCompany = null;
+    mapFocusedCompanyList = null;
     if(aptCanvasState && typeof aptCanvasState.destroy === 'function'){
       try{ aptCanvasState.destroy(); } catch(err){ /* 무시 */ }
     }
@@ -27417,6 +27418,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       const tab = btn.getAttribute('data-map-tab');
       if(tab === mapActiveTab) return;
       mapActiveTab = tab;
+      mapFocusedCompanyList = null;
       root.querySelectorAll('[data-map-tab]').forEach(b=> b.classList.toggle('is-active', b === btn));
       const titleEl = document.getElementById('mapModalTitle');
       const subEl = document.getElementById('mapModalSubtitle');
@@ -27794,6 +27796,9 @@ window.SHIN2_CRM_APP_INIT = function(){
   let updateMapMarkers = null;
   let focusMapRegion = null;
   let focusMapCompany = null;
+  // 지도 클러스터/지역 행을 누르면 오른쪽의 기존 업체 목록 영역에 같은 집계 대상을
+  // 그대로 보여준다. 업체 사본은 만들지 않고 id만 보관한다.
+  let mapFocusedCompanyList = null;
   // 시공 아파트 탭 전용 지도 인스턴스 — 시공사 탭(mapCanvasState)과 완전히 분리된다(§1
   // "탭을 전환할 때 기존 마커를 정리한 뒤 선택한 종류의 마커만... 중복으로 쌓이지 않게").
   let aptCanvasState = null;
@@ -27885,6 +27890,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 필터/검색이 바뀌었을 때 지도 마커와 정보 패널을 다시 그린다(전체 팝업을 다시
   // 그리지 않음 — 검색창 포커스가 끊기지 않게).
   function refreshMapInfoAndMarkers(){
+    mapFocusedCompanyList = null;
     const _t = (typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
     const allEntries = buildMapCompanies();
     console.log('[MAP-PERF] refreshMapInfoAndMarkers buildMapCompanies ' + (((typeof performance!=='undefined'&&performance.now)?performance.now():Date.now())-_t).toFixed(1) + 'ms');
@@ -27930,7 +27936,14 @@ window.SHIN2_CRM_APP_INIT = function(){
     const visibleEntries = (mapCanvasState && typeof mapCanvasState.getVisibleEntries === 'function')
       ? mapCanvasState.getVisibleEntries()
       : located;
-    const listEntries = mapFilterState.listView === 'unlocated' ? unlocated : visibleEntries;
+    const filteredById = new Map(filtered.map(e=> [e.co.id, e]));
+    const focusedEntries = mapFocusedCompanyList
+      ? mapFocusedCompanyList.companyIds.map(id=> filteredById.get(id)).filter(Boolean)
+      : null;
+    const listEntries = mapFilterState.listView === 'unlocated' ? unlocated : (focusedEntries || visibleEntries);
+    const listTitle = mapFilterState.listView === 'unlocated'
+      ? '위치 미확인 업체'
+      : (mapFocusedCompanyList ? `${mapFocusedCompanyList.label} 업체 (${listEntries.length}곳)` : '현재 지도 내 업체');
     infoCol.innerHTML = `
       <div>
         <div class="map-info-block-title">지역 요약</div>
@@ -27948,7 +27961,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         `).join('') : '<div class="map-modal-empty" style="padding:8px 0;">표시할 업체가 없습니다.</div>'}
       </div>
       <div>
-        <div class="map-info-block-title">${mapFilterState.listView === 'unlocated' ? '위치 미확인 업체' : '현재 지도 내 업체'}${mapFilterState.listView === 'unlocated' ? ' <a href="#" id="mapBackToInBounds" style="font-weight:500;font-size:11px;">전체 보기</a>' : ''}</div>
+        <div class="map-info-block-title">${esc(listTitle)}${mapFilterState.listView === 'unlocated' || mapFocusedCompanyList ? ' <a href="#" id="mapBackToInBounds" style="font-weight:500;font-size:11px;">목록 닫기</a>' : ''}</div>
         ${listEntries.length ? listEntries.slice(0, 200).map(e=> `
           <div class="map-company-row" data-map-company="${esc(e.co.id)}">
             <div class="map-company-row-name">${esc(e.co.name)}</div>
@@ -27979,6 +27992,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     const backBtn = document.getElementById('mapBackToInBounds');
     if(backBtn) backBtn.addEventListener('click', (e)=>{
       e.preventDefault();
+      mapFocusedCompanyList = null;
       mapFilterState.listView = 'inBounds';
       renderMapInfoPanel(allEntries);
     });
@@ -28183,7 +28197,11 @@ window.SHIN2_CRM_APP_INIT = function(){
         el.style.color = clusterTextColor(it.ratio);
         el.style.fontSize = Math.max(10, Math.min(13, it.size * 0.24)) + 'px';
         el.innerHTML = `<span>${esc(it.key)}</span><b>${it.count}</b>`;
-        el.addEventListener('click', ()=> focusClusterGroup(it.key, tier));
+        el.addEventListener('click', (event)=>{
+          event.preventDefault();
+          event.stopPropagation();
+          focusClusterGroup(it.key, tier);
+        });
         const overlay = new kakao.maps.CustomOverlay({ position: latlng, content: el, xAnchor:0.5, yAnchor:0.5, zIndex:10 });
         overlay.setMap(map);
         clusterOverlays.push(overlay);
@@ -28193,6 +28211,13 @@ window.SHIN2_CRM_APP_INIT = function(){
       selectedClusterKey = key;
       const targets = currentEntries.filter(e=> e.hasCoords && groupKeyFor(e, tier) === key);
       if(!targets.length) return;
+      console.log('[REGION-CLICK] click');
+      console.log('[REGION-CLICK] region=' + key);
+      console.log('[REGION-CLICK] matched companies=' + targets.length);
+      mapFocusedCompanyList = { label:key, companyIds:targets.map(e=> e.co.id) };
+      mapFilterState.listView = 'inBounds';
+      renderMapInfoPanel(buildMapCompanies());
+      console.log('[REGION-CLICK] open list');
       const bounds = new kakao.maps.LatLngBounds();
       targets.forEach(e=> bounds.extend(new kakao.maps.LatLng(e.co.latitude, e.co.longitude)));
       map.setBounds(bounds); // bounds 변경이 idle을 발생시켜 다음 틱에서 다시 그려진다
@@ -28301,6 +28326,9 @@ window.SHIN2_CRM_APP_INIT = function(){
       selectedClusterKey = regionName;
       const targets = applyMapFilters(buildMapCompanies()).filter(e=> e.hasCoords && (e.region || '주소 미확인') === regionName);
       if(!targets.length) return;
+      mapFocusedCompanyList = { label:regionName, companyIds:targets.map(e=> e.co.id) };
+      mapFilterState.listView = 'inBounds';
+      renderMapInfoPanel(buildMapCompanies());
       const bounds = new kakao.maps.LatLngBounds();
       targets.forEach(e=> bounds.extend(new kakao.maps.LatLng(e.co.latitude, e.co.longitude)));
       map.setBounds(bounds);
