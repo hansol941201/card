@@ -5010,7 +5010,6 @@ window.SHIN2_CRM_OCR = (function(){
           // localStorage가 용량 초과여도 Firestore의 최신 메타데이터는 메모리 미러에서
           // 즉시 읽을 수 있게 한다. 기존 로컬 전용 파일 메타데이터는 함께 보존한다.
           setDocsMemory(payload.value, true);
-          try{ localStorage.setItem(DOC_SYNC_STORAGE_KEY, JSON.stringify(payload.value)); }catch(e){}
           window.dispatchEvent(new CustomEvent('shin2-crm-docs-cloud-update'));
         }, (err)=> console.warn('[CRM/Firebase] 서류함 메타데이터 구독 실패', err));
       }
@@ -6563,18 +6562,23 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     opts = opts || {};
     const S = window.SHIN2_CRM_DOCS_SYNC;
     const ST = window.SHIN2_STORAGE;
-    const cloudReady = !!(S && S.push && S.setMemory && ST && ST.isSignedIn && ST.isSignedIn());
-    // 신규 파일 원본은 이미 Storage에 올라간 상태다. DOC_KEY localStorage 미러가 용량
-    // 초과여도 기존 값을 지우지 않고, 같은 전체 메타데이터 배열을 메모리에 유지한 뒤
-    // Firestore로 직접 보낸다. 클라우드 로그인이 없을 때만 기존 보호 동작대로 실패한다.
-    const writeOpts = Object.assign({}, opts, { cloudFallback: cloudReady });
-    const localSaved = writeArr(DOC_KEY, list, writeOpts);
-    if(!localSaved && !cloudReady) return false;
-    if(S && S.setMemory) S.setMemory(list);
-    if(!opts.skipCloudPush){
-      try{ if(S && S.push) S.push(list); }catch(e){}
+    const remoteSession = !!(ST && ST.isSignedIn && ST.isSignedIn());
+    const cloudReady = !!(remoteSession && S && S.push && S.setMemory);
+    if(cloudReady){
+      // 원격 서류함 사용 중에는 DOC_KEY localStorage를 캐시로도 다시 쓰지 않는다.
+      // 기존 값은 legacy 조회용으로 그대로 남기고, 신규/수정 메타데이터는 메모리 미러와
+      // Firestore만 사용한다. 따라서 로컬 quota가 신규 원격 파일 성공을 막지 않는다.
+      S.setMemory(list);
+      if(!opts.skipCloudPush){
+        try{ S.push(list); }catch(e){}
+      }
+      return true;
     }
-    return true;
+    // Storage 인증 세션에서 Firestore 동기화 모듈이 아직 준비되지 않은 경우에도 legacy
+    // localStorage로 우회하지 않는다. 호출부가 정보 동기화 실패로 처리하고 재시도한다.
+    if(remoteSession) return false;
+    // 로그인되지 않은 기존 legacy 데이터 편집만 과거 localStorage 경로를 유지한다.
+    return writeArr(DOC_KEY, list, opts);
   }
   function documentsForCompany(companyId, type){
     return loadDocuments().filter(d=> d.companyId === companyId && (!type || d.documentType === type))
@@ -6736,16 +6740,8 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     }
     const id = genId('doc');
     return saveDocumentFile(id, companyId, file, onProgress, opts).then(result=>{
-      if(result.dataUrl){
-        const blobs = readObj(BLOB_KEY);
-        blobs[id] = result.dataUrl;
-        // writeObj가 false를 반환하면(용량 초과 등 storageProblem 가드) 파일 바이트가 실제로는
-        // 저장되지 않은 것이므로, 여기서 성공으로 취급해 메타데이터만 남기면 안 된다 — 호출부까지
-        // 실패를 전파해서 "성공한 것처럼 보이지만 실제로는 저장 안 됨" 상태를 막는다.
-        if(!writeObj(BLOB_KEY, blobs)){
-          throw Object.assign(new Error('LOCAL_STORAGE_FULL'), { code:'LOCAL_STORAGE_FULL' });
-        }
-      }
+      // 신규 파일 원본은 Firebase Storage에만 저장한다. BLOB_KEY는 과거 로컬 파일을
+      // 읽는 getBlob()/getLocalDocFile() 호환 경로로만 남기며 신규 write는 하지 않는다.
       const now = nowIso();
       const rec = {
         id, companyId, documentType,
@@ -6766,11 +6762,10 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
         rec.rawOcrText = extracted.rawOcrText || '';
       }
       const list = loadDocuments(); list.push(rec);
-      // saveDocuments도 실패 시 false를 반환한다(writeArr의 storageProblem 가드) — 메타데이터
-      // 저장이 실제로는 안 됐는데도 rec을 성공으로 돌려주면 화면에는 등록된 것처럼 보이지만
-      // 새로고침하면 사라지는 유령 문서가 된다. 여기서도 반드시 실패를 전파한다.
+      // 원격 세션에서 saveDocuments 실패는 Firestore 메타데이터 동기화 불가다. Storage에
+      // 올라간 파일을 localStorage로 우회 저장하지 않고 호출부에 별도 오류로 전달한다.
       if(!saveDocuments(list)){
-        throw Object.assign(new Error('LOCAL_STORAGE_FULL'), { code:'LOCAL_STORAGE_FULL' });
+        throw Object.assign(new Error('FIRESTORE_METADATA_FAILED'), { code:'FIRESTORE_METADATA_FAILED' });
       }
       return rec;
     });
@@ -6896,9 +6891,8 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
         rec2.localOnly = false;
         rec2.updatedAt = nowIso();
         saveDocuments(list);
-        const blobs2 = readObj(BLOB_KEY);
-        delete blobs2[id];
-        writeObj(BLOB_KEY, blobs2);
+        // 기존 로컬 원본은 자동 삭제하지 않는다. BLOB_KEY/IndexedDB는 과거 파일 조회
+        // fallback으로 그대로 보존하고, 이후 열기는 Storage URL을 우선 사용한다.
         return rec2;
       });
     });
@@ -18149,7 +18143,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         const r = await confirmCloudSave('mailAssets');
         if(!r.ok){
           if(progEl) progEl.style.display = 'none';
-          if(statusEl){ statusEl.textContent = '업로드 실패 · 다시 시도 — ' + cloudSaveErrorMessage(r.err); statusEl.classList.add('is-err'); }
+          if(statusEl){ statusEl.textContent = '정보 동기화 실패 · 다시 시도 — ' + cloudSaveErrorMessage(r.err); statusEl.classList.add('is-err'); }
           return;
         }
         if(progEl) progEl.textContent = '등록됨';
@@ -20576,13 +20570,15 @@ window.SHIN2_CRM_APP_INIT = function(){
         }
         else{
           console.warn('[QUESTIONNAIRE-UPLOAD] metadata failed');
-          setUploadLabel('업로드 실패 · 다시 시도');
+          setUploadLabel('정보 동기화 실패 · 다시 시도');
           alert('질문서 정보 저장 확인에 실패했습니다(파일은 등록됨) — ' + cloudSaveErrorMessage(r.err));
         }
         renderAgreementPopupBody(companyId);
       }catch(err){
         console.warn(`[QUESTIONNAIRE-UPLOAD] request failed: ${Math.round(performance.now() - uploadStarted)}ms`);
-        setUploadLabel('업로드 실패 · 다시 시도');
+        setUploadLabel(err && err.code === 'FIRESTORE_METADATA_FAILED'
+          ? '정보 동기화 실패 · 다시 시도'
+          : '업로드 실패 · 다시 시도');
         alert(documentUploadErrorMessage(err && err.code));
       }finally{
         input.disabled = false;
@@ -26477,6 +26473,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(code === 'LOCAL_STORAGE_FULL'){
       return '이 브라우저의 저장 공간이 가득 찼습니다. 기존 데이터는 삭제하지 말고, 페이지를 새로고침한 뒤 원격 저장소 연결 상태를 확인해주세요.';
     }
+    if(code === 'FIRESTORE_METADATA_FAILED') return '파일은 저장됐지만 정보 동기화에 실패했습니다. 네트워크와 원격 저장소 연결을 확인한 뒤 다시 시도해주세요.';
     if(code === 'NOT_AUTHENTICATED') return '공용 파일 저장소에 로그인되지 않았습니다. 페이지를 새로고침한 뒤 다시 시도해주세요.';
     if(code === 'UPLOAD_TIMEOUT') return '공용 파일 저장소의 응답이 없어 업로드를 중단했습니다. 네트워크를 확인한 뒤 다시 시도해주세요.';
     if(code === 'LOCAL_SAVE_DISABLED') return '신규 서류는 공용 파일 저장소에만 등록할 수 있습니다. 원격 저장소 연결을 확인해주세요.';
@@ -26957,7 +26954,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(label) label.textContent = multiPrefix + '파일 저장 완료 · 정보 동기화 중...';
       const cloudR = await confirmDocsCloudSave();
       if(!cloudR.ok){
-        if(statusEl){ statusEl.style.display = 'block'; statusEl.innerHTML = `<div class="doc-upload-err">업로드 실패 · 다시 시도 — ${esc(cloudSaveErrorMessage(cloudR.err))}</div>`; }
+        if(statusEl){ statusEl.style.display = 'block'; statusEl.innerHTML = `<div class="doc-upload-err">정보 동기화 실패 · 다시 시도 — ${esc(cloudSaveErrorMessage(cloudR.err))}</div>`; }
       } else if(statusEl){
         // §8: 성공은 잠깐 "등록됨"으로 보여준 뒤 상태 표시를 닫는다.
         if(bar) bar.style.width='100%'; if(label) label.textContent = multiPrefix + '등록됨'; setTimeout(()=>{ statusEl.style.display = 'none'; statusEl.innerHTML = ''; }, 700);
