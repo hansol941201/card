@@ -2277,6 +2277,14 @@
   .cdash2-revenue-stat-value{ font-size:19px; font-weight:800; color:var(--navy); }
   /* §1: "{year}년 매출" 옆 작은 태그 */
   .cdash2-revenue-yearly-tag{ display:inline-block; margin-left:6px; padding:1px 7px; font-size:10.5px; font-weight:700; color:#1D4ED8; background:#EAF2FE; border-radius:4px; vertical-align:middle; }
+  /* §시안 레이아웃 정합 라운드(신규) — "기업 요약" 카드. */
+  .cdash2-card-title-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+  .cdash2-cosum-edit-btn{ appearance:none; border:1px solid var(--line); background:#fff; border-radius:6px; width:24px; height:24px; font-size:12px; color:var(--text-muted); cursor:pointer; flex:none; }
+  .cdash2-cosum-edit-btn:hover{ color:var(--navy); border-color:var(--navy); }
+  .cdash2-cosum-row{ padding:6px 0; border-top:1px solid var(--line); }
+  .cdash2-cosum-row:first-of-type{ border-top:none; }
+  .cdash2-cosum-label{ font-size:11px; color:var(--text-muted); font-weight:600; margin-bottom:2px; }
+  .cdash2-cosum-value{ font-size:12.5px; color:var(--text); font-weight:600; word-break:break-all; }
   /* §막대그래프 전환 라운드: 말풍선/배경박스 없이 순수 텍스트 라벨만 쓰는 만큼 기존
      176px보다 낮춰도 충분하다(§2 "카드 높이는 지금과 비슷하거나 조금 더 낮게"). */
   .cdash2-chart-wrap{ position:relative; height:150px; }
@@ -2296,6 +2304,34 @@
 
   .cdash2-body-grid{ display:grid; grid-template-columns:minmax(220px,34%) 1fr; gap:10px; margin-bottom:10px; align-items:start; }
   .cdash2-col-stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+  /* §디자인 개편 라운드(신규, 참고 시안 반영) — 참고 시안의 데스크톱 3열 카드 그리드.
+     기존 .cdash2-body-grid(2열)를 대체하지 않고 새 수정자 클래스로만 폭을 넓혀 3등분한다
+     (§ 좁은 화면 동작은 아래 900px 이하 미디어쿼리에서 그대로 1열로 접힌다 — 기존 규칙 유지). */
+  .cdash2-body-grid.cdash2-body-grid-3col{ grid-template-columns:repeat(3, minmax(0,1fr)); }
+  /* §시안 레이아웃 정합 라운드(신규) — cdashSummaryRow(POUR실적+매출현황)가 이제 3열 그리드의
+     가운데 열 안에 들어가므로, 좁은 열 폭에서 두 카드가 옆으로 눌리지 않도록 세로로 쌓는다.
+     .cdash2-summary-row 자체(다른 곳에서 쓰일 경우의 기본 가로 배치)는 건드리지 않고, 이
+     그리드 안에 있을 때만 덮어쓴다(§ 스코프 한정 원칙). */
+  .cdash2-col-stack .cdash2-summary-row{ grid-template-columns:1fr; }
+  @media(max-width:1200px){
+    .cdash2-body-grid.cdash2-body-grid-3col{ grid-template-columns:1fr 1fr; }
+  }
+  @media(max-width:900px){
+    .cdash2-body-grid.cdash2-body-grid-3col{ grid-template-columns:1fr; }
+  }
+
+  /* §디자인 개편 라운드(신규, 참고 시안 반영) — 시각적 탭 메뉴(실제 전환 없음, 스크롤만). */
+  .cdash2-tabbar{ display:flex; gap:4px; overflow-x:auto; border-bottom:1px solid var(--line); margin-bottom:10px; padding-bottom:0; }
+  .cdash2-tab{ flex:none; appearance:none; border:none; background:none; padding:8px 12px; font-size:12.5px; font-weight:650; color:var(--text-muted); cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; }
+  .cdash2-tab:hover{ color:var(--navy); }
+  .cdash2-tab.is-active{ color:var(--navy); border-bottom-color:var(--navy); }
+
+  /* §디자인 개편 라운드(신규, 참고 시안 반영) — "관련 문서" 전체 폭 섹션. 안의
+     #cdashDocStatusBlock은 기존 renderDocStatusBlock/renderDocsSection이 그대로 채운다. */
+  .cdash2-docs-section{ background:#fff; border:1px solid var(--line); border-radius:9px; padding:13px 15px; margin-bottom:10px; }
+
+  .cdash2-memo-preview-text{ font-size:12.5px; color:var(--text); line-height:1.5; white-space:pre-wrap; overflow:hidden; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; }
+  .cdash2-memo-preview-date{ font-size:11px; color:var(--text-faint); margin-top:6px; }
 
   .cdash2-timeline{ display:flex; flex-direction:column; gap:0; }
   .cdash2-timeline-item{ position:relative; padding:0 0 12px 15px; border-left:1.5px solid var(--line); }
@@ -13893,23 +13929,59 @@ window.SHIN2_CRM_APP_INIT = function(){
               <button type="button" class="cdash-header-popover-close" id="cdashHeaderPopoverClose" aria-label="닫기">&times;</button>
               <div class="cdash-header-popover-section" id="cdashInsightBlock"></div>
               <div class="cdash-header-popover-section" id="cdashReactionsCol"></div>
-              <div class="cdash-header-popover-section" id="cdashDocStatusBlock"></div>
             </div>
             <div id="cdashMgmtNeedBanner"></div>
             <div id="cdashInfoStrip"></div>
-            <div id="cdashSummaryRow"></div>
-            <div class="cdash2-body-grid">
-              <div class="cdash2-col-stack">
-                <div id="cdashTimelineCard"></div>
+            <!-- §디자인 개편 라운드(신규, 참고 시안 반영) — 시각적 탭 메뉴만 추가한다(§ "실제
+                 탭 전환 로직이 없으면 시각 탭바만 만들고 전부 스크롤로 보이게 유지" 지시 그대로).
+                 클릭하면 이미 화면에 렌더돼 있는 해당 카드로 스크롤만 하고, 어떤 카드도
+                 숨기거나 다시 그리지 않는다(§ 데이터 소실 위험 없음) — renderTabBar가 여는 새
+                 상태/저장소는 전혀 없다. -->
+            <div id="cdashTabBar"></div>
+            <!-- §시안 레이아웃 정합 라운드(신규) — 참고 시안의 3열 배치(좌: 기업요약/고객
+                 인사이트, 중: POUR실적·매출현황/최근 시공실적, 우: 최근 접촉기록/질문지
+                 상담요약/상담메모)에 정확히 맞춘다. cdashSummaryRow(POUR실적+매출현황)와
+                 cdashQuestionnaireCard는 컨테이너 위치만 옮겼을 뿐 렌더 함수(renderSummaryRow2/
+                 renderQuestionnaireSummaryCard)는 전혀 바뀌지 않았다 — 데이터/로직 무변경,
+                 배치만 시안과 동일하게 재배열(§ "기존 함수 출력 그대로, 컨테이너만 재배치"
+                 원칙 유지). -->
+            <div class="cdash2-body-grid cdash2-body-grid-3col">
+              <div class="cdash2-col-stack" id="cdashColLeft">
+                <!-- §신규 — 참고 시안의 "기업 요약" 카드. 새 데이터/계산 없음 — 이미 있는
+                     co.name/repName/address/phone/contactName 필드만 읽는다(§ "없는 필드
+                     지어내지 않기" — 고객구분/업종은 현재 데이터 모델에 해당 필드 자체가
+                     없어 넣지 않았다, 완료 보고에 명시). 수정 아이콘은 기존 편집 진입점
+                     (openHeaderSection('info'), 고객 정보 아코디언)을 그대로 연다 — 새 편집
+                     폼을 만들지 않는다. -->
+                <div id="cdashCompanySummaryCard"></div>
                 <div id="cdashInsightTagsCard"></div>
-                <!-- §질문지 상담 기록 요약 라운드(신규) — 이미 저장된 doc.qaAnswers를 AI 요약
-                     없이 채워진 답변만 그대로 나열만 한다(새 저장소/계산 없음, §요청 A안). -->
-                <div id="cdashQuestionnaireCard"></div>
                 <!-- §업체 관계·협약 종료 라운드(신규) — 현재 상호/이전 상호/자회사·모회사/
-                     협약 종료 처리를 한 카드에 모은다. -->
+                     협약 종료 처리를 한 카드에 모은다. 참고 시안에는 없는 카드지만 기존
+                     기능이라 삭제하지 않고 좌측 열 맨 아래로 유지한다. -->
                 <div id="cdashRelationsCard"></div>
               </div>
-              <div id="cdashPourResultsCard"></div>
+              <div class="cdash2-col-stack" id="cdashColMid">
+                <div id="cdashSummaryRow"></div>
+                <div id="cdashPourResultsCard"></div>
+              </div>
+              <div class="cdash2-col-stack" id="cdashColRight">
+                <div id="cdashTimelineCard"></div>
+                <!-- §질문지 상담 기록 요약 라운드(신규) — 이미 저장된 doc.qaAnswers를 AI 요약
+                     없이 채워진 답변만 그대로 나열만 한다(새 저장소/계산 없음, §요청 A안).
+                     §시안 레이아웃 정합 라운드에서 가운데 열 → 오른쪽 열로 위치만 이동. -->
+                <div id="cdashQuestionnaireCard"></div>
+                <!-- §디자인 개편 라운드(신규) — 참고 시안의 "상담 메모" 카드. 새 저장 로직을
+                     만들지 않고 기존 openMemoPanel(co)/renderMemoPanel/D.addMemo를 그대로
+                     열기만 한다(§ 기존 함수 재사용, 중복 저장 로직 금지). -->
+                <div id="cdashMemoPreviewCard"></div>
+              </div>
+            </div>
+            <!-- §디자인 개편 라운드(신규) — "관련 문서"를 아코디언 팝오버 안에서 상시 노출
+                 섹션으로 옮긴다. renderDocStatusBlock/renderDocsSection 함수와 내부 마크업은
+                 한 글자도 바꾸지 않았다 — #cdashDocStatusBlock 컨테이너의 위치만 옮겼다
+                 (§ "기존 함수 출력 그대로, 컨테이너만 재배치"). -->
+            <div class="cdash2-docs-section" id="cdashDocsSectionWrap">
+              <div id="cdashDocStatusBlock"></div>
             </div>
           </div>
           <div id="cdashFooterBar"></div>
@@ -13920,12 +13992,15 @@ window.SHIN2_CRM_APP_INIT = function(){
     renderChartHeader(co);
     renderMgmtNeedBanner(co);
     renderInfoStrip(co);
+    renderTabBar(co);
+    renderCompanySummaryCard(co);
     renderSummaryRow2(co);
     renderContactTimelineCard(co);
     renderInsightTagsCard(co);
     renderQuestionnaireSummaryCard(co);
     renderCompanyRelationsCard(co);
     renderPourResultsCard(co);
+    renderMemoPreviewCard(co);
     renderFooterBar(co);
 
     // 팝오버 안 실제 콘텐츠(고객 정보/고객 인사이트/서류 현황)는 그대로 채워 둔다 — 열려있지
@@ -14146,6 +14221,48 @@ window.SHIN2_CRM_APP_INIT = function(){
     // §요청 10 "삭제된 업체는 일반 목록에서 제외" — 카드가 이 업체를 보여주고 있었으므로
     // 그대로 두면 이미 숨겨진 업체 화면이 남는다. 목록으로 돌아가 즉시 반영을 보여준다.
     closeChart();
+  }
+
+  // §시안 레이아웃 정합 라운드(신규) — 참고 시안의 좌측 상단 "기업 요약" 카드. 새 데이터/
+  // 계산은 전혀 만들지 않는다 — 이미 있는 co.name/repName/address/phone/contactName
+  // 필드만 읽어 보여준다("업체명"이 시안의 "기업명"에 대응, CO_FIELD_LABELS와 같은 필드).
+  // 시안에는 "고객구분"/"업종" 행도 있지만 이 프로젝트 데이터 모델에는 그 두 필드 자체가
+  // 없어(전수 검색 확인) 지어내지 않고 뺐다 — 완료 보고에 명시. 값이 없는 항목은 renderRow가
+  // 그냥 아무것도 안 그린다(기존 renderBasicInfoView의 "값 없으면 스킵" 원칙과 동일).
+  // 수정 아이콘은 새 편집 폼을 만들지 않고 기존 "고객 정보 수정" 버튼(cdashInfoEditBtn,
+  // §14084)과 완전히 같은 핸들러를 그대로 실행한다(§ 기존 편집 진입점 재사용).
+  function renderCompanySummaryCard(co){
+    const wrap = document.getElementById('cdashCompanySummaryCard');
+    if(!wrap) return;
+    const row = (label, value)=> value ? `
+      <div class="cdash2-cosum-row">
+        <div class="cdash2-cosum-label">${esc(label)}</div>
+        <div class="cdash2-cosum-value">${esc(value)}</div>
+      </div>` : '';
+    const rowsHtml = [
+      row('기업명', co.name),
+      row('대표', co.repName),
+      row('주소', co.address),
+      row('전화번호', co.phone),
+      row('담당자', co.contactName)
+    ].join('');
+    wrap.innerHTML = `
+      <div class="cdash2-card cdash2-cosum-card">
+        <div class="cdash2-card-title-row">
+          <div class="cdash2-card-title" style="margin-bottom:0;">기업 요약</div>
+          <button type="button" class="cdash2-cosum-edit-btn" id="cdashCompanySummaryEditBtn" title="고객 정보 수정" aria-label="고객 정보 수정">✎</button>
+        </div>
+        ${rowsHtml || '<div class="chart-empty">등록된 기업 정보가 없습니다</div>'}
+      </div>
+    `;
+    const editBtn = document.getElementById('cdashCompanySummaryEditBtn');
+    if(editBtn) editBtn.addEventListener('click', ()=>{
+      cardState.accordionOpen.info = true;
+      cardState.chartEditing = true;
+      renderReactionsCol(co);
+      renderBasicInfoForm(co);
+      openHeaderSection('info');
+    });
   }
 
   // ---- §고객카드 전면 개선 라운드 [3] 핵심 요약 — 왼쪽 POUR 실적 카드(D.getAllPourRecordsForCompany
@@ -14548,14 +14665,22 @@ window.SHIN2_CRM_APP_INIT = function(){
         </button>
         <div class="cdash2-footer-right">
           <button type="button" class="co-text-action" id="cdashFooterMemoBtn">상담 메모</button>
+          <!-- §디자인 개편 라운드(신규) — 참고 시안의 하단 고정 바 "닫기" 버튼. 새 닫기
+               로직을 만들지 않고 헤더 X 버튼과 완전히 같은 closeChart()를 그대로 호출한다
+               (§ 기존 함수 재사용). 이 화면 구조에는 단일 "전체 저장" 개념이 없다 — 각 영역
+               (기본정보/인사이트/메모/서류)이 각자 독립적으로 즉시 저장되므로(§ 기존 관례),
+               새로운 통합 저장 버튼/로직은 만들지 않았다(§ 보고서 3절 참고, 데이터 소실 위험
+               있는 기능을 새로 만들지 않기 위한 의도적 결정). -->
+          <button type="button" class="btn-secondary-action" id="cdashFooterCloseBtn" style="height:30px;padding:0 14px;font-size:12px;">닫기</button>
         </div>
       </div>
       <div class="cdash-danger-zone">
         <span class="cdash-danger-zone-label">위험 영역</span>
-        <button type="button" class="btn-danger-link" id="cdashDeleteCoBtn">업체 삭제</button>
+        <button type="button" class="btn-danger-link" id="cdashDeleteCoBtn">삭제</button>
       </div>
     `;
     document.getElementById('cdashDeleteCoBtn').addEventListener('click', ()=> openDeleteCompanyModal(co.id));
+    document.getElementById('cdashFooterCloseBtn').addEventListener('click', closeChart);
     document.getElementById('cdashFooterDocsBtn').addEventListener('click', ()=>{
       cardState.accordionOpen.docs = true;
       // §Firebase 인증 사용자 미생성 원인 조사 라운드(신규) — 기존 버그 발견: renderDocCounts
@@ -14567,12 +14692,77 @@ window.SHIN2_CRM_APP_INIT = function(){
       // renderDocsSection(co)를 다시 불러 첫 클릭에서도 바로 채워지게 고쳤다.
       renderDocCounts(co);
       renderDocsSection(co);
-      openHeaderSection('docs');
+      // §디자인 개편 라운드(신규) — "관련 문서"가 이제 팝오버가 아니라 화면 하단에 항상
+      // 보이는 섹션이라(#cdashDocsSectionWrap), openHeaderSection('docs')(빈 팝오버가
+      // 뜨는 버그가 됨) 대신 그 섹션으로 스크롤만 한다.
+      const docsSection = document.getElementById('cdashDocsSectionWrap');
+      if(docsSection) docsSection.scrollIntoView({ behavior:'smooth', block:'start' });
     });
     document.getElementById('cdashFooterMemoBtn').addEventListener('click', ()=>{
       memoPanelState = { editingId: null, drafting: true, deleteConfirmId: null };
       renderMemoPanel(co);
     });
+  }
+
+  // ---- §디자인 개편 라운드(신규, 참고 시안 반영) — 상단 시각적 탭 메뉴. 실제 탭
+  // 전환(섹션 show/hide) 로직은 만들지 않는다(§ 작업 지시 "탭 전환 메커니즘이 없으면
+  // 시각적 탭바만 만들고 전부 스크롤 가능한 채로 두는 것도 괜찮다" 그대로 적용) — 클릭하면
+  // 이미 항상 렌더돼 있는 해당 카드로 스크롤만 한다. 새 상태(cardState.*)나 데이터를 전혀
+  // 만들지 않으므로 다른 기능과 충돌할 위험이 없다.
+  const CDASH_TABS = [
+    { key:'basic', label:'기본 정보', target:null },
+    { key:'revenue', label:'매출/실적', target:'cdashSummaryRow' },
+    { key:'contact', label:'접촉이력', target:'cdashTimelineCard' },
+    { key:'pour', label:'시공실적', target:'cdashPourResultsCard' },
+    { key:'insight', label:'고객인사이트', target:'cdashInsightTagsCard' },
+    { key:'memo', label:'상담메모', target:'cdashMemoPreviewCard' },
+    { key:'qa', label:'질문지요약', target:'cdashQuestionnaireCard' }
+  ];
+  function renderTabBar(co){
+    const wrap = document.getElementById('cdashTabBar');
+    if(!wrap) return;
+    wrap.innerHTML = `
+      <div class="cdash2-tabbar">
+        ${CDASH_TABS.map((t,i)=> `<button type="button" class="cdash2-tab${i===0 ? ' is-active' : ''}" data-cdash-tab="${esc(t.key)}">${esc(t.label)}</button>`).join('')}
+      </div>
+    `;
+    wrap.querySelectorAll('[data-cdash-tab]').forEach((btn, i)=>{
+      btn.addEventListener('click', ()=>{
+        wrap.querySelectorAll('.cdash2-tab').forEach(b=> b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+        const tab = CDASH_TABS[i];
+        if(tab.target){
+          const el = document.getElementById(tab.target);
+          if(el) el.scrollIntoView({ behavior:'smooth', block:'start' });
+        } else if(wrap.scrollIntoView){
+          document.getElementById('chartBody').scrollTo({ top:0, behavior:'smooth' });
+        }
+      });
+    });
+  }
+
+  // ---- §디자인 개편 라운드(신규, 참고 시안 반영) — "상담 메모" 미리보기 카드. 새 저장
+  // 로직을 만들지 않고 가장 최근 메모 1건만 D.memosFor(co.id)로 미리보기하고, 실제
+  // 작성/수정/삭제는 기존 openMemoPanel(co)(§ D.addMemo 등 기존 저장 함수 그대로)를 그대로
+  // 연다 — 참고 시안처럼 이 카드 안에 새 textarea+저장 버튼을 따로 만들지 않았다(§ 보고서
+  // 3절 "기존 함수 그대로 재사용" 참고 — 중복 저장 경로를 새로 만들지 않기 위한 의도적 결정).
+  function renderMemoPreviewCard(co){
+    const wrap = document.getElementById('cdashMemoPreviewCard');
+    if(!wrap) return;
+    const memos = D.memosFor(co.id).slice().sort((a,b)=> (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+    const latest = memos[0];
+    wrap.innerHTML = `
+      <div class="cdash2-card">
+        <div class="cdash2-card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <span>상담 메모</span>
+          <button type="button" class="co-text-action" id="cdashMemoPreviewOpenBtn" style="font-size:11px;padding:2px 8px;white-space:nowrap;">${memos.length ? `전체보기 (${memos.length})` : '메모 작성'}</button>
+        </div>
+        ${latest
+          ? `<div class="cdash2-memo-preview-text">${esc(stripPhoneReqPrefix((latest.text || '').trim()))}</div><div class="cdash2-memo-preview-date">${esc(fmtDateTimeSmart(latest.updatedAt || latest.createdAt))}</div>`
+          : `<div class="chart-empty">상담 메모를 입력하세요</div>`}
+      </div>
+    `;
+    document.getElementById('cdashMemoPreviewOpenBtn').addEventListener('click', ()=> openMemoPanel(co));
   }
 
   function closeHeaderSection(){
@@ -14582,7 +14772,10 @@ window.SHIN2_CRM_APP_INIT = function(){
   }
 
   function openHeaderSection(section){
-    const ids = { insight:'cdashInsightBlock', info:'cdashReactionsCol', docs:'cdashDocStatusBlock' };
+    // §디자인 개편 라운드(신규) — "docs"(서류 현황)는 더 이상 이 팝오버 안에 있지 않다
+    // (#cdashDocStatusBlock이 화면 하단 상시 노출 "관련 문서" 섹션으로 옮겨짐, renderFooterBar
+    // 참고) — 매핑에서 빼서 실수로 빈 팝오버가 뜨는 일을 막는다.
+    const ids = { insight:'cdashInsightBlock', info:'cdashReactionsCol' };
     const popover = document.getElementById('cdashHeaderPopover');
     const target = document.getElementById(ids[section]);
     if(!popover || !target) return;
