@@ -2948,6 +2948,16 @@ body.map-modal-lock{ overflow:hidden; }
   .deleted-co-row{ grid-template-columns:1fr; gap:3px; padding:10px 4px; }
   .deleted-co-actions{ text-align:left; }
 }
+/* §의지박약 자동관리 라운드(신규) — 위 .deleted-co-* 표 스타일을 그대로 재사용하고
+   (같은 클래스명), 규칙별 3개 섹션(리마인드/의지박약/규칙2 후보)만 구분해 쌓는다. */
+.willpower-tab{ display:flex; flex-direction:column; gap:22px; }
+.willpower-section-title{ font-size:13px; font-weight:700; color:var(--text); margin-bottom:6px; }
+.willpower-tab .deleted-co-row[data-willpower-open]{ cursor:pointer; }
+.willpower-tab .deleted-co-row[data-willpower-open]:hover{ background:var(--bg); }
+@media (max-width:600px){
+  .willpower-tab .deleted-co-head{ display:none; }
+  .willpower-tab .deleted-co-row{ grid-template-columns:1fr !important; gap:3px; }
+}
 /* §업체 삭제(휴지통) 라운드(신규) — 상세 팝업 "업체 삭제" 버튼과 확인 모달. 이 앱에는
    진짜 붉은 배경 버튼 관례가 없어(기존 .co-text-action.danger는 hover에서만 붉어짐),
    요청한 "빨간색 버튼"을 기존 배지류(§요청X 미등록/기한초과 배지)와 같은 옅은 빨강
@@ -5977,7 +5987,16 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   // (questionnaire/firstMeeting/postSecondMeeting/documentRequest)을 새로 추가한다.
   // firstMeeting은 기존 값을 초기값으로 그대로 읽어오는 호환 처리(§8 "새 3종 구조가
   // 저장되기 전에도 기존 1차 미팅 메일이 정상 작동해야 한다")를 loadMailSettings에서 한다.
-  const MAIL_TEMPLATE_KEYS = ['questionnaire', 'firstMeeting', 'postSecondMeeting', 'documentRequest'];
+  // §의지박약 자동관리 라운드(신규) — 규칙3(1차 미팅 후 2차 일정 미회신) 리마인드 전용
+  // 메일 유형을 새로 추가한다. "새 발송 시스템을 만들지 마라"는 지시는 EmailJS
+  // 호출/작성 파이프라인(openMailComposeModal→appendM1MailLog→D.sendMailViaEmailJs) 자체를
+  // 새로 만들지 말라는 뜻으로 이해했다 — 그 파이프라인은 이미 mailType 문자열로 여러
+  // 종류를 구분해 쓰도록 설계돼 있으므로(§메일 3종+1 템플릿 확장 라운드와 동일한 확장
+  // 방식), 여기서는 그 문자열 키 하나(secondMeetingRequest)만 새로 등록한다. 기존 4종
+  // (questionnaire/firstMeeting/postSecondMeeting/documentRequest)의 값·동작은 전혀
+  // 건드리지 않는다. 규칙4(2차 미팅 후 후속 연락 없음) 리마인드는 이미 있는
+  // postSecondMeeting을 그대로 재사용한다(내용상 목적이 같음 — 새 유형 추가 없음).
+  const MAIL_TEMPLATE_KEYS = ['questionnaire', 'firstMeeting', 'postSecondMeeting', 'documentRequest', 'secondMeetingRequest'];
   const DEFAULT_MAIL_TEMPLATES = {
     questionnaire: {
       enabled: true,
@@ -6004,6 +6023,15 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
       enabled: true,
       subjectTemplate: '[POUR] {업체명} 협력 서류 요청드립니다',
       bodyTemplate: '안녕하세요, {업체명} {담당자}님.\n\n원활한 협력 진행을 위해 아래 자료 전달을 요청드립니다.\n\n{요청서류목록}\n\n확인 후 회신 부탁드립니다. 문의사항이 있으시면 편하게 연락해 주세요.\n\n감사합니다.\n{보내는사람}',
+      attachmentDocType: null, videoUrl: '', updatedAt: null
+    },
+    // §의지박약 자동관리 라운드(신규) — 1차 미팅 완료 후 2차 미팅 일정 회신이 없는
+    // 업체에게 보내는 리마인드 초안(§규칙3). 다른 4종과 동일한 구조/치환 규칙을 그대로
+    // 따른다(새 문법 없음).
+    secondMeetingRequest: {
+      enabled: true,
+      subjectTemplate: '[POUR] {업체명} 2차 미팅 일정 문의드립니다',
+      bodyTemplate: '안녕하세요, {업체명} {담당자}님.\n\n1차 미팅 진행해 주셔서 감사합니다.\n\n이후 2차 미팅 일정 관련 회신을 아직 받지 못해 다시 한 번 문의드립니다.\n가능하신 일정을 알려주시면 확인 후 조율하겠습니다.\n\n감사합니다.\n{보내는사람}',
       attachmentDocType: null, videoUrl: '', updatedAt: null
     }
   };
@@ -10752,6 +10780,12 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 빠진 목록)를 훑어 세므로, FILTER_DEFS 안에 넣으면 항상 0건으로만 보인다(§요청 6에
   // 어긋남). renderList가 이 값은 D.loadDeletedCompanies().length로 따로 채운다.
   const DELETED_FILTER_DEF = ['deleted','삭제된 업체'];
+  // §의지박약 자동관리 라운드(신규) — "쓰레기통 안에 새 구분을 추가"(§요청 목표)를 위해
+  // DELETED_FILTER_DEF와 같은 자리에 둔다. 단, 이 값은 D.loadActiveCompanies()에서 빠지지
+  // 않는(=진짜로 삭제되지 않는) 업체를 세는 것이라 filterCounts.willpower도 deleted와
+  // 마찬가지로 FILTER_DEFS.forEach 루프 밖(위 renderList, willpowerCache.list.length)에서
+  // 따로 채운다.
+  const WILLPOWER_FILTER_DEF = ['willpower','의지박약'];
   // §L2→L3 전환관리 탭 라운드(신규) — 상단 "관리 필요" 탭(구 mgmt-need-chip, 클릭하면
   // 모달만 열리던 버튼)을 제거하고 같은 위치(탭 줄 맨 끝)에 진짜 탭(filterKey 기반,
   // FILTER_DEFS/DELETED_FILTER_DEF와 같은 클릭 위임을 그대로 재사용)을 새로 둔다(§요청
@@ -10886,6 +10920,144 @@ window.SHIN2_CRM_APP_INIT = function(){
       _managementNeedIndexSourceList = managementNeedCache.list;
     }
     return _managementNeedIndexCache.get(companyId) || null;
+  }
+
+  /* ==========================================================================
+     §의지박약 자동관리 라운드(신규) — "장기 미응답/진행 의사 없음" 업체를 쓰레기통 >
+     의지박약으로 분류한다. 실제 조사 결과 재사용한 필드(전부 이미 존재하는 값, 새로
+     지어낸 날짜 필드 없음):
+       - buildProgressStages(co).stages[0..3] = [q(질문서), m1(1차미팅), m2(2차미팅), mou]
+         각 stage는 { state: done|scheduled|waiting, ts, dateDisplay } — 이미 이 파일
+         전역에서 "고객카드 진행바"가 쓰는 단일 source of truth(§진행 기록 라운드).
+         q.state==='done' → 질문지 회신 완료(nm.qReplyLabel 파싱됨).
+         q.state==='waiting' + q.ts!=null → 질문지 발송만 되고 회신 없음(nm.qSentLabel만
+         파싱됨) — "질문지 발송일"은 이 값 하나뿐이다(별도 발송일 필드 없음, §조사).
+         m1/m2도 동일 — state==='done'이면 완료일(m1Label/m2Label), state==='scheduled'면
+         예정일(m1ScheduledLabel/m2ScheduledLabel, "2차 미팅 일정 확정"에 해당하는 실제
+         유일한 필드)이다.
+       - mouDoneFlag/stageCorrections에 의한 done 승격·정정(§협약 진행단계 수정·완료 취소
+         라운드)도 buildProgressStages가 이미 반영해 두므로 그대로 물려받는다 — "최신
+         진행단계 우선" 요구사항(§우선순위)이 여기서 별도 처리 없이 자동으로 지켜진다.
+       - "2차 미팅 이후 업체 측 후속 연락"에 해당하는 별도 회신 로그는 존재하지 않는다
+         (§조사 결과, 아래 hasCompanyFollowUpAfter 주석 참고) — Google Sheets 연동 요청
+         레코드(r.sheetReqs, source==='google-sheets-request', 이미 L2→L3 전환관리 화면이
+         "업체 측 실제 문의"로 쓰는 것과 동일한 소스)를 대리 신호로 쓴다. 이것은 근사값
+         (proxy)이며, 직원이 쓰는 상담메모/activities는 "내부 관리 활동"이라 절대 섞지
+         않는다(§데이터 중복/오판 방지) — 이 구분과 그 한계는 최종 보고서 4/9번 항목에
+         그대로 보고한다.
+     ========================================================================== */
+  const WILLPOWER_DAYS = { qNoReply: 10, remindAt: 30, moveAt: 40 };
+  const WILLPOWER_REASON_TEXT = {
+    1: '질문지 발송 후 10일 미회신',
+    3: '1차 미팅 후 40일간 2차 일정 미회신',
+    4: '2차 미팅 후 40일간 후속 연락 없음'
+  };
+  // 규칙3/4 리마인드에 쓰는 mailType — 규칙3은 새로 추가한 secondMeetingRequest,
+  // 규칙4는 이미 있는 postSecondMeeting을 그대로 재사용한다(§ "새 발송 시스템 금지").
+  const WILLPOWER_REMINDER_MAIL_TYPE = { 3:'secondMeetingRequest', 4:'postSecondMeeting' };
+  function willpowerDaysSince(ts){
+    if(ts == null) return null;
+    return Math.round((getSeoulTodayDateOnly() - ts) / 86400000);
+  }
+  // "업체 측 후속 연락"의 대리 신호(§위 블록 설명) — sheetReqs(google-sheets-request
+  // 활동, computeOrphanedDeletedCompanies가 이미 쓰는 것과 같은 배열/같은 requestDate
+  // 필드)에 baseTs 이후 요청이 하나라도 있으면 "업체 측이 반응했다"로 본다.
+  function hasCompanyFollowUpAfter(sheetReqs, baseTs){
+    if(!Array.isArray(sheetReqs) || baseTs == null) return false;
+    return sheetReqs.some(r=> r.requestDate && new Date(r.requestDate).getTime() > baseTs);
+  }
+  // 업체 1건의 "정체 규칙"을 판정한다 — 저장하지 않고 매번 다시 계산만 한다(§ "co에
+  // 상태를 저장하지 않는다", buildProgressStages/isNewPartnerCompany와 같은 원칙). 이
+  // 원칙 덕분에 "자동 복구"는 별도 코드 없이 저절로 된다 — 다음 렌더에서 조건이 더 이상
+  // 맞지 않으면 이 함수가 그냥 null을 반환한다.
+  function computeWillpowerBase(co, progress){
+    if(!progress.hasAny) return null; // 진행정보 자체가 없는 업체 — 판정 불가, 대상 아님(추측 금지)
+    const stages = progress.stages;
+    const q = stages[0], m1 = stages[1], m2 = stages[2], mou = stages[3];
+    if(mou.state === 'done') return null; // §우선순위: 이미 MOU 체결된 업체는 무조건 제외
+    if(m2.state === 'done'){
+      // 규칙4 대상(2차 미팅 완료, MOU 미체결) — days>=40 여부/후속 연락 여부는 호출부에서 판정
+      return { rule:4, ts:m2.ts, label:m2.dateDisplay, days: willpowerDaysSince(m2.ts) };
+    }
+    // §실제 버그 수정(Playwright 테스트로 발견) — m2.state==='scheduled'(2차 미팅 일정이
+    // 이미 확정됨)인 업체는 m1.state==='done'이라도 규칙3 대상이 아니다(§규칙3 "2차 미팅
+    // 일정/날짜 회신 또는 확정 없음"이 조건). 처음 구현에서는 m1.state만 보고 m2.state를
+    // 전혀 확인하지 않아, 2차 일정이 이미 잡힌 업체도 "규칙3 40일 미회신"으로 잘못
+    // 분류되는 실제 버그가 있었다 — 정상 진행 중인 업체는 완전히 제외한다.
+    if(m2.state === 'scheduled') return null;
+    if(m1.state === 'done'){
+      // 규칙3 대상(1차 미팅 완료, 2차 일정 미확정 — 위에서 이미 scheduled/done을 걸렀으므로
+      // 이 분기에 오면 m2.state는 항상 'waiting'이다)
+      return { rule:3, ts:m1.ts, label:m1.dateDisplay, days: willpowerDaysSince(m1.ts) };
+    }
+    if(q.state === 'done'){
+      // 규칙2 후보(자동이동 금지, §규칙2) — 질문지 회신 완료, 1차 미팅 예정/완료 없음
+      return { rule:2, ts:q.ts, label:q.dateDisplay, days: willpowerDaysSince(q.ts) };
+    }
+    if(q.state === 'waiting' && q.ts != null){
+      // 규칙1 대상 — 질문지 발송만 되고 회신 없음
+      return { rule:1, ts:q.ts, label:q.dateDisplay, days: willpowerDaysSince(q.ts) };
+    }
+    return null; // 질문지 발송조차 안 된 업체 — 판정할 날짜 자체가 없음(추측 금지)
+  }
+  // renderList()가 렌더링당 한 번만 호출해 결과를 아래 willpowerCache에 채운다(§성능 —
+  // computeManagementNeedList와 완전히 같은 패턴, 행마다 다시 계산하지 않는다).
+  //   list: 실제 "의지박약" 확정 대상(규칙1 D+10 / 규칙3·4 D+40, 후속 연락 있으면 제외)
+  //   reminders: 규칙3·4 D+30~39(리마인드 대상), 아직 의지박약 아님
+  //   candidates: 규칙2 후보(보고 전용, 절대 자동 이동 안 함)
+  function computeWillpowerList(enrichedRows){
+    const list = [], reminders = [], candidates = [];
+    enrichedRows.forEach(r=>{
+      const base = computeWillpowerBase(r.co, r.progress);
+      if(!base) return;
+      if(base.rule === 2){
+        candidates.push({ co:r.co, rule:2, baseTs:base.ts, baseLabel:base.label, days:base.days });
+        return;
+      }
+      if(base.days == null) return; // 날짜를 못 읽은 경우 — 추측하지 않고 대상에서 제외
+      if(base.rule === 1){
+        if(base.days >= WILLPOWER_DAYS.qNoReply){
+          list.push({ co:r.co, rule:1, reason:WILLPOWER_REASON_TEXT[1], baseTs:base.ts, baseLabel:base.label, days:base.days,
+            movedAtTs: base.ts + WILLPOWER_DAYS.qNoReply * 86400000, reminderSentAt:null });
+        }
+        return;
+      }
+      // 규칙3/4 — 후속 연락(§대리 신호)이 있으면 완전히 제외(정상 진행으로 복귀)
+      if(hasCompanyFollowUpAfter(r.sheetReqs, base.ts)) return;
+      const mailType = WILLPOWER_REMINDER_MAIL_TYPE[base.rule];
+      const sentInfo = mailAlreadySentInfo(r.co, mailType);
+      const reminderSentAt = (sentInfo.last && sentInfo.last.sentAt) || null;
+      if(base.days >= WILLPOWER_DAYS.moveAt){
+        list.push({ co:r.co, rule:base.rule, reason:WILLPOWER_REASON_TEXT[base.rule], baseTs:base.ts, baseLabel:base.label,
+          days:base.days, movedAtTs: base.ts + WILLPOWER_DAYS.moveAt * 86400000, reminderSentAt, mailType });
+      } else if(base.days >= WILLPOWER_DAYS.remindAt){
+        reminders.push({ co:r.co, rule:base.rule, baseTs:base.ts, baseLabel:base.label, days:base.days,
+          reminderSent: sentInfo.alreadySent, reminderSentAt, mailType });
+      }
+    });
+    return { list, reminders, candidates };
+  }
+  let willpowerCache = { list:[], reminders:[], candidates:[] };
+  // O(1) 조회용 인덱스 — findManagementNeedForCompany(§10864)와 같은 패턴(참조가 바뀔
+  // 때만 Map을 다시 만든다). 목록/고객카드가 업체별 배지를 그릴 때 매번 willpowerCache.list
+  // 전체를 선형 탐색하지 않게 한다(§성능).
+  let _willpowerIndexCache = null;
+  let _willpowerIndexSourceList = null;
+  function findWillpowerForCompany(companyId){
+    if(_willpowerIndexSourceList !== willpowerCache.list){
+      _willpowerIndexCache = new Map(willpowerCache.list.map(w=> [w.co.id, w]));
+      _willpowerIndexSourceList = willpowerCache.list;
+    }
+    return _willpowerIndexCache.get(companyId) || null;
+  }
+  let _willpowerReminderIndexCache = null;
+  let _willpowerReminderIndexSourceList = null;
+  function findWillpowerReminderForCompany(companyId){
+    if(_willpowerReminderIndexSourceList !== willpowerCache.reminders){
+      _willpowerReminderIndexCache = new Map(willpowerCache.reminders.map(w=> [w.co.id, w]));
+      _willpowerReminderIndexSourceList = willpowerCache.reminders;
+    }
+    return _willpowerReminderIndexCache.get(companyId) || null;
   }
   function buildStageBadgeHtml(progress){
     if(!progress.hasAny) return `<span class="stage-badge st-none">미확인</span>`;
@@ -11049,7 +11221,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     // .list-filter-chip 높이/폰트는 그대로 재사용, 새 크기 체계를 만들지 않았다).
     // §업체 삭제(휴지통) 라운드(신규) — "삭제된 업체" 탭도 같은 칩 UI/클릭 위임을 그대로
     // 재사용한다(DELETED_FILTER_DEF만 목록 끝에 덧붙임, 새 템플릿·새 이벤트 바인딩 없음).
-    const allDefs = FILTER_DEFS.concat([DELETED_FILTER_DEF, L2L3_MANAGE_FILTER_DEF, CASE_BY_CASE_FILTER_DEF]);
+    const allDefs = FILTER_DEFS.concat([DELETED_FILTER_DEF, WILLPOWER_FILTER_DEF, L2L3_MANAGE_FILTER_DEF, CASE_BY_CASE_FILTER_DEF]);
     const defByKey = {}; allDefs.forEach(d=> defByKey[d[0]] = d);
     const chipHtml = ([key,label])=>
       `<button type="button" class="list-filter-chip${filterKey===key?' is-active':''}${key==='deleted'?' is-trash':''}" data-filter="${esc(key)}">${FILTER_ICON_SVG[key]||''}<span>${esc(label)}</span><span class="chip-count">${counts[key]||0}</span></button>`;
@@ -11072,6 +11244,14 @@ window.SHIN2_CRM_APP_INIT = function(){
       <button type="button" class="list-filter-trash-btn${filterKey==='deleted'?' is-active':''}" data-filter="deleted" title="삭제된 업체">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4.8c0-.44.36-.8.8-.8h4.4c.44 0 .8.36.8.8V7"/><path d="M6.5 7 7.3 19.2c.04.6.55 1.05 1.15 1.05h6.1c.6 0 1.11-.45 1.15-1.05L16.5 7"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
         ${counts.deleted ? `<span class="trash-btn-count">${counts.deleted}</span>` : ''}
+      </button>
+      <!-- §의지박약 자동관리 라운드(신규) — 실제 업체 데이터를 지우지 않는 파생 분류라
+           deletedAt은 전혀 쓰지 않지만(§목표 "삭제하면 안 된다"), 사용자에게는 같은
+           쓰레기통 UI 자리에 나란히 보이는 게 요구사항(§목표 "쓰레기통 안에 새 구분")이라
+           같은 아이콘 버튼 스타일을 그대로 재사용해 옆에 붙인다. -->
+      <button type="button" class="list-filter-trash-btn${filterKey==='willpower'?' is-active':''}" data-filter="willpower" title="의지박약(장기 미응답)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+        ${counts.willpower ? `<span class="trash-btn-count">${counts.willpower}</span>` : ''}
       </button>
       <div class="list-filter-more" id="crmFilterMore">
         <button type="button" class="list-filter-more-btn" id="crmFilterMoreBtn" title="추가 관리 항목" aria-haspopup="true" aria-expanded="false">
@@ -11171,7 +11351,12 @@ window.SHIN2_CRM_APP_INIT = function(){
       { key:'all', label:'전체 고객', value: counts.all || 0, cls:'', sub:'' },
       { key:'mouDone', label:'MOU 체결', value: counts.mouDone || 0, cls:'', sub: counts.all ? `전체 ${counts.all}곳 중` : '' },
       { key:'trendUp', label:'상승 업체', value: counts.trendUp || 0, cls:'is-up', sub: counts.all ? `전체 ${counts.all}곳 중` : '' },
-      { key:'l2l3Manage', label:'L2→L3 전환율', value: `${l2l3.rate}%`, cls: l2l3.rate < 50 ? 'is-warn' : '', sub: `${l2l3.total}곳 중 ${l2l3.converted.length}곳 · 5/20 이후 협약 기준` }
+      { key:'l2l3Manage', label:'L2→L3 전환율', value: `${l2l3.rate}%`, cls: l2l3.rate < 50 ? 'is-warn' : '', sub: `${l2l3.total}곳 중 ${l2l3.converted.length}곳 · 5/20 이후 협약 기준` },
+      // §의지박약 자동관리 라운드(신규) — "리마인드 필요 · N곳"을 상단에서 바로 확인
+      // 가능하게 한다(§요청). willpowerCache는 이 함수 호출 전에 renderList()가 이미
+      // 채워 둔 값을 그대로 읽는다(새 계산 없음). 클릭하면 기존 kpi-item 클릭 위임
+      // 그대로 filterKey='willpower'(쓰레기통>의지박약 화면)로 이동한다.
+      { key:'willpower', label:'리마인드 필요', value: (willpowerCache.reminders||[]).length, cls: (willpowerCache.reminders||[]).length ? 'is-warn' : '', sub: `의지박약 ${counts.willpower || 0}곳` }
     ];
     wrap.innerHTML = items.map(it=> `
       <button type="button" class="kpi-item ${it.cls}" data-kpi="${esc(it.key)}">
@@ -11334,7 +11519,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 엘리먼트)는 "삭제된 업체"/"신규 협약사" 탭처럼 그 7컬럼 표를 아예 안 쓰는 화면에서는
     // 지금까지도 계속 보이고 있었다(다른 화면 구조/컬럼은 전혀 안 바꿈, 표시 여부만 토글).
     const coTableHeadEl = document.getElementById('crmCoTableHead');
-    if(coTableHeadEl) coTableHeadEl.hidden = (filterKey === 'deleted' || filterKey === 'newPartner' || filterKey === 'l2l3Manage' || filterKey === 'caseByCase');
+    if(coTableHeadEl) coTableHeadEl.hidden = (filterKey === 'deleted' || filterKey === 'willpower' || filterKey === 'newPartner' || filterKey === 'l2l3Manage' || filterKey === 'caseByCase');
     const companies = D.loadActiveCompanies(); // §업체 삭제(휴지통) 라운드 — 소프트 삭제된 업체를 일반 목록/신규 협약사/협약 진행/MOU체결 탭에서 뺀다(§요청 10)
     const unregisteredClassification = D.classifyUnregisteredCompaniesByMouMaster(D.buildUnregisteredCompanies2026());
     // 기존 건바이건 컬렉션과 엑셀 분류 결과에 같은 업체가 있으면 한 번만 표시한다.
@@ -11404,6 +11589,10 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 캐시(managementNeedCache)만 조회한다(§ "같은 계산을 여러 곳에서 반복하지 않는다").
     managementNeedCache = computeManagementNeedList(enriched, pourLatestIndex);
     filterCounts.manageNeeded = managementNeedCache.counts.total;
+    // §의지박약 자동관리 라운드(신규) — 위 enriched(co/progress/sheetReqs)를 그대로
+    // 재사용해 렌더링당 한 번만 계산한다(§성능, managementNeedCache와 동일 패턴).
+    willpowerCache = computeWillpowerList(enriched);
+    filterCounts.willpower = willpowerCache.list.length;
     // §업체 삭제(휴지통) 라운드(신규) — companies가 이미 활성 업체만이라 위 FILTER_DEFS.forEach
     // 루프로는 절대 못 세므로 따로 채운다(§요청 6 "삭제된 업체 탭").
     filterCounts.deleted = D.loadDeletedCompanies().length;
@@ -11453,6 +11642,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 별도의 단순한 표(삭제일/업체명/삭제 사유/복구, §요청 6)로 갈아탄다.
     if(filterKey === 'deleted'){
       renderDeletedCompaniesTab();
+      return;
+    }
+    // §의지박약 자동관리 라운드(신규) — "삭제된 업체" 탭과 같은 이유(§7976 주석)로 무거운
+    // 7컬럼 목록 템플릿을 타지 않고 전용 화면(renderWillpowerTab)으로 갈아탄다.
+    if(filterKey === 'willpower'){
+      renderWillpowerTab();
       return;
     }
     // §신규 협약사 탭 리디자인 라운드(신규) — "삭제된 업체" 탭과 같은 이유로(§7976 주석
@@ -13064,6 +13259,111 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(!r.ok){ showCloudSaveStatus(statusEl, false, r.err); return; }
       renderDeletedCompaniesTab();
       if(typeof refreshMapIfOpen === 'function') refreshMapIfOpen();
+    }));
+  }
+
+  /* ==========================================================================
+     §의지박약 자동관리 라운드(신규) — 쓰레기통 > 의지박약 화면. renderDeletedCompaniesTab과
+     같은 자리(무거운 7컬럼 표를 타지 않는 단순 표)를 그대로 본떴다. willpowerCache는
+     renderList()가 이미 렌더링당 한 번 채워둔 값을 그대로 읽기만 한다(§성능, 여기서
+     새로 계산하지 않음). "실제 업체 데이터는 삭제하지 않는다"(§목표) — 이 화면은
+     co.deletedAt을 전혀 건드리지 않고, 순수 파생 계산 결과(willpowerCache)만 보여준다.
+     복구도 버튼이 없다 — 다음 조건 변화(회신/일정확정 등) 때 자동으로 목록에서 빠진다
+     (§자동 복구, computeWillpowerBase가 매번 다시 계산하므로).
+     ========================================================================== */
+  function fmtWillpowerDate(ts){
+    if(ts == null) return '—';
+    const d = new Date(ts);
+    return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+  }
+  const WILLPOWER_STAGE_LABEL = { 1:'질문지(미회신)', 3:'1차 미팅 완료', 4:'2차 미팅 완료' };
+  function willpowerReminderSendBtnHtml(item){
+    if(!item.mailType) return '';
+    const co = item.co;
+    if(co.mailOptOut) return `<span class="deleted-co-reason" style="font-size:11px;">수신거부</span>`;
+    if(!co.email) return `<span class="deleted-co-reason" style="font-size:11px;">이메일 없음</span>`;
+    return `<button type="button" class="co-text-action" data-willpower-remind="${esc(co.id)}" data-mail-type="${esc(item.mailType)}">${item.reminderSentAt ? '리마인드 재발송' : '리마인드 발송'}</button>`;
+  }
+  function renderWillpowerTab(){
+    renderPagination(0);
+    const { list, reminders, candidates } = willpowerCache;
+    const remindHtml = reminders.length ? `
+      <div class="willpower-section">
+        <div class="willpower-section-title">리마인드 필요 · ${reminders.length}곳 <span style="font-weight:400;color:var(--text-muted);">(1차/2차 미팅 후 30~39일 무응답 — 아직 의지박약 아님, D+40에 의지박약으로 전환됩니다)</span></div>
+        <div class="deleted-co-table">
+          <div class="deleted-co-head" style="grid-template-columns:1.3fr 1.1fr 0.9fr 0.7fr 1fr 1fr;">
+            <span>업체명</span><span>현재 정체 단계</span><span>기준일</span><span>경과일</span><span>리마인드 발송</span><span></span>
+          </div>
+          ${reminders.map(item=> `
+            <div class="deleted-co-row" style="grid-template-columns:1.3fr 1.1fr 0.9fr 0.7fr 1fr 1fr;" data-willpower-open="${esc(item.co.id)}">
+              <span class="deleted-co-name">${esc(item.co.name || '(업체명 없음)')}</span>
+              <span class="deleted-co-reason">${esc(WILLPOWER_STAGE_LABEL[item.rule] || '')}</span>
+              <span class="deleted-co-date">${esc(item.baseLabel || fmtWillpowerDate(item.baseTs))}</span>
+              <span class="deleted-co-date">D+${item.days}</span>
+              <span class="deleted-co-reason">${item.reminderSentAt ? ('발송됨 · ' + esc(String(item.reminderSentAt).slice(0,10))) : '미발송'}</span>
+              <span class="deleted-co-actions">${willpowerReminderSendBtnHtml(item)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : '';
+    const listHtml = list.length ? `
+      <div class="willpower-section">
+        <div class="willpower-section-title">의지박약 · ${list.length}곳</div>
+        <div class="deleted-co-table">
+          <div class="deleted-co-head" style="grid-template-columns:1.3fr 1.1fr 0.9fr 0.7fr 1fr 1fr 1.4fr;">
+            <span>업체명</span><span>현재 정체 단계</span><span>기준일</span><span>경과일</span><span>리마인드 발송일</span><span>의지박약 전환일</span><span>사유</span>
+          </div>
+          ${list.map(item=> `
+            <div class="deleted-co-row" style="grid-template-columns:1.3fr 1.1fr 0.9fr 0.7fr 1fr 1fr 1.4fr;" data-willpower-open="${esc(item.co.id)}">
+              <span class="deleted-co-name">${esc(item.co.name || '(업체명 없음)')}</span>
+              <span class="deleted-co-reason">${esc(WILLPOWER_STAGE_LABEL[item.rule] || '')}</span>
+              <span class="deleted-co-date">${esc(item.baseLabel || fmtWillpowerDate(item.baseTs))}</span>
+              <span class="deleted-co-date">D+${item.days}</span>
+              <span class="deleted-co-reason">${item.reminderSentAt ? esc(String(item.reminderSentAt).slice(0,10)) : '미발송'}</span>
+              <span class="deleted-co-date">${fmtWillpowerDate(item.movedAtTs)}(계산값)</span>
+              <span class="deleted-co-reason">${esc(item.reason)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : '';
+    const candidateHtml = candidates.length ? `
+      <div class="willpower-section">
+        <div class="willpower-section-title">규칙2 후보(수동 확인 필요) · ${candidates.length}곳 <span style="font-weight:400;color:var(--text-muted);">— 질문지 회신 완료 + 1차 미팅 미진행. 자동으로 의지박약 처리되지 않습니다. 아래서 직접 확인 후 판단해 주세요.</span></div>
+        <div class="deleted-co-table">
+          <div class="deleted-co-head" style="grid-template-columns:1.6fr 1.1fr 0.9fr;">
+            <span>업체명</span><span>질문지 회신일</span><span>회신 후 경과일</span>
+          </div>
+          ${candidates.map(item=> `
+            <div class="deleted-co-row" style="grid-template-columns:1.6fr 1.1fr 0.9fr;" data-willpower-open="${esc(item.co.id)}">
+              <span class="deleted-co-name">${esc(item.co.name || '(업체명 없음)')}</span>
+              <span class="deleted-co-date">${esc(item.baseLabel || fmtWillpowerDate(item.baseTs))}</span>
+              <span class="deleted-co-date">${item.days == null ? '—' : ('D+' + item.days)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : '';
+    if(!remindHtml && !listHtml && !candidateHtml){
+      listEl.innerHTML = '<div class="empty-note">의지박약 대상/리마인드 대상/규칙2 후보가 없습니다.</div>';
+      return;
+    }
+    listEl.innerHTML = `<div class="willpower-tab">${remindHtml}${listHtml}${candidateHtml}</div>`;
+    // §기존 업체 상세보기 클릭 기능은 유지(§요청) — 다른 화면(지도 등)과 동일하게 기존
+    // openCard()를 그대로 재사용한다. 새 상세 팝업을 만들지 않는다.
+    listEl.querySelectorAll('[data-willpower-open]').forEach(row=> row.addEventListener('click', (e)=>{
+      if(e.target.closest('[data-willpower-remind]')) return;
+      openCard(row.getAttribute('data-willpower-open'));
+    }));
+    // §리마인드 발송 — 기존 메일 작성 팝업(openMailComposeModal)을 그대로 연다. 이 버튼은
+    // "발송"이 아니라 "작성 화면 열기"다 — 실제 발송은 그 팝업 안의 [메일 발송] 버튼을
+    // 사용자가 직접 눌러야 일어난다(§ "사용자가 확인 후 보내는 구조", 여기서 자동 발송 없음).
+    listEl.querySelectorAll('[data-willpower-remind]').forEach(btn=> btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const id = btn.getAttribute('data-willpower-remind');
+      const mailType = btn.getAttribute('data-mail-type');
+      openMailComposeModal(id, mailType);
     }));
   }
 
@@ -16900,7 +17200,10 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 없다(§이 세션에서 이미 확인된 계층 분리 규칙 — D.loadMailSettings()가 돌려주는
   // "값"만 쓸 수 있고, D 안의 상수/함수 자체는 못 씀) — 같은 4개 키를 렌더 레이어에도
   // 그대로 복제한다(값 자체는 100% 동일, 새 개념 아님).
-  const MAIL_TEMPLATE_KEYS = ['questionnaire', 'firstMeeting', 'postSecondMeeting', 'documentRequest'];
+  // §의지박약 자동관리 라운드(신규) — 데이터 계층 MAIL_TEMPLATE_KEYS(위 §5945 부근)와
+  // 똑같이 secondMeetingRequest 키를 추가한다(같은 4개 키를 복제해 쓰던 기존 규칙 그대로,
+  // 다섯 번째 키만 새로 더함).
+  const MAIL_TEMPLATE_KEYS = ['questionnaire', 'firstMeeting', 'postSecondMeeting', 'documentRequest', 'secondMeetingRequest'];
   // §"모든 메일에 이 이미지를 꼭 첨부" 라운드(신규) — 데이터 계층의 GLOBAL_MAIL_ASSET_KEY
   // 상수와 반드시 같은 문자열이어야 한다(위 MAIL_TEMPLATE_KEYS와 같은 이유로 리터럴
   // 그대로 복제).
@@ -16914,7 +17217,8 @@ window.SHIN2_CRM_APP_INIT = function(){
     questionnaire: '질문서',
     firstMeeting: '1차 미팅 제안',
     postSecondMeeting: '2차 미팅 제안',
-    documentRequest: 'MOU 체결 서류 요청'
+    documentRequest: 'MOU 체결 서류 요청',
+    secondMeetingRequest: '2차 미팅 일정 리마인드'
   };
   // §메일 설정 상단 카드형 선택 라운드(신규) — 카드 보조 문구(사용자 확정 문구
   // 그대로). MAIL_TEMPLATE_TIMING_TEXT(왼쪽 패널의 긴 안내문)와는 다른 자리에
@@ -16923,7 +17227,8 @@ window.SHIN2_CRM_APP_INIT = function(){
     questionnaire: '신규 업체 등록 시',
     firstMeeting: '미팅 일정 조율',
     postSecondMeeting: '당사 직접 방문',
-    documentRequest: '협약 진행'
+    documentRequest: '협약 진행',
+    secondMeetingRequest: '의지박약 리마인드'
   };
   // 카드 왼쪽의 작은 심플 아이콘(§요청 "필요하면") — 단색 선 아이콘, currentColor로
   // 선택/미선택 색이 자동으로 따라간다.
@@ -16931,7 +17236,8 @@ window.SHIN2_CRM_APP_INIT = function(){
     questionnaire: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h6l3 3v9H4z"/><path d="M9 2v3h3"/><path d="M6 9h5M6 11.3h3.4"/></svg>',
     firstMeeting: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.3" width="12" height="10.2" rx="1.3"/><path d="M2 6.3h12M5 1.8v3M11 1.8v3"/></svg>',
     postSecondMeeting: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="10" height="12.5" rx="1"/><path d="M6 5h1.2M8.8 5H10M6 7.5h1.2M8.8 7.5H10M6 10h1.2M8.8 10H10"/></svg>',
-    documentRequest: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h6l3 3v9H4z"/><path d="M9 2v3h3"/><path d="M6.1 9.4l1.3 1.3 2.6-2.9"/></svg>'
+    documentRequest: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h6l3 3v9H4z"/><path d="M9 2v3h3"/><path d="M6.1 9.4l1.3 1.3 2.6-2.9"/></svg>',
+    secondMeetingRequest: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5l3 2"/><circle cx="8" cy="8" r="6.3"/></svg>'
   };
   // 첨부자료 한 줄 카드의 파일종류 아이콘(§요청 [6]) — 문서/이미지 슬롯(attachmentDoc)과
   // 동영상 슬롯(video) 두 가지만 구분하면 된다(assetKind 자체는 기존 그대로).
@@ -16947,7 +17253,8 @@ window.SHIN2_CRM_APP_INIT = function(){
     questionnaire: '신규 업체 등록 완료 직후, 발송 여부를 물을 때 사용됩니다.',
     firstMeeting: '질문서 회신 확인 후, 1차 미팅을 제안할 때 사용됩니다.',
     postSecondMeeting: '2차 미팅 완료 후, 협약 후속 안내를 보낼 때 사용됩니다.',
-    documentRequest: '미등록·재요청 서류가 있는 업체에 자료를 요청할 때 사용됩니다.'
+    documentRequest: '미등록·재요청 서류가 있는 업체에 자료를 요청할 때 사용됩니다.',
+    secondMeetingRequest: '1차 미팅 완료 후 30일 이상 2차 미팅 일정 회신이 없는 업체에게 리마인드로 발송됩니다(쓰레기통 > 의지박약 화면 [리마인드 발송] 버튼).'
   };
   const MAIL_PLACEHOLDER_BUTTONS = [['{업체명}','업체명'], ['{담당자}','담당자'], ['{대표자}','대표자'], ['{보내는사람}','보내는 사람']];
   // 미리보기 전용 예시 데이터 — 실제 고객 레코드가 아니며 저장도 안 한다(§4 "예시
@@ -18054,13 +18361,15 @@ window.SHIN2_CRM_APP_INIT = function(){
     questionnaire: '질문서 발송 메일',
     firstMeeting: '1차 미팅 제안 메일',
     postSecondMeeting: '협약 후속 메일',
-    documentRequest: '서류 요청 메일'
+    documentRequest: '서류 요청 메일',
+    secondMeetingRequest: '2차 미팅 일정 리마인드 메일'
   };
   const MAIL_TYPE_SUCCESS_LOG_TEXT = {
     questionnaire: '질문서 발송 완료',
     firstMeeting: '1차 미팅 제안 메일 발송 완료',
     postSecondMeeting: '2차 미팅 후 협약 안내 메일 발송 완료',
-    documentRequest: '서류 요청 메일 발송 완료'
+    documentRequest: '서류 요청 메일 발송 완료',
+    secondMeetingRequest: '2차 미팅 일정 리마인드 메일 발송 완료'
   };
   // §요청 [7]: 메일 종류별로 co.m1MailLog(이름은 예전 그대로지만 mailType으로 구분해
   // 4종을 함께 쓴다 — 새 배열을 만들면 "재발송/최근 발송" 판정을 두 곳에서 따로 관리해야
