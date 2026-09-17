@@ -682,6 +682,41 @@
   .workq-today-line b{ color:var(--navy); }
   .workq-filter-row{ display:flex; flex-wrap:wrap; gap:6px; margin:12px 0 10px; }
 
+  /* 업무관리 검색 자동완성/화면 크기 — 이 화면 안에서만 폭과 결과 영역을 제한한다. */
+  #workQueueView{ width:100%; max-width:1320px; margin:0 auto; padding-bottom:0; }
+  .workq-search-row{ position:relative; z-index:30; padding:8px!important; }
+  .workq-search-autocomplete{ position:relative; flex:1 1 auto; min-width:0; }
+  .workq-search-autocomplete .search-box{ width:100%; }
+  .workq-autocomplete-list{
+    position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:80;
+    max-height:288px; overflow-y:auto; background:#fff; border:1px solid #DCE5EF;
+    border-radius:8px; box-shadow:0 8px 22px rgba(15,23,42,.13); padding:4px;
+  }
+  .workq-autocomplete-list[hidden]{ display:none; }
+  .workq-autocomplete-item{
+    display:block; width:100%; padding:7px 10px; border:0; border-radius:6px;
+    background:#fff; color:var(--text); text-align:left; cursor:pointer; font-size:12.5px;
+  }
+  .workq-autocomplete-item:hover,.workq-autocomplete-item.is-active{ background:#F1F6FC; }
+  .workq-autocomplete-name{ display:block; color:var(--navy); line-height:1.35; }
+  .workq-autocomplete-name strong,.workq-autocomplete-meta strong{ font-weight:800; color:#0B5BD3; }
+  .workq-autocomplete-meta{ display:block; margin-top:2px; color:var(--text-muted); font-size:10.5px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .workq-autocomplete-empty{ padding:10px; color:var(--text-muted); font-size:12px; text-align:center; }
+  .workq-results-scroll{ max-height:min(58vh, 620px); overflow:auto; border-radius:8px; }
+  .workq-results-scroll .workq-table th{ position:sticky; top:0; z-index:2; }
+  body:has(#workQueueView[style*="display: block"]) .app{ padding-bottom:16px!important; }
+  @media(max-width:1100px){
+    #workQueueView{ max-width:100%; }
+    .workq-results-scroll{ max-height:60vh; }
+  }
+  @media(max-width:760px){
+    #workQueueView{ max-width:100%; }
+    .workq-search-row{ width:100%; min-width:0!important; }
+    .workq-search-autocomplete{ width:100%; }
+    .workq-autocomplete-list{ max-width:100%; max-height:240px; }
+    .workq-results-scroll{ max-width:100%; max-height:62vh; overflow:auto; }
+  }
+
   /* §업무관리 상단 재구성 라운드 §1~§10 — 제목줄(좌:제목/설명, 우:정렬). */
   .workq-header-row{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px; }
 
@@ -16193,6 +16228,85 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 고객관리 쪽 선례(filterCounts는 searchQuery 적용 전 enriched로 계산)와 똑같이 검색과
   // 무관하게 유지하고, 검색은 아래 표에 실제로 보이는 행에만 적용한다.
   let workQueueSearch = '';
+  let workQueueAutocompleteItems = [];
+  let workQueueAutocompleteOpen = false;
+  let workQueueAutocompleteIndex = -1;
+  let workQueueSearchRenderTimer = null;
+  let workQueueAutocompleteOutsideHandler = null;
+
+  function workQueueAutocompleteMatch(entry, rawQuery){
+    const q = String(rawQuery || '').trim().toLowerCase();
+    if(!q) return null;
+    const co = entry.co || {};
+    const name = String(co.name || '');
+    const nameLower = name.toLowerCase();
+    if(nameLower.startsWith(q)) return { entry, score:0, matchLabel:'업체명', matchValue:name };
+    if(nameLower.includes(q)) return { entry, score:1, matchLabel:'업체명', matchValue:name };
+    const contacts = [co.repName, co.contactName].filter(Boolean).map(String);
+    const contact = contacts.find(v=> v.toLowerCase().includes(q));
+    if(contact) return { entry, score:2, matchLabel:'담당자', matchValue:contact };
+    const phones = [co.phone, co.mobile].filter(Boolean).map(String);
+    const phone = phones.find(v=> v.toLowerCase().includes(q));
+    if(phone) return { entry, score:3, matchLabel:'연락처', matchValue:phone };
+    const formerNames = Array.isArray(co.formerNames) ? co.formerNames.map(String) : [];
+    const otherFields = [co.address, co.bizRegNo, co.parentCompanyNameUnconfirmed]
+      .filter(Boolean).map(String).concat(formerNames);
+    const other = otherFields.find(v=> v.toLowerCase().includes(q));
+    if(other) return { entry, score:4, matchLabel:'기존 검색 정보', matchValue:other };
+    const activity = (entry.acts || []).map(a=> String(a && a.activityText || '')).find(v=> v.toLowerCase().includes(q));
+    if(activity) return { entry, score:5, matchLabel:'활동내용', matchValue:activity };
+    return null;
+  }
+  function getWorkQueueAutocompleteSuggestions(query){
+    const seen = new Set();
+    return workQueueAutocompleteItems.map(entry=> workQueueAutocompleteMatch(entry, query)).filter(match=>{
+      if(!match) return false;
+      const id = String(match.entry.co.id);
+      if(seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    }).sort((a,b)=> a.score - b.score || String(a.entry.co.name || '').localeCompare(String(b.entry.co.name || ''), 'ko')).slice(0, 10);
+  }
+  function highlightWorkQueueAutocompleteText(value, query){
+    const text = String(value || '');
+    const q = String(query || '').trim();
+    const at = text.toLowerCase().indexOf(q.toLowerCase());
+    if(!q || at < 0) return esc(text);
+    return esc(text.slice(0, at)) + '<strong>' + esc(text.slice(at, at + q.length)) + '</strong>' + esc(text.slice(at + q.length));
+  }
+  function chooseWorkQueueAutocomplete(match){
+    if(!match || !match.entry || !match.entry.co) return;
+    if(workQueueSearchRenderTimer){ clearTimeout(workQueueSearchRenderTimer); workQueueSearchRenderTimer = null; }
+    workQueueSearch = String(match.entry.co.name || '');
+    workQueueAutocompleteOpen = false;
+    workQueueAutocompleteIndex = -1;
+    renderWorkQueueView();
+  }
+  function renderWorkQueueAutocomplete(input){
+    const listEl = document.getElementById('workqAutocompleteList');
+    if(!input || !listEl) return;
+    const query = input.value.trim();
+    if(!workQueueAutocompleteOpen || !query){
+      listEl.hidden = true;
+      listEl.innerHTML = '';
+      input.setAttribute('aria-expanded', 'false');
+      return;
+    }
+    const suggestions = getWorkQueueAutocompleteSuggestions(query);
+    if(workQueueAutocompleteIndex >= suggestions.length) workQueueAutocompleteIndex = suggestions.length ? suggestions.length - 1 : -1;
+    listEl.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+    listEl.innerHTML = suggestions.length ? suggestions.map((match, index)=>{
+      const name = String(match.entry.co.name || '');
+      const metaValue = String(match.matchValue || '').slice(0, 80);
+      const meta = match.matchLabel === '업체명' ? '' : `<span class="workq-autocomplete-meta">${esc(match.matchLabel)} · ${highlightWorkQueueAutocompleteText(metaValue, query)}</span>`;
+      return `<button type="button" role="option" aria-selected="${index === workQueueAutocompleteIndex ? 'true' : 'false'}" class="workq-autocomplete-item${index === workQueueAutocompleteIndex ? ' is-active' : ''}" data-workq-suggestion="${index}"><span class="workq-autocomplete-name">${highlightWorkQueueAutocompleteText(name, query)}</span>${meta}</button>`;
+    }).join('') : '<div class="workq-autocomplete-empty">일치하는 업체가 없습니다.</div>';
+    listEl.querySelectorAll('[data-workq-suggestion]').forEach(btn=>{
+      btn.addEventListener('pointerdown', e=> e.preventDefault());
+      btn.addEventListener('click', ()=> chooseWorkQueueAutocomplete(suggestions[Number(btn.getAttribute('data-workq-suggestion'))]));
+    });
+  }
   // §경과일 짧은 업체 분리 보기 라운드: false=기존 그대로(오래된 순), true=경과일 적은
   // 업체가 위로(같은 행동 우선순위 안에서만 방향이 바뀐다 — 우선순위 자체는 안 바뀜).
   // §P1-3 기본 정렬 변경 라운드(신규) — 진단 보고서 P1-3 "기본 정렬을 경과일 적은 순으로".
@@ -16239,11 +16353,13 @@ window.SHIN2_CRM_APP_INIT = function(){
     // §업무관리 1·2차미팅 탭 분리 라운드 — 'm1'/'m2' 필터는 예정된 미팅(m1Scheduled/
     // m2Scheduled)도 같은 탭에 포함해야 한다(§7 "일정 잡아둔 업체가 어디에도 안 보이는
     // 문제" 방지 원칙과 동일 이유 — 새 판정 아니라 이미 있는 두 type을 한 탭으로 묶어 보는 것).
-    const filtered = (workQueueFilter === 'all' ? list : list.filter(it=>{
+    const workQueueBaseFiltered = (workQueueFilter === 'all' ? list : list.filter(it=>{
       if(workQueueFilter === 'm1') return it.type === 'm1' || it.type === 'm1Scheduled';
       if(workQueueFilter === 'm2') return it.type === 'm2' || it.type === 'm2Scheduled';
       return it.category === workQueueFilter || it.type === workQueueFilter;
-    }))
+    }));
+    workQueueAutocompleteItems = workQueueBaseFiltered.map(it=> ({ co:it.co, acts:activitiesIdxForSearch.get(String(it.co.id)) || [] }));
+    const filtered = workQueueBaseFiltered
       .filter(it=> matchesSearch(it.co, workQueueSearch ? (activitiesIdxForSearch.get(String(it.co.id)) || []) : [], workQueueSearch));
     const m1Count = list.filter(it=> it.type==='m1').length;
     const m2Count = list.filter(it=> it.type==='m2').length;
@@ -16288,15 +16404,19 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="list-search-row workq-search-row">
         <!-- §검색창 클릭 영역 수정 라운드 — 고객목록 검색창과 완전히 같은 구조/문제라 같은
              방식(label)으로 맞춘다. -->
-        <label class="search-box">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-          <input type="text" id="workqSearchInput" placeholder="업체명 / 담당자 / 활동내용 검색" value="${esc(workQueueSearch)}" />
-        </label>
+        <div class="workq-search-autocomplete">
+          <label class="search-box">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input type="text" id="workqSearchInput" placeholder="업체명 / 담당자 / 연락처 / 활동내용 검색" value="${esc(workQueueSearch)}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="workqAutocompleteList" aria-expanded="false" />
+          </label>
+          <div class="workq-autocomplete-list" id="workqAutocompleteList" role="listbox" hidden></div>
+        </div>
       </div>
       <div class="workq-filter-row" id="workqFilterRow">
         ${WORKQ_FILTER_DEFS.map(([key,label])=> `<button type="button" class="list-filter-chip${workQueueFilter===key?' is-active':''}" data-workq-filter="${esc(key)}">${esc(label)} ${esc(counts[key]||0)}</button>`).join('')}
       </div>
       ${filtered.length ? `
+        <div class="workq-results-scroll">
         <table class="workq-table">
           <!-- §단계 진행상황 이전 라운드 — 고객관리 목록 컬럼("단계 진행상황", 질문서→1차→
                2차→MOU 4단계 stepper)을 여기로 옮겼다(요청 "정보를 지우는 게 아니라 이 창을
@@ -16359,6 +16479,7 @@ window.SHIN2_CRM_APP_INIT = function(){
             }).join('')}
           </tbody>
         </table>
+        </div>
       ` : `<div class="workq-empty">해당 조건의 업체가 없습니다.</div>`}
     `;
     wrap.querySelectorAll('[data-workq-filter]').forEach(btn=> btn.addEventListener('click', ()=>{
@@ -16408,12 +16529,46 @@ window.SHIN2_CRM_APP_INIT = function(){
       searchInput.addEventListener('compositionend', ()=>{
         isComposing = false;
         workQueueSearch = searchInput.value;
-        renderWorkQueueView();
+        workQueueAutocompleteOpen = !!workQueueSearch.trim();
+        workQueueAutocompleteIndex = -1;
+        renderWorkQueueAutocomplete(searchInput);
+        if(workQueueSearchRenderTimer) clearTimeout(workQueueSearchRenderTimer);
+        workQueueSearchRenderTimer = setTimeout(()=>{ workQueueSearchRenderTimer = null; renderWorkQueueView(); }, 100);
       });
       searchInput.addEventListener('input', ()=>{
         if(isComposing) return; // 조합 중인 입력은 compositionend에서 한 번에 반영
         workQueueSearch = searchInput.value;
-        renderWorkQueueView();
+        workQueueAutocompleteOpen = !!workQueueSearch.trim();
+        workQueueAutocompleteIndex = -1;
+        renderWorkQueueAutocomplete(searchInput);
+        if(workQueueSearchRenderTimer) clearTimeout(workQueueSearchRenderTimer);
+        workQueueSearchRenderTimer = setTimeout(()=>{ workQueueSearchRenderTimer = null; renderWorkQueueView(); }, 100);
+      });
+      searchInput.addEventListener('focus', ()=>{
+        workQueueAutocompleteOpen = !!searchInput.value.trim();
+        renderWorkQueueAutocomplete(searchInput);
+      });
+      searchInput.addEventListener('keydown', e=>{
+        const suggestions = getWorkQueueAutocompleteSuggestions(searchInput.value);
+        if(e.key === 'ArrowDown' && suggestions.length){
+          e.preventDefault();
+          workQueueAutocompleteOpen = true;
+          workQueueAutocompleteIndex = (workQueueAutocompleteIndex + 1) % suggestions.length;
+          renderWorkQueueAutocomplete(searchInput);
+        }else if(e.key === 'ArrowUp' && suggestions.length){
+          e.preventDefault();
+          workQueueAutocompleteOpen = true;
+          workQueueAutocompleteIndex = workQueueAutocompleteIndex <= 0 ? suggestions.length - 1 : workQueueAutocompleteIndex - 1;
+          renderWorkQueueAutocomplete(searchInput);
+        }else if(e.key === 'Enter' && workQueueAutocompleteOpen && suggestions.length){
+          e.preventDefault();
+          chooseWorkQueueAutocomplete(suggestions[Math.max(0, workQueueAutocompleteIndex)]);
+        }else if(e.key === 'Escape'){
+          e.preventDefault();
+          workQueueAutocompleteOpen = false;
+          workQueueAutocompleteIndex = -1;
+          renderWorkQueueAutocomplete(searchInput);
+        }
       });
       // §업무관리 검색창 라운드 — 위에서 기억해 둔 포커스/커서 위치를 새로 그려진 입력창에
       // 그대로 되돌려 준다(재렌더링마다 포커스가 풀리지 않게).
@@ -16421,6 +16576,17 @@ window.SHIN2_CRM_APP_INIT = function(){
         searchInput.focus();
         if(searchCaret != null) searchInput.setSelectionRange(searchCaret, searchCaret);
       }
+      renderWorkQueueAutocomplete(searchInput);
+      if(workQueueAutocompleteOutsideHandler) document.removeEventListener('pointerdown', workQueueAutocompleteOutsideHandler);
+      workQueueAutocompleteOutsideHandler = e=>{
+        const shell = document.querySelector('#workQueueView .workq-search-autocomplete');
+        if(shell && !shell.contains(e.target)){
+          workQueueAutocompleteOpen = false;
+          workQueueAutocompleteIndex = -1;
+          renderWorkQueueAutocomplete(document.getElementById('workqSearchInput'));
+        }
+      };
+      document.addEventListener('pointerdown', workQueueAutocompleteOutsideHandler);
     }
   }
   // §업무관리 처리 팝업 전환 라운드(신규) — "저런형식말고 팝업으로 간단하게" 요청에
