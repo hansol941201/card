@@ -10837,8 +10837,20 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
     return { list, counts };
   }
+  // §MAP-PERF 라운드(신규) — 기존에는 이 함수가 companyId 하나당 managementNeedCache.list를
+  // 매번 선형 탐색(.find)했다. 지도 팝업(buildMapCompanyEntry)이 열려있는 업체 전체에 대해
+  // 이 함수를 하나씩 부르므로, 업체 수 × managementNeedCache.list 길이만큼 비교가 반복되는
+  // O(N×M) 구조였다(§요청 "동일 원본 배열을 업체마다 반복 검색" 사례와 동일 패턴). 결과값은
+  // 그대로 두고 조회 방식만 Map으로 바꾼다 — managementNeedCache.list가 바뀔 때만(참조가
+  // 달라질 때만) 인덱스를 다시 만들고, 그 사이엔 재사용한다(§ "값은 절대 달라지지 않는다").
+  let _managementNeedIndexCache = null;
+  let _managementNeedIndexSourceList = null;
   function findManagementNeedForCompany(companyId){
-    return managementNeedCache.list.find(m=> m.co.id === companyId) || null;
+    if(_managementNeedIndexSourceList !== managementNeedCache.list){
+      _managementNeedIndexCache = new Map(managementNeedCache.list.map(m=> [m.co.id, m]));
+      _managementNeedIndexSourceList = managementNeedCache.list;
+    }
+    return _managementNeedIndexCache.get(companyId) || null;
   }
   function buildStageBadgeHtml(progress){
     if(!progress.hasAny) return `<span class="stage-badge st-none">미확인</span>`;
@@ -27206,6 +27218,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     mapFilterState = { search:'', filterKey:'all', category:'all', pourRange:'all', viewMode:'cluster', listView:'inBounds' };
     aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all', nearCenter:null, nearRadiusKm:5, nearQuery:'' };
     mapActiveTab = 'company'; // §요청 "기본 선택은 시공사" — 매번 열 때 항상 기본 탭으로 시작
+    invalidateMapCompaniesCache(); // §MAP-PERF: 닫을 때도 비워둔다(다음 open이 항상 새로 계산하도록, 방어적)
     if(mapCanvasState && typeof mapCanvasState.destroy === 'function'){
       try{ mapCanvasState.destroy(); } catch(err){ /* 지도 정리 실패는 무시 — 다음 열기에서 새로 만들어짐 */ }
     }
@@ -27223,11 +27236,22 @@ window.SHIN2_CRM_APP_INIT = function(){
   }
 
 
+  // §MAP-PERF 계측 라운드(신규, 개발용) — "지도 버튼 클릭 → 화면에 실제로 보일 때까지"
+  // 각 단계 소요 시간을 콘솔에 남긴다(요청된 라벨 그대로). 기능에는 전혀 영향을 주지
+  // 않는 순수 로깅이며, 지도 팝업이 열려 있지 않을 때는 아무 것도 하지 않는다.
+  let _mapPerfT0 = 0;
+  function mapPerfMark(label, extra){
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    console.log('[MAP-PERF] ' + label + ' +' + (now - _mapPerfT0).toFixed(1) + 'ms' + (extra ? ' ' + extra : ''));
+  }
   function openMapDistributionModal(){
     if(mapModalOpen) return; // 이미 열려있으면 다시 열지 않음(중복 방지)
+    _mapPerfT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    mapPerfMark('open start');
     mapModalOpen = true;
     const root = document.getElementById('mapDistributionModalRoot');
     if(!root) return;
+    invalidateMapCompaniesCache(); // §MAP-PERF: 열 때마다 항상 최신 companies로 새로 계산(§ 캐시 무효화 지점 1)
     document.body.classList.add('map-modal-lock'); // 기존 chart-lock과는 별도 클래스라 서로 안 건드림(§2-2 "충돌 없게")
     // §POUR 시공 아파트 지도 라운드: 사용자 요청 "지도 기능을 새로 하나 더 복사해서 만들지
     // 말고, 기존 지도 컴포넌트 안에서 탭으로 전환되도록" — 탭 자체는 모달 head 바로 아래
@@ -27316,8 +27340,10 @@ window.SHIN2_CRM_APP_INIT = function(){
     const wrap = document.getElementById('mapModalBody');
     if(!wrap) return;
     wrap.innerHTML = `<div class="map-modal-loading">지도를 불러오는 중…</div>`;
+    mapPerfMark('modal shell visible (loading state)');
     loadKakaoMapSdk().then((kakao)=>{
       if(!mapModalOpen) return; // 로딩 중 팝업이 닫혔으면 아무것도 안 함
+      mapPerfMark('sdk ready');
       if(typeof renderMapModalMain === 'function') renderMapModalMain(kakao);
       else wrap.innerHTML = `<div class="map-modal-loading">지도 SDK 로드 완료 — 화면 구성은 다음 단계에서 이어집니다.</div>`;
     }).catch((err)=>{
@@ -27390,7 +27416,31 @@ window.SHIN2_CRM_APP_INIT = function(){
       hasCoords, geocodeStatus,
     };
   }
-  function buildMapCompanies(){ return D.loadActiveCompanies().map(buildMapCompanyEntry); } // §업체 삭제(휴지통) 라운드 — 지도 집계에서 소프트 삭제된 업체 제외(§요청 10)
+  // §MAP-PERF 라운드(신규) — buildMapCompanies()는 지도 팝업이 열려있는 동안 검색창
+  // 입력마다(refreshMapInfoAndMarkers), 지도를 움직일 때마다(refreshVisibleList의 idle
+  // 리스너, getVisibleEntries), 지역 패널 클릭마다(focusMapRegion) 매번 다시 불렸다 — 그때마다
+  // D.loadActiveCompanies()가 localStorage 전체를 다시 JSON.parse하고 업체 전원에 대해
+  // buildMapCompanyEntry(진행단계/실적/매출/미수금/관리필요 조회)를 처음부터 다시 계산했다
+  // (§요청 "지도 열 때마다/필터 바꿀 때마다 전체 업체 배열 순회·localStorage JSON.parse
+  // 반복" 사례와 정확히 일치). 이 함수의 호출부는 전부 지도 모듈 내부뿐이라(§ 위 grep으로
+  // 확인 — buildMapCompanies를 부르는 곳은 이 파일에서 지도 관련 함수들뿐이다) 결과를
+  // 지도가 열려 있는 한 세션 동안만 캐시해도 안전하다. 무효화 지점 3곳만 정확히 지키면
+  // "오래된 데이터가 남는" 문제 없이 항상 최신과 동일하다:
+  //  1) openMapDistributionModal — 팝업을 열 때마다 무조건 새로 계산(§ 항상 최신 반영).
+  //  2) refreshMapIfOpen — 업체 데이터가 바뀌었다고 앱이 이미 알고 있는 모든 지점
+  //     (activities/거래/설정 변경 후 호출부, storage/클라우드 동기화 이벤트)에서 호출된다
+  //     — 여기서 무효화하면 그 다음 재조회부터 최신 값이 나온다.
+  //  3) initMapCanvas의 지오코딩 완료 콜백 — D.updateCompany로 좌표를 직접 쓴 직후라
+  //     refreshMapIfOpen을 거치지 않으므로 별도로 무효화한다.
+  // 캐시된 값 자체(계산 결과)는 기존 buildMapCompanies()와 완전히 동일하다 — 호출 빈도만
+  // 줄었을 뿐 계산 로직/기준은 전혀 바꾸지 않았다(§9 "기능 결과 절대 변경 금지").
+  let _mapCompaniesCache = null;
+  function invalidateMapCompaniesCache(){ _mapCompaniesCache = null; }
+  function buildMapCompanies(){
+    if(_mapCompaniesCache) return _mapCompaniesCache;
+    _mapCompaniesCache = D.loadActiveCompanies().map(buildMapCompanyEntry); // §업체 삭제(휴지통) 라운드 — 지도 집계에서 소프트 삭제된 업체 제외(§요청 10)
+    return _mapCompaniesCache;
+  }
 
   // §지도분포2: 필터/검색 상태 — 지도 팝업이 열려있는 동안에만 유지되고, 닫으면
   // 초기화된다(별도 저장 없음, 목록 화면의 filterKey/searchQuery와는 독립적인
@@ -27630,7 +27680,11 @@ window.SHIN2_CRM_APP_INIT = function(){
       return;
     }
     if(!wrap) return;
+    mapPerfMark('data prepare start');
     const allEntries = buildMapCompanies();
+    mapPerfMark('company aggregation done', 'companies=' + allEntries.length);
+    const hasCoordsCount = allEntries.filter(e=> e.hasCoords).length;
+    mapPerfMark('coordinate prepare done', 'withCoords=' + hasCoordsCount + '/' + allEntries.length);
     const categoryOptions = buildMapCategoryOptions(allEntries);
     wrap.innerHTML = `
       <div class="map-modal-filters">
@@ -27693,13 +27747,19 @@ window.SHIN2_CRM_APP_INIT = function(){
       const canvas = document.getElementById('mapModalCanvas');
       if(canvas) canvas.innerHTML = '<div class="map-modal-error">지도를 표시하지 못했습니다.</div>';
     }
+    mapPerfMark('extra render start (info panel)');
     renderMapInfoPanel(allEntries);
+    mapPerfMark('extra render done (info panel)');
+    mapPerfMark('visible');
+    mapPerfMark('total');
   }
 
   // 필터/검색이 바뀌었을 때 지도 마커와 정보 패널을 다시 그린다(전체 팝업을 다시
   // 그리지 않음 — 검색창 포커스가 끊기지 않게).
   function refreshMapInfoAndMarkers(){
+    const _t = (typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
     const allEntries = buildMapCompanies();
+    console.log('[MAP-PERF] refreshMapInfoAndMarkers buildMapCompanies ' + (((typeof performance!=='undefined'&&performance.now)?performance.now():Date.now())-_t).toFixed(1) + 'ms');
     if(typeof updateMapMarkers === 'function'){
       try{ updateMapMarkers(allEntries); } catch(err){ console.warn('지도 마커 갱신 실패:', err); }
     }
@@ -27712,6 +27772,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   // (§동기화 규칙 "닫혀 있어도 다음 열 때 최신 데이터 사용", 별도 캐시 없음).
   function refreshMapIfOpen(){
     if(!mapModalOpen) return;
+    invalidateMapCompaniesCache(); // §MAP-PERF 캐시 무효화 지점 2 — companies가 바뀌었다고 이미 알려진 시점
     // §POUR 시공 아파트 지도 라운드: companies가 바뀌면 아파트 그룹도 바뀔 수 있어(등록
     // 업체가 늘거나 줄면 그 업체의 POUR 실적도 아파트 집합에서 빠지거나 들어온다) 활성
     // 탭에 맞는 쪽만 갱신한다 — 비활성 탭의 지도 인스턴스는 애초에 존재하지 않는다.
@@ -27865,12 +27926,14 @@ window.SHIN2_CRM_APP_INIT = function(){
   function initMapCanvas(kakao, allEntries){
     const container = document.getElementById('mapModalCanvas');
     if(!container) return;
+    mapPerfMark('map init start');
     const center = new kakao.maps.LatLng(36.2, 127.9); // 대한민국 대략 중앙
     const map = new kakao.maps.Map(container, { center, level: 13 });
     if(kakao.maps.ZoomControl){
       map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
     }
     const clusterer = new kakao.maps.MarkerClusterer({ map, averageCenter:true, minLevel:6 });
+    mapPerfMark('map init done');
     const infoWindow = new kakao.maps.InfoWindow({ removable:true });
     let markerByCompanyId = new Map();
     let currentEntries = allEntries; // 마지막으로 그린 필터 결과 — idle(팬/줌)마다 다시 쓴다
@@ -28081,9 +28144,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 실행되게 막는다(mapModalOpen만 보던 기존 가드로는 부족했다).
     function refreshVisibleList(){
       if(!mapModalOpen || mapActiveTab !== 'company') return;
+      const _t = (typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
       if(mapFilterState.viewMode === 'heatmap') buildHeatmapFor(currentEntries);
       else renderClusterLayer(currentEntries);
-      renderMapInfoPanel(buildMapCompanies());
+      const fresh = buildMapCompanies();
+      console.log('[MAP-PERF] refreshVisibleList (idle/pan-zoom) ' + (((typeof performance!=='undefined'&&performance.now)?performance.now():Date.now())-_t).toFixed(1) + 'ms');
+      renderMapInfoPanel(fresh);
     }
     kakao.maps.event.addListener(map, 'idle', refreshVisibleList);
 
@@ -28141,7 +28207,10 @@ window.SHIN2_CRM_APP_INIT = function(){
       setTimeout(openNow, 260);
     };
 
+    mapPerfMark('marker build start');
     renderMapLayer(applyMapFilters(allEntries));
+    mapPerfMark('marker build done');
+    mapPerfMark('marker render done');
     // §동기화 규칙: 변경/신규 주소만 지오코딩 — 끝나면 마커·정보 패널을 최신 좌표로
     // 다시 그린다(팝업이 그새 닫혔으면 아무것도 안 함).
     syncGeocodeForEntries(allEntries, kakao).then((changed)=>{
@@ -28149,6 +28218,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 동안 사용자가 아파트 탭으로 넘어갔으면 이 콜백이 늦게 도착해서 지금은 아파트
       // 탭 것인 #mapModalInfoCol에 회사용 패널을 덮어쓸 수 있었다. mapActiveTab도 함께 확인.
       if(!changed || !mapModalOpen || mapActiveTab !== 'company') return;
+      invalidateMapCompaniesCache(); // §MAP-PERF 캐시 무효화 지점 3 — 지오코딩이 D.updateCompany로 좌표를 직접 갱신한 직후
       const fresh = buildMapCompanies();
       renderMapLayer(applyMapFilters(fresh));
       renderMapInfoPanel(fresh);
