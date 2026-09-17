@@ -4949,10 +4949,27 @@ window.SHIN2_CRM_OCR = (function(){
       // 원래의 공유 키로 되돌렸다).
       const DOC_SYNC_STORAGE_KEY = 'shin2-customer-documents-v1';
       function docSyncLocalRevKey(){ return 'shin2-sync-rev-' + DOC_SYNC_STORAGE_KEY; }
+      function setDocsMemory(data, preserveLocalOnly){
+        if(!Array.isArray(data)) return;
+        const next = data.slice();
+        if(preserveLocalOnly){
+          try{
+            const raw = localStorage.getItem(DOC_SYNC_STORAGE_KEY);
+            const local = raw ? JSON.parse(raw) : [];
+            const ids = new Set(next.map(item=> item && item.id).filter(Boolean));
+            if(Array.isArray(local)) local.forEach(item=>{
+              if(item && item.localOnly === true && item.id && !ids.has(item.id)) next.push(item);
+            });
+          }catch(e){}
+        }
+        window.SHIN2_CRM_DOCS_MEMORY = next;
+        window.SHIN2_CRM_DOCS_MEMORY_REV = (window.SHIN2_CRM_DOCS_MEMORY_REV || 0) + 1;
+      }
       let docsSyncStarted = false;
       let docsPushTimer = null;
       function pushDocsToCloud(data){
         if(!currentUid) return;
+        setDocsMemory(data, false);
         const rev = Date.now();
         try{ localStorage.setItem(docSyncLocalRevKey(), String(rev)); }catch(e){}
         clearTimeout(docsPushTimer);
@@ -4966,6 +4983,7 @@ window.SHIN2_CRM_OCR = (function(){
       // 변형을 추가한다(§로그인 단일화 라운드의 pushSharedKeyToCloudAsync와 같은 패턴).
       function pushDocsToCloudAsync(data){
         if(!currentUid) return Promise.reject(new Error('로그인이 필요합니다.'));
+        setDocsMemory(data, false);
         const rev = Date.now();
         try{ localStorage.setItem(docSyncLocalRevKey(), String(rev)); }catch(e){}
         clearTimeout(docsPushTimer);
@@ -4986,7 +5004,12 @@ window.SHIN2_CRM_OCR = (function(){
           // 이 기기에서 이미 낙관적으로 localStorage에 반영한 저장의 확인 스냅샷은 같은
           // localRev로 돌아온다. 데이터가 이미 같으므로 전체 documents 배열을 다시
           // stringify하고 서류 목록 7종을 다시 그리는 이벤트를 발생시키지 않는다.
-          if(localRev && snapRev === localRev) return;
+          // 새로고침 직후 localRev만 남고 DOC_SYNC_STORAGE_KEY 본문은 용량 초과로 이전
+          // 상태일 수 있다. 메모리 미러가 실제로 준비된 현재 페이지에서만 동등 rev를 생략한다.
+          if(localRev && snapRev === localRev && Array.isArray(window.SHIN2_CRM_DOCS_MEMORY)) return;
+          // localStorage가 용량 초과여도 Firestore의 최신 메타데이터는 메모리 미러에서
+          // 즉시 읽을 수 있게 한다. 기존 로컬 전용 파일 메타데이터는 함께 보존한다.
+          setDocsMemory(payload.value, true);
           try{ localStorage.setItem(DOC_SYNC_STORAGE_KEY, JSON.stringify(payload.value)); }catch(e){}
           window.dispatchEvent(new CustomEvent('shin2-crm-docs-cloud-update'));
         }, (err)=> console.warn('[CRM/Firebase] 서류함 메타데이터 구독 실패', err));
@@ -4994,6 +5017,9 @@ window.SHIN2_CRM_OCR = (function(){
       window.SHIN2_CRM_DOCS_SYNC = {
         push: (data)=> pushDocsToCloud(data),
         pushAsync: (data)=> pushDocsToCloudAsync(data),
+        setMemory: (data)=> setDocsMemory(data, false),
+        getMemory: ()=> Array.isArray(window.SHIN2_CRM_DOCS_MEMORY) ? window.SHIN2_CRM_DOCS_MEMORY.slice() : null,
+        getMemoryRev: ()=> window.SHIN2_CRM_DOCS_MEMORY_REV || 0,
         isReady: ()=> docsSyncStarted
       };
 
@@ -5959,7 +5985,11 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     }
     try{ localStorage.setItem(key, JSON.stringify(arr)); }
     catch(e){
-      storageProblem('저장 공간이 가득 찼거나 저장이 거부되었습니다(' + key + ')', e);
+      if(opts.cloudFallback){
+        console.warn('[CRM/서류함] 로컬 메타데이터 미러 저장 실패 — Firestore 직접 저장으로 계속합니다.', e);
+      }else{
+        storageProblem('저장 공간이 가득 찼거나 저장이 거부되었습니다(' + key + ')', e);
+      }
       return false;
     }
     // §race 차단: 지금까지 localRev는 클라우드 push 경로 안에서만 기록됐다. 그래서 로그인
@@ -6519,7 +6549,11 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   }
 
   // ---- customerDocuments (메타데이터만 — 바이너리는 별도 로컬 전용 blob 저장소) ----
-  function loadDocuments(){ return readArr(DOC_KEY); }
+  function loadDocuments(){
+    const S = window.SHIN2_CRM_DOCS_SYNC;
+    const memory = S && S.getMemory ? S.getMemory() : null;
+    return Array.isArray(memory) ? memory : readArr(DOC_KEY);
+  }
   // saveDocuments: 로컬에 쓴 직후, 이미 실시간 동기화가 켜진 기기라면(§ 위 firebase 블록의
   // SHIN2_CRM_DOCS_SYNC — v2에서 [클라우드 동기화 시작]을 이미 눌러둔 기기만) 같은 배열을
   // 그대로 클라우드에도 밀어준다 — v2 탭이 열려있어야만 동작하던 기존 "storage 이벤트
@@ -6527,11 +6561,18 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   // 공용전환)에서 항상 직접 동기화된다.
   function saveDocuments(list, opts){
     opts = opts || {};
-    // 로컬 저장이 막히거나 실패했으면 클라우드로도 내보내지 않는다 — 로컬과 클라우드가
-    // 어긋난 상태(로컬은 옛 값, 클라우드는 새 값)를 만드는 것이 유실을 키웠다.
-    if(!writeArr(DOC_KEY, list, opts)) return false;
+    const S = window.SHIN2_CRM_DOCS_SYNC;
+    const ST = window.SHIN2_STORAGE;
+    const cloudReady = !!(S && S.push && S.setMemory && ST && ST.isSignedIn && ST.isSignedIn());
+    // 신규 파일 원본은 이미 Storage에 올라간 상태다. DOC_KEY localStorage 미러가 용량
+    // 초과여도 기존 값을 지우지 않고, 같은 전체 메타데이터 배열을 메모리에 유지한 뒤
+    // Firestore로 직접 보낸다. 클라우드 로그인이 없을 때만 기존 보호 동작대로 실패한다.
+    const writeOpts = Object.assign({}, opts, { cloudFallback: cloudReady });
+    const localSaved = writeArr(DOC_KEY, list, writeOpts);
+    if(!localSaved && !cloudReady) return false;
+    if(S && S.setMemory) S.setMemory(list);
     if(!opts.skipCloudPush){
-      try{ if(window.SHIN2_CRM_DOCS_SYNC && window.SHIN2_CRM_DOCS_SYNC.push) window.SHIN2_CRM_DOCS_SYNC.push(list); }catch(e){}
+      try{ if(S && S.push) S.push(list); }catch(e){}
     }
     return true;
   }
@@ -6550,7 +6591,10 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   let documentsIndexCache = { raw: undefined, map: null };
   function buildDocumentsIndex(){
     const raw = localStorage.getItem(DOC_KEY);
-    if(raw === documentsIndexCache.raw && documentsIndexCache.map) return documentsIndexCache.map;
+    const S = window.SHIN2_CRM_DOCS_SYNC;
+    const memoryRev = S && S.getMemoryRev ? S.getMemoryRev() : 0;
+    const cacheKey = raw + '\n#memory-rev:' + memoryRev;
+    if(cacheKey === documentsIndexCache.raw && documentsIndexCache.map) return documentsIndexCache.map;
     const map = new Map();
     loadDocuments().forEach(d=>{
       const k = String(d.companyId);
@@ -6558,7 +6602,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
       map.get(k).push(d);
     });
     map.forEach(list=> list.sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt)));
-    documentsIndexCache = { raw, map };
+    documentsIndexCache = { raw:cacheKey, map };
     return map;
   }
   function findDocument(id){ return loadDocuments().find(d=> d.id === id) || null; }
@@ -6876,8 +6920,8 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   // (경로에 assetKind가 안 들어가므로 attachmentDoc/video와 같은 폴더를 쓰지만 id가
   // 서로 달라 섞이지 않는다). 이메일 본문에 바로 박히는 이미지라 5MB로 더 빡빡하게
   // 잡았다 — 메일 서비스 대부분이 전체 메일 용량을 25MB 안팎으로 제한하기 때문.
-  const MAIL_ASSET_MAX_CLOUD_BYTES = { attachmentDoc: DOC_MAX_CLOUD_BYTES, video: 100 * 1024 * 1024, inlineImage: 5 * 1024 * 1024 };
-  const MAIL_ASSET_ALLOWED_EXT = { attachmentDoc: DOC_ALLOWED_EXT, video: ['mp4','mov','webm','m4v'], inlineImage: ['jpg','jpeg','png','gif','webp'] };
+  const MAIL_ASSET_MAX_CLOUD_BYTES = { attachmentDoc: CUSTOMER_DOC_MAX_BYTES, video: 100 * 1024 * 1024, inlineImage: CUSTOMER_DOC_MAX_BYTES };
+  const MAIL_ASSET_ALLOWED_EXT = { attachmentDoc: CUSTOMER_DOC_ALLOWED_EXT, video: ['mp4','mov','webm','m4v'], inlineImage: ['jpg','jpeg','png','gif','webp'] };
   function isAllowedMailAssetFile(assetKind, file){
     const name = String((file && file.name) || '').toLowerCase();
     const dot = name.lastIndexOf('.');
@@ -6982,7 +7026,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
       const path = `users/${uid}/mailCommonAssets/${templateKey}/${id}/${safeFileName}`;
       return ST.uploadFile(file, path, onProgress).then(res=> ({
         id, fileName: file.name, mimeType: file.type||'', size: file.size||0,
-        storagePath: res.storagePath, uploadedAt: nowIso(), uploadedBy: currentUserLabel()
+        storagePath: res.storagePath, downloadURL: res.downloadURL || '', uploadedAt: nowIso(), uploadedBy: currentUserLabel()
       })).catch(err=>{
         throw Object.assign(err, { diag: { signedIn:true, hasUid:true, path } });
       });
@@ -17794,7 +17838,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="mail-asset-progress" id="mailAssetProgress_${key}" style="display:none;"></div>
       <div class="mail-asset-status" id="mailAssetStatus_${key}"></div>
       <div class="mail-diag-panel" id="mailAssetDiag_${key}" style="display:none;"></div>
-      <div class="mail-settings-help mail-asset-limit-line" title="${esc(limitTitle)}">허용 형식: PDF · 이미지 · 문서 · 동영상 / 등록된 파일만 실제 메일에 첨부됩니다.</div>`;
+      <div class="mail-settings-help mail-asset-limit-line" title="${esc(limitTitle)}">허용 형식: PDF · 이미지 · 동영상 / 등록된 파일만 실제 메일에 첨부됩니다.</div>`;
   }
   function mailTabPanelHtml(key, tpl, asset, meta){
     // §첨부자료 UI 단순화 라운드(신규) — 사용자 확정 지시: 오른쪽의 "서류함 종류(선택)"
@@ -18097,14 +18141,19 @@ window.SHIN2_CRM_APP_INIT = function(){
       return;
     }
     if(statusEl){ statusEl.textContent = ''; statusEl.classList.remove('is-err'); }
-    if(progEl){ progEl.style.display = 'block'; progEl.textContent = '업로드 중… 0%'; }
+    if(progEl){ progEl.style.display = 'block'; progEl.textContent = '업로드 준비 중...'; }
     D.uploadMailAssetFile(key, assetKind, file, (pct)=>{ if(progEl) progEl.textContent = `업로드 중… ${pct}%`; })
       .then(async rec=>{
+        if(progEl) progEl.textContent = '파일 저장 완료 · 정보 동기화 중...';
         D.saveMailAssetPatch(key, { [assetKind]: rec });
         const r = await confirmCloudSave('mailAssets');
-        if(progEl) progEl.style.display = 'none';
-        if(!r.ok && statusEl){ statusEl.textContent = '파일은 업로드됐지만 저장 확인에 실패했습니다: ' + cloudSaveErrorMessage(r.err); statusEl.classList.add('is-err'); }
-        refreshMailTabPanel(key);
+        if(!r.ok){
+          if(progEl) progEl.style.display = 'none';
+          if(statusEl){ statusEl.textContent = '업로드 실패 · 다시 시도 — ' + cloudSaveErrorMessage(r.err); statusEl.classList.add('is-err'); }
+          return;
+        }
+        if(progEl) progEl.textContent = '등록됨';
+        setTimeout(()=> refreshMailTabPanel(key), 700);
       })
       .catch(err=>{
         if(progEl) progEl.style.display = 'none';
@@ -20516,13 +20565,18 @@ window.SHIN2_CRM_APP_INIT = function(){
         await D.addDocument(companyId, 'questionnaire', file, pct=>{
           setUploadLabel('업로드 중... ' + pct + '%');
         });
+        setUploadLabel('파일 저장 완료 · 정보 동기화 중...');
         // Storage 업로드 뒤 Firestore 메타데이터 저장을 확인한다. 확인 Promise에는 15초
         // 제한이 있어 Firestore가 늦어도 UI가 무한 대기하지 않는다.
         console.info(`[QUESTIONNAIRE-UPLOAD] file complete: ${Math.round(performance.now() - uploadStarted)}ms`);
         const r = await confirmDocsCloudSave();
-        if(r.ok) console.info(`[QUESTIONNAIRE-UPLOAD] metadata complete: ${Math.round(performance.now() - uploadStarted)}ms`);
+        if(r.ok){
+          setUploadLabel('등록됨');
+          console.info(`[QUESTIONNAIRE-UPLOAD] metadata complete: ${Math.round(performance.now() - uploadStarted)}ms`);
+        }
         else{
           console.warn('[QUESTIONNAIRE-UPLOAD] metadata failed');
+          setUploadLabel('업로드 실패 · 다시 시도');
           alert('질문서 정보 저장 확인에 실패했습니다(파일은 등록됨) — ' + cloudSaveErrorMessage(r.err));
         }
         renderAgreementPopupBody(companyId);
@@ -26900,12 +26954,13 @@ window.SHIN2_CRM_APP_INIT = function(){
       // §요청 3 "서류 메타데이터"도 Firestore 저장 확인 대상 — 파일(Storage) 업로드는
       // 이미 끝났으니 메타데이터 저장만 한 번 더 확인한다. 실패해도 파일과 로컬
       // 메타데이터는 이미 있어 사라지지 않는다 — "완료" 대신 확인 실패를 알린다.
+      if(label) label.textContent = multiPrefix + '파일 저장 완료 · 정보 동기화 중...';
       const cloudR = await confirmDocsCloudSave();
       if(!cloudR.ok){
-        if(statusEl){ statusEl.style.display = 'block'; statusEl.innerHTML = `<div class="doc-upload-err">파일은 저장됐지만 서류 정보 저장 확인에 실패했습니다: ${esc(cloudSaveErrorMessage(cloudR.err))}</div>`; }
+        if(statusEl){ statusEl.style.display = 'block'; statusEl.innerHTML = `<div class="doc-upload-err">업로드 실패 · 다시 시도 — ${esc(cloudSaveErrorMessage(cloudR.err))}</div>`; }
       } else if(statusEl){
-        // §8: 성공은 잠깐 "업로드 완료"로 보여준 뒤 상태 표시를 닫는다.
-        if(bar) bar.style.width='100%'; if(label) label.textContent = multiPrefix + '업로드 완료'; setTimeout(()=>{ statusEl.style.display = 'none'; statusEl.innerHTML = ''; }, 700);
+        // §8: 성공은 잠깐 "등록됨"으로 보여준 뒤 상태 표시를 닫는다.
+        if(bar) bar.style.width='100%'; if(label) label.textContent = multiPrefix + '등록됨'; setTimeout(()=>{ statusEl.style.display = 'none'; statusEl.innerHTML = ''; }, 700);
       }
       renderDocList(co, type);
       renderDocCounts(co);
