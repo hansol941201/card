@@ -816,12 +816,10 @@
      시작 위치가 동일하다(§4 "정렬 통일"). 첫 줄(연도·공종)/둘째 줄(현장명) 2줄 고정, 첫
      줄은 진한 텍스트·둘째 줄은 연한 회색(§4). */
   .col-pour{ flex:0 0 150px; min-width:0; font-size:12px; }
-  /* §B 총 실적 박스 분리 라운드(신규) — 진단 보고서 B: "132 2026·슬라브"처럼 총 실적
-     숫자(파란색)가 연도/공종 텍스트와 한 줄에 붙어 헷갈리던 문제. .lastpour-cell을
-     세로 1열 텍스트에서 가로 flex(박스 + 상세)로 바꾼다. 계산값(yr/latestPourRec)·
-     클릭 핸들러(data-pour-detail)는 전혀 안 건드리고 마크업 구조와 스타일만 바꾼다. */
+  /* §총 실적 문구 제거 라운드 — 숫자와 최근 실적을 구분하는 가로 구조는 유지하되,
+     작은 박스에는 건수만 남긴다. 계산값(yr/latestPourRec)·클릭 핸들러는 그대로다. */
   .lastpour-cell{
-    display:flex; flex-direction:row; align-items:center; gap:14px; min-width:0; max-width:100%; text-align:left;
+    display:flex; flex-direction:row; align-items:center; gap:10px; min-width:0; max-width:100%; text-align:left;
     background:none; border:none; padding:0; cursor:pointer; font-family:inherit; width:100%;
   }
   .lastpour-cell.lastpour-empty{ cursor:default; }
@@ -829,13 +827,12 @@
   .lastpour-cell .lastpour-main{ font-weight:700; color:var(--text); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .lastpour-cell:hover:not(.lastpour-empty) .lastpour-main{ text-decoration:underline; }
   .lastpour-cell .lastpour-site{ color:var(--text-faint); font-weight:400; font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  /* 총 실적 박스 — width~76px, 옅은 파란 배경/테두리, 상단 라벨(작게)+하단 숫자(굵고 크게, 파랑). */
+  /* 실적 건수 박스 — 라벨을 없앤 뒤 남는 위쪽 여백 없이 숫자를 중앙 정렬한다. */
   .lastpour-total-box{
-    flex:0 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    width:76px; min-width:76px; padding:6px 4px; border-radius:7px;
-    border:1px solid #C7DBFA; background:#F1F6FF; line-height:1.25;
+    flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center;
+    width:62px; min-width:62px; min-height:34px; padding:4px 6px; border-radius:7px;
+    border:1px solid #C7DBFA; background:#F1F6FF; line-height:1;
   }
-  .lastpour-total-label{ font-size:10.5px; font-weight:600; color:var(--navy); }
   .lastpour-total-num{ font-size:17px; font-weight:800; color:var(--blue); }
   .col-stage{ flex:0 0 112px; font-size:12px; white-space:nowrap; } /* 더 이상 목록에 렌더링하지 않지만 클래스는 남겨둔다 */
   /* "최근 요청" 컬럼 — 첫 줄(작은 날짜)/둘째 줄(요청 내용), §10. */
@@ -3639,15 +3636,12 @@ table.pdf-doc-table thead{ background:var(--bg); }
    보이는 게 원인이었다(§요청 "매출/흐름 정보가 오른쪽으로 몰려 보임"). 열 순서·개수·
    min-width·내용은 그대로 두고, 성장 비율(fr)만 최근 실적(1.4→0.8)에서 줄여 매출
    (1→1.25)·흐름(1.1→1.3) 쪽으로 재배분 — 결과적으로 매출 열이 왼쪽으로 당겨진다. */
-/* §B/C 총 실적 박스 도입 후 컬럼 재점검 라운드(신규) — "최근 실적" 셀 내부에 고정폭
-   총 실적 박스(76px)+gap(14px)가 새로 들어가서(§B), 기존 min-width 175px로는 상세
-   텍스트가 너무 좁게 눌렸다(§C-2/C-3 "안 잘림/충분한 폭"). 이 열 min-width만 205px로
-   올리고, 그만큼의 fr 비중은 낮춰(0.8→0.72) "총 매출·2026 매출" 열의 min-width·fr을
-   올려(150→160px, 1.25→1.35) 왼쪽으로 당긴다(§C-1). 열 순서·개수·다른 열 내용은
-   그대로. */
+/* §업체 목록 오른쪽 열 재배치 라운드 — 헤더와 행의 DOM 순서를 함께
+   협력사/최근 실적/총 매출·2026 매출/최근 요청/최근 흐름·실적↔매출로 맞췄다.
+   단일 grid-template-columns를 공유하므로 헤더와 모든 행의 시작점이 정확히 같다. */
 .co-table-head, .co-row{
-  grid-template-columns: minmax(220px,1.2fr) minmax(140px,0.85fr) minmax(205px,0.72fr) minmax(160px,1.35fr) minmax(180px,1.28fr) !important;
-  gap:10px !important;
+  grid-template-columns: minmax(220px,1.15fr) minmax(240px,1.3fr) minmax(180px,1fr) minmax(150px,0.8fr) minmax(180px,1fr) !important;
+  gap:12px !important;
 }
 /* 협력사(업체명) 열 — 이 화면에서 가장 중요한 정보이므로 가장 크고 진하게(§요청). */
 .co-row .col-name, .co-row .co-name-text{ font-size:14px!important; font-weight:700!important; }
@@ -3672,20 +3666,23 @@ table.pdf-doc-table thead{ background:var(--bg); }
    비율로 맞추고, 더 이상 가로 스크롤이 필요 없으므로 min-width 강제와 overflow-x:auto도
    함께 정리한다(§요청 "가로 스크롤 없어져야"). */
 @media(max-width:1180px){
-  .co-table-head, .co-row{ grid-template-columns: minmax(190px,1.4fr) 120px 200px 130px 170px !important; }
+  .co-table-head, .co-row{ grid-template-columns: minmax(190px,1.2fr) 220px 160px 130px 160px !important; gap:10px!important; }
   .co-table-head, .co-list{ min-width:0 !important; }
   #listView{ overflow-x:visible !important; }
 }
 @media(max-width:1100px){
-  .co-table-head, .co-row{ grid-template-columns: minmax(170px,1.3fr) 105px 176px 118px 150px !important; }
+  .co-table-head, .co-row{ grid-template-columns: minmax(170px,1.2fr) 190px 145px 115px 140px !important; }
   .co-table-head, .co-list{ min-width:0 !important; }
 }
 @media(max-width:760px){
-  .co-table-head, .co-row{ grid-template-columns: minmax(70px,1fr) 42px 74px 58px 52px !important; gap:5px !important; }
+  .co-table-head, .co-row{ grid-template-columns: minmax(70px,1fr) 90px 58px 48px 52px !important; gap:5px !important; }
   .co-table-head, .co-list{ min-width:0 !important; }
   .col-name, .col-request, .col-pour, .col-revenue-combo, .col-contrib-trend{ min-width:0!important; overflow:hidden!important; }
   .col-revenue-combo, .col-contrib-trend{ font-size:9.5px!important; }
   .co-row .col-name, .co-row .co-name-text{ font-size:11.5px!important; }
+  .lastpour-cell{ gap:4px; }
+  .lastpour-total-box{ width:38px; min-width:38px; min-height:28px; padding:3px; }
+  .lastpour-total-num{ font-size:11px; }
   .co-row .col-yr, .co-row .yr-cell-btn{ font-size:11px!important; }
   .co-table-head{ font-size:9px!important; }
   .co-table-head .col-name{ font-size:9.5px!important; }
@@ -3950,7 +3947,6 @@ table.pdf-doc-table thead{ background:var(--bg); }
          실적/최근 요청/총 매출/2026 매출/실적↔매출/최근 흐름/단계 진행상황/다음 행동. -->
     <div class="co-table-head" id="crmCoTableHead">
       <div class="col-name">협력사</div>
-      <div class="col-request">최근 요청</div>
       <div class="col-pour">최근 실적</div>
       <!-- §고객 성향 컬럼 라운드 — "최근 요청" 컬럼을 "고객 성향"으로 교체(§1). 최근 요청
            데이터/계산(requestHistoryIndex 등)과 고객카드의 최근 요청/메모 기능은 전혀 안
@@ -3964,6 +3960,7 @@ table.pdf-doc-table thead{ background:var(--bg); }
            없앤다(계산/클릭 핸들러는 전혀 안 바꿈 — 기존 버튼을 새 wrapper div 안으로
            옮기기만 했다). -->
       <div class="col-revenue-combo col-total-revenue-head" id="totalRevenueSortHeader">총 매출 · 2026 매출 <span class="total-revenue-sort-arrow" id="totalRevenueSortArrow"></span></div>
+      <div class="col-request">최근 요청</div>
       <div class="col-contrib-trend" title="실적 1건당 평균 매출을 전체 업체와 비교한 상대 순위(하위 30%=낮음·중간 40%=보통·상위 30%=높음)와 POUR 시공실적 건수의 전년 대비 증감(작년 vs 재작년, ±10% 기준)을 함께 보여줍니다. 클릭하면 각 근거를 볼 수 있습니다.">최근 흐름 · 실적↔매출</div>
       <!-- §단계 진행상황 이전 라운드: "단계 진행상황"(4단계 stepper) 컬럼을 목록 화면에서
            뺐다(요청 "정보를 지우는 게 아니라 창에서 안 보이게, 업무관리 창으로 이전"—
@@ -11521,11 +11518,9 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 클릭하던 곳(data-pour-detail/data-yr-detail)이 이미 완전히 같은 openConstruction
       // Modal(co, null) 호출이었으므로(§확인) 버튼 하나로 합쳐도 동작 차이가 없다 — 계산
       // (pourLatestIndex/getTotalPourCountForCompany)은 그대로, 표시만 합친다.
-      // §B 총 실적 박스 분리 라운드(신규) — "132 2026·슬라브"처럼 붙어 있던 총 실적
-      // 숫자를 별도 박스(.lastpour-total-box)로, 연도·공종·현장명은 옆의 상세
-      // 영역(.lastpour-detail)으로 완전히 분리한다. yr(getTotalPourCountForCompany)·
-      // latestPourRec(pourLatestIndex) 계산값은 그대로, HTML 구조만 바꾼다.
-      const totalBoxHtml = yr == null ? '' : `<span class="lastpour-total-box"><span class="lastpour-total-label">총 실적</span><span class="lastpour-total-num">${esc(yr)}건</span></span>`;
+      // §총 실적 문구 제거 라운드 — 박스 안에는 기존 계산값(yr)에 단위만 붙여 표시한다.
+      // 최근 실적/총 실적 계산과 data-pour-detail 클릭 동작은 전혀 바꾸지 않는다.
+      const totalBoxHtml = yr == null ? '' : `<span class="lastpour-total-box"><span class="lastpour-total-num">${esc(yr)}건</span></span>`;
       const lastActHtml = latestPourRec
         ? `<button type="button" class="lastpour-cell" data-pour-detail="${esc(co.id)}" title="${esc(latestPourRec.year)}${latestPourCats[0] ? ' · ' + latestPourCats[0] : ''}${latestPourRec.client ? ' · ' + latestPourRec.client : ''}${yr != null ? ' · 총 실적 ' + yr + '건' : ''}">
             ${totalBoxHtml}<span class="lastpour-detail"><span class="lastpour-main">${esc(latestPourRec.year)}${latestPourCats[0] ? ' · ' + esc(latestPourCats[0]) : ''}</span>${latestPourRec.client ? `<span class="lastpour-site">${esc(latestPourRec.client)}</span>` : ''}</span>
@@ -11683,7 +11678,6 @@ window.SHIN2_CRM_APP_INIT = function(){
           </div>
           ${formerNameSubtextHtml(co)}
         </div>
-        <div class="col-request">${nameRequestCellHtml}</div>
         <div class="col-pour">${lastActHtml}</div>
         <!-- §P1-1 목록 열 재구성 라운드(신규): "고객 성향" 열(col-insight)은 화면에서만
              뺀다 — insightHtml 변수 계산과 고객카드 쪽 인사이트 표시는 그대로다. -->
@@ -11691,6 +11685,7 @@ window.SHIN2_CRM_APP_INIT = function(){
           <div class="revenue-combo-line revenue-combo-total">${totalRevenueHtml}</div>
           <div class="revenue-combo-line revenue-combo-yr"><span class="revenue-combo-yr-label">2026년</span>${yrRevenueHtml}</div>
         </div>
+        <div class="col-request">${nameRequestCellHtml}</div>
         <!-- §최근 흐름·실적↔매출 겹침 수정 라운드(신규) — 한 줄 flex(트렌드·기여 라벨·
              값)로 욱여넣었더니 칸 폭이 좁을 때 "기여" 라벨이 줄바꿈되며 값과 겹쳐 보였다
              (§요청 "서로 너무 엉겨있어"). "총 매출·2026 매출" 칸과 같은 2줄 세로 배치로
