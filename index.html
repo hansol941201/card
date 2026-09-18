@@ -10993,7 +10993,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   // (리스트 등재 co.partnerStatus==='partner' OR MOU 단계 done) 그대로다. 새 판정 로직
   // 없음 — 이미 있는 isConfirmedPartner를 그대로 재사용한다.
   const FILTER_DEFS = [
-    ['all','전체'], ['agreementInProgress','협약 진행'], ['mouDone','MOU체결'], ['newPartner','신규 협약사'], ['agreementTerminated','협약 종료'], ['subsidiary','이전 상호'], ['trendUp','최근흐름 상승세']
+    ['all','전체'], ['agreementInProgress','협약 진행'], ['mouDone','MOU체결'], ['newPartner','신규 협약사'], ['agreementTerminated','협약 종료'], ['subsidiary','이전 상호'], ['trendUp','최근흐름 상승세'], ['nonPartnerRevenue','실적있음·MOU미체결']
   ];
   // §업체 삭제(휴지통) 라운드(신규) — "삭제된 업체" 탭은 위 FILTER_DEFS와 별도로 둔다.
   // 이유: filterCounts[key]는 companies(=D.loadActiveCompanies(), 삭제된 업체가 이미
@@ -11428,7 +11428,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 시각적으로만 구분한다: 상태 필터(칩 모양 유지)/분석(텍스트 링크)/정리(텍스트 링크,
   // 처리 대기 있으면 빨간 점).
   const FILTER_GROUP_STATE = ['all','agreementInProgress','mouDone','agreementTerminated'];
-  const FILTER_GROUP_ANALYSIS = ['newPartner','trendUp','l2l3Manage'];
+  const FILTER_GROUP_ANALYSIS = ['newPartner','trendUp','l2l3Manage','nonPartnerRevenue'];
   // §삭제 업체 휴지통 분리 라운드(신규) — "삭제된 업체"만 정리 팝오버에서 빼서 별도
   // 휴지통 아이콘 버튼으로 뺀다(§요청 "삭제 업체는 따로 빼서 휴지통 아이콘으로"). 나머지
   // 두 항목(이전 상호/건바이건 업체)은 그대로 팝오버 "정리" 그룹에 남긴다.
@@ -11739,7 +11739,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 엘리먼트)는 "삭제된 업체"/"신규 협약사" 탭처럼 그 7컬럼 표를 아예 안 쓰는 화면에서는
     // 지금까지도 계속 보이고 있었다(다른 화면 구조/컬럼은 전혀 안 바꿈, 표시 여부만 토글).
     const coTableHeadEl = document.getElementById('crmCoTableHead');
-    if(coTableHeadEl) coTableHeadEl.hidden = (filterKey === 'deleted' || filterKey === 'willpower' || filterKey === 'newPartner' || filterKey === 'l2l3Manage' || filterKey === 'caseByCase');
+    if(coTableHeadEl) coTableHeadEl.hidden = (filterKey === 'deleted' || filterKey === 'willpower' || filterKey === 'newPartner' || filterKey === 'l2l3Manage' || filterKey === 'caseByCase' || filterKey === 'nonPartnerRevenue');
     const companies = D.loadActiveCompanies(); // §업체 삭제(휴지통) 라운드 — 소프트 삭제된 업체를 일반 목록/신규 협약사/협약 진행/MOU체결 탭에서 뺀다(§요청 10)
     const unregisteredClassification = D.classifyUnregisteredCompaniesByMouMaster(D.buildUnregisteredCompanies2026());
     // 기존 건바이건 컬렉션과 엑셀 분류 결과에 같은 업체가 있으면 한 번만 표시한다.
@@ -11889,6 +11889,14 @@ window.SHIN2_CRM_APP_INIT = function(){
     // enriched를 넘길 필요가 없다.
     if(filterKey === 'caseByCase'){
       renderCaseByCaseTab(classifiedCaseByCaseRows);
+      return;
+    }
+    // §실적있음·MOU미체결 탭 라운드(신규) — 위 특수 탭들과 같은 이유로 무거운 7컬럼
+    // 목록 템플릿을 타지 않고 전용 화면(renderNonPartnerRevenueTab)으로 갈아탄다.
+    // 판정 기준(matchesFilter의 'nonPartnerRevenue' 키)은 §요청 이전부터 이미 있던
+    // 로직을 그대로 재사용한다 — 여기서는 그 결과를 탭으로 노출만 한다.
+    if(filterKey === 'nonPartnerRevenue'){
+      renderNonPartnerRevenueTab(enriched);
       return;
     }
 
@@ -13584,6 +13592,98 @@ window.SHIN2_CRM_APP_INIT = function(){
       const id = btn.getAttribute('data-willpower-remind');
       const mailType = btn.getAttribute('data-mail-type');
       openMailComposeModal(id, mailType);
+    }));
+  }
+
+  /* ==========================================================================
+     §실적있음·MOU미체결 탭 라운드(신규) — 매출/시공실적은 있지만 아직 MOU가 체결되지
+     않은 업체(matchesFilter의 기존 'nonPartnerRevenue' 판정 그대로 재사용, 새 판정
+     로직 아님)를 모아 보여주고, [MOU 체결] 버튼으로 그 자리에서 바로 업체코드 발급 +
+     MOU 단계 완료 처리까지 한 번에 끝낼 수 있게 한다. "삭제된 업체"/"의지박약" 탭과
+     같은 이유로 전용 화면으로 갈아탄다(무거운 7컬럼 목록 템플릿 대신 단순 표).
+     ========================================================================== */
+  // handleConfirmMouFromNonPartnerTab: 확인 팝업 1번(§요청) 거친 뒤,
+  //  1) co.code가 아직 없으면 genCompanyCode()로 B2B 코드 자동 발급(신규 업체 등록과
+  //     동일한 함수 재사용, 저장 직전 중복 재검증도 그대로 적용)
+  //  2) saveStageCorrection으로 MOU 단계를 오늘 날짜로 "완료" 정정 — 원본 co.partnerDashboard.
+  //     newMou는 건드리지 않는 안전한 레이어라 나중에 되돌릴 수 있고 변경 이력도 남는다
+  //     (§위 협약 진행단계 수정·완료 취소 라운드와 완전히 같은 함수 재사용).
+  // 두 변경 모두 성공하면 업체가 isConfirmedPartner==true가 되어 다음 렌더부터 자동으로
+  // "MOU체결" 탭으로 옮겨가고 이 탭에서는 사라진다(기존 판정 로직 그대로 반영, 별도 이동
+  // 처리를 직접 하지 않는다).
+  function handleConfirmMouFromNonPartnerTab(companyId){
+    const co = D.findCompany(companyId);
+    if(!co) return;
+    if(!confirm(`"${co.name}"을(를) MOU 체결 처리하시겠습니까?\n오늘 날짜로 기록되며, 업체코드가 없으면 자동으로 발급됩니다.\n(나중에 실수로 처리한 경우, 협약 진행단계 수정에서 되돌릴 수 있습니다)`)) return;
+    let latest = D.findCompany(companyId);
+    if(!latest) return;
+    if(!latest.code){
+      const companies = D.loadCompanies();
+      let code = genCompanyCode(companies);
+      // §업체코드 중복발급 방지 라운드와 동일한 저장 직전 재검증(§27399 근처) — 동시에
+      // 다른 기기에서도 발급했을 드문 경우까지 대비해 한 번 더 확인 후 필요하면 다음 번호로.
+      if(findCompanyByCodeExcept(code, D.loadCompanies(), companyId)){
+        code = genCompanyCode(D.loadCompanies());
+      }
+      D.updateCompany(companyId, { code });
+      latest = D.findCompany(companyId);
+    }
+    // isConfirmedPartner는 co.partnerStatus==='partner'를 progress.hasAny와 무관하게 즉시
+    // "확정 협력사"로 인정한다(위 §협력업체 리스트 등재 기준 재정정 라운드, partner-dashboard
+    // 리스트 동기화가 쓰는 것과 같은 필드). 이 탭의 업체는 질문서/미팅 등 기존 MOU 파이프라인
+    // 신호가 아예 없는 경우(매출/실적만 있는 시공사)가 많아 progress.hasAny가 false일 수
+    // 있으므로, stageCorrection(진행바 표시용)만으로는 MOU체결로 안 옮겨갈 수 있다 — 그래서
+    // partnerStatus를 함께 세팅해 확실히 반영한다.
+    if(latest.partnerStatus !== 'partner') D.updateCompany(companyId, { partnerStatus: 'partner' });
+    saveStageCorrection(companyId, 'mou', { status:'done', dateText: fmtDate(new Date().toISOString()), owner: null },
+      { reason:'기타', reasonOther:'실적있음·MOU미체결 탭에서 MOU 체결 처리' });
+    renderList();
+  }
+  function renderNonPartnerRevenueTab(enriched){
+    renderPagination(0);
+    const rows = enriched.filter(r=> matchesFilter(r.co, r.progress, 'nonPartnerRevenue'))
+      .sort((a,b)=>{
+        const ra = D.getCompanyTotalRevenueAllYears(a.co); const rb = D.getCompanyTotalRevenueAllYears(b.co);
+        const va = (ra && !ra.ambiguous && typeof ra.total === 'number') ? ra.total : 0;
+        const vb = (rb && !rb.ambiguous && typeof rb.total === 'number') ? rb.total : 0;
+        return vb - va;
+      });
+    if(!rows.length){
+      listEl.innerHTML = '<div class="empty-note">매출/시공실적은 있지만 MOU가 아직 체결되지 않은 업체가 없습니다.</div>';
+      return;
+    }
+    listEl.innerHTML = `
+      <div class="willpower-tab">
+        <div class="willpower-section">
+          <div class="willpower-section-title">실적있음·MOU미체결 · ${rows.length}곳</div>
+          <div class="deleted-co-table">
+            <div class="deleted-co-head" style="grid-template-columns:1.4fr 1fr .9fr .9fr 1fr;">
+              <span>업체명</span><span>총 매출</span><span>총 실적</span><span>업체코드</span><span></span>
+            </div>
+            ${rows.map(r=>{
+              const co = r.co;
+              const revAll = D.getCompanyTotalRevenueAllYears(co);
+              const revenueHtml = (revAll && !revAll.ambiguous && typeof revAll.total === 'number')
+                ? esc(fmtKrwCompact(revAll.total)) : '<span class="data-none">매출자료 없음</span>';
+              return `
+              <div class="deleted-co-row" style="grid-template-columns:1.4fr 1fr .9fr .9fr 1fr;" data-nonpartner-open="${esc(co.id)}">
+                <span class="deleted-co-name">${esc(co.name || '(업체명 없음)')}</span>
+                <span>${revenueHtml}</span>
+                <span>${r.pourCount || 0}건</span>
+                <span>${co.code ? esc(co.code) : '<span class="data-none">미발급</span>'}</span>
+                <span class="deleted-co-actions"><button type="button" class="co-text-action" data-nonpartner-mou="${esc(co.id)}">MOU 체결</button></span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      </div>`;
+    listEl.querySelectorAll('[data-nonpartner-open]').forEach(row=> row.addEventListener('click', (e)=>{
+      if(e.target.closest('[data-nonpartner-mou]')) return;
+      openCard(row.getAttribute('data-nonpartner-open'));
+    }));
+    listEl.querySelectorAll('[data-nonpartner-mou]').forEach(btn=> btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      handleConfirmMouFromNonPartnerTab(btn.getAttribute('data-nonpartner-mou'));
     }));
   }
 
