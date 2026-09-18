@@ -2950,6 +2950,15 @@ body.map-modal-lock{ overflow:hidden; }
 #cdashMemoPreviewCard .cdash2-card{ min-height:0; padding:9px 12px; }
 #cdashMemoPreviewCard .cdash2-card-title{ margin-bottom:4px; }
 #cdashColLeft.cdash2-col-stack{ gap:8px; }
+/* §고객인사이트·상담메모·질문지요약 통합 라운드(신규) — 세 카드(#cdashInsightTagsCard/
+   #cdashMemoPreviewCard/#cdashQuestionnaireCard)를 하나의 테두리 안에 담는 wrapper
+   (#cdashInsightMergedCard, 자기 자신도 .cdash2-card라 바깥 테두리/배경은 이미 있음).
+   안쪽 3개가 각자 그리는 .cdash2-card는 테두리/모서리를 지우고 구분선만 남겨, 겉으로는
+   하나의 카드처럼 보이게 한다. 세 함수(renderInsightTagsCard/renderMemoPreviewCard/
+   renderQuestionnaireSummaryCard)는 전혀 안 바뀐다 — 여기서는 스타일만 덮어쓴다. */
+#cdashInsightMergedCard{ padding:0; }
+#cdashInsightMergedCard > div > .cdash2-card{ border:none; border-radius:0; }
+#cdashInsightMergedCard > div:not(:first-child) > .cdash2-card{ border-top:1px solid var(--line); }
 
 /* §6 매출 현황 카드 — 이 라운드의 핵심 카드. 카드 자체를 더 높이고(약 280~300px),
    KPI 박스에 옅은 파란 배경을 주고, 그래프 영역도 더 키운다. */
@@ -14214,14 +14223,18 @@ window.SHIN2_CRM_APP_INIT = function(){
                      (openHeaderSection('info'), 고객 정보 아코디언)을 그대로 연다 — 새 편집
                      폼을 만들지 않는다. -->
                 <div id="cdashCompanySummaryCard"></div>
-                <!-- §업체 관계·협약 종료 라운드에서 만든 카드 — 정답 시안엔 "기업 요약" 바로
-                     아래에 있어 그 위치로 옮겼다(§ 기존 기능 삭제 아님, 위치만 이동). -->
-                <div id="cdashRelationsCard"></div>
-                <div id="cdashInsightTagsCard"></div>
-                <!-- §디자인 개편 라운드에서 만든 "상담 메모" 미리보기 카드 — 정답 시안엔
-                     오른쪽 열이 아니라 왼쪽 열 맨 아래에 있어 그 위치로 옮겼다(§ 렌더 함수/
-                     저장 로직 전혀 안 바뀜, 컨테이너 위치만 이동). -->
-                <div id="cdashMemoPreviewCard"></div>
+                <!-- §고객인사이트·상담메모·질문지요약 통합 라운드(신규) — 사용자 요청("고객인사이트
+                     .상담메모.질문지상담요약 하나로 합칠거야")에 따라 세 카드를 하나의 카드
+                     테두리 안에 담는다. renderInsightTagsCard/renderMemoPreviewCard/
+                     renderQuestionnaireSummaryCard 세 함수는 전혀 안 바뀌었다 — 각자 여전히
+                     자기 id(cdashInsightTagsCard/cdashMemoPreviewCard/cdashQuestionnaireCard)
+                     에만 그린다. 이 wrapper는 시각적 테두리 하나로 묶어주는 역할만 하고, CSS가
+                     안쪽 3개의 개별 카드 테두리를 없애고 구분선만 넣는다(§ 아래 CSS 참고). -->
+                <div class="cdash2-card cdash2-merged-card" id="cdashInsightMergedCard">
+                  <div id="cdashInsightTagsCard"></div>
+                  <div id="cdashMemoPreviewCard"></div>
+                  <div id="cdashQuestionnaireCard"></div>
+                </div>
               </div>
               <div class="cdash2-col-stack" id="cdashColMid">
                 <div id="cdashSummaryRow"></div>
@@ -14232,9 +14245,6 @@ window.SHIN2_CRM_APP_INIT = function(){
                      오른쪽 열 맨 위로 옮겨, 스크롤 없이 매출현황과 나란히 바로 보이게 한다
                      (§요청). renderPourResultsCard 자체는 전혀 안 바뀌었다. -->
                 <div id="cdashPourResultsCard"></div>
-                <!-- §질문지 상담 기록 요약 라운드(신규) — 이미 저장된 doc.qaAnswers를 AI 요약
-                     없이 채워진 답변만 그대로 나열만 한다(새 저장소/계산 없음, §요청 A안). -->
-                <div id="cdashQuestionnaireCard"></div>
               </div>
             </div>
             <!-- §디자인 개편 라운드(신규) — "관련 문서"를 아코디언 팝오버 안에서 상시 노출
@@ -14259,7 +14269,6 @@ window.SHIN2_CRM_APP_INIT = function(){
     renderContactTimelineCard(co);
     renderInsightTagsCard(co);
     renderQuestionnaireSummaryCard(co);
-    renderCompanyRelationsCard(co);
     renderPourResultsCard(co);
     renderMemoPreviewCard(co);
     renderFooterBar(co);
@@ -14268,6 +14277,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 않으면 화면엔 안 보이지만(.cdash-header-popover-section에 is-open 없으면 display:none),
     // 새 카드를 클릭했을 때 openHeaderSection이 바로 보여줄 수 있게 항상 최신 상태로 렌더.
     renderReactionsCol(co);
+    // §업체 관계 헤더 이관 라운드(신규) — #cdashRelationsCard가 이제 메인 그리드가 아니라
+    // renderReactionsCol이 그리는 "고객 정보" 팝오버 안(#crmBasicInfo 옆)에 있으므로, 그
+    // div가 실제로 DOM에 생긴 뒤(renderReactionsCol 호출 이후)에 그려야 한다 — 순서를
+    // 바꾸면 wrap이 없어 조용히 no-op된다(renderCompanyRelationsCard의 `if(!wrap) return`).
+    renderCompanyRelationsCard(co);
     renderInsightBlock(co);
     if(cardState.chartEditing){ renderBasicInfoForm(co); }
     else { renderBasicInfoView(co); }
@@ -14334,13 +14348,27 @@ window.SHIN2_CRM_APP_INIT = function(){
     const dealSummary = isDone
       ? ('협약 완료' + (resolveDealStageFormValues(co).mou.date ? ' · ' + fmtDate(resolveDealStageFormValues(co).mou.date) : ''))
       : buildDealStageSummaryText(co);
+    // §업체 관계 헤더 이관 라운드(신규) — "업체 관계" 카드(이전 상호/협약 종료 상태)를
+    // 왼쪽 열에서 빼고, 남색 헤더에 아주 짧은 한 줄로만 보여준다(§요청 "그냥 간단하게
+    // 입력. 없으면 없는걸로" — 없으면 아무것도 안 그림, 지어내지 않음). 실제 편집(이전
+    // 상호 추가/협약 종료 처리)은 새로 만들지 않고 기존 renderCompanyRelationsCard를
+    // 그대로 "고객 정보 수정" 팝오버 안으로 옮겨서 계속 쓸 수 있게 한다(아래
+    // renderReactionsCol 안 #cdashRelationsCard 참고, § 기능 유지).
+    const formerNames = Array.isArray(co.formerNames) ? co.formerNames : [];
+    const terminated = D.isAgreementTerminated(co);
+    let relationsInline = '';
+    if(terminated){
+      relationsInline = '협약 종료' + (co.agreementEndedAt ? ' · ' + fmtDate(co.agreementEndedAt) : '');
+    } else if(formerNames.length){
+      relationsInline = '이전 상호 ' + formerNames.join(', ');
+    }
     wrap.innerHTML = `
       <div class="cdash2-header">
         <div class="cdash2-header-left">
           ${showMapBackBtn ? `<button type="button" class="cdash2-map-back-btn" id="chartMapBackBtn">← 지도 분포로 돌아가기</button>` : ''}
           <div>
             <div class="cdash2-title" id="chartCoNameTitle" title="${esc(co.name)}">${esc(co.name)}</div>
-            <div class="cdash2-deal-summary">${esc(dealSummary)}</div>
+            <div class="cdash2-deal-summary">${esc(dealSummary)}${relationsInline ? ' · ' + esc(relationsInline) : ''}</div>
           </div>
           <span class="cdash2-tag${isDone ? ' is-done' : ''}">${esc(stageText)}</span>
           ${isCore ? `<span class="cdash2-tag is-core">핵심 고객</span>` : ''}
@@ -14778,7 +14806,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     wrap.innerHTML = `
       <div class="cdash2-card">
         <div class="cdash2-card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-          <span><span aria-hidden="true">📞</span> 최근 접촉 기록</span>
+          <span><span aria-hidden="true">⭐</span> 최근 접촉 기록</span>
           <button type="button" class="co-text-action" id="cdashContactReqBtn" style="font-size:11px;padding:2px 8px;white-space:nowrap;">최근 요청 보기${reqCount ? ` (${reqCount})` : ''}</button>
         </div>
         ${items.length ? `
@@ -14927,20 +14955,8 @@ window.SHIN2_CRM_APP_INIT = function(){
   function renderFooterBar(co){
     const wrap = document.getElementById('cdashFooterBar');
     if(!wrap) return;
-    const docList = buildDocStatusList(co);
-    const mou = docList.find(d=> d.type === 'mouAgreement');
-    const q = docList.find(d=> d.type === 'questionnaire');
-    const docChip = (label, item)=>{
-      const done = !!(item && item.count > 0);
-      return `<span class="cdash2-doc-item${done ? ' is-done' : ' is-pending'}"><span class="dot"></span>${esc(label)} ${done ? '완료' : '미완료'}</span>`;
-    };
     wrap.innerHTML = `
       <div class="cdash2-footer">
-        <button type="button" class="cdash2-footer-left" id="cdashFooterDocsBtn" style="background:none;border:none;padding:0;cursor:pointer;">
-          <span class="cdash2-doc-title">서류 현황</span>
-          ${docChip('협약서', mou)}
-          ${docChip('질문서', q)}
-        </button>
         <div class="cdash2-footer-right">
           <button type="button" class="co-text-action" id="cdashFooterMemoBtn">상담 메모</button>
           <!-- §디자인 개편 라운드(신규) — 참고 시안의 하단 고정 바 "닫기" 버튼. 새 닫기
@@ -14959,23 +14975,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     `;
     document.getElementById('cdashDeleteCoBtn').addEventListener('click', ()=> openDeleteCompanyModal(co.id));
     document.getElementById('cdashFooterCloseBtn').addEventListener('click', closeChart);
-    document.getElementById('cdashFooterDocsBtn').addEventListener('click', ()=>{
-      cardState.accordionOpen.docs = true;
-      // §Firebase 인증 사용자 미생성 원인 조사 라운드(신규) — 기존 버그 발견: renderDocCounts
-      // → renderDocStatusBlock이 #cdashDocStatusBlock 안(서류 업로드 UI 컨테이너
-      // #crmDocsSection의 부모)을 통째로 새로 그리면서 그 안의 #crmDocsSection을 빈
-      // placeholder로 덮어쓰는데, 그 뒤를 채우는 renderDocsSection(co)는 호출되지 않아
-      // 첫 클릭에서는 "공용으로 업로드" 버튼/파일 목록이 안 보이고 아코디언을 다시 열어야만
-      // (refreshChart가 renderDocsSection을 다시 부르므로) 보였다 — renderDocCounts 뒤에
-      // renderDocsSection(co)를 다시 불러 첫 클릭에서도 바로 채워지게 고쳤다.
-      renderDocCounts(co);
-      renderDocsSection(co);
-      // §디자인 개편 라운드(신규) — "관련 문서"가 이제 팝오버가 아니라 화면 하단에 항상
-      // 보이는 섹션이라(#cdashDocsSectionWrap), openHeaderSection('docs')(빈 팝오버가
-      // 뜨는 버그가 됨) 대신 그 섹션으로 스크롤만 한다.
-      const docsSection = document.getElementById('cdashDocsSectionWrap');
-      if(docsSection) docsSection.scrollIntoView({ behavior:'smooth', block:'start' });
-    });
+    // §서류현황 삭제 라운드(신규) — "서류 현황"(협약서/질문서 완료 상태 칩) 버튼을
+    // 요청대로 없앴다. 그 버튼이 하던 "관련 문서 섹션으로 스크롤" 기능은 그 섹션
+    // 자체가 이미 화면 하단에 항상 노출돼 있어(#cdashDocsSectionWrap, §디자인 개편
+    // 라운드) 버튼 없이도 그대로 접근 가능하다 — renderDocCounts/renderDocsSection
+    // 호출부나 문서 데이터/저장 로직은 전혀 건드리지 않았다.
     document.getElementById('cdashFooterMemoBtn').addEventListener('click', ()=>{
       memoPanelState = { editingId: null, drafting: true, deleteConfirmId: null };
       renderMemoPanel(co);
@@ -25133,6 +25137,12 @@ window.SHIN2_CRM_APP_INIT = function(){
         ` : ''}
         <div class="cdash-col-subtitle" style="margin-top:12px;">업체 정보</div>
         <div id="crmBasicInfo"></div>
+        <!-- §업체 관계 헤더 이관 라운드(신규) — "업체 관계"(이전 상호/협약 종료) 편집 카드를
+             메인 그리드에서 빼고, "고객 정보 수정" 팝오버 안 이 자리로 옮겼다. 렌더 함수
+             (renderCompanyRelationsCard)/데이터/저장 로직은 전혀 안 바뀌었다 — 그려지는
+             컨테이너 위치만 이동, 기능(이전 상호 추가·삭제, 협약 종료 처리·취소) 그대로.
+             카드 자체가 이미 "업체 관계" 제목을 그리므로 여기서 별도 subtitle은 안 붙인다. -->
+        <div id="cdashRelationsCard" style="margin-top:12px;"></div>
       </div>
     `;
     document.getElementById('cdashReactionsAccHeader').addEventListener('click', (e)=>{
