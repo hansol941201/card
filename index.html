@@ -11437,11 +11437,16 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 시각적으로만 구분한다: 상태 필터(칩 모양 유지)/분석(텍스트 링크)/정리(텍스트 링크,
   // 처리 대기 있으면 빨간 점).
   const FILTER_GROUP_STATE = ['all','agreementInProgress','mouDone','agreementTerminated'];
-  const FILTER_GROUP_ANALYSIS = ['newPartner','trendUp','l2l3Manage','nonPartnerRevenue'];
+  const FILTER_GROUP_ANALYSIS = ['newPartner','trendUp','l2l3Manage'];
   // §삭제 업체 휴지통 분리 라운드(신규) — "삭제된 업체"만 정리 팝오버에서 빼서 별도
   // 휴지통 아이콘 버튼으로 뺀다(§요청 "삭제 업체는 따로 빼서 휴지통 아이콘으로"). 나머지
-  // 두 항목(이전 상호/건바이건 업체)은 그대로 팝오버 "정리" 그룹에 남긴다.
-  const FILTER_GROUP_CLEANUP = ['subsidiary','caseByCase'];
+  // 항목(이전 상호)은 그대로 팝오버 "정리" 그룹에 남긴다.
+  // §실적있음·MOU미체결 + 건바이건 통합 라운드(신규) — 두 탭을 하나로 합치면서(§요청
+  // "실적있음.미체결.건바이건 이걸 하나로 묶어줘"), 팝오버 안에 숨어있던 것도 "밖으로
+  // 빼줘"(§요청)에 따라 삭제된 업체/의지박약과 같은 독립 아이콘 버튼 자리로 옮긴다 —
+  // 그래서 caseByCase는 이제 팝오버 정리 그룹에도 없다(아래 renderFilterChips의 새
+  // list-filter-trash-btn 참고).
+  const FILTER_GROUP_CLEANUP = ['subsidiary'];
   function renderFilterChips(counts){
     const wrap = document.getElementById('crmFilterRow');
     if(!wrap) return;
@@ -11481,6 +11486,15 @@ window.SHIN2_CRM_APP_INIT = function(){
       <button type="button" class="list-filter-trash-btn${filterKey==='willpower'?' is-active':''}" data-filter="willpower" title="의지박약(장기 미응답)">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
         ${counts.willpower ? `<span class="trash-btn-count">${counts.willpower}</span>` : ''}
+      </button>
+      <!-- §실적있음·MOU미체결 + 건바이건 통합 라운드(신규) — "더보기" 팝오버 안에
+           숨어있던 실적있음·MOU미체결을 여기로 꺼내고(§요청 "밖으로 빼줘"), 같은 자리에
+           건바이건 업체도 합쳐서 하나의 진입점으로 만든다(§요청 "하나로 묶어줘"). 판정
+           로직(matchesFilter의 nonPartnerRevenue 키, caseByCaseCompanies 컬렉션)은
+           전혀 안 바뀌고 화면 진입점과 배지 숫자만 합친다. -->
+      <button type="button" class="list-filter-trash-btn${filterKey==='nonPartnerRevenue'?' is-active':''}" data-filter="nonPartnerRevenue" title="실적있음·MOU미체결 / 건바이건 업체">
+        ${FILTER_ICON_SVG.nonPartnerRevenue}
+        ${(counts.nonPartnerRevenue || counts.caseByCase) ? `<span class="trash-btn-count">${(counts.nonPartnerRevenue||0) + (counts.caseByCase||0)}</span>` : ''}
       </button>
       <div class="list-filter-more" id="crmFilterMore">
         <button type="button" class="list-filter-more-btn" id="crmFilterMoreBtn" title="추가 관리 항목" aria-haspopup="true" aria-expanded="false">
@@ -11896,16 +11910,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     // §확인 필요 복원/3단계 분류 라운드(신규, §요청 5) — 건바이건 업체 탭도 같은 이유로
     // 전용 화면으로 갈아탄다. companies 배열과 무관한 별도 데이터(caseByCaseCompanies)라
     // enriched를 넘길 필요가 없다.
-    if(filterKey === 'caseByCase'){
-      renderCaseByCaseTab(classifiedCaseByCaseRows);
-      return;
-    }
-    // §실적있음·MOU미체결 탭 라운드(신규) — 위 특수 탭들과 같은 이유로 무거운 7컬럼
-    // 목록 템플릿을 타지 않고 전용 화면(renderNonPartnerRevenueTab)으로 갈아탄다.
-    // 판정 기준(matchesFilter의 'nonPartnerRevenue' 키)은 §요청 이전부터 이미 있던
-    // 로직을 그대로 재사용한다 — 여기서는 그 결과를 탭으로 노출만 한다.
+    // §실적있음·MOU미체결 + 건바이건 통합 라운드(신규) — 위 특수 탭들과 같은 이유로
+    // 무거운 7컬럼 목록 템플릿을 타지 않고 전용 화면으로 갈아탄다. 두 판정 기준
+    // (matchesFilter의 'nonPartnerRevenue' 키, caseByCaseCompanies 컬렉션)은 각각
+    // 기존 그대로 재사용 — 화면 하나에 두 섹션으로 같이 보여줄 뿐이다.
     if(filterKey === 'nonPartnerRevenue'){
-      renderNonPartnerRevenueTab(enriched);
+      renderNonPartnerRevenueTab(enriched, classifiedCaseByCaseRows);
       return;
     }
 
@@ -13644,48 +13654,108 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 있으므로, stageCorrection(진행바 표시용)만으로는 MOU체결로 안 옮겨갈 수 있다 — 그래서
     // partnerStatus를 함께 세팅해 확실히 반영한다.
     if(latest.partnerStatus !== 'partner') D.updateCompany(companyId, { partnerStatus: 'partner' });
-    saveStageCorrection(companyId, 'mou', { status:'done', dateText: fmtDate(new Date().toISOString()), owner: null },
+    // §버그 수정(신규) — resolveEffectiveMouDate/buildProgressStages의 correctionOverrides가
+    // 실제로 찾는 정정 키는 'mou'가 아니라 'mouDone'이다(§15828 근처 확인) — 잘못된 키로
+    // 저장하면 이 정정이 어디에서도 안 읽혀서 협약일이 인식되지 않는다(신규 협약사 탭/
+    // L2→L3 전환율 population 등에 반영 안 됨). isConfirmedPartner는 partnerStatus로도
+    // 통과하므로 겉보기엔 정상 동작하는 것처럼 보였지만, 실제 협약일 데이터는 비어있었다.
+    saveStageCorrection(companyId, 'mouDone', { status:'done', dateText: fmtDate(new Date().toISOString()), owner: null },
       { reason:'기타', reasonOther:'실적있음·MOU미체결 탭에서 MOU 체결 처리' });
     renderList();
   }
-  function renderNonPartnerRevenueTab(enriched){
+  // §실적있음·MOU미체결 + 건바이건 통합 라운드(신규) — 두 화면을 하나로 합친다(§요청
+  // "실적있음.미체결.건바이건 이걸 하나로 묶어줘"). 두 데이터는 원본이 다르다 —
+  // 실적있음·MOU미체결은 companies 배열(D.loadActiveCompanies() 기준, 매출/실적 있는
+  // 정식 등록 업체)이고, 건바이건은 별도 caseByCaseCompanies 컬렉션(등록 안 된 업체) +
+  // 엑셀 기준 미등록 분류다 — 그래서 표를 억지로 하나로 합치지 않고, 한 화면 안에 섹션
+  // 둘로 나눠서 보여준다(원래 renderCaseByCaseTab이 이미 쓰던 것과 같은 패턴). 판정/
+  // 집계 로직은 두 섹션 모두 기존 그대로 재사용 — 여기서는 출력 화면만 합친다.
+  function renderNonPartnerRevenueTab(enriched, classifiedUnregisteredRows){
+    classifiedUnregisteredRows = classifiedUnregisteredRows || [];
     renderPagination(0);
-    const rows = enriched.filter(r=> matchesFilter(r.co, r.progress, 'nonPartnerRevenue'))
+    const revRows = enriched.filter(r=> matchesFilter(r.co, r.progress, 'nonPartnerRevenue'))
       .sort((a,b)=>{
         const ra = D.getCompanyTotalRevenueAllYears(a.co); const rb = D.getCompanyTotalRevenueAllYears(b.co);
         const va = (ra && !ra.ambiguous && typeof ra.total === 'number') ? ra.total : 0;
         const vb = (rb && !rb.ambiguous && typeof rb.total === 'number') ? rb.total : 0;
         return vb - va;
       });
-    if(!rows.length){
-      listEl.innerHTML = '<div class="empty-note">매출/시공실적은 있지만 MOU가 아직 체결되지 않은 업체가 없습니다.</div>';
+    const revSectionHtml = revRows.length ? `
+      <div class="willpower-section">
+        <div class="willpower-section-title">실적있음·MOU미체결 · ${revRows.length}곳</div>
+        <div class="deleted-co-table">
+          <div class="deleted-co-head" style="grid-template-columns:1.4fr 1fr .9fr .9fr 1fr;">
+            <span>업체명</span><span>총 매출</span><span>총 실적</span><span>업체코드</span><span></span>
+          </div>
+          ${revRows.map(r=>{
+            const co = r.co;
+            const revAll = D.getCompanyTotalRevenueAllYears(co);
+            const revenueHtml = (revAll && !revAll.ambiguous && typeof revAll.total === 'number')
+              ? esc(fmtKrwCompact(revAll.total)) : '<span class="data-none">매출자료 없음</span>';
+            return `
+            <div class="deleted-co-row" style="grid-template-columns:1.4fr 1fr .9fr .9fr 1fr;" data-nonpartner-open="${esc(co.id)}">
+              <span class="deleted-co-name">${esc(co.name || '(업체명 없음)')}</span>
+              <span>${revenueHtml}</span>
+              <span>${r.pourCount || 0}건</span>
+              <span>${co.code ? esc(co.code) : '<span class="data-none">미발급</span>'}</span>
+              <span class="deleted-co-actions"><button type="button" class="co-text-action" data-nonpartner-mou="${esc(co.id)}">MOU 체결</button></span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>` : `<div class="willpower-section"><div class="empty-note">매출/시공실적은 있지만 MOU가 아직 체결되지 않은 업체가 없습니다.</div></div>`;
+
+    // 건바이건 섹션 — renderCaseByCaseTab이 기존에 하던 계산을 그대로 가져온다(§요청 7
+    // "판정 로직 안 건드림" 그대로 유지).
+    const cbcAll = D.loadCaseByCaseCompanies();
+    const cbcActive = cbcAll.filter(r=> !r.convertedToCompanyId);
+    const reqIndex = D.buildSheetRequestsIndex();
+    const cbcRows = cbcActive.map(cbc=>{
+      const reqs = (reqIndex.get(String(cbc.id)) || []).slice().sort((a,b)=> new Date(b.requestDate) - new Date(a.requestDate));
+      const bySource = {};
+      L2L3_ALL_SOURCE_SHEETS.forEach(s=> bySource[s] = 0);
+      reqs.forEach(r=>{ const t = r.sourceSheet || r.requestType; if(bySource[t] != null) bySource[t]++; });
+      const first = reqs.length ? reqs[reqs.length-1] : null;
+      const last = reqs[0] || null;
+      return { cbc, reqs, bySource, firstAt: first ? first.requestDate : cbc.firstSeenAt, lastAt: last ? last.requestDate : cbc.lastSeenAt, total: reqs.length };
+    }).sort((a,b)=> new Date(b.lastAt||0) - new Date(a.lastAt||0));
+    const cbcTotalCompanies = cbcActive.length + classifiedUnregisteredRows.length;
+    const cbcSectionHtml = (cbcActive.length || classifiedUnregisteredRows.length) ? `
+      <div class="willpower-section">
+        <div class="willpower-section-title">건바이건 업체 · ${cbcTotalCompanies}곳</div>
+        ${cbcRows.length ? `<div class="deleted-co-table" style="overflow-x:auto;">
+          <div class="deleted-co-row" style="display:grid;grid-template-columns:1.4fr .9fr .9fr .6fr repeat(5,.6fr) .7fr .7fr 1fr 1.4fr .8fr;gap:6px;font-weight:600;background:#f6f7f9;">
+            <span>업체명</span><span>최초 요청일</span><span>최근 요청일</span><span>전체</span>
+            <span>기술자문</span><span>컨설팅</span><span>샘플·카탈로그</span><span>공법설명회</span><span>기타문의</span>
+            <span>담당자</span><span>연락처</span><span>출처 시트</span><span>최근 요청 내용</span><span>분류 상태</span>
+          </div>
+          ${cbcRows.map(r=> `
+            <div class="deleted-co-row" data-cbc-row="${esc(r.cbc.id)}" style="display:grid;grid-template-columns:1.4fr .9fr .9fr .6fr repeat(5,.6fr) .7fr .7fr 1fr 1.4fr .8fr;gap:6px;cursor:pointer;">
+              <span class="deleted-co-name">${esc(r.cbc.name || '(업체명 없음)')}</span>
+              <span>${esc(fmtDate(r.firstAt))}</span>
+              <span>${esc(fmtDate(r.lastAt))}</span>
+              <span>${r.total}</span>
+              <span>${r.bySource['기술자문문의']||0}</span>
+              <span>${r.bySource['컨설팅요청_통합']||0}</span>
+              <span>${r.bySource['샘플카달로그요청']||0}</span>
+              <span>${r.bySource['공법설명회이력']||0}</span>
+              <span>${r.bySource['기타문의답변현황']||0}</span>
+              <span>—</span>
+              <span>—</span>
+              <span title="${esc((r.cbc.sourceTabs||[]).join(', '))}">${esc((r.cbc.sourceTabs||[]).join(', ') || '—')}</span>
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.reqs[0] ? r.reqs[0].summary : '—')}</span>
+              <span>건바이건</span>
+            </div>
+          `).join('')}
+        </div>` : ''}
+        ${classifiedUnregisteredTableHtml(classifiedUnregisteredRows, '엑셀 기준 건바이건 · CRM 미등록', '건바이건')}
+      </div>` : `<div class="willpower-section"><div class="empty-note">건바이건 업체가 없습니다 — "확인 필요" 목록에서 [②건바이건 업체로 등록]을 눌러야만 여기 나타납니다(자동 분류 없음).</div></div>`;
+
+    if(!revRows.length && !cbcActive.length && !classifiedUnregisteredRows.length){
+      listEl.innerHTML = '<div class="empty-note">실적있음·MOU미체결 업체도, 건바이건 업체도 없습니다.</div>';
       return;
     }
-    listEl.innerHTML = `
-      <div class="willpower-tab">
-        <div class="willpower-section">
-          <div class="willpower-section-title">실적있음·MOU미체결 · ${rows.length}곳</div>
-          <div class="deleted-co-table">
-            <div class="deleted-co-head" style="grid-template-columns:1.4fr 1fr .9fr .9fr 1fr;">
-              <span>업체명</span><span>총 매출</span><span>총 실적</span><span>업체코드</span><span></span>
-            </div>
-            ${rows.map(r=>{
-              const co = r.co;
-              const revAll = D.getCompanyTotalRevenueAllYears(co);
-              const revenueHtml = (revAll && !revAll.ambiguous && typeof revAll.total === 'number')
-                ? esc(fmtKrwCompact(revAll.total)) : '<span class="data-none">매출자료 없음</span>';
-              return `
-              <div class="deleted-co-row" style="grid-template-columns:1.4fr 1fr .9fr .9fr 1fr;" data-nonpartner-open="${esc(co.id)}">
-                <span class="deleted-co-name">${esc(co.name || '(업체명 없음)')}</span>
-                <span>${revenueHtml}</span>
-                <span>${r.pourCount || 0}건</span>
-                <span>${co.code ? esc(co.code) : '<span class="data-none">미발급</span>'}</span>
-                <span class="deleted-co-actions"><button type="button" class="co-text-action" data-nonpartner-mou="${esc(co.id)}">MOU 체결</button></span>
-              </div>`;
-            }).join('')}
-          </div>
-        </div>
-      </div>`;
+    listEl.innerHTML = `<div class="willpower-tab">${revSectionHtml}${cbcSectionHtml}</div>`;
+
     listEl.querySelectorAll('[data-nonpartner-open]').forEach(row=> row.addEventListener('click', (e)=>{
       if(e.target.closest('[data-nonpartner-mou]')) return;
       openCard(row.getAttribute('data-nonpartner-open'));
@@ -13694,6 +13764,8 @@ window.SHIN2_CRM_APP_INIT = function(){
       e.stopPropagation();
       handleConfirmMouFromNonPartnerTab(btn.getAttribute('data-nonpartner-mou'));
     }));
+    listEl.querySelectorAll('[data-cbc-row]').forEach(row=> row.addEventListener('click', ()=> openCaseByCaseDetailModal(row.getAttribute('data-cbc-row'))));
+    bindClassifiedUnregisteredRows(listEl);
   }
 
   /* ==========================================================================
