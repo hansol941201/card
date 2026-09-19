@@ -9443,6 +9443,18 @@ window.SHIN2_CRM_APP_INIT = function(){
         <button type="button" class="co-text-action danger" data-terminated-restore="${esc(co.id)}">종료 취소</button>
       </div>`;
   }
+  // §실적있음·MOU미체결 탭·건바이건 통합 정리 라운드(신규) — terminatedInfoRowHtml과 같은
+  // 패턴(행 아래 별도 정보 줄, 같은 .terminated-info-row 스타일 재사용 — 새 CSS 없음).
+  // "MOU 체결" 버튼은 새 판정/저장 로직이 아니라 기존 handleConfirmMouFromNonPartnerTab을
+  // 그대로 호출한다(§요청 "MOU 체결 버튼 하나로 업체코드도 같이 입혀지게" — 그 함수가
+  // 이미 하던 동작 그대로).
+  function revenueNoMouActionRowHtml(co){
+    return `
+      <div class="terminated-info-row" data-revenue-no-mou-info="${esc(co.id)}">
+        <span class="terminated-info-item"><b>업체코드</b> ${co.code ? esc(co.code) : '미발급'}</span>
+        <button type="button" class="co-text-action primary" data-revenue-no-mou-confirm="${esc(co.id)}">MOU 체결</button>
+      </div>`;
+  }
   // §신규 협약사 탭 라운드 → §요청 발생 UI 보류 라운드(신규) — terminatedInfoRowHtml과
   // 완전히 같은 패턴(행 아래 별도 정보 줄). r은 renderList()의 enriched 행(co/acts/
   // summary/progress/pourCount) 그대로. "요청 발생"은 사용자 확정: 컨설팅 내역서 요청/
@@ -11503,14 +11515,17 @@ window.SHIN2_CRM_APP_INIT = function(){
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
         ${counts.willpower ? `<span class="trash-btn-count">${counts.willpower}</span>` : ''}
       </button>
-      <!-- §실적있음·MOU미체결 + 건바이건 통합 라운드(신규) — "더보기" 팝오버 안에
-           숨어있던 실적있음·MOU미체결을 여기로 꺼내고(§요청 "밖으로 빼줘"), 같은 자리에
-           건바이건 업체도 합쳐서 하나의 진입점으로 만든다(§요청 "하나로 묶어줘"). 판정
-           로직(matchesFilter의 nonPartnerRevenue 키, caseByCaseCompanies 컬렉션)은
-           전혀 안 바뀌고 화면 진입점과 배지 숫자만 합친다. -->
-      <button type="button" class="list-filter-trash-btn${filterKey==='nonPartnerRevenue'?' is-active':''}" data-filter="nonPartnerRevenue" title="실적있음·MOU미체결 / 건바이건 업체">
+      <!-- §실적있음·MOU미체결 탭·건바이건 통합 정리 라운드(신규) — 사용자가 이 아이콘과
+           위 메인 탭("실적 있음 · MOU 미체결")이 같은 데이터를 중복으로 보여주는 게
+           헷갈린다고 확인(§요청 "저 두개가 같은건가?" → "합쳐줘"). 실적있음·MOU미체결
+           부분은 이제 메인 탭 하나로만 보이게 하고, 이 아이콘은 건바이건 업체 전용으로
+           좁힌다 — 건바이건 업체(caseByCaseCompanies 컬렉션)는 매출/실적 데이터가 아예
+           없는 미등록 업체라 표준 7컬럼 테이블(메인 탭)에는 원래도 들어갈 수 없어서
+           별도 진입점이 계속 필요하다. renderNonPartnerRevenueTab 내부에서 실적있음
+           섹션만 뺐고(아래), 건바이건 판정/집계 로직은 전혀 안 바뀌었다. -->
+      <button type="button" class="list-filter-trash-btn${filterKey==='nonPartnerRevenue'?' is-active':''}" data-filter="nonPartnerRevenue" title="건바이건 업체">
         ${FILTER_ICON_SVG.nonPartnerRevenue}
-        ${(counts.nonPartnerRevenue || counts.caseByCase) ? `<span class="trash-btn-count">${(counts.nonPartnerRevenue||0) + (counts.caseByCase||0)}</span>` : ''}
+        ${counts.caseByCase ? `<span class="trash-btn-count">${counts.caseByCase}</span>` : ''}
       </button>
       <div class="list-filter-more" id="crmFilterMore">
         <button type="button" class="list-filter-more-btn" id="crmFilterMoreBtn" title="추가 관리 항목" aria-haspopup="true" aria-expanded="false">
@@ -12188,6 +12203,13 @@ window.SHIN2_CRM_APP_INIT = function(){
       // 종료 사유/최근 활동/고객카드 보기/종료 취소).
       const terminatedInfoHtml = (filterKey === 'agreementTerminated' && D.isAgreementTerminated(co))
         ? terminatedInfoRowHtml(co, r.progress, requestHistoryIndex) : '';
+      // §실적있음·MOU미체결 탭·건바이건 통합 정리 라운드(신규) — 사용자 요청: "협력사인데
+      // 협력사로 표기 안 된 곳을 팀장이 판단해서 MOU 체결 버튼 하나로 업체코드까지 같이
+      // 입혀지게" — 기존에 있던 handleConfirmMouFromNonPartnerTab(코드 자동발급 +
+      // partnerStatus/mouDone 정정, 새 로직 없음)을 이 표준 테이블 행에도 그대로 노출한다.
+      // terminatedInfoHtml과 같은 패턴(행 아래 별도 정보 줄, .co-row 그리드 구조는 안 건드림).
+      const revenueNoMouActionHtml = (filterKey === 'revenueNoMou')
+        ? revenueNoMouActionRowHtml(co) : '';
       // §신규 협약사 탭 리디자인 라운드 — filterKey==='newPartner'는 이제 이 일반 7컬럼
       // 표까지 오지 않고(§renderNewPartnerTab으로 먼저 분기·return) newPartnerInfoRowHtml은
       // 그 함수의 "상세 보기" 펼침 내용으로 그대로 재사용된다 — 여기서는 더 이상 부를
@@ -12220,7 +12242,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         <!-- §단계 진행상황 이전 라운드: 이 컬럼은 목록에서 뺐다(업무관리 화면으로 이전,
              stageStepperHtml 변수/buildStageStepperHtml 함수는 그대로 계산돼 있다 —
              §"데이터 제거가 아니라 숨김" 관례 그대로). -->
-      </div>${terminatedInfoHtml}`;
+      </div>${terminatedInfoHtml}${revenueNoMouActionHtml}`;
     }).join('');
     if(filterKey === 'mouDone' && currentPage === 1 && classifiedMouRows.length){
       listEl.insertAdjacentHTML('afterbegin', classifiedUnregisteredTableHtml(classifiedMouRows, '엑셀 기준 MOU 체결 · CRM 미등록', 'MOU 체결'));
@@ -12355,6 +12377,14 @@ window.SHIN2_CRM_APP_INIT = function(){
         if(!confirm(`"${co.name}"의 협약 종료를 취소하고 이전 체결 상태로 복구할까요?\n(과거 MOU 체결일·활동기록은 그대로 유지됩니다)`)) return;
         D.restoreAgreement(id);
         renderList();
+      });
+    });
+    // §실적있음·MOU미체결 탭·건바이건 통합 정리 라운드(신규) — 행 클릭(고객카드 열기)으로
+    // 전파되지 않도록 stopPropagation, 나머지는 기존 handleConfirmMouFromNonPartnerTab 그대로.
+    listEl.querySelectorAll('[data-revenue-no-mou-confirm]').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        handleConfirmMouFromNonPartnerTab(btn.getAttribute('data-revenue-no-mou-confirm'));
       });
     });
     renderPagination(totalPages);
@@ -13679,47 +13709,16 @@ window.SHIN2_CRM_APP_INIT = function(){
       { reason:'기타', reasonOther:'실적있음·MOU미체결 탭에서 MOU 체결 처리' });
     renderList();
   }
-  // §실적있음·MOU미체결 + 건바이건 통합 라운드(신규) — 두 화면을 하나로 합친다(§요청
-  // "실적있음.미체결.건바이건 이걸 하나로 묶어줘"). 두 데이터는 원본이 다르다 —
-  // 실적있음·MOU미체결은 companies 배열(D.loadActiveCompanies() 기준, 매출/실적 있는
-  // 정식 등록 업체)이고, 건바이건은 별도 caseByCaseCompanies 컬렉션(등록 안 된 업체) +
-  // 엑셀 기준 미등록 분류다 — 그래서 표를 억지로 하나로 합치지 않고, 한 화면 안에 섹션
-  // 둘로 나눠서 보여준다(원래 renderCaseByCaseTab이 이미 쓰던 것과 같은 패턴). 판정/
-  // 집계 로직은 두 섹션 모두 기존 그대로 재사용 — 여기서는 출력 화면만 합친다.
+  // §실적있음·MOU미체결 탭·건바이건 통합 정리 라운드(신규) — 원래 이 함수는 "실적있음·
+  // MOU미체결" 섹션 + "건바이건 업체" 섹션을 한 화면에 같이 보여줬는데, 이제 실적있음·
+  // MOU미체결은 메인 탭("실적 있음 · MOU 미체결", 표준 7컬럼 테이블)으로 옮겨가서 같은
+  // 데이터가 두 군데 중복 표시되고 있었다(§요청 "저 두개가 같은건가?" → "합쳐줘"). 그래서
+  // 실적있음 섹션은 이 함수에서 뺐다 — 건바이건 업체(caseByCaseCompanies 컬렉션, 매출/
+  // 실적 데이터가 없는 미등록 업체라 표준 테이블에는 애초에 들어갈 수 없음) 섹션만 남긴다.
+  // 건바이건 판정/집계 로직 자체는 전혀 안 바꿨다.
   function renderNonPartnerRevenueTab(enriched, classifiedUnregisteredRows){
     classifiedUnregisteredRows = classifiedUnregisteredRows || [];
     renderPagination(0);
-    const revRows = enriched.filter(r=> matchesFilter(r.co, r.progress, 'nonPartnerRevenue'))
-      .sort((a,b)=>{
-        const ra = D.getCompanyTotalRevenueAllYears(a.co); const rb = D.getCompanyTotalRevenueAllYears(b.co);
-        const va = (ra && !ra.ambiguous && typeof ra.total === 'number') ? ra.total : 0;
-        const vb = (rb && !rb.ambiguous && typeof rb.total === 'number') ? rb.total : 0;
-        return vb - va;
-      });
-    const revSectionHtml = revRows.length ? `
-      <div class="willpower-section">
-        <div class="willpower-section-title">실적있음·MOU미체결 · ${revRows.length}곳</div>
-        <div class="deleted-co-table">
-          <div class="deleted-co-head" style="grid-template-columns:1.4fr 1fr .9fr .9fr 1fr;">
-            <span>업체명</span><span>총 매출</span><span>총 실적</span><span>업체코드</span><span></span>
-          </div>
-          ${revRows.map(r=>{
-            const co = r.co;
-            const revAll = D.getCompanyTotalRevenueAllYears(co);
-            const revenueHtml = (revAll && !revAll.ambiguous && typeof revAll.total === 'number')
-              ? esc(fmtKrwCompact(revAll.total)) : '<span class="data-none">매출자료 없음</span>';
-            return `
-            <div class="deleted-co-row" style="grid-template-columns:1.4fr 1fr .9fr .9fr 1fr;" data-nonpartner-open="${esc(co.id)}">
-              <span class="deleted-co-name">${esc(co.name || '(업체명 없음)')}</span>
-              <span>${revenueHtml}</span>
-              <span>${r.pourCount || 0}건</span>
-              <span>${co.code ? esc(co.code) : '<span class="data-none">미발급</span>'}</span>
-              <span class="deleted-co-actions"><button type="button" class="co-text-action" data-nonpartner-mou="${esc(co.id)}">MOU 체결</button></span>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>` : `<div class="willpower-section"><div class="empty-note">매출/시공실적은 있지만 MOU가 아직 체결되지 않은 업체가 없습니다.</div></div>`;
-
     // 건바이건 섹션 — renderCaseByCaseTab이 기존에 하던 계산을 그대로 가져온다(§요청 7
     // "판정 로직 안 건드림" 그대로 유지).
     const cbcAll = D.loadCaseByCaseCompanies();
@@ -13766,20 +13765,12 @@ window.SHIN2_CRM_APP_INIT = function(){
         ${classifiedUnregisteredTableHtml(classifiedUnregisteredRows, '엑셀 기준 건바이건 · CRM 미등록', '건바이건')}
       </div>` : `<div class="willpower-section"><div class="empty-note">건바이건 업체가 없습니다 — "확인 필요" 목록에서 [②건바이건 업체로 등록]을 눌러야만 여기 나타납니다(자동 분류 없음).</div></div>`;
 
-    if(!revRows.length && !cbcActive.length && !classifiedUnregisteredRows.length){
-      listEl.innerHTML = '<div class="empty-note">실적있음·MOU미체결 업체도, 건바이건 업체도 없습니다.</div>';
+    if(!cbcActive.length && !classifiedUnregisteredRows.length){
+      listEl.innerHTML = '<div class="empty-note">건바이건 업체가 없습니다 — "확인 필요" 목록에서 [②건바이건 업체로 등록]을 눌러야만 여기 나타납니다(자동 분류 없음).</div>';
       return;
     }
-    listEl.innerHTML = `<div class="willpower-tab">${revSectionHtml}${cbcSectionHtml}</div>`;
+    listEl.innerHTML = `<div class="willpower-tab">${cbcSectionHtml}</div>`;
 
-    listEl.querySelectorAll('[data-nonpartner-open]').forEach(row=> row.addEventListener('click', (e)=>{
-      if(e.target.closest('[data-nonpartner-mou]')) return;
-      openCard(row.getAttribute('data-nonpartner-open'));
-    }));
-    listEl.querySelectorAll('[data-nonpartner-mou]').forEach(btn=> btn.addEventListener('click', (e)=>{
-      e.stopPropagation();
-      handleConfirmMouFromNonPartnerTab(btn.getAttribute('data-nonpartner-mou'));
-    }));
     listEl.querySelectorAll('[data-cbc-row]').forEach(row=> row.addEventListener('click', ()=> openCaseByCaseDetailModal(row.getAttribute('data-cbc-row'))));
     bindClassifiedUnregisteredRows(listEl);
   }
