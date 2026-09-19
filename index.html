@@ -11876,7 +11876,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     filterCounts.l2l3Manage = buildL2L3AnalysisBase().rows.length;
     // §확인 필요 복원/3단계 분류 라운드(신규, §요청 5) — 이미 협약사로 전환된 건바이건
     // 업체(convertedToCompanyId 있음)는 이 탭 카운트/목록에서 빠진다(§요청 8 "카운트 전환").
-    filterCounts.caseByCase = activeCaseByCaseCompanies.length + classifiedCaseByCaseRows.length;
+    // §매출자료 미등록 업체 재분류 라운드(신규) — classifiedCaseByCaseRows(엑셀 매출은
+    // 있는 CRM 미등록 업체)는 이제 "실적 있음 · MOU 미체결" 탭에 붙으므로(위 renderList
+    // 안 classifiedRevenueNoMouRows) 이 배지 숫자(건바이건 아이콘)에서는 뺀다 — MOU체결
+    // 탭 배지가 classifiedMouRows(같은 패턴의 엑셀 기준 미등록 부가 표)를 배지 숫자에
+    // 안 더하던 기존 관례와 동일하게 맞춘다.
+    filterCounts.caseByCase = activeCaseByCaseCompanies.length;
     renderFilterChips(filterCounts);
     // §신규 협약사 탭 라운드(신규) — "90일 임박순"/"최근 체결순" 옵션은 이 탭에서만
     // 보이게 하고, 정렬 드롭다운 표시값도 현재 sortMode와 항상 맞춰 둔다(탭 클릭
@@ -11941,12 +11946,15 @@ window.SHIN2_CRM_APP_INIT = function(){
     // §확인 필요 복원/3단계 분류 라운드(신규, §요청 5) — 건바이건 업체 탭도 같은 이유로
     // 전용 화면으로 갈아탄다. companies 배열과 무관한 별도 데이터(caseByCaseCompanies)라
     // enriched를 넘길 필요가 없다.
-    // §실적있음·MOU미체결 + 건바이건 통합 라운드(신규) — 위 특수 탭들과 같은 이유로
-    // 무거운 7컬럼 목록 템플릿을 타지 않고 전용 화면으로 갈아탄다. 두 판정 기준
-    // (matchesFilter의 'nonPartnerRevenue' 키, caseByCaseCompanies 컬렉션)은 각각
-    // 기존 그대로 재사용 — 화면 하나에 두 섹션으로 같이 보여줄 뿐이다.
+    // §매출자료 미등록 업체 재분류 라운드(신규) — classifiedCaseByCaseRows(엑셀 매출은
+    // 있지만 CRM 미등록 + MOU 서명 미확인 업체)는 이제 위 classifiedRevenueNoMouRows로
+    // "실적 있음 · MOU 미체결" 탭에 붙는다(§요청 "이 목록에 있는 애들도 MOU체결 미진행
+    // 애들로 이동시켜줘" — 실적이 있으니 "건바이건"보다 "MOU 미체결"이 맞다는 판단).
+    // 그래서 여기서는 더 이상 renderNonPartnerRevenueTab에 넘기지 않는다 — 그 화면(아이콘)은
+    // 진짜 건바이건 업체(caseByCaseCompanies 컬렉션, 매출 데이터 자체가 없는 문의 이력만
+    // 있는 업체)만 보여준다. 판정 로직 자체는 그대로다 — 어느 화면에 붙일지만 바뀐다.
     if(filterKey === 'nonPartnerRevenue'){
-      renderNonPartnerRevenueTab(enriched, classifiedCaseByCaseRows);
+      renderNonPartnerRevenueTab(enriched);
       return;
     }
 
@@ -11968,12 +11976,22 @@ window.SHIN2_CRM_APP_INIT = function(){
     const classifiedMouRows = filterKey === 'mouDone'
       ? unregisteredClassification.mou.filter(x=> !searchQuery || [x.name, x.latestSite, x.latestDate].join(' ').toLowerCase().includes(searchQuery.toLowerCase()))
       : [];
+    // §매출자료 미등록 업체 재분류 라운드(신규) — 사용자 확인: "매출자료 미등록 업체"
+    // 팝업(엑셀 기준 실적은 있지만 CRM에 등록 안 된 업체)이 MOU 서명 여부와 무관하게
+    // 전부 "건바이건"으로 분류되고 있었는데, 실제로는 매출 실적이 있으므로 "MOU 미체결"
+    // (실적 있음·MOU 미체결)로 분류하는 게 맞다는 요청. classifiedCaseByCaseRows(기존
+    // classifyUnregisteredCompaniesByMouMaster 판정 그대로, 새 로직 없음)를 이제 건바이건
+    // 대신 이 탭에 붙인다 — 아래 renderNonPartnerRevenueTab 호출부(§) 에서 더 이상 이
+    // 목록을 넘기지 않도록 같이 바꿨다.
+    const classifiedRevenueNoMouRows = filterKey === 'revenueNoMou'
+      ? classifiedCaseByCaseRows.filter(x=> !searchQuery || [x.name, x.latestSite, x.latestDate].join(' ').toLowerCase().includes(searchQuery.toLowerCase()))
+      : [];
 
     const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
     if(currentPage > totalPages) currentPage = totalPages;
     const pageRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-    if(!rows.length && !classifiedMouRows.length){
+    if(!rows.length && !classifiedMouRows.length && !classifiedRevenueNoMouRows.length){
       // §고객관리카드 단일 원본 전환 라운드(신규) — companies가 아직 0건일 때, 정말로
       // "등록된 고객이 없습니다"인지 아니면 클라우드에서 아직 못 받아온 것뿐인지 구분한다
       // (§요청 5). 검색어로 걸러져서 0건이 된 경우(companies.length>0)는 건드리지 않는다.
@@ -12246,6 +12264,13 @@ window.SHIN2_CRM_APP_INIT = function(){
     }).join('');
     if(filterKey === 'mouDone' && currentPage === 1 && classifiedMouRows.length){
       listEl.insertAdjacentHTML('afterbegin', classifiedUnregisteredTableHtml(classifiedMouRows, '엑셀 기준 MOU 체결 · CRM 미등록', 'MOU 체결'));
+      bindClassifiedUnregisteredRows(listEl);
+    }
+    // §매출자료 미등록 업체 재분류 라운드(신규) — 위 classifiedRevenueNoMouRows와 같은 패턴
+    // (mouDone 탭의 "엑셀 기준 MOU 체결 · CRM 미등록"과 완전히 동일한 구조). 클릭하면
+    // 기존 openAddCompanyForm(업체명 미리 입력된 등록 화면)으로 연결 — 새 로직 없음.
+    if(filterKey === 'revenueNoMou' && currentPage === 1 && classifiedRevenueNoMouRows.length){
+      listEl.insertAdjacentHTML('afterbegin', classifiedUnregisteredTableHtml(classifiedRevenueNoMouRows, '엑셀 기준 실적있음·MOU미체결 · CRM 미등록', 'MOU 미체결'));
       bindClassifiedUnregisteredRows(listEl);
     }
     // §실적↔매출 실제 구현 라운드: "실적↔매출" 클릭 -> 실적·매출 분석 Drawer(다른 컬럼과
@@ -21997,12 +22022,33 @@ window.SHIN2_CRM_APP_INIT = function(){
     const root = document.getElementById('unregModalRoot');
     if(root) root.innerHTML = '';
   }
+  // §애매한 일치 체크리스트 라운드(신규) — 사용자 요청: 두레이앤씨(주)처럼 실제로는 이미
+  // CRM에 등록된 업체인데 이름이 (보이지 않는 문자 등으로) 완전일치하지 않아 "미등록"으로
+  // 잘못 뜨는 경우가 있어, 자동으로 연결/제외하지 말고 "애매한 일치" 후보만 뽑아서 사람이
+  // 직접 확인 후 체크할 수 있는 체크리스트로 보여달라는 요청. 매칭 판정은 새로 만들지
+  // 않고 기존 §Google Sheets 확인 필요 유사후보 제안 라운드의 D.findSimilarCompanySuggestions
+  // (레벤슈타인 편집거리 기반, "완전일치만 자동 연결" 원칙은 그대로)를 그대로 재사용한다.
+  // 체크 상태는 순수 사람이 검토했다는 표시일 뿐이라 별도 서버 동기화 없이 로컬에만
+  // 저장한다(§업체명 기준 — 이 화면은 검토 도구일 뿐 데이터 매칭 자체를 바꾸지 않는다).
+  const UNREG_AMBIGUOUS_CHECKED_KEY = 'shin2-unreg-ambiguous-checked-v1';
+  function loadUnregAmbiguousChecked(){
+    try{ const raw = localStorage.getItem(UNREG_AMBIGUOUS_CHECKED_KEY); return raw ? new Set(JSON.parse(raw)) : new Set(); }
+    catch(e){ return new Set(); }
+  }
+  function saveUnregAmbiguousChecked(set){
+    try{ localStorage.setItem(UNREG_AMBIGUOUS_CHECKED_KEY, JSON.stringify(Array.from(set))); } catch(e){}
+  }
   function openUnregisteredPanel(){
     const root = document.getElementById('unregModalRoot');
     if(!root) return;
     const list = D.buildUnregisteredCompanies2026();
     const classified = D.classifyUnregisteredCompaniesByMouMaster(list);
     const classificationByName = new Map(classified.mou.concat(classified.caseByCase).map(x=> [x.name, x]));
+    const activeCompanies = D.loadActiveCompanies();
+    const ambiguous = list
+      .map(x=> Object.assign({}, x, { suggestions: D.findSimilarCompanySuggestions(x.name, activeCompanies) }))
+      .filter(x=> x.suggestions.length);
+    const checkedSet = loadUnregAmbiguousChecked();
     root.innerHTML = `
       <div class="pi-overlay" id="unregOverlay">
         <div class="pi-panel" role="dialog" aria-modal="true" aria-label="매출자료 미등록 업체">
@@ -22020,6 +22066,24 @@ window.SHIN2_CRM_APP_INIT = function(){
             <div class="pi-note" style="margin-top:6px;">판정 기준: 매출현황 업체명과 CRM 업체명을 정규화(법인 표기·공백·괄호·점·하이픈 등 제거, 대소문자 무시)해서 완전히 일치할 때만 "등록됨"으로 봅니다. 이름이 비슷하다는 이유만으로는 자동으로 연결하지 않으며, 별도로 저장하지 않고 화면을 열 때마다 다시 계산하므로 CRM에 등록하는 즉시 목록에서 빠집니다.</div>
             <div class="pi-note" style="margin-top:6px;">업체명을 클릭하면 고객 등록 화면이 열리고 업체명만 미리 입력됩니다 — 매출금액은 자동 저장되지 않으며, 확인 후 직접 저장해야 등록됩니다.</div>
             <div class="pi-note" style="margin-top:6px;">첨부 엑셀 기준 자동 분류: MOU 체결 ${classified.mou.length}곳 · 건바이건 ${classified.caseByCase.length}곳. 엑셀에 없거나 체결일이 없는 업체는 건바이건으로 분류합니다.</div>
+            ${ambiguous.length ? `
+              <div style="margin-top:14px;padding:10px;border:1px solid #FCA5A5;border-radius:8px;background:#FEF2F2;">
+                <div style="font-weight:700;margin-bottom:4px;color:#B91C1C;">⚠ 애매한 일치 · ${ambiguous.length}곳 — 이미 등록된 업체일 수 있음</div>
+                <div class="pi-note" style="margin-bottom:8px;">이름이 비슷한 CRM 업체가 있습니다. 자동으로 연결하지 않으니, 실제로 같은 업체인지 "고객카드 보기"로 직접 확인한 뒤 체크해주세요. 체크 표시는 이 브라우저에만 저장됩니다.</div>
+                <table class="pi-sample-table" style="margin:0;background:#fff;">
+                  <thead><tr><th style="width:32px;"></th><th>미등록 업체명</th><th>2026 매출</th><th>유사한 CRM 업체</th></tr></thead>
+                  <tbody>
+                    ${ambiguous.map(x=> `
+                      <tr data-ambiguous-row="${esc(x.name)}">
+                        <td><input type="checkbox" class="unreg-ambiguous-check" data-ambiguous-check="${esc(x.name)}" ${checkedSet.has(x.name) ? 'checked' : ''}/></td>
+                        <td>${esc(x.name)}</td>
+                        <td>${esc(fmtKrwCompact(x.revenue2026))}</td>
+                        <td>${x.suggestions.map(s=> `<div>${esc(s.companyName)} <span style="color:var(--text-muted);">(편집거리 ${s.distance})</span> <button type="button" class="co-text-action" data-ambiguous-open-card="${esc(s.companyId)}">고객카드 보기</button></div>`).join('')}</td>
+                      </tr>`).join('')}
+                  </tbody>
+                </table>
+              </div>
+            ` : ''}
             ${list.length ? `
               <table class="pi-sample-table" style="margin-top:10px;">
                 <thead><tr><th>업체명</th><th>2026 매출</th><th>최근 매출일</th><th>최근 현장명</th><th>상태</th><th>분류</th></tr></thead>
@@ -22051,6 +22115,27 @@ window.SHIN2_CRM_APP_INIT = function(){
         const name = row.getAttribute('data-name');
         closeUnregisteredPanel();
         openAddCompanyForm(name);
+      });
+    });
+    // §애매한 일치 체크리스트 라운드(신규) — 체크박스는 클릭해도 행 전체를 클릭한 게 아니라
+    // 상태만 저장한다(자동 연결/자동 제외 없음, 사람이 직접 확인했다는 표시일 뿐).
+    root.querySelectorAll('[data-ambiguous-check]').forEach(cb=>{
+      cb.addEventListener('click', (e)=> e.stopPropagation());
+      cb.addEventListener('change', ()=>{
+        const name = cb.getAttribute('data-ambiguous-check');
+        const set = loadUnregAmbiguousChecked();
+        if(cb.checked) set.add(name); else set.delete(name);
+        saveUnregAmbiguousChecked(set);
+      });
+    });
+    // "고객카드 보기" — 유사 후보로 뜬 CRM 업체가 실제로 같은 업체인지 직접 대조할 수 있게
+    // 패널을 닫고 그 업체 카드를 연다(기존 unreg-row 클릭과 같은 패턴).
+    root.querySelectorAll('[data-ambiguous-open-card]').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const id = btn.getAttribute('data-ambiguous-open-card');
+        closeUnregisteredPanel();
+        openCard(id);
       });
     });
   }
