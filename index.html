@@ -11001,8 +11001,17 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 리스트 동기화가 안되도 협력사로 들어온건 다 mou체결로 해줘" — 결국 isConfirmedPartner
   // (리스트 등재 co.partnerStatus==='partner' OR MOU 단계 done) 그대로다. 새 판정 로직
   // 없음 — 이미 있는 isConfirmedPartner를 그대로 재사용한다.
+  // §메인 탭 5번째 추가 라운드(신규) — 사용자 요청: 전체/협약 진행/MOU체결/협약 종료와
+  // 같은 줄·같은 칩 UI로 "실적 있음 · MOU 미체결" 탭을 추가한다. 아래 기존
+  // 'nonPartnerRevenue'(건바이건 업체와 합쳐진 전용 화면 아이콘 버튼, §실적있음·MOU미체결
+  // + 건바이건 통합 라운드)는 그대로 두고 건드리지 않는다 — 키를 재사용하면 그 전용 화면
+  // (renderNonPartnerRevenueTab)도 같이 바뀌어버려 §요청 "기존 업체 카드에 표시되는
+  // 정보를 동일하게, 검색·상세보기·수정·저장도 기존 탭과 똑같이"를 못 맞춘다(그 화면은
+  // 표준 7컬럼 테이블이 아닌 별도 축약 표). 그래서 새 키 'revenueNoMou'를 따로 둔다.
+  // 판정 조건은 완전히 동일해야 하므로 새 로직을 만들지 않고 matchesFilter 안에서
+  // key==='nonPartnerRevenue' 분기를 그대로 재호출(아래)한다.
   const FILTER_DEFS = [
-    ['all','전체'], ['agreementInProgress','협약 진행'], ['mouDone','MOU체결'], ['newPartner','신규 협약사'], ['agreementTerminated','협약 종료'], ['subsidiary','이전 상호'], ['trendUp','최근흐름 상승세'], ['nonPartnerRevenue','실적있음·MOU미체결']
+    ['all','전체'], ['agreementInProgress','협약 진행'], ['mouDone','MOU체결'], ['newPartner','신규 협약사'], ['agreementTerminated','협약 종료'], ['subsidiary','이전 상호'], ['trendUp','최근흐름 상승세'], ['nonPartnerRevenue','실적있음·MOU미체결'], ['revenueNoMou','실적 있음 · MOU 미체결']
   ];
   // §업체 삭제(휴지통) 라운드(신규) — "삭제된 업체" 탭은 위 FILTER_DEFS와 별도로 둔다.
   // 이유: filterCounts[key]는 companies(=D.loadActiveCompanies(), 삭제된 업체가 이미
@@ -11076,6 +11085,10 @@ window.SHIN2_CRM_APP_INIT = function(){
       const revenue = D.getCompanyTotalRevenueAllYears(co);
       return !!revenue && !revenue.ambiguous && typeof revenue.total === 'number' && revenue.total > 0 && !isConfirmedPartner(co, progress);
     }
+    // §메인 탭 5번째 추가 라운드(신규) — "실적 있음 · MOU 미체결" 메인 탭. 판정 기준은
+    // 위 'nonPartnerRevenue'와 완전히 동일해야 한다는 요청이라 새 로직을 만들지 않고
+    // 그대로 재호출한다(키만 다르다 — 화면 렌더링 경로를 분리하기 위한 용도).
+    if(key === 'revenueNoMou') return matchesFilter(co, progress, 'nonPartnerRevenue', relationIndex);
     if(key === 'inProgress') return progress.hasAny; // §지도분포 필터(MAP_FILTER_DEFS) 등 다른 화면이 여전히 참조 — 의미 유지
     // §고객관리 탭 3개 재구성 라운드 → §MOU체결 기준 재정정 라운드: 처음엔 "순수하게 MOU
     // 단계 체결완료만"(partnerStatus 리스트 등재는 안 봄)으로 만들었는데, 사용자가 실제
@@ -11424,6 +11437,9 @@ window.SHIN2_CRM_APP_INIT = function(){
     agreementInProgress: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>',
     hurdle: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v4"/><circle cx="12" cy="16.5" r=".8" fill="currentColor" stroke="none"/></svg>',
     nonPartnerRevenue: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v10H4z"/><path d="M8 12h8"/><circle cx="12" cy="12" r="2.5"/></svg>',
+    // §메인 탭 5번째 추가 라운드(신규) — 새 순수 장식 아이콘, 기존 'nonPartnerRevenue'
+    // 아이콘 버튼과 같은 도형을 그대로 재사용(새 디자인을 만들지 않음).
+    revenueNoMou: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v10H4z"/><path d="M8 12h8"/><circle cx="12" cy="12" r="2.5"/></svg>',
     receivable: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.8v5"/><circle cx="12" cy="16" r="0.9" fill="currentColor" stroke="none"/></svg>',
     mouDone: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12.5 8 21l4-2 4 2-1-8.5"/><circle cx="12" cy="7" r="5"/><path d="m9.3 7 1.8 1.8L15 5.3"/></svg>',
     newPartner: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v7"/><path d="M8.5 6.5 12 3l3.5 3.5"/><rect x="4" y="12" width="16" height="8" rx="1.5"/></svg>',
@@ -11436,7 +11452,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   // filterKey 대입, renderList 재호출)은 전혀 안 건드리고, 순수하게 3그룹으로 나눠
   // 시각적으로만 구분한다: 상태 필터(칩 모양 유지)/분석(텍스트 링크)/정리(텍스트 링크,
   // 처리 대기 있으면 빨간 점).
-  const FILTER_GROUP_STATE = ['all','agreementInProgress','mouDone','agreementTerminated'];
+  const FILTER_GROUP_STATE = ['all','agreementInProgress','mouDone','agreementTerminated','revenueNoMou'];
   const FILTER_GROUP_ANALYSIS = ['newPartner','trendUp','l2l3Manage'];
   // §삭제 업체 휴지통 분리 라운드(신규) — "삭제된 업체"만 정리 팝오버에서 빼서 별도
   // 휴지통 아이콘 버튼으로 뺀다(§요청 "삭제 업체는 따로 빼서 휴지통 아이콘으로"). 나머지
