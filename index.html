@@ -2727,7 +2727,7 @@ html,body{background:radial-gradient(circle at 75% -10%,rgba(11,91,211,.055),tra
    --text 토큰만 재사용 — 새 팔레트 없음, 그라데이션 없음.
    ========================================================================== */
 .map-modal-overlay{ position:fixed; inset:0; z-index:350; background:rgba(20,24,34,.45); display:flex; align-items:center; justify-content:center; padding:20px; }
-.map-modal-panel{ background:#fff; border-radius:12px; width:90%; max-width:1500px; height:88vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(17,24,39,.22); }
+.map-modal-panel{ background:#fff; border-radius:12px; width:88%; max-width:1400px; height:86vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(17,24,39,.22); }
 .map-modal-head{ flex:none; padding:16px 22px; border-bottom:1px solid var(--line); display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
 .map-modal-title-wrap{ flex:1; min-width:0; }
 .map-modal-title{ font-size:18px; font-weight:700; color:var(--text); }
@@ -3941,15 +3941,18 @@ table.pdf-doc-table thead{ background:var(--bg); }
    (--navy/--line/--bg/--text 등, 위에서 이미 선언된 값)만 재사용하고 새 팔레트를
    만들지 않는다. 기존 글꼴 스택(Pretendard 등, 위 body 규칙)도 그대로 둔다.
    ========================================================================== */
-/* §플로팅 지도 버튼 라운드(신규, §요청 2) — 오른쪽 지도 칸(.crm-map-col)을 없앴으니
-   1열 그리드로 바꿔 업체 목록이 메인 콘텐츠 폭을 거의 그대로 쓴다. */
 .crm-main-grid{
-  display:grid; grid-template-columns: 1fr;
+  display:grid; grid-template-columns: minmax(0,1fr) minmax(0,420px);
   grid-template-rows: auto 1fr; gap:16px; align-items:start;
 }
+@media(min-width:1400px){ .crm-main-grid{ grid-template-columns: 70% 30%; } }
 .crm-panel{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px 16px; box-shadow:0 2px 8px rgba(22,44,78,.035); }
 .crm-kpi-cell{ grid-column:1; grid-row:1; margin-bottom:0!important; }
 .crm-list-col{ min-width:0; grid-column:1; grid-row:2; }
+/* §요청(신규) "시공사 지역 분포가 위 빈 공간까지 쭉 올라가야 해" — 오른쪽 지도 카드를
+   1행(KPI 줄)~2행(업체목록 줄)에 걸쳐 세로로 늘려서, KPI 줄 옆에 비어 있던 공간까지
+   위로 채운다. align-self:stretch로 늘어난 세로 공간을 실제로 다 채우게 한다. */
+.crm-map-col{ min-width:0; display:flex; flex-direction:column; grid-column:2; grid-row:1 / span 2; align-self:stretch; height:100%; }
 .crm-panel-title{ font-size:14px; font-weight:800; color:var(--navy); margin-bottom:10px; }
 .crm-list-col .list-filter-row{ margin-top:0; }
 .crm-rising-bottom{ margin-top:16px; width:100%; }
@@ -4056,21 +4059,6 @@ table.pdf-doc-table thead{ background:var(--bg); }
    퍼지지 않게 max-width로 살짝 눌러준다. */
 .kpi-strip{ max-width:920px!important; }
 .kpi-item{ flex:1 1 0!important; }
-
-/* §플로팅 지도 버튼 라운드(신규, §요청 3) — 딥네이비 배경 + 흰 아이콘, 54px 원형,
-   옅은 그림자. #listView 안에 있어 어떤 필터 pill을 골라도(§요청 9) 계속 떠 있는다. */
-.map-float-btn{
-  position:fixed; right:24px; bottom:24px; z-index:60;
-  width:54px; height:54px; border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  background:var(--navy); color:#fff; border:none; cursor:pointer;
-  box-shadow:0 4px 14px rgba(16,43,73,.32);
-}
-.map-float-btn:hover{ background:var(--navy-hover); box-shadow:0 6px 18px rgba(16,43,73,.4); }
-.map-float-btn:focus-visible{ outline:2px solid #fff; outline-offset:2px; }
-@media(max-width:760px){
-  .map-float-btn{ right:16px; bottom:16px; width:50px; height:50px; }
-}
 </style>
 </head>
 <body>
@@ -4187,20 +4175,21 @@ table.pdf-doc-table thead{ background:var(--bg); }
         <div class="list-title" id="crmListTitle">고객</div>
       </div>
     </div>
-    <!-- §플로팅 지도 버튼 라운드(신규) — "고정 오른쪽 패널" → "플로팅 지도 버튼 + 큰
-         지도 모달" 방식으로 전환(§요청 1-4). 오른쪽에 항상 떠 있던 .crm-map-col 카드
-         (지도/지역요약/지역별업체수를 인라인 마운트하던 자리)를 없애고, 업체 목록이
-         전체 폭을 쓰도록 1열 그리드로 바꿨다. 지도 기능 자체(렌더 함수/필터/클러스터·
-         히트맵/지역요약)는 하나도 안 지웠다 — 원래 있던 진짜 모달 함수
-         openMapDistributionModal()이 그대로 열어준다(아래 #crmMapFloatBtn 클릭
-         바인딩, "진입" 섹션 참고). 이 함수는 §고객관리 메인화면 재배치 라운드 이전부터
-         있던 원본 팝업 구현이고, 그때 지운 적이 없다 — 인라인 마운트용 보조 함수
-         mountMapDistributionInline()만 새로 안 쓰게 됐을 뿐(정의는 그대로 남겨둠,
-         죽은 코드지만 실수로 다시 불러도 안전). "업체 상태별 현황" 도넛은 이 파일에
-         애초에 존재하지 않았다(전수 검색 결과 없음). -->
+    <!-- §고객관리 메인화면 재배치 라운드(신규) — 사이드바 없이 상단 KPI 스트립(기존
+         renderKpiStrip 그대로 재사용) 아래를 "업체 목록"(좌, ~70%)과 "지도 분포"(우, ~30%)
+         2열 그리드로 나눈다(§요청 0/23). "업체 상태별 현황" 도넛은 이 파일에 애초에
+         존재하지 않았다(전수 검색 결과 없음 — 별도 제거 작업 불필요). "실적 상승 업체"는
+         이 그리드 밖, 페이지 맨 아래로 옮겼다(아래 #crmRisingSection 참고, §요청 21/22). -->
+    <!-- §요청(신규) — "시공사 지역 분포가 위에 비어있는 공간까지 쭉 올라가야 해":
+         KPI 스트립을 .crm-main-grid 밖의 독립된 줄로 두면, 오른쪽 지도 카드는 그
+         아래(2번째 줄)에서만 시작해서 KPI 줄 옆(오른쪽) 공간이 그대로 비었다. KPI
+         스트립을 그리드 안 좌측 칸의 1행으로 넣고, 지도 카드(.crm-map-col)를
+         1행~2행에 걸쳐 세로로 붙여서(grid-row:1/span 2) 그 빈 공간까지 위로 올라가
+         채우게 한다 — renderKpiStrip()이 채우는 대상 id(#crmKpiStrip)는 그대로라
+         KPI 계산/렌더 로직은 전혀 안 건드렸다. -->
     <div class="crm-main-grid">
       <div class="kpi-strip crm-kpi-cell" id="crmKpiStrip"></div>
-      <!-- 업체 목록 카드 — 검색/정렬/필터 pill/표는 전부 기존 DOM·id·렌더 함수
+      <!-- 좌: 업체 목록 카드 — 검색/정렬/필터 pill/표는 전부 기존 DOM·id·렌더 함수
            (renderFilterChips/renderList/applySort 등) 그대로, 카드 틀만 새로 씌운다. -->
       <div class="crm-panel crm-list-col">
         <div class="crm-panel-title">업체 목록</div>
@@ -4281,6 +4270,14 @@ table.pdf-doc-table thead{ background:var(--bg); }
         <div class="co-list" id="crmList"></div>
         <div class="list-pagination" id="crmPagination"></div>
       </div>
+      <!-- 우: 지도 분포 카드 — §요청 14-19. 기존 팝업(openMapDistributionModal)이 쓰던
+           것과 완전히 같은 렌더 함수(renderMapModalBody/renderMapModalMain/
+           renderMapInfoPanel)를 그대로 재사용하되, 팝업으로 열지 않고 이 자리에 항상
+           마운트해 둔다(아래 mountMapDistributionInline, renderList()에서 최초 1회만 호출). -->
+      <div class="crm-panel crm-map-col">
+        <div class="crm-panel-title">시공사 지역 분포</div>
+        <div id="mapDistributionModalRoot" class="map-embed-root"></div>
+      </div>
     </div>
     <!-- §요청 21/22 — "실적 상승 업체"를 페이지 맨 아래, 전체 폭 1줄로 옮긴다. 계산
          함수(computeRisingCompanies/buildRisingCompaniesTop5)와 렌더 함수(renderRisingSection)
@@ -4288,15 +4285,6 @@ table.pdf-doc-table thead{ background:var(--bg); }
     <div class="analysis-panel analysis-panel-rising crm-rising-bottom">
       <div class="rising-section" id="crmRisingSection"></div>
     </div>
-    <!-- §플로팅 지도 버튼 라운드(신규, §요청 3/9) — position:fixed라 문서 흐름과 무관하게
-         항상 우하단에 떠 있는다. #listView 안에 두면 전체/협약종료/실적있음·MOU미체결/
-         쓰레기통업체/의지박약/건바이건 등 어떤 pill 필터를 선택해도(전부 같은 #listView
-         안에서 #crmList만 다시 그리는 탭이라) 계속 표시된다 — workQueueView/
-         mailSettingsView(별도 최상위 view)로 전환했을 때만 #listView 자체가 숨겨지며
-         같이 사라진다. -->
-    <button type="button" class="map-float-btn" id="crmMapFloatBtn" aria-label="지도 보기" title="지도 보기">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20l-5.447-2.724A1 1 0 0 1 3 16.382V5.618a1 1 0 0 1 1.447-.894L9 7m0 13l6-3m-6-13v13m6 0l4.553-2.276A1 1 0 0 0 21 16.382V5.618a1 1 0 0 0-1.447-.894L15 7m0 13V7m0 0L9 4"/></svg>
-    </button>
   </div>
 
   <div id="cardView" style="display:none;"></div>
@@ -12098,9 +12086,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 호출만 없앴다 — renderManagementTodayPanel 함수 정의와 managementNeedCache
     // 계산(관리필요 버튼/모달/고객카드 배너가 계속 씀) 자체는 그대로 둔다.
     renderKpiStrip(filterCounts);
-    // §플로팅 지도 버튼 라운드(신규) — 지도는 더 이상 renderList()마다 자동으로 화면에
-    // 마운트되지 않는다(§요청 1 "고정 패널 제거"). #crmMapFloatBtn을 눌렀을 때만
-    // openMapDistributionModal()이 진짜 모달로 연다(아래 "진입" 섹션 바인딩 참고).
+    // §고객관리 메인화면 재배치 라운드(신규) — 지도 분포를 팝업이 아니라 페이지에 항상
+    // 인라인으로 마운트한다(§요청 14-17). mountMapDistributionInline 내부에서 mapModalOpen
+    // 플래그로 최초 1회만 실제로 마운트하므로, 필터/검색/페이지 이동으로 renderList()가
+    // 반복 호출돼도 카카오맵 인스턴스를 매번 새로 만들지 않는다.
+    if(typeof mountMapDistributionInline === 'function') mountMapDistributionInline();
 
     // §업체 삭제(휴지통) 라운드(신규) — "삭제된 업체" 탭은 위에서 이미 칩/KPI 스트립까지
     // 정상적으로 그린 뒤(다른 탭과 똑같이 계속 클릭 가능해야 하므로), 여기서부터 이어지는
@@ -29228,12 +29218,6 @@ window.SHIN2_CRM_APP_INIT = function(){
      나머지 CRM 기능에는 전혀 영향이 없도록 완전히 분리한다(§보안 원칙).
      ========================================================================== */
   let mapModalOpen = false;
-  // §플로팅 지도 버튼 라운드(신규, §요청 7) — "모달을 닫았다 다시 열어도 검색어/필터/
-  // 클러스터-히트맵/지도 중심/줌 유지" — 닫을 때 mapCanvasState.map에서 마지막 중심좌표/
-  // 줌레벨만 module-level 변수에 저장해두고, initMapCanvas/initAptMapCanvas가 새 지도를
-  // 만들 때 이 값이 있으면 기본값(대한민국 중앙, level 13) 대신 이 값을 쓴다.
-  let mapLastCenterLatLng = null, mapLastLevel = null;
-  let aptLastCenterLatLng = null, aptLastLevel = null;
   let mapModalOutsideHandlers = null; // ESC/배경클릭 핸들러 — 열 때마다 재등록·정리
   // §지도→고객카드 뒤로가기 라운드(신규) — 지도 위에 고객카드가 겹쳐 열려있는 동안은
   // 지도 쪽 ESC 핸들러를 잠깐 떼어둔다(pauseMapEscHandler/resumeMapEscHandler). 두
@@ -29316,36 +29300,19 @@ window.SHIN2_CRM_APP_INIT = function(){
   }
 
   function closeMapDistributionModal(){
-    // §플로팅 지도 버튼 라운드(신규, §요청 7) — Kakao map/marker 객체는 DOM이 사라지면
-    // 재사용할 수 없어 destroy 자체는 그대로 하지만, 그 전에 마지막 중심좌표/줌레벨만
-    // 뽑아 저장해서 다음 open 때 initMapCanvas/initAptMapCanvas가 이어서 쓴다.
-    if(mapCanvasState && mapCanvasState.map){
-      try{
-        const c = mapCanvasState.map.getCenter();
-        mapLastCenterLatLng = { lat: c.getLat(), lng: c.getLng() };
-        mapLastLevel = mapCanvasState.map.getLevel();
-      }catch(err){ /* 무시 — 다음 open은 기본 중심으로 */ }
-    }
-    if(aptCanvasState && aptCanvasState.map){
-      try{
-        const c = aptCanvasState.map.getCenter();
-        aptLastCenterLatLng = { lat: c.getLat(), lng: c.getLng() };
-        aptLastLevel = aptCanvasState.map.getLevel();
-      }catch(err){ /* 무시 */ }
-    }
     const root = document.getElementById('mapDistributionModalRoot');
     if(root) root.innerHTML = '';
     mapModalOpen = false;
     document.body.classList.remove('map-modal-lock');
     if(mapModalOutsideHandlers){ mapModalOutsideHandlers(); mapModalOutsideHandlers = null; }
     mapEscHandlerFn = null;
-    // §플로팅 지도 버튼 라운드(신규, §요청 7) — 예전엔 여기서 mapFilterState/aptFilterState/
-    // mapActiveTab을 매번 기본값으로 되돌렸다("닫으면 초기화"). 사용자 확인: "다시 열었을
-    // 때 검색어/필터/클러스터-히트맵 상태 유지" — 그래서 이 3개는 더 이상 리셋하지 않고
-    // 그대로 모듈 변수에 남겨 다음 open이 이어서 쓴다. 지도 인스턴스(mapCanvasState 등)는
-    // Kakao 객체 특성상 그대로 재사용할 수 없어 여전히 destroy 후 다음 open 때 새로 만든다
-    // (그때 mapLastCenterLatLng/mapLastLevel로 중심/줌만 이어붙인다, 위 initMapCanvas 참고).
-    invalidateMapCompaniesCache(); // §MAP-PERF: 닫을 때도 비워둔다(다음 open이 항상 최신 데이터로 새로 계산)
+    // §지도분포2: 팝업을 닫으면 필터/지도 인스턴스 상태를 초기화한다 — 다음에 열 때는
+    // 항상 "전체" 상태로 새로 시작하고, 닫혀있던 동안 바뀐 최신 companies로 다시
+    // 그려진다(§동기화 규칙 "닫혀 있어도 다음에 열 때 최신 데이터 사용").
+    mapFilterState = { search:'', filterKey:'all', category:'all', pourRange:'all', viewMode:'cluster', listView:'inBounds' };
+    aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all', nearCenter:null, nearRadiusKm:5, nearQuery:'' };
+    mapActiveTab = 'company'; // §요청 "기본 선택은 시공사" — 매번 열 때 항상 기본 탭으로 시작
+    invalidateMapCompaniesCache(); // §MAP-PERF: 닫을 때도 비워둔다(다음 open이 항상 새로 계산하도록, 방어적)
     if(mapCanvasState && typeof mapCanvasState.destroy === 'function'){
       try{ mapCanvasState.destroy(); } catch(err){ /* 지도 정리 실패는 무시 — 다음 열기에서 새로 만들어짐 */ }
     }
@@ -30155,13 +30122,8 @@ window.SHIN2_CRM_APP_INIT = function(){
     const container = document.getElementById('mapModalCanvas');
     if(!container) return;
     mapPerfMark('map init start');
-    // §플로팅 지도 버튼 라운드(신규, §요청 7/8) — 이전에 닫을 때 저장해둔 중심/줌이
-    // 있으면 그걸로 시작(재오픈 시 상태 유지), 없으면(첫 오픈) 기존 그대로 대한민국
-    // 대략 중앙 + level 13.
-    const center = mapLastCenterLatLng
-      ? new kakao.maps.LatLng(mapLastCenterLatLng.lat, mapLastCenterLatLng.lng)
-      : new kakao.maps.LatLng(36.2, 127.9);
-    const map = new kakao.maps.Map(container, { center, level: mapLastLevel || 13 });
+    const center = new kakao.maps.LatLng(36.2, 127.9); // 대한민국 대략 중앙
+    const map = new kakao.maps.Map(container, { center, level: 13 });
     if(kakao.maps.ZoomControl){
       map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
     }
@@ -30644,12 +30606,8 @@ window.SHIN2_CRM_APP_INIT = function(){
   function initAptMapCanvas(kakao, allEntries){
     const container = document.getElementById('mapModalCanvas');
     if(!container) return;
-    // §플로팅 지도 버튼 라운드(신규, §요청 7/8) — 시공사 탭(initMapCanvas)과 동일하게
-    // 마지막 중심/줌을 이어받는다(아파트 탭 전용 변수 aptLastCenterLatLng/aptLastLevel).
-    const center = aptLastCenterLatLng
-      ? new kakao.maps.LatLng(aptLastCenterLatLng.lat, aptLastCenterLatLng.lng)
-      : new kakao.maps.LatLng(36.2, 127.9);
-    const map = new kakao.maps.Map(container, { center, level: aptLastLevel || 13 });
+    const center = new kakao.maps.LatLng(36.2, 127.9);
+    const map = new kakao.maps.Map(container, { center, level: 13 });
     if(kakao.maps.ZoomControl){ map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT); }
     // 확대(개별 마커) 단계에서만 쓰는 네이티브 클러스터러 — 시공사 탭과 동일 패턴.
     const clusterer = new kakao.maps.MarkerClusterer({
@@ -31815,9 +31773,6 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 버튼)은 HTML에서 제거했으므로 그 바인딩도 함께 없앤다. 상단 "PDF 내보내기" 버튼
   // 하나만 openPdfExportModal을 연다(예전엔 openMouPdfMenuModal이었음).
   document.getElementById('crmMouPdfBtn').addEventListener('click', openPdfExportModal);
-  // §플로팅 지도 버튼 라운드(신규, §요청 3/4) — 원래부터 있던 진짜 모달 함수
-  // openMapDistributionModal()을 그대로 연결. 새 지도 코드 없음.
-  document.getElementById('crmMapFloatBtn').addEventListener('click', openMapDistributionModal);
   // §업체 추가 폼 이관 라운드에서 함께 수정: addEventListener('click', openAddCompanyForm)로
   // 직접 등록하면 클릭 이벤트(MouseEvent)가 그대로 prefillName 인자로 들어가 이름칸에
   // "[object MouseEvent]"가 채워지는 기존 버그가 있었다 — 인자 없이 호출하도록 감싼다.
