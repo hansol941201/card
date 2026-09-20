@@ -4048,6 +4048,12 @@ table.pdf-doc-table thead{ background:var(--bg); }
                  위치(관리 도구 드롭다운)에 새 항목만 추가한다(§요청, 새 진입점을 따로
                  만들지 않음). -->
             <button type="button" id="crmMasterImportBtn">마스터 업체 명단 가져오기</button>
+            <!-- §협력사 엑셀 일괄 반영 라운드(신규) — 사용자가 별도 관리하는 협력사 엑셀을
+                 그때그때 업로드해서 "이미 협력사로 확정된 업체"들의 MOU 상태·B2B 코드만
+                 보정하는 새 도구. 위 "마스터 업체 명단 가져오기"(고정 임베드 스냅샷,
+                 masterCode/프로필 필드 갱신용)와는 목적과 대상 필드가 달라 완전히 별도
+                 진입점으로 둔다 — 그 도구는 이 라운드에서 전혀 건드리지 않는다. -->
+            <button type="button" id="crmPartnerExcelImportBtn">협력사 엑셀 일괄 반영</button>
             <!-- §로컬-클라우드 비교 라운드(신규, §요청 2) — Firestore 원본을 병합 없이
                  그대로 읽어 이 기기 localStorage와 나란히 비교만 한다. 자동 저장은
                  전혀 하지 않고, 사람이 항목을 직접 선택했을 때만 Firestore에 반영한다. -->
@@ -4243,6 +4249,10 @@ table.pdf-doc-table thead{ background:var(--bg); }
   <!-- §마스터 업체 명단 가져오기 라운드(신규) — 미리보기/적용 전용 모달 root. 같은
        .pi-overlay/.pi-panel 패턴. -->
   <div id="masterImportModalRoot"></div>
+  <!-- §협력사 엑셀 일괄 반영 라운드(신규) — 위 마스터 업체 명단 가져오기와 같은
+       .pi-overlay/.pi-panel 패턴이지만 완전히 별도의 도구(이 파일은 절대 안 건드림).
+       업로드한 엑셀을 그때그때 파싱해서 미리보기 → 확정 반영하는 전용 모달 root. -->
+  <div id="partnerExcelImportModalRoot"></div>
   <!-- §중복 업체 병합 라운드(신규) — 중복 후보 목록(읽기 전용) + 선택/미리보기/적용 병합
        도구, 두 개의 전용 root. 같은 .pi-overlay/.pi-panel 패턴(새 시각 언어 없음). -->
   <div id="dupListModalRoot"></div>
@@ -23441,6 +23451,419 @@ window.SHIN2_CRM_APP_INIT = function(){
   }
 
   /* ==========================================================================
+     §협력사 엑셀 일괄 반영 라운드(신규) — "관리 도구 ▸ 협력사 엑셀 일괄 반영".
+     사용자가 별도로 관리하는 협력사 엑셀(업로드할 때마다 다른 파일일 수 있음)을 넣으면,
+     그 안의 업체는 전부 "이미 협력사로 확정된 업체"로 간주해 MOU 상태·B2B 고유코드만
+     보정한다. 위 마스터 업체 명단 가져오기(masterCode/프로필 필드, 고정 임베드 스냅샷)와는
+     목적·대상 필드가 달라 완전히 별도 함수/모달로 둔다 — 그 도구의 함수는 이 라운드에서
+     한 글자도 안 바꿨다.
+
+     안전 원칙(순수 계산 → 사람 확인 → 명시 적용, 이 파일 전체가 지켜온 관례 그대로):
+     - previewPartnerExcelImport()는 아무것도 저장하지 않는다.
+     - applyPartnerExcelImport()만 실제로 저장하며, preview가 matched로 분류한 행만 쓴다.
+     - 업체명/연락처/주소/대표자/이메일/메모/활동기록/매출/실적/질문지/문서/첨부파일은
+       전혀 건드리지 않는다 — 건드리는 필드는 co.code(B2B 코드)와 MOU 상태(partnerStatus +
+       stageCorrections.mouDone)뿐이다.
+     - CRM에 없는 업체는 자동 생성하지 않는다("CRM 미등록"으로만 분리).
+     - 매칭이 애매하거나(동일 정규화명/사업자번호로 CRM 후보 2건 이상) 코드가 서로
+       충돌하면 자동 반영하지 않고 "확인 필요"로 분리한다.
+
+     매칭 규칙(§요청 4) — 새 유사도 판정을 만들지 않고 기존 것만 재사용:
+       ①사업자번호 완전일치(normBizNo) ②normCompanyName() 정규화 완전일치
+       (이미 "(주)/㈜/주식회사/공백/괄호" 등을 제거하는 함수, matchMasterRowToCompany와
+       완전히 같은 원칙) ③매칭 안 됨 → CRM 미등록. 이름이 "비슷하다"는 이유의 자동
+       병합은 없다(§요청 "에스제이건설/에이치제이건설 자동 매칭 금지"와 동일 원칙).
+
+     코드 처리 규칙(§요청 최종 확정본) — 엑셀의 "신규 업체코드(B2B)" 컬럼이 가장 중요한
+     기준 코드다:
+       ① co.code 있고 엑셀 B2B 코드와 동일 → 그대로 유지
+       ② co.code 없고 엑셀 B2B 코드 있음 → 엑셀 코드를 co.code에 복사
+       ③ co.code 없고 엑셀 코드도 없지만 masterCode 있음(§마스터 업체 명단 가져오기가
+          이전에 써둔 값, "기존 코드"로 인정하기로 사용자 확정) → masterCode를 co.code에 복사
+       ④ co.code/masterCode/엑셀 B2B 코드 중 2개 이상 값이 존재하는데 서로 다름 → 자동
+          반영 금지, "확인 필요"
+       ⑤ 셋 다 없음 → 그때만 기존 genCompanyCode()/nextB2BSeq() 규칙으로 신규 발급
+          (형식은 전혀 안 바꿈 — B2B+3자리, 기존 카운터/스캔 로직 그대로 재사용)
+     추가로 반영 전 다음도 검사(§요청 6/코드 충돌 검증):
+       - 엑셀 안에서 같은 B2B 코드가 2개 이상 행에 쓰였는지
+       - 엑셀이 지정한 코드가 이미 CRM의 "다른" 업체(매칭 대상이 아닌 업체)에 쓰이고
+         있는지
+     둘 중 하나라도 걸리면 그 행은 "확인 필요"로 분리한다.
+     ========================================================================== */
+
+  // 엑셀 컬럼명은 파일마다 다를 수 있어(§요청 14) 후보군 중 첫 일치만 채택한다. 못 찾으면
+  // 추측하지 않고 사용자가 드롭다운으로 직접 고르게 한다(아래 renderPartnerExcelImportModal).
+  const PARTNER_EXCEL_COL_CANDIDATES = {
+    name: ['업체명','회사명','협력사명','시공사명','통합 대표 업체명'],
+    mouDate: ['체결일','협약일','MOU 체결일','체결일(협약일)'],
+    code: ['신규 업체코드(B2B)','B2B','B2B코드','업체코드(B2B)','신규 업체코드'],
+    bizno: ['사업자번호','사업자등록번호']
+  };
+  function detectPartnerExcelColumn(headerRow, candidates){
+    for(const cand of candidates){
+      const idx = headerRow.findIndex(h=> String(h||'').trim() === cand);
+      if(idx !== -1) return idx;
+    }
+    return -1;
+  }
+  // 엑셀 시트를 읽어 { headerRow, dataRows, autoCols:{name,mouDate,code,bizno}(못 찾으면 -1) }로만
+  // 변환한다 — 매칭/코드 판정은 여기서 하지 않는다(단일 책임, 아래 previewPartnerExcelImport가
+  // 실제 판정을 전담).
+  function parsePartnerExcelSheet(workbook){
+    const sheetName = workbook.SheetNames[0];
+    const ws = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+    if(!rows.length) return { headerRow: [], dataRows: [], autoCols: { name:-1, mouDate:-1, code:-1, bizno:-1 } };
+    const headerRow = rows[0].map(h=> String(h||'').trim());
+    const dataRows = rows.slice(1).filter(r=> r.some(c=> String(c||'').trim() !== ''));
+    const autoCols = {
+      name: detectPartnerExcelColumn(headerRow, PARTNER_EXCEL_COL_CANDIDATES.name),
+      mouDate: detectPartnerExcelColumn(headerRow, PARTNER_EXCEL_COL_CANDIDATES.mouDate),
+      code: detectPartnerExcelColumn(headerRow, PARTNER_EXCEL_COL_CANDIDATES.code),
+      bizno: detectPartnerExcelColumn(headerRow, PARTNER_EXCEL_COL_CANDIDATES.bizno)
+    };
+    return { headerRow, dataRows, autoCols };
+  }
+  // colMap이 확정된 뒤(자동 탐색 또는 사용자 수동 선택) 실제 행 배열로 변환. 날짜는 엑셀
+  // 표기를 그대로 dateText로 쓴다(§요청 "임의로 오늘 날짜를 넣지 말 것" — 파싱 실패해도
+  // 그냥 원문 문자열을 보존, 없으면 빈 문자열).
+  function buildPartnerExcelRows(dataRows, colMap){
+    return dataRows.map((r, i)=>{
+      const name = colMap.name >= 0 ? String(r[colMap.name] || '').trim() : '';
+      const mouDateRaw = colMap.mouDate >= 0 ? String(r[colMap.mouDate] || '').trim() : '';
+      const code = colMap.code >= 0 ? String(r[colMap.code] || '').trim() : '';
+      const bizno = colMap.bizno >= 0 ? String(r[colMap.bizno] || '').trim() : '';
+      return { rowIndex: i, name, mouDateRaw, code, bizno };
+    }).filter(r=> r.name); // 업체명 빈 행은 판정 대상이 아님(빈 줄 등)
+  }
+  // §코드 처리 규칙 — 위 클래스 주석 "코드 처리 규칙" 그대로. otherCompanyCodeIndex는
+  // "이 매칭 대상이 아닌 다른 업체가 이미 쓰고 있는 코드" 검사용(§요청 코드 충돌 검증).
+  // normBizNo(index.html:7852)는 D 데이터 모듈 안의 로컬 함수라 이 화면(app 블록)에서는
+  // 직접 못 부른다 — 이름 충돌을 피하려 별도 이름으로 같은 한 줄짜리 로직만 재사용한다.
+  function partnerExcelNormBizNo(s){ return String(s || '').replace(/[^0-9]/g, ''); }
+  function resolvePartnerExcelCode(co, excelCode, otherCompanyCodeIndex){
+    const existingCode = (co.code || '').trim();
+    const masterCode = (co.masterCode || '').trim();
+    // §요청 최종 확정본 — co.code/masterCode/엑셀 코드 중 "존재하는" 값을 전부 모아서
+    // 비교한다(엑셀 코드가 있다고 masterCode 비교를 건너뛰지 않는다 — 셋 중 어느 둘이라도
+    // 다르면 확인 필요).
+    const values = [];
+    if(existingCode) values.push({ src:'co.code', v: existingCode });
+    if(masterCode) values.push({ src:'masterCode', v: masterCode });
+    if(excelCode) values.push({ src:'엑셀 B2B 코드', v: excelCode });
+    const distinct = Array.from(new Set(values.map(v=> v.v)));
+    if(distinct.length > 1){
+      return { status:'conflict', reason: values.map(v=> `${v.src}=${v.v}`).join(' vs '), values };
+    }
+    const finalCode = distinct[0] || '';
+    if(finalCode){
+      // 이 코드가 이미 "다른" 업체가 쓰고 있는지(매칭 대상 자기 자신은 제외).
+      const owner = otherCompanyCodeIndex.get(finalCode);
+      if(owner && owner !== co.id){
+        return { status:'conflict', reason: `코드 ${finalCode}가 이미 다른 CRM 업체(${otherCompanyCodeIndex.get(finalCode+'__name') || owner})에서 사용 중`, values };
+      }
+      if(existingCode === finalCode) return { status:'keep', code: finalCode };
+      if(excelCode && finalCode === excelCode) return { status:'copyExcel', code: finalCode };
+      if(masterCode && finalCode === masterCode) return { status:'copyMaster', code: finalCode };
+      return { status:'keep', code: finalCode };
+    }
+    return { status:'issueNew', code:null };
+  }
+  // previewPartnerExcelImport: 순수 계산, 아무것도 저장하지 않는다. rows는
+  // buildPartnerExcelRows() 결과. 반환: { matched, needsReview, notInCrm, excelDuplicateNames,
+  // excelDuplicateCodes, total }.
+  function previewPartnerExcelImport(rows){
+    const companies = D.loadActiveCompanies();
+    // §요청 6 — 엑셀 내부 자체 중복(같은 업체명/같은 B2B 코드가 여러 행)부터 검사한다.
+    const nameNormCounts = new Map();
+    const codeCounts = new Map();
+    rows.forEach(r=>{
+      const n = D.normCompanyName(r.name);
+      if(n) nameNormCounts.set(n, (nameNormCounts.get(n)||0) + 1);
+      if(r.code) codeCounts.set(r.code, (codeCounts.get(r.code)||0) + 1);
+    });
+    // 매칭 대상이 아닌 다른 업체가 이미 쓰고 있는 코드 인덱스(코드 충돌 검사용).
+    const codeOwnerIndex = new Map();
+    companies.forEach(c=>{
+      if(c.code){ codeOwnerIndex.set(c.code, c.id); codeOwnerIndex.set(c.code+'__name', c.name); }
+    });
+    const matched = [], needsReview = [], notInCrm = [];
+    rows.forEach(row=>{
+      const nameNorm = D.normCompanyName(row.name);
+      const excelDupName = nameNorm && nameNormCounts.get(nameNorm) > 1;
+      const excelDupCode = row.code && codeCounts.get(row.code) > 1;
+      if(excelDupName || excelDupCode){
+        needsReview.push({ row, reason: excelDupName && excelDupCode ? '엑셀 내 업체명·B2B 코드 중복' : (excelDupName ? '엑셀 내 업체명 중복' : '엑셀 내 B2B 코드 중복') });
+        return;
+      }
+      // 매칭: ①사업자번호 완전일치 ②정규화 업체명 완전일치(§요청 4, matchMasterRowToCompany와 동일 우선순위)
+      let hits = [];
+      let matchedBy = null;
+      if(row.bizno){
+        const nb = partnerExcelNormBizNo(row.bizno);
+        if(nb){ hits = companies.filter(c=> c.bizRegNo && partnerExcelNormBizNo(c.bizRegNo) === nb); if(hits.length) matchedBy = '사업자번호 완전일치'; }
+      }
+      if(!hits.length && nameNorm){
+        hits = companies.filter(c=> D.normCompanyName(c.name) === nameNorm);
+        if(hits.length) matchedBy = '정규화 업체명 완전일치';
+      }
+      if(hits.length > 1){
+        needsReview.push({ row, reason: '동일 ' + (matchedBy||'기준')  + '의 CRM 업체가 여러 건', candidates: hits.map(c=>({id:c.id,name:c.name})) });
+        return;
+      }
+      if(!hits.length){
+        notInCrm.push({ row, reason: 'CRM에서 매칭되는 업체를 찾지 못함' });
+        return;
+      }
+      const co = hits[0];
+      const codeDecision = resolvePartnerExcelCode(co, row.code, codeOwnerIndex);
+      if(codeDecision.status === 'conflict'){
+        needsReview.push({ row, companyId: co.id, companyName: co.name, reason: 'B2B 코드 충돌 — ' + codeDecision.reason });
+        return;
+      }
+      // 체결일: 엑셀 값이 있으면 그 값, 없으면 현재 화면에 실제로 표시되는 기존 체결일을
+      // 그대로 유지(§요청 "기존 체결일 삭제 금지") — 새 값으로 지어내지 않는다.
+      const existingEffective = resolveEffectiveMouDate(co);
+      const finalDateText = row.mouDateRaw || (existingEffective ? existingEffective.display : '');
+      const progress = buildProgressStages(co);
+      const currentStatusLabel = isConfirmedPartner(co, progress) ? 'MOU 체결' : '미체결/진행중';
+      matched.push({
+        row, companyId: co.id, companyName: co.name, matchedBy,
+        currentStatusLabel,
+        existingCode: co.code || '', existingMasterCode: co.masterCode || '',
+        existingMouDateDisplay: existingEffective ? existingEffective.display : '',
+        excelMouDate: row.mouDateRaw || '',
+        finalMouDate: finalDateText,
+        codeDecision, finalCode: codeDecision.code
+      });
+    });
+    return { total: rows.length, matched, needsReview, notInCrm };
+  }
+  function buildPartnerExcelActivityLog(m){
+    const bits = ['[협력사 엑셀 일괄 반영] MOU 체결 상태 보정'];
+    if(m.codeDecision.status === 'issueNew') bits.push('업체코드 신규발급');
+    else if(m.codeDecision.status === 'copyExcel') bits.push('업체코드 엑셀 값 반영(' + m.finalCode + ')');
+    else if(m.codeDecision.status === 'copyMaster') bits.push('업체코드 masterCode 값 반영(' + m.finalCode + ')');
+    if(m.excelMouDate) bits.push('체결일 ' + m.excelMouDate + ' 반영');
+    return bits.join(' · ');
+  }
+  // applyPartnerExcelImport: preview.matched만 저장한다(needsReview/notInCrm은 절대 자동
+  // 처리하지 않음). 코드 신규발급은 배치 안에서 순차적으로 겹치지 않게, 매번 발급 직후
+  // 로컬 작업 배열에도 반영해 가면서 처리하고 마지막에 카운터를 한 번에 올린다(§요청 3
+  // "순차 발급, 중복 금지" — 기존 genCompanyCode/nextB2BSeq/bumpCompanyCodeB2BCounter
+  // 재사용, 새 카운터 로직 없음).
+  function applyPartnerExcelImport(preview){
+    const workingCompanies = D.loadCompanies();
+    let mouChangedCount = 0, alreadyMouCount = 0, newCodeCount = 0, mouDateAppliedCount = 0, mouNoDateCount = 0, errorCount = 0;
+    let lastIssuedSeq = null;
+    preview.matched.forEach(m=>{
+      try{
+        const co = D.findCompany(m.companyId);
+        if(!co){ errorCount++; return; }
+        const wasConfirmedPartner = isConfirmedPartner(co, buildProgressStages(co));
+        let finalCode = m.finalCode;
+        if(m.codeDecision.status === 'issueNew'){
+          finalCode = genCompanyCode(workingCompanies);
+          if(findCompanyByCodeExcept(finalCode, workingCompanies, co.id)) finalCode = genCompanyCode(workingCompanies);
+          const rec = workingCompanies.find(c=> c.id === co.id);
+          if(rec) rec.code = finalCode;
+          const seqMatch = finalCode.match(/^B2B(\d{3})$/);
+          if(seqMatch) lastIssuedSeq = parseInt(seqMatch[1], 10);
+          newCodeCount++;
+        }
+        const patch = {};
+        if(finalCode && finalCode !== co.code) patch.code = finalCode;
+        if(co.partnerStatus !== 'partner') patch.partnerStatus = 'partner';
+        if(Object.keys(patch).length) D.updateCompany(m.companyId, patch);
+        saveStageCorrection(m.companyId, 'mouDone',
+          { status:'done', dateText: m.finalMouDate || '', owner:null },
+          { reason:'기타', reasonOther:'협력사 엑셀 일괄 반영' });
+        D.addActivity(m.companyId, buildPartnerExcelActivityLog(m));
+        if(wasConfirmedPartner) alreadyMouCount++; else mouChangedCount++;
+        if(m.excelMouDate) mouDateAppliedCount++; else mouNoDateCount++;
+      }catch(e){ errorCount++; }
+    });
+    if(lastIssuedSeq != null) D.bumpCompanyCodeB2BCounter(lastIssuedSeq);
+    return {
+      excelTotal: preview.total,
+      matchedCount: preview.matched.length,
+      mouChangedCount, alreadyMouCount, newCodeCount,
+      mouDateAppliedCount, mouNoDateCount,
+      notInCrmCount: preview.notInCrm.length,
+      needsReviewCount: preview.needsReview.length,
+      errorCount
+    };
+  }
+
+  // SheetJS(xlsx) 지연 로드 — loadTesseractSdk(§27810 근처)와 완전히 같은 "Promise 캐시로
+  // 중복 <script> 방지" 패턴. 이 모달을 열 때만(엑셀 업로드가 실제로 필요할 때만) 불러오고,
+  // 상시 로드 의존성으로 추가하지 않는다.
+  let xlsxLoadPromise = null;
+  function loadXlsxSdk(){
+    if(xlsxLoadPromise) return xlsxLoadPromise;
+    if(window.XLSX){ xlsxLoadPromise = Promise.resolve(window.XLSX); return xlsxLoadPromise; }
+    xlsxLoadPromise = new Promise((resolve, reject)=>{
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      s.onload = ()=>{ if(window.XLSX) resolve(window.XLSX); else reject(new Error('엑셀 파서 로드 실패')); };
+      s.onerror = ()=>{ xlsxLoadPromise = null; reject(new Error('엑셀 파서 스크립트를 불러오지 못했습니다(네트워크 확인 필요)')); };
+      document.head.appendChild(s);
+    });
+    return xlsxLoadPromise;
+  }
+
+  let partnerExcelImportState = {
+    fileName: null, headerRow: [], dataRows: [], colMap: { name:-1, mouDate:-1, code:-1, bizno:-1 },
+    preview: null, applying: false, result: null, error: null
+  };
+  function closePartnerExcelImportModal(){
+    const root = document.getElementById('partnerExcelImportModalRoot');
+    if(root) root.innerHTML = '';
+  }
+  function resetPartnerExcelImportState(){
+    partnerExcelImportState = { fileName:null, headerRow:[], dataRows:[], colMap:{name:-1,mouDate:-1,code:-1,bizno:-1}, preview:null, applying:false, result:null, error:null };
+  }
+  function openPartnerExcelImportModal(){
+    resetPartnerExcelImportState();
+    renderPartnerExcelImportModal();
+  }
+  function recomputePartnerExcelPreview(){
+    const st = partnerExcelImportState;
+    if(st.colMap.name < 0){ st.error = '업체명 컬럼을 먼저 선택해주세요.'; st.preview = null; renderPartnerExcelImportModal(); return; }
+    try{
+      const rows = buildPartnerExcelRows(st.dataRows, st.colMap);
+      st.preview = previewPartnerExcelImport(rows);
+      st.error = null;
+    }catch(e){ st.error = '미리보기 계산 중 오류가 발생했습니다: ' + (e && e.message || e); st.preview = null; }
+    st.result = null;
+    renderPartnerExcelImportModal();
+  }
+  function partnerExcelColSelectHtml(fieldKey, label, required){
+    const st = partnerExcelImportState;
+    const opts = st.headerRow.map((h,i)=> `<option value="${i}" ${st.colMap[fieldKey]===i?'selected':''}>${esc(h || '(제목 없음 ' + (i+1) + '열)')}</option>`).join('');
+    return `<label style="display:inline-flex;align-items:center;gap:6px;margin-right:14px;font-size:12.5px;">
+      ${esc(label)}${required?' *':''}
+      <select data-partner-excel-col="${fieldKey}" style="font-size:12.5px;"><option value="-1">(사용 안 함)</option>${opts}</select>
+    </label>`;
+  }
+  function partnerExcelMatchedRowHtml(m){
+    const codeLabel = { keep:'기존 유지', copyExcel:'엑셀 코드 반영', copyMaster:'masterCode 반영', issueNew:'신규 발급' }[m.codeDecision.status] || m.codeDecision.status;
+    return `<div class="local-cloud-diag-section">
+      <div class="local-cloud-diag-title">${esc(m.row.name)} → ${esc(m.companyName)} <span style="font-weight:normal;opacity:.65;">(매칭: ${esc(m.matchedBy)})</span></div>
+      <div class="local-cloud-diag-row">현재 상태: ${esc(m.currentStatusLabel)} → <b>MOU 체결</b></div>
+      <div class="local-cloud-diag-row">체결일: 기존 ${esc(m.existingMouDateDisplay || '(없음)')} · 엑셀 ${esc(m.excelMouDate || '(없음)')} → 최종 <b>${esc(m.finalMouDate || '(빈칸 유지)')}</b></div>
+      <div class="local-cloud-diag-row">B2B 코드: 기존 ${esc(m.existingCode || '(없음)')}${m.existingMasterCode ? ' · masterCode ' + esc(m.existingMasterCode) : ''} · 엑셀 ${esc(m.row.code || '(없음)')} → <b>${esc(m.finalCode || '(미정)')}</b> (${esc(codeLabel)})</div>
+    </div>`;
+  }
+  function renderPartnerExcelImportModal(){
+    const root = document.getElementById('partnerExcelImportModalRoot');
+    if(!root) return;
+    const st = partnerExcelImportState;
+    const p = st.preview;
+    const hasFile = st.headerRow.length > 0;
+    const body = `
+      <div class="pi-note">별도로 관리하는 협력사 엑셀을 업로드하면, 그 안의 업체는 전부 "이미
+        협력사로 확정된 업체"로 간주해 MOU 상태와 B2B 코드만 보정합니다(다른 정보는 전혀
+        바꾸지 않음). 업로드 직후 저장되지 않으며, 아래 "확정 반영"을 눌러야만 실제
+        반영됩니다.</div>
+      <div style="margin:10px 0;">
+        <input type="file" id="partnerExcelFileInput" accept=".xlsx,.xls" />
+        ${st.fileName ? `<span style="font-size:12.5px;color:var(--text-muted);margin-left:8px;">${esc(st.fileName)} · ${st.dataRows.length}행</span>` : ''}
+      </div>
+      ${hasFile ? `
+      <div style="margin-bottom:10px;padding:8px;background:#F6F7F9;border-radius:6px;">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">컬럼이 자동으로 안 맞으면 직접 선택하세요(업체명은 필수):</div>
+        ${partnerExcelColSelectHtml('name','업체명',true)}
+        ${partnerExcelColSelectHtml('mouDate','체결일')}
+        ${partnerExcelColSelectHtml('code','B2B 코드')}
+        ${partnerExcelColSelectHtml('bizno','사업자번호')}
+      </div>` : ''}
+      ${st.error ? `<div class="delete-co-modal-err">${esc(st.error)}</div>` : ''}
+      ${st.result ? `<div style="color:#1E7B34;margin-bottom:10px;">확정 반영 완료 — 엑셀 전체 ${st.result.excelTotal}건 · 매칭 ${st.result.matchedCount}건 ·
+        MOU 체결로 변경 ${st.result.mouChangedCount}건 · 기존에 이미 MOU 체결 ${st.result.alreadyMouCount}건 ·
+        신규 B2B 코드 발급 ${st.result.newCodeCount}건 · 체결일 반영 ${st.result.mouDateAppliedCount}건 ·
+        체결일 없는 MOU 체결 ${st.result.mouNoDateCount}건 · CRM 미등록 ${st.result.notInCrmCount}건 ·
+        확인 필요 ${st.result.needsReviewCount}건 · 오류 ${st.result.errorCount}건</div>` : ''}
+      ${p ? `
+      <div class="pi-note" style="padding:0 0 10px;">
+        엑셀 전체 ${p.total}건 — 매칭됨(반영 예정) ${p.matched.length}건 · 확인 필요 ${p.needsReview.length}건 · CRM 미등록 ${p.notInCrm.length}건
+      </div>
+      <details open><summary><b>매칭됨 — MOU 체결로 반영 예정 (${p.matched.length}건)</b></summary>
+        ${p.matched.length ? p.matched.map(partnerExcelMatchedRowHtml).join('') : `<div class="local-cloud-diag-empty">없음</div>`}
+      </details>
+      <details><summary><b>확인 필요 — 자동 반영 안 함 (${p.needsReview.length}건)</b></summary>
+        ${p.needsReview.length ? p.needsReview.map(r=> `<div class="local-cloud-diag-row">${esc(r.row.name)}${r.row.code ? ' · ' + esc(r.row.code) : ''} — ${esc(r.reason)}${r.candidates ? ': ' + r.candidates.map(c=>esc(c.name)).join(', ') : ''}</div>`).join('') : `<div class="local-cloud-diag-empty">없음</div>`}
+      </details>
+      <details><summary><b>CRM 미등록 — 신규 생성 안 함, 검토용 (${p.notInCrm.length}건)</b></summary>
+        ${p.notInCrm.length ? `<table class="pi-sample-table" style="width:100%;"><thead><tr><th>Excel 업체명</th><th>정규화 업체명</th><th>Excel 체결일</th><th>매칭 실패 이유</th></tr></thead><tbody>
+          ${p.notInCrm.map(r=> `<tr><td>${esc(r.row.name)}</td><td>${esc(D.normCompanyName(r.row.name))}</td><td>${esc(r.row.mouDateRaw || '—')}</td><td>${esc(r.reason)}</td></tr>`).join('')}
+        </tbody></table>` : `<div class="local-cloud-diag-empty">없음</div>`}
+      </details>` : ''}
+    `;
+    root.innerHTML = `
+      <div class="pi-overlay" id="partnerExcelImportOverlay">
+        <div class="pi-panel" style="max-width:820px;max-height:88vh;" role="dialog" aria-modal="true" aria-label="협력사 엑셀 일괄 반영">
+          <div class="pi-head">
+            <div class="pi-title">협력사 엑셀 일괄 반영</div>
+            <button type="button" class="chart-close-btn" id="partnerExcelImportCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body" style="overflow-y:auto;">${body}</div>
+          <div class="pi-actions">
+            ${hasFile ? `<button type="button" class="co-text-action" id="partnerExcelRecomputeBtn">미리보기 계산</button>` : ''}
+            <button type="button" class="co-text-action" id="partnerExcelImportCloseBtn2">닫기</button>
+            <button type="button" class="co-text-action primary" id="partnerExcelImportApplyBtn" ${(!p || !p.matched.length || st.applying) ? 'disabled' : ''}>${st.applying ? '반영 중…' : '확정 반영'}</button>
+          </div>
+        </div>
+      </div>`;
+    const close = ()=> closePartnerExcelImportModal();
+    document.getElementById('partnerExcelImportCloseBtn').addEventListener('click', close);
+    document.getElementById('partnerExcelImportCloseBtn2').addEventListener('click', close);
+    bindSafeBackdropClose(document.getElementById('partnerExcelImportOverlay'), close);
+    const fileInput = document.getElementById('partnerExcelFileInput');
+    if(fileInput) fileInput.addEventListener('change', async ()=>{
+      const file = fileInput.files && fileInput.files[0];
+      if(!file) return;
+      st.error = null; st.preview = null; st.result = null;
+      renderPartnerExcelImportModal();
+      try{
+        const XLSX = await loadXlsxSdk();
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type:'array' });
+        const parsed = parsePartnerExcelSheet(wb);
+        st.fileName = file.name;
+        st.headerRow = parsed.headerRow;
+        st.dataRows = parsed.dataRows;
+        st.colMap = parsed.autoCols;
+        if(st.colMap.name < 0) st.error = '업체명 컬럼을 자동으로 찾지 못했습니다 — 아래에서 직접 선택해주세요.';
+      }catch(e){
+        st.error = '엑셀을 읽는 중 오류가 발생했습니다: ' + (e && e.message || e);
+      }
+      renderPartnerExcelImportModal();
+    });
+    root.querySelectorAll('[data-partner-excel-col]').forEach(sel=> sel.addEventListener('change', ()=>{
+      const key = sel.getAttribute('data-partner-excel-col');
+      st.colMap[key] = parseInt(sel.value, 10);
+    }));
+    const recomputeBtn = document.getElementById('partnerExcelRecomputeBtn');
+    if(recomputeBtn) recomputeBtn.addEventListener('click', recomputePartnerExcelPreview);
+    const applyBtn = document.getElementById('partnerExcelImportApplyBtn');
+    if(applyBtn) applyBtn.addEventListener('click', ()=>{
+      if(!p || !p.matched.length) return;
+      if(!confirm(`매칭된 ${p.matched.length}건을 MOU 체결 상태로 반영합니다.\n확인 필요 ${p.needsReview.length}건, CRM 미등록 ${p.notInCrm.length}건은 반영하지 않습니다.\n계속할까요?`)) return;
+      st.applying = true;
+      renderPartnerExcelImportModal();
+      try{
+        st.result = applyPartnerExcelImport(p);
+      }catch(e){
+        st.error = '반영 중 오류가 발생했습니다: ' + (e && e.message || e);
+      }
+      st.applying = false;
+      renderList();
+      renderPartnerExcelImportModal();
+    });
+  }
+
+  /* ==========================================================================
      §중복 업체 병합 라운드(신규) — "관리 도구 ▸ 중복 업체 병합"이 여는 두 모달.
      ① dupListModalRoot: 전체 활성 업체를 정규화 업체명/사업자번호 기준으로 그룹화한
         읽기 전용 리포트(§추가 요청) — 여기서는 아무것도 저장하지 않는다. 그룹마다
@@ -30817,6 +31240,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   document.getElementById('crmLocalCloudDiagBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openLocalCloudDiagModal(); });
   document.getElementById('crmGsheetReviewBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openGsheetReviewModal(); });
   document.getElementById('crmMasterImportBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openMasterImportModal(); });
+  document.getElementById('crmPartnerExcelImportBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openPartnerExcelImportModal(); });
   document.getElementById('crmMergeDupBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openDupListModal(); });
   // §디자인 진단 P2-5: 새로 추가한 "미등록 업체" 항목 — 이미 있는 openUnregisteredPanel을
   // 그대로 재사용(새 판정/새 모달 없음), 목록 위 배지(#crmUnregBadge)와 같은 진입점이다.
