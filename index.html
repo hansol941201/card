@@ -3795,6 +3795,15 @@ table.pdf-doc-table thead{ background:var(--bg); }
 /* §P1-5 필터 칩 3그룹 분리 라운드(신규) — 상태 필터(칩 유지)/분석/정리(텍스트 링크)
    시각적 구분. 클릭 위임(data-filter)과 필터링 로직은 전혀 안 바꿨다. */
 .list-filter-row{ display:flex!important; flex-wrap:wrap!important; align-items:center!important; column-gap:14px!important; row-gap:8px!important; }
+/* §상단 헤더 정리 라운드(신규) — "+ 고객 등록"을 필터 칩 줄("건바이건" 옆)로 옮기면서
+   추가한 래퍼. #crmFilterRow(칩 컨테이너) 자체는 display:contents로 박스를 없애 안의
+   칩들이 이 래퍼의 직계 flex 항목처럼 흐르게 하고, 그 뒤에 "+ 고객 등록" 버튼이 이어져
+   칩과 같은 줄에서 6~8px 간격으로 붙는다(§요청 "건바이건 탭과 간격은 6~8px"). 버튼은
+   액션 버튼이라는 걸 알 수 있게 칩보다 살짝 크게(§요청 "일반 탭과는 약간 구분되게")
+   유지하되, 높이/반경은 칩과 부딪히지 않는 선에서만 조정한다. */
+.list-filter-row-wrap{ display:flex!important; flex-wrap:wrap!important; align-items:center!important; column-gap:7px!important; row-gap:8px!important; margin-bottom:12px; }
+#crmFilterRow{ display:contents!important; margin-bottom:0!important; }
+.list-add-btn-inline{ height:32px; border-radius:7px; flex:none; margin-left:1px; }
 .list-filter-group{ display:flex!important; align-items:center!important; flex-wrap:wrap!important; gap:6px!important; }
 .list-filter-group-links{ padding-left:12px!important; border-left:1px solid var(--line)!important; }
 .list-filter-group-label{ font-size:10.5px!important; font-weight:700!important; color:var(--text-faint)!important; margin-right:2px!important; text-transform:uppercase!important; letter-spacing:.02em!important; }
@@ -4082,9 +4091,15 @@ table.pdf-doc-table thead{ background:var(--bg); }
     <div class="list-toolbar">
       <div class="list-title-row">
         <div class="list-title" id="crmListTitle">고객</div>
-        <!-- §미등록 업체 관리 라운드: 매출자료-CRM 비교 결과 미등록 업체가 있을 때만 보이는
-             작은 경고 배지. 0건이면 아예 렌더링하지 않는다(§ "0개면 표시 안 해도 됨"). -->
-        <button type="button" class="unreg-badge" id="crmUnregBadge" style="display:none;"></button>
+        <!-- §화면 정리 라운드(신규) — 사용자가 빨간색으로 표시해 지적한 "! 미등록 업체
+             N개" 배지(#crmUnregBadge)를 제목 줄에서 완전히 제거했다(§요청 3, "숨김이
+             아니라 실제로 제거"). 이 데이터는 이미 "실적있음·MOU미체결" 탭 리스트에
+             같은 모양으로 통합되어 있어(§미등록 업체 리스트 통합 라운드) 중복 진입점이었다.
+             renderUnregisteredBadge()/D.buildUnregisteredCompanies2026()/
+             openUnregisteredPanel(애매한 일치 체크리스트·동일 업체 연결 검색) 등 데이터·
+             판정·모달 로직 자체는 전혀 안 지웠다 — renderUnregisteredBadge는 버튼 노드가
+             없으면 그냥 조용히 리턴하는 가드가 이미 있어(`if(!btn) return;`) 호출부를
+             따로 안 건드려도 안전하다. -->
         <!-- §상단 경고 정리 라운드: "⏱ 기한 초과 N" 배지는 메인 첫화면 상단 경고에서
              제거했다(§요청) — buildOverdueCompanies/getStageDurationInfo/D+N 계산 자체와
              행 왼쪽 빨간 라인(.co-row.is-overdue) 강조는 그대로 두고, 배지 버튼(#crmOverdueBadge)
@@ -4174,11 +4189,6 @@ table.pdf-doc-table thead{ background:var(--bg); }
             <button type="button" id="crmSignOutBtn" class="update-menu-signout">로그아웃</button>
           </div>
         </div>
-        <!-- §전화 요청 기록 라운드(신규) — "+ 고객 등록"과 같은 줄에 배치. 처음엔 작은
-             밑줄 텍스트(list-secondary-link)였는데 잘 안 보인다는 피드백으로 같은 높이의
-             테두리형 버튼(.list-phone-btn)+📞 아이콘으로 키웠다(§전화 요청 기록 버튼 확대
-             라운드) — 다만 진한 네이비로 채운 주 CTA "+ 고객 등록"보다는 한 단계 낮은
-             톤(흰 배경+네이비 테두리)이라 위계는 그대로 유지된다. -->
         <!-- §고객관리 메인화면 재배치 라운드(신규) — "지도 분포" 팝업 트리거 버튼을 없앴다.
              지도는 더 이상 버튼을 눌러야 뜨는 팝업이 아니라 화면 오른쪽에 항상 인라인으로
              보이므로(§mountMapDistributionInline, 아래) 이 버튼은 더 이상 필요 없다. 팝업을
@@ -4196,14 +4206,11 @@ table.pdf-doc-table thead{ background:var(--bg); }
              PDF/목록 출력 기능에 들어가는 대표 진입점을 이 버튼 하나로 통일. 기존
              openMouPdfMenuModal/doMouPdfSave 함수 자체는 지우지 않고 그대로 남겨뒀다
              (다른 곳에서 참조하지 않는 죽은 코드일 뿐, 실수로 재사용하더라도 안전). -->
+        <!-- §상단 헤더 정리 라운드(신규) — 상단 네이비 헤더 쪽 도구줄에는 "관리 도구"/
+             "PDF 내보내기"만 남긴다(§요청 2). "+ 고객 등록"은 여기 있던 걸 그대로
+             아래 필터 칩 줄("건바이건" 바로 옆)로 옮겼다 — id/class/onclick 바인딩은
+             전혀 안 건드리고 DOM 위치만 옮겼다(아래 #crmFilterRowWrap 참고). -->
         <button type="button" class="list-phone-btn" id="crmMouPdfBtn">PDF 내보내기</button>
-        <!-- §전화 요청 기록 제거 라운드(신규) — "전화 요청 기록" 버튼을 화면에서 뺐다
-             (§요청 "화면 기능만 제거, 이미 저장된 과거 기록은 그대로 둔다"). 기존
-             customerActivities에 저장된 과거 전화요청 활동기록은 삭제하지 않았고, 그
-             기록을 보기 좋게 표시하던 stripPhoneReqPrefix 등 읽기 전용 표시 로직도
-             그대로 남겨뒀다 — 새 기록을 만드는 입력 진입점(이 버튼과 고객카드의 "자료
-             발송" 버튼, 아래 openPhoneRequestModal 전체)만 제거했다. -->
-        <button type="button" id="crmAddBtn" class="list-add-btn">+ 고객 등록</button>
       </div>
     </div>
     <!-- §고객관리 메인화면 재배치 라운드(신규) — 사이드바 없이 상단 KPI 스트립(기존
@@ -4219,8 +4226,21 @@ table.pdf-doc-table thead{ background:var(--bg); }
         <div class="crm-panel-title">업체 목록</div>
         <!-- §요청 5/6 — 지역/업종/고객상태 3개 드롭다운은 이 파일에 이미 없었다(전수
              검색 결과 없음). 대신 요청한 6개 pill 필터만 여기 남긴다(data-filter 값은
-             기존 matchesFilter/renderList 분기와 100% 동일 — 아래 renderFilterChips 참고). -->
-        <div class="list-filter-row" id="crmFilterRow"></div>
+             기존 matchesFilter/renderList 분기와 100% 동일 — 아래 renderFilterChips 참고).
+             §상단 헤더 정리 라운드(신규) — "+ 고객 등록"을 상단 네이비 도구줄에서 여기
+             "건바이건" 칩 바로 옆으로 옮겼다(§요청 1). #crmFilterRow는 renderFilterChips가
+             매번 innerHTML을 통째로 새로 그리는 컨테이너라 그 안에 버튼을 직접 넣지 않고,
+             바깥에 얇은 래퍼(#crmFilterRowWrap)를 하나 더 둬서 시각적으로만 같은 줄에
+             붙인다 — #crmFilterRow는 display:contents로 눌러 자기 자신은 박스를 만들지
+             않고 안의 칩들만 래퍼의 flex 항목으로 흘러들어가게 한다(칩 렌더 함수/이벤트
+             위임은 전혀 안 건드림). "+ 고객 등록" 버튼도 id="crmAddBtn"
+             class="list-add-btn" 그대로, DOM 위치만 이동 — onclick 바인딩은 아래
+             "진입" 섹션의 기존 addEventListener 한 줄 그대로 재사용된다(재바인딩 불필요,
+             이 버튼 노드 자체가 옮겨진 것뿐이라 리스너가 그대로 붙어 있다). -->
+        <div class="list-filter-row-wrap" id="crmFilterRowWrap">
+          <div class="list-filter-row" id="crmFilterRow"></div>
+          <button type="button" id="crmAddBtn" class="list-add-btn list-add-btn-inline">+ 고객 등록</button>
+        </div>
         <div class="list-search-row">
           <!-- §검색창 클릭 영역 수정 라운드 — div였을 때는 아이콘·좌우 padding·input 세로 여백을
                클릭해도 아무 반응이 없었다. label로 바꾸면 새 JS 이벤트 없이도 "label 영역 클릭
@@ -31139,8 +31159,9 @@ window.SHIN2_CRM_APP_INIT = function(){
     // co.code 데이터/발급 로직 자체는 전혀 안 건드렸다).
     { key:'internal', label:'내부용', desc:'사내 보관용 전체 정보', fileLabel:'내부용', landscape:true,
       columns:['no','region','name','repName','bizRegNo','address','phone','fax','email','mouDate','capital','note'] },
+    // §사용자 확인(신규) — 외부 발송용도 업체코드 컬럼 제거 요청.
     { key:'external', label:'외부 발송용', desc:'MOU 체결 업체 · 외부 공유용 최소 정보', fileLabel:'외부용', landscape:false,
-      columns:['no','region','name','code','repName','address','phone'] }
+      columns:['no','region','name','repName','address','phone'] }
   ];
   const PDF_EXPORT_COLUMN_LABELS = {
     no:'번호', region:'지역', name:'업체명', code:'업체코드', repName:'대표자', bizRegNo:'사업자번호',
