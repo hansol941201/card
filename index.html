@@ -31145,54 +31145,49 @@ window.SHIN2_CRM_APP_INIT = function(){
      공유하고, 행 데이터 생성·컬럼 정의·HTML 조립은 완전히 분리된 별도 함수/상수다 —
      내부용 템플릿을 나중에 고쳐도 외부용 코드 경로에는 영향이 없다.
      ========================================================================== */
-  // getMouSignedCompanies: KPI "MOU 체결" 카드와 완전히 같은 모집단. 정렬은 업체코드
-  // (co.code, "연도2자리+3자리 일련번호" 문자열 — genCompanyCode/findCompanyByCodeExcept가
-  // 이미 이 형식으로 다룬다) 오름차순 — 이 코드베이스에 그 외의 "업체코드 정렬" 고정
-  // 관행은 따로 없어 기본값인 업체코드 오름차순을 그대로 쓴다.
+  // getMouSignedCompanies: KPI "MOU 체결" 카드와 완전히 같은 모집단(matchesFilter(co,
+  // progress,'mouDone',relationIndex) — isConfirmedPartner && !isAgreementTerminated,
+  // §9736 근처). 새 판정 로직을 만들지 않고 이미 화면이 쓰는 것 그대로 재사용한다.
+  // §MOU PDF 스펙 업그레이드 라운드(신규) — 정렬 기준 확정: 1순위 업체코드(co.code)
+  // 오름차순, 코드가 없는 업체는 뒤로 밀려서 2순위로 업체명 가나다순.
   function getMouSignedCompanies(){
     const companies = D.loadActiveCompanies();
     const relationIndex = D.buildRelationIndex(companies);
     return companies
       .filter(co=> matchesFilter(co, buildProgressStages(co), 'mouDone', relationIndex))
       .slice()
-      .sort((a,b)=> String(a.code||'').localeCompare(String(b.code||''), 'ko'));
+      .sort((a,b)=>{
+        const ac = String(a.code||''), bc = String(b.code||'');
+        if(ac && bc) return ac.localeCompare(bc, 'ko');
+        if(ac && !bc) return -1;
+        if(!ac && bc) return 1;
+        return String(a.name||'').localeCompare(String(b.name||''), 'ko');
+      });
   }
-  function mouPdfTruncate(s, n){
-    const t = String(s||'').replace(/\s+/g,' ').trim();
-    return t.length > n ? t.slice(0, n) + '…' : t;
-  }
-  function mouPdfShortDate(v){
-    if(!v) return '';
-    const d = new Date(v);
-    if(isNaN(d.getTime())) return '';
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  }
-  // buildInternalPdfRow: 내부용 문서 1행 — 실제 존재하는 관리 정보 중 표 하나에 다
-  // 넣어도 읽을 수 있는 것만 고른다. 활동/메모는 업체당 전체를 한 줄씩 펼치면(별도
-  // 저장소인 D.activitiesForCompany/D.memosFor가 업체당 수십 건도 흔함) MOU 체결
-  // 228건 규모에서 표 자체가 읽을 수 없게 되므로, 건수 + 가장 최근 1건 요약만 담는다
-  // (§요청 "회사당 요약 한 줄, 다건 펼치기 아님").
-  function buildInternalPdfRow(co, idx, sheetReqIndex){
-    const acts = D.activitiesForCompany(co.id);
-    const memos = D.memosFor(co.id);
-    const grade = getCompanyGrade(co);
-    const techReqs = (sheetReqIndex.get(String(co.id)) || []).filter(r=> (r.requestType || r.sourceSheet) === '기술자문문의');
-    const latestAct = acts[0];
-    const latestMemo = memos[0];
+  // buildInternalPdfRow: 내부용 문서 1행 — 사용자 확정 컬럼(§요청 6)만 담는다. 전부
+  // 실제 CRM 필드값 조회이고 새로 지어내는 값은 없다. 지역은 resolveCompanyRegionList
+  // (§30914 근처, 이미 co.region → partnerDashboard.region → 주소 파생 순으로 조회하는
+  // 기존 함수 — 새 지역 추출 로직 없음, §요청 11)를 그대로 재사용한다. "현재 협력 상태"는
+  // 이 목록 자체가 이미 matchesFilter(...,'mouDone',...)로 걸러진 모집단이라(§요청 3)
+  // 전부 "MOU 체결"이다 — 별도 판정을 새로 만들지 않는다. 비밀번호/API Key/Firebase
+  // 설정값/토큰 등은 co 레코드에 애초에 존재하지 않으므로 여기서 참조할 방법도 없다
+  // (§요청 6 "절대 출력 금지" 목록은 이 데이터 모델에 원천적으로 없는 값들).
+  function buildInternalPdfRow(co, idx){
     return {
       no: idx + 1,
       code: co.code || '-',
       name: co.name || '-',
+      bizRegNo: co.bizRegNo || '-',
       repName: co.repName || '-',
       contactName: co.contactName || '-',
       phone: co.phone || co.mobile || '-',
       email: co.email || '-',
+      region: resolveCompanyRegionList(co).join(', ') || '-',
       address: co.address || '-',
-      grade: grade ? grade.label : '-',
+      gongjong: co.gongjong || '-',
       mouDate: resolvePartnerAgreementDate(co) || '-',
-      techAdvice: techReqs.length ? `있음(${techReqs.length}건)` : '없음',
-      activity: acts.length ? `${acts.length}건 · 최근 ${mouPdfShortDate(latestAct.createdAt)} ${mouPdfTruncate(latestAct.activityText, 30)}` : '없음',
-      memo: latestMemo ? mouPdfTruncate(latestMemo.text, 30) : '없음'
+      status: 'MOU 체결',
+      note: co.memo || (co.partnerDashboard && co.partnerDashboard.note) || '-'
     };
   }
   // §외부용 PDF 개인정보 유출 긴급 수정 라운드(신규) — 실제 배포본(commit b795be3)의
@@ -31238,94 +31233,121 @@ window.SHIN2_CRM_APP_INIT = function(){
     }
     return '-';
   }
-  // 외부용 PDF는 업체명·전화번호·주소만 출력한다. 업체코드는 내부 관리용이므로
-  // 외부용 명단에 포함하지 않는다. 전화번호 폴백은 pdfExportResolveField의 'phone'
-  // 케이스(§26799 부근)와 동일한 체인(co.phone → co.mobile → co.partnerDashboard.phone)을
-  // 그대로 재사용해 일관성을 맞춘다.
+  // 외부용 PDF는 §요청 8/9 확정 컬럼(업체명·전화번호·지역·주소)만 출력한다. 업체코드/
+  // 사업자번호/이메일/담당자 등 내부 정보는 co를 통째로 넘기지 않고 이 리터럴 객체
+  // 딱 4개 필드(no 제외)만 새로 만들어 반환하므로, 그 뒤 화면(display)이나 인쇄 HTML
+  // 어디에도 원본 co를 참조할 방법이 없다(§요청 9 "JS 단계에서 외부용 전용 객체").
+  // 전화번호 폴백은 pdfExportResolveField의 'phone' 케이스와 동일한 체인(co.phone →
+  // co.mobile → co.partnerDashboard.phone)을 그대로 재사용해 일관성을 맞춘다. 지역은
+  // 내부용과 똑같이 resolveCompanyRegionList만 재사용 — 새 지역 추출 로직 없음.
   function buildExternalPdfRow(co, idx){
     const pd = co.partnerDashboard || {};
-    return { no: idx + 1, name: co.name || '-', phone: co.phone || co.mobile || pd.phone || '-', address: co.address || '-' };
+    return {
+      no: idx + 1,
+      name: co.name || '-',
+      phone: co.phone || co.mobile || pd.phone || '-',
+      region: resolveCompanyRegionList(co).join(', ') || '-',
+      address: co.address || '-'
+    };
   }
-  const MOU_PDF_INTERNAL_COLUMNS = ['no','code','name','repName','contactName','phone','email','address','grade','mouDate','techAdvice','activity','memo'];
+  const MOU_PDF_INTERNAL_COLUMNS = ['no','code','name','bizRegNo','repName','contactName','phone','email','region','address','gongjong','mouDate','status','note'];
   const MOU_PDF_INTERNAL_LABELS = {
-    no:'번호', code:'업체코드', name:'업체명', repName:'대표자', contactName:'담당자', phone:'연락처',
-    email:'이메일', address:'주소', grade:'등급', mouDate:'MOU 체결일', techAdvice:'기술자문문의',
-    activity:'최근 활동', memo:'최근 메모'
+    no:'No.', code:'B2B 고유코드', name:'시공사명', bizRegNo:'사업자번호', repName:'대표자', contactName:'담당자',
+    phone:'전화번호', email:'이메일', region:'지역', address:'주소', gongjong:'주요 공종/업종',
+    mouDate:'MOU 체결일', status:'현재 협력 상태', note:'비고'
   };
-  const MOU_PDF_EXTERNAL_COLUMNS = ['no','name','phone','address'];
-  const MOU_PDF_EXTERNAL_LABELS = { no:'번호', name:'업체명', phone:'전화번호', address:'주소' };
-  function mouPdfGenLabel(){
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  }
+  const MOU_PDF_EXTERNAL_COLUMNS = ['no','name','phone','region','address'];
+  const MOU_PDF_EXTERNAL_LABELS = { no:'No.', name:'시공사명', phone:'전화번호', region:'지역', address:'주소' };
   function mouPdfDateStamp(){
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   }
   // mouPdfBuildDocHtml: kind는 'internal'|'external'. 두 경로가 공유하는 건
-  // getMouSignedCompanies(업체 선정) 하나뿐이고, 그 다음부터는 컬럼 정의/행 데이터 생성
-  // 함수가 완전히 분리된다(위 보안 요구사항 주석 참고) — internal 쪽 코드는 이 함수
-  // 안에서도 kind==='internal'일 때만 실행된다.
+  // getMouSignedCompanies(업체 선정) 하나뿐이고, 그 다음부터는 정렬·컬럼 정의·행 데이터
+  // 생성 함수가 완전히 분리된다(위 보안 요구사항 주석 참고) — internal 전용 필드는
+  // buildInternalPdfRow 안에서만, external 전용 필드는 buildExternalPdfRow 안에서만
+  // 계산된다. §요청 12 — 외부용만 별도로 업체명 가나다순으로 다시 정렬한다(내부용은
+  // getMouSignedCompanies가 이미 만든 "코드순→이름순" 그대로).
   function mouPdfBuildDocHtml(kind){
-    const companies = getMouSignedCompanies();
     const isInternal = kind === 'internal';
+    let companies = getMouSignedCompanies();
+    if(!isInternal) companies = companies.slice().sort((a,b)=> String(a.name||'').localeCompare(String(b.name||''), 'ko'));
     const columns = isInternal ? MOU_PDF_INTERNAL_COLUMNS : MOU_PDF_EXTERNAL_COLUMNS;
     const labels = isInternal ? MOU_PDF_INTERNAL_LABELS : MOU_PDF_EXTERNAL_LABELS;
-    const sheetReqIndex = isInternal ? D.buildSheetRequestsIndex() : null;
-    const rows = companies.map((co, i)=> isInternal ? buildInternalPdfRow(co, i, sheetReqIndex) : buildExternalPdfRow(co, i));
+    const strongCols = isInternal ? ['code','name'] : ['name']; // §요청 7/10 — B2B코드·업체명(시공사명) font-weight 700
+    const rows = companies.map((co, i)=> isInternal ? buildInternalPdfRow(co, i) : buildExternalPdfRow(co, i));
     const theadHtml = `<tr>${columns.map(c=> `<th>${esc(labels[c])}</th>`).join('')}</tr>`;
-    const tbodyHtml = rows.map(r=> `<tr>${columns.map(c=> `<td>${esc(r[c])}</td>`).join('')}</tr>`).join('')
+    const tbodyHtml = rows.map(r=> `<tr>${columns.map(c=> `<td${strongCols.includes(c) ? ' class="pdf-col-strong"' : ''}>${esc(r[c])}</td>`).join('')}</tr>`).join('')
       || `<tr><td colspan="${columns.length}" class="pdf-doc-empty">MOU 체결 업체가 없습니다.</td></tr>`;
-    const badgeHtml = isInternal
-      ? `<div class="pdf-doc-confidential">내부용 / 사내관리용 — 개인정보 포함, 외부 공유 금지</div>`
+    // §요청 8 — 외부용 5개 컬럼 비율(No. 6% / 시공사명 24% / 전화번호 18% / 지역 14% / 주소 38%).
+    const colgroupHtml = isInternal ? '' : `<colgroup>
+      <col style="width:6%"/><col style="width:24%"/><col style="width:18%"/><col style="width:14%"/><col style="width:38%"/>
+    </colgroup>`;
+    const title = 'MOU 체결 협력사 목록' + (isInternal ? ' - 내부용' : '');
+    const footerHtml = isInternal
+      ? `<div class="pdf-doc-footer"><span>NETFORM R&D / B2B 내부관리용</span><span class="pdf-doc-footer-warn">※ 내부 관리용 문서 / 외부 배포 금지</span></div>`
       : '';
     return {
       rows,
       html: `
         <div class="pdf-doc">
-          ${badgeHtml}
           <div class="pdf-doc-header">
-            <div class="pdf-doc-title">POUR 체결 협력사 리스트</div>
+            <div class="pdf-doc-header-left">
+              <div class="pdf-doc-brand">NETFORM</div>
+              <div class="pdf-doc-title">${esc(title)}</div>
+            </div>
             <div class="pdf-doc-meta">
-              <span>구분: ${isInternal ? '내부용' : '외부용'}</span>
-              <span>생성 일시: ${esc(mouPdfGenLabel())}</span>
-              <span>총 MOU 체결 업체 수: ${rows.length}건</span>
-              <span>정렬: 업체코드순</span>
+              <div>출력일: ${esc(mouPdfDateStamp())}</div>
+              <div>총 업체 수: ${rows.length}개</div>
             </div>
           </div>
+          <div class="pdf-doc-divider"></div>
           <table class="pdf-doc-table">
+            ${colgroupHtml}
             <thead>${theadHtml}</thead>
             <tbody>${tbodyHtml}</tbody>
           </table>
+          ${footerHtml}
         </div>`
     };
   }
   // doMouPdfSave: 위 doPdfExportSave(§고객관리 목록 출력(PDF) 라운드)와 완전히 같은
   // window.open → document.write → print 패턴을 그대로 재사용한다(§ "같은 관행 재사용",
-  // 새 방식 없음). 인쇄창 <title>을 파일명 형태로 미리 맞춰 두면(§그 라운드 관행 재사용)
-  // 브라우저 "PDF로 저장" 시 제안 파일명이 그 형태로 맞춰진다. 내부용은 컬럼이 13개라
-  // landscape(가로)로, 외부용은 3컬럼뿐이라 portrait(세로)로 충분하다.
+  // 새 방식 없음, §요청 13). 클릭 이벤트 핸들러 안에서 동기적으로 window.open을 호출해
+  // 팝업 차단을 피한다(§요청 19). 인쇄창 <title>을 파일명 형태로 미리 맞춰 두면 브라우저
+  // "PDF로 저장" 시 제안 파일명이 그 형태로 맞춰진다. 내부용(14컬럼)은 landscape,
+  // 외부용(5컬럼)은 portrait(§요청 7/10 확정 값 그대로) — 조회 + 문서 생성 + print만
+  // 하고 그 외 어떤 저장/쓰기도 하지 않는다(§요청 16).
   function doMouPdfSave(kind){
     const { html } = mouPdfBuildDocHtml(kind);
     const isInternal = kind === 'internal';
-    const filename = `POUR_체결협력사_${isInternal ? '내부용' : '외부용'}_${mouPdfDateStamp()}`;
+    const filename = `MOU체결협력사_${isInternal ? '내부용' : '외부용'}_${mouPdfDateStamp()}`;
     const printWin = window.open('', '_blank');
     if(!printWin){ alert('팝업이 차단되어 PDF 저장 창을 열 수 없습니다 — 브라우저의 팝업 차단을 해제한 뒤 다시 시도해주세요.'); return; }
     try{ printWin.focus(); }catch(e){}
     printWin.document.open();
     printWin.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(filename)}</title>
       <style>
-        @page { size: A4 ${isInternal ? 'landscape' : 'portrait'}; margin: 14mm 10mm; }
-        body{ font-family:'Malgun Gothic','맑은 고딕',sans-serif; color:#111; margin:0; }
-        .pdf-doc-confidential{ font-size:11px; font-weight:700; color:#B91C1C; border:1px solid #B91C1C; display:inline-block; padding:3px 8px; margin-bottom:8px; }
-        .pdf-doc-header{ margin-bottom:10px; }
-        .pdf-doc-title{ font-size:16px; font-weight:700; color:#0B2545; margin-bottom:4px; }
-        .pdf-doc-meta{ display:flex; gap:14px; flex-wrap:wrap; font-size:10.5px; color:#555; }
-        table.pdf-doc-table{ width:100%; border-collapse:collapse; font-size:${isInternal?'9px':'11px'}; table-layout:fixed; }
-        table.pdf-doc-table th, table.pdf-doc-table td{ border:1px solid #ccc; padding:4px 6px; text-align:left; word-break:break-all; vertical-align:top; }
-        table.pdf-doc-table thead{ display:table-header-group; background:#eef1f6; }
+        :root{
+          --pdf-primary:#082F67; --pdf-primary-soft:#EAF2FB; --pdf-text:#13243E;
+          --pdf-muted:#66758D; --pdf-border:#D9E2EC; --pdf-header-bg:#F3F6FA; --pdf-bg:#FFFFFF;
+        }
+        @page { size: A4 ${isInternal ? 'landscape' : 'portrait'}; margin: ${isInternal ? '10mm 12mm' : '12mm'}; }
+        body{ font-family:'Pretendard','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif; color:var(--pdf-text); background:var(--pdf-bg); margin:0; }
+        .pdf-doc-header{ display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:6px; }
+        .pdf-doc-brand{ font-size:11px; font-weight:700; color:var(--pdf-primary); letter-spacing:.04em; margin-bottom:3px; }
+        .pdf-doc-title{ font-size:16px; font-weight:700; color:var(--pdf-primary); }
+        .pdf-doc-meta{ text-align:right; font-size:${isInternal?'9.5px':'10.5px'}; color:var(--pdf-muted); line-height:1.5; }
+        .pdf-doc-divider{ height:2px; background:var(--pdf-primary); margin-bottom:10px; }
+        table.pdf-doc-table{ width:100%; border-collapse:collapse; table-layout:fixed; font-size:${isInternal?'8.5px':'10.5px'}; }
+        table.pdf-doc-table th{ background:var(--pdf-header-bg); color:var(--pdf-primary); font-size:${isInternal?'9.5px':'10.5px'}; font-weight:700; }
+        table.pdf-doc-table th, table.pdf-doc-table td{ border:1px solid var(--pdf-border); padding:${isInternal?'3px 5px':'6px 8px'}; text-align:left; vertical-align:top; word-break:break-word; }
+        table.pdf-doc-table td.pdf-col-strong{ font-weight:700; }
+        table.pdf-doc-table thead{ display:table-header-group; }
         table.pdf-doc-table tr{ break-inside:avoid; }
-        .pdf-doc-empty{ text-align:center; color:#888; }
+        .pdf-doc-empty{ text-align:center; color:var(--pdf-muted); }
+        .pdf-doc-footer{ display:flex; justify-content:space-between; gap:10px; margin-top:10px; font-size:8.5px; color:var(--pdf-muted); }
+        .pdf-doc-footer-warn{ color:#B91C1C; font-weight:700; }
       </style>
     </head><body>${html}</body></html>`);
     printWin.document.close();
@@ -31349,9 +31371,9 @@ window.SHIN2_CRM_APP_INIT = function(){
     const count = getMouSignedCompanies().length;
     root.innerHTML = `
       <div class="pi-overlay" id="mouPdfMenuOverlay">
-        <div class="pi-panel" style="max-width:380px;" role="dialog" aria-modal="true" aria-label="PDF 내보내기">
+        <div class="pi-panel" style="max-width:380px;" role="dialog" aria-modal="true" aria-label="MOU 체결 협력사 PDF 내보내기">
           <div class="pi-head">
-            <div class="pi-title">PDF 내보내기</div>
+            <div class="pi-title">MOU 체결 협력사 PDF 내보내기</div>
             <button type="button" class="chart-close-btn" id="mouPdfMenuCloseBtn" aria-label="닫기">&times;</button>
           </div>
           <div class="pi-body">
