@@ -11858,7 +11858,16 @@ window.SHIN2_CRM_APP_INIT = function(){
     const activeCaseByCaseCompanies = D.loadCaseByCaseCompanies().filter(r=> !r.convertedToCompanyId);
     const activeCaseByCaseClassified = D.classifyUnregisteredCompaniesByMouMaster(activeCaseByCaseCompanies);
     const activeCaseByCaseNorms = new Set(activeCaseByCaseClassified.mou.concat(activeCaseByCaseClassified.caseByCase).map(r=> r.mouMasterNorm));
-    const classifiedCaseByCaseRows = unregisteredClassification.caseByCase.filter(r=> !activeCaseByCaseNorms.has(r.mouMasterNorm));
+    // §관리도구 미등록 업체 전량 이동 라운드(신규) — 사용자 확정: "관리도구 미등록업체
+    // (buildUnregisteredCompanies2026, 매출자료엔 있지만 CRM 미등록인 업체) 전부를
+    // MOU 서명 여부(classifyUnregisteredCompaniesByMouMaster) 구분 없이 전부 "실적
+    // 있음·MOU미체결" 탭 하나로 모은다 — 예전엔 mou 매칭분만 MOU체결 탭에, 나머지만
+    // 이 탭에 나뉘어 붙었는데, 그 구분을 없애고 전부 여기로 합친다(§요청 "18곳 모두 다
+    // 이 탭으로"). 판정 로직(classifyUnregisteredCompaniesByMouMaster) 자체는 안
+    // 바꿨다 — 계산 결과를 어느 화면에 붙일지만 바꿨다. 기존 건바이건 컬렉션과 겹치는
+    // 건 그대로 제외한다(§기존 원칙 유지).
+    const classifiedCaseByCaseRows = unregisteredClassification.mou.concat(unregisteredClassification.caseByCase)
+      .filter(r=> !activeCaseByCaseNorms.has(r.mouMasterNorm));
     listTitle.textContent = '고객 ' + companies.length;
     // §미등록 업체 관리 라운드: 별도 저장소 없이 매번 다시 계산한다(§ "등록 후" 요구사항 —
     // 사용자가 업체를 등록하면 다음 renderList()에서 자동으로 줄어든다).
@@ -12031,9 +12040,11 @@ window.SHIN2_CRM_APP_INIT = function(){
       })() : null));
     applySort(rows, contribIndex);
 
-    const classifiedMouRows = filterKey === 'mouDone'
-      ? unregisteredClassification.mou.filter(x=> !searchQuery || [x.name, x.latestSite, x.latestDate].join(' ').toLowerCase().includes(searchQuery.toLowerCase()))
-      : [];
+    // §관리도구 미등록 업체 전량 이동 라운드(신규) — unregisteredClassification.mou도
+    // 이제 위 classifiedCaseByCaseRows에 합쳐져 "실적 있음·MOU미체결" 탭으로만 가므로,
+    // MOU체결 탭에는 더 이상 엑셀 기준 미등록 부가 표를 붙이지 않는다(§요청 "18곳 모두
+    // 이 탭으로" — 한 곳에만 있어야 중복 표시가 안 생긴다).
+    const classifiedMouRows = [];
     // §매출자료 미등록 업체 재분류 라운드(신규) — 사용자 확인: "매출자료 미등록 업체"
     // 팝업(엑셀 기준 실적은 있지만 CRM에 등록 안 된 업체)이 MOU 서명 여부와 무관하게
     // 전부 "건바이건"으로 분류되고 있었는데, 실제로는 매출 실적이 있으므로 "MOU 미체결"
