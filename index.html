@@ -3899,6 +3899,82 @@ table.pdf-doc-table thead{ background:var(--bg); }
   .co-table-head .col-name{ font-size:9.5px!important; }
 }
 
+/* ==========================================================================
+   §고객관리 메인화면 재배치 라운드(신규) — 사이드바 없이 "업체 목록"(좌 ~70%)/
+   "지도 분포"(우 ~30%) 2열 그리드 + 맨 아래 "실적상승 업체" 1줄. 기존 디자인 토큰
+   (--navy/--line/--bg/--text 등, 위에서 이미 선언된 값)만 재사용하고 새 팔레트를
+   만들지 않는다. 기존 글꼴 스택(Pretendard 등, 위 body 규칙)도 그대로 둔다.
+   ========================================================================== */
+.crm-main-grid{ display:grid; grid-template-columns: minmax(0,1fr) minmax(0,420px); gap:16px; align-items:start; }
+@media(min-width:1400px){ .crm-main-grid{ grid-template-columns: 70% 30%; } }
+.crm-panel{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px 16px; box-shadow:0 2px 8px rgba(22,44,78,.035); }
+.crm-list-col{ min-width:0; }
+.crm-map-col{ min-width:0; display:flex; flex-direction:column; }
+.crm-panel-title{ font-size:14px; font-weight:800; color:var(--navy); margin-bottom:10px; }
+.crm-list-col .list-filter-row{ margin-top:0; }
+.crm-rising-bottom{ margin-top:16px; width:100%; }
+
+/* §요청 7 — 6컬럼(업체명/최근실적/총매출/최근요청/최근흐름/실적-매출). .crm-list-col
+   범위로 좁혀 특정도를 높여서, 위쪽의 옛 5/9/10컬럼 grid-template-columns 규칙들을
+   덮어쓴다(그 규칙들은 그대로 남겨둠 — 삭제하지 않고 이 스코프에서만 override). */
+.crm-list-col .co-table-head, .crm-list-col .co-row{
+  grid-template-columns: minmax(150px,1.4fr) 118px 130px 84px 84px 96px !important;
+  gap:8px !important;
+}
+.crm-list-col .col-pour{ flex:none; word-break:keep-all; white-space:normal; }
+.co-code-sub{ font-size:10.5px; color:var(--text-muted); font-weight:500; margin-top:1px; }
+.col-trend, .col-contrib{ min-width:0; text-align:right; font-size:12px; word-break:keep-all; }
+.crm-list-col .co-table-head .col-trend, .crm-list-col .co-table-head .col-contrib{ text-align:right; }
+
+@media(max-width:1180px){
+  .crm-main-grid{ grid-template-columns: 1fr; }
+  .crm-list-col{ overflow-x:auto; }
+  .crm-list-col .co-table-head, .crm-list-col .co-list{ min-width:780px; }
+  .crm-list-col .co-table-head, .crm-list-col .co-row{
+    grid-template-columns: minmax(150px,1.3fr) 110px 120px 80px 80px 90px !important;
+  }
+}
+@media(max-width:760px){
+  .crm-list-col .co-table-head, .crm-list-col .co-list{ min-width:680px; }
+  .crm-list-col .co-table-head, .crm-list-col .co-row{
+    grid-template-columns: minmax(130px,1.2fr) 100px 104px 74px 70px 78px !important;
+    gap:5px !important;
+  }
+}
+
+/* §요청 14-20 — 지도 분포를 팝업(.map-modal-overlay: position:fixed 전체 덮개)에서
+   페이지 인라인으로 바꾼다. 렌더 함수(renderMapModalBody/renderMapModalMain/
+   renderMapInfoPanel)는 그대로 재사용하고, 이 규칙들은 오직 "팝업처럼 보이지 않게"
+   포지셔닝만 되돌린다 — 지도/필터/마커/지역 집계 로직은 전혀 안 건드린다. */
+.map-embed-root .map-modal-overlay.map-embedded{
+  position:static; inset:auto; background:none; z-index:auto; padding:0; display:block;
+}
+.map-embed-root .map-modal-panel{
+  width:100%; max-width:none; height:auto; border-radius:0; box-shadow:none;
+}
+.map-embed-root .map-modal-close{ display:none; } /* §요청 30: 인라인 카드는 닫을 수 없는 상시 영역 — 버튼은 그대로 두되 숨김만 */
+.map-embed-root .map-modal-head{ padding:0 0 8px; }
+.map-embed-root .map-modal-tabs{ padding:0 0 8px; }
+.map-embed-root .map-modal-filters{ padding:8px 0; flex-wrap:wrap; }
+.map-embed-root .map-modal-search{ flex:1 1 160px; min-width:120px; }
+/* §요청 14 — 지도는 정사각형에 가깝게. mapcol을 aspect-ratio 1/1로 고정하고, 그 아래
+   info col(지역 요약/지역별 업체 수)이 옆이 아니라 밑으로 쌓이게 flex-direction만
+   column으로 바꾼다(§요청 18-19 "지도 아래에"). */
+.map-embed-root .map-modal-body-main{ flex-direction:column; overflow:visible; }
+.map-embed-root .map-modal-mapcol{
+  flex:none; width:100%; aspect-ratio:1/1; height:auto; border-right:0; border-bottom:1px solid var(--line); border-radius:8px 8px 0 0; overflow:hidden;
+}
+.map-embed-root .map-modal-infocol{ flex:none; width:100%; overflow-y:visible; padding:12px 2px 0; }
+/* §요청 20 — "지도+지역요약+지역별업체수"만 남기고 그 외(현재 지도 내 업체 목록/위치
+   미확인 안내)는 인라인 카드에서는 숨긴다. 계산(listEntries 등)은 그대로 실행되고
+   DOM에도 그려지지만 화면에만 안 보인다 — renderMapInfoPanel 자체는 안 건드린다. */
+.map-embed-root #mapCompanyListBlock,
+.map-embed-root .map-unlocated-summary{ display:none; }
+.map-embed-root .map-info-block-title{ font-size:12.5px; }
+@media(max-width:1180px){
+  .map-embed-root .map-modal-mapcol{ aspect-ratio:1/1; height:auto; }
+}
+
 </style>
 </head>
 <body>
@@ -4076,14 +4152,12 @@ table.pdf-doc-table thead{ background:var(--bg); }
              테두리형 버튼(.list-phone-btn)+📞 아이콘으로 키웠다(§전화 요청 기록 버튼 확대
              라운드) — 다만 진한 네이비로 채운 주 CTA "+ 고객 등록"보다는 한 단계 낮은
              톤(흰 배경+네이비 테두리)이라 위계는 그대로 유지된다. -->
-        <!-- §지도 분포 라운드(신규): "전화 요청 기록"과 완전히 같은 보조 버튼 스타일
-             (.list-phone-btn 그대로 재사용 — 높이/테두리/글꼴/hover 전부 동일)로, 그
-             왼쪽에 배치한다. 이모지 대신 작은 SVG 핀 아이콘을 쓴다(§요청사항). -->
-        <button type="button" id="crmMapDistributionBtn" class="list-phone-btn">
-          <span class="list-phone-btn-icon" aria-hidden="true">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.4-7-11.5A7 7 0 0 1 19 9.5C19 14.6 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg>
-          </span>지도 분포
-        </button>
+        <!-- §고객관리 메인화면 재배치 라운드(신규) — "지도 분포" 팝업 트리거 버튼을 없앴다.
+             지도는 더 이상 버튼을 눌러야 뜨는 팝업이 아니라 화면 오른쪽에 항상 인라인으로
+             보이므로(§mountMapDistributionInline, 아래) 이 버튼은 더 이상 필요 없다. 팝업을
+             열던 openMapDistributionModal 함수/지도 렌더링 로직 자체는 전혀 지우지 않았다 —
+             mountMapDistributionInline이 같은 렌더 함수(renderMapModalBody 등)를 그대로
+             재사용해서 이 인라인 자리에 붙이기만 한다. -->
         <!-- §P1-4 PDF 버튼 이동 라운드(신규) — 진단 보고서 P1-4: KPI 스트립 안(5번째 칸처럼
              보이던 kpi-strip-row 구조)에 있던 "PDF 내보내기"를 목록 제목줄의 "관리 도구"/
              "지도 분포" 버튼 옆으로 옮긴다. 클릭 핸들러(#crmMouPdfBtn 이벤트 바인딩)는
@@ -4098,97 +4172,92 @@ table.pdf-doc-table thead{ background:var(--bg); }
         <button type="button" id="crmAddBtn" class="list-add-btn">+ 고객 등록</button>
       </div>
     </div>
-    <!-- §전면 리디자인 라운드(신규) — KPI 요약 바(전체 고객/MOU 체결/상승 업체/관리 필요).
-         전부 renderList()가 이미 계산해 둔 값(filterCounts)만 다시 보여준다.
-         §오늘의 관리 목록 제거 라운드(신규, §요청): "오늘의 관리 목록" 패널을 화면에서
-         뺐다 — analysis-grid의 두 번째 칸(analysis-panel-today)과 그걸 채우던
-         renderManagementTodayPanel() 호출만 없앤다(§ 화면에서만 제거, 데이터/판정
-         로직(classifyManagementNeed 등)과 "관리필요" 버튼·모달은 그대로 유지). 남는
-         "올해의 고객 흐름" 칸은 폭을 그대로 두면 어색해서 analysis-grid 자체를 걷어내고
-         .rising-section을 직접 배치해 전체 폭을 쓰게 한다. -->
-    <!-- §PDF 내보내기(MOU 체결 협력사) 라운드(신규) — 기존 kpi-strip(전체 고객/MOU 체결/
-         상승 업체/L2→L3 전환율 카드 4개, renderKpiStrip이 채움)은 그대로 두고, 얇은 flex
-         줄(.kpi-strip-row)로만 감싸 옆에 버튼 하나를 추가한다(§요청 "카드 레이아웃/디자인
-         방해 없이"). 클릭하면 내부용/외부용 2택 모달(#mouPdfMenuModalRoot)이 뜬다. -->
+    <!-- §고객관리 메인화면 재배치 라운드(신규) — 사이드바 없이 상단 KPI 스트립(기존
+         renderKpiStrip 그대로 재사용) 아래를 "업체 목록"(좌, ~70%)과 "지도 분포"(우, ~30%)
+         2열 그리드로 나눈다(§요청 0/23). "업체 상태별 현황" 도넛은 이 파일에 애초에
+         존재하지 않았다(전수 검색 결과 없음 — 별도 제거 작업 불필요). "실적 상승 업체"는
+         이 그리드 밖, 페이지 맨 아래로 옮겼다(아래 #crmRisingSection 참고, §요청 21/22). -->
     <div class="kpi-strip" id="crmKpiStrip"></div>
-    <div class="analysis-panel analysis-panel-rising">
-      <div class="analysis-panel-title">올해의 고객 흐름</div>
+    <div class="crm-main-grid">
+      <!-- 좌: 업체 목록 카드 — 검색/정렬/필터 pill/표는 전부 기존 DOM·id·렌더 함수
+           (renderFilterChips/renderList/applySort 등) 그대로, 카드 틀만 새로 씌운다. -->
+      <div class="crm-panel crm-list-col">
+        <div class="crm-panel-title">업체 목록</div>
+        <!-- §요청 5/6 — 지역/업종/고객상태 3개 드롭다운은 이 파일에 이미 없었다(전수
+             검색 결과 없음). 대신 요청한 6개 pill 필터만 여기 남긴다(data-filter 값은
+             기존 matchesFilter/renderList 분기와 100% 동일 — 아래 renderFilterChips 참고). -->
+        <div class="list-filter-row" id="crmFilterRow"></div>
+        <div class="list-search-row">
+          <!-- §검색창 클릭 영역 수정 라운드 — div였을 때는 아이콘·좌우 padding·input 세로 여백을
+               클릭해도 아무 반응이 없었다. label로 바꾸면 새 JS 이벤트 없이도 "label 영역 클릭
+               -> 그 안의 input에 포커스"라는 표준 브라우저 동작만으로 박스 전체가 클릭 가능해진다
+               (§확인 4 "CSS/label 구조만으로 해결되면 불필요한 이벤트 추가 안 함"). -->
+          <label class="search-box">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input type="text" id="crmSearchInput" placeholder="업체명 / 담당자 / 활동내용 검색" />
+          </label>
+          <!-- §정렬 드롭다운 정리 라운드: "전체 실적순"(pour, 옛 co.pourTrackRecords 상태값
+               기준)/"최근 1년 매출순"(revenue, co.partnerDashboard.gradeSales 단일 스냅샷
+               기준)은 메인 테이블에 더 이상 없는 옛 용어라 드롭다운에서 뺐다(계산 코드 자체는
+               지우지 않음, applySort 안에 그대로 남아있음). 새 6개 옵션은 전부 메인 컬럼명과
+               동일한 함수를 그대로 재사용한다(계산 새로 안 만듦) — 총 실적순(yearPour)/총
+               매출순(totalRevDesc, "총 매출" 헤더 클릭 정렬과 완전히 같은 모드)/2026
+               매출순(revenue2026)/실적↔매출 높은순(contribDesc)/최근 흐름순(trend)/
+               업체명순(name). -->
+          <select class="list-sort-select" id="crmSortSelect">
+            <option value="yearPour">총 실적순</option>
+            <option value="totalRevDesc">총 매출순</option>
+            <option value="revenue2026">2026 매출순</option>
+            <option value="contribDesc">실적↔매출 높은순</option>
+            <option value="trend">최근 흐름순</option>
+            <option value="name">업체명순</option>
+            <!-- §신규 협약사 탭 라운드(신규) — "신규 협약사" 탭에서만 의미가 있는 정렬이라
+                 평소엔 숨겨 둔다(renderList에서 filterKey에 따라 hidden 토글). -->
+            <option value="newPartnerUrgent" id="crmSortOptNewUrgent" hidden>90일 임박순</option>
+            <option value="newPartnerRecent" id="crmSortOptNewRecent" hidden>최근 체결순</option>
+            <!-- §디자인 개편 라운드(신규) — "정렬 select 최근 활동순을 검색창 오른쪽에 배치"
+                 (§요청 2-9). 새 정렬 기준을 만들지 않고, 이미 각 행에 있는 r.summary.createdAt
+                 (최근 활동 컬럼과 같은 값)를 그대로 내림차순 정렬만 한다. -->
+            <option value="newPartnerActivity" id="crmSortOptNewActivity" hidden>최근 활동순</option>
+          </select>
+          <!-- §고객관리 목록 출력(PDF) 라운드(신규) — 내부용/시공사 발송용/외부 발송용 3종
+               출력. 클릭 시 열리는 모달 안에서 유형·지역·검색을 다시 선택한 뒤에만 실제
+               출력 대상이 정해진다(§요청 "화면 필터와 출력 필터를 혼동하지 않게"). -->
+          <button type="button" class="co-text-action" id="crmPdfExportBtn">목록 출력</button>
+        </div>
+        <!-- §고객관리 메인화면 재배치 라운드(신규) — 컬럼 재구성(§요청 7): 업체명/최근실적/
+             총매출/최근요청/최근흐름/실적-매출 6개만 남긴다. 지역/업종/고객상태/담당자/
+             연락처/최근활동일/비고 컬럼은 원래 이 표에 없었다(전수 검색 결과 없음) — 삭제할
+             컬럼 자체가 없어 컬럼 수만 새 스펙에 맞춘다. 계산 함수(totalRevenueHtml/
+             yrRevenueHtml/trendHtml/contribHtml 등)는 전혀 안 바꾸고, 기존 col-revenue-combo/
+             col-contrib-trend 두 칸을 각각의 값이 원래 쓰던 변수 그대로 4칸(총매출/최근요청은
+             기존 그대로, 최근흐름·실적-매출만 별도 칸으로 분리)으로 배치만 바꿨다. -->
+        <div class="co-table-head" id="crmCoTableHead">
+          <div class="col-name">업체명</div>
+          <div class="col-pour">최근 실적</div>
+          <div class="col-revenue-combo col-total-revenue-head" id="totalRevenueSortHeader">총매출 <span class="total-revenue-sort-arrow" id="totalRevenueSortArrow"></span></div>
+          <div class="col-request">최근 요청</div>
+          <div class="col-trend" title="POUR 시공실적 건수의 전년 대비 증감(작년 vs 재작년, ±10% 기준)입니다. 클릭하면 근거를 볼 수 있습니다.">최근 흐름</div>
+          <div class="col-contrib" title="실적 1건당 평균 매출을 전체 업체와 비교한 상대 순위입니다(하위 30%=낮음·중간 40%=보통·상위 30%=높음). 클릭하면 근거를 볼 수 있습니다.">실적-매출</div>
+        </div>
+        <div class="co-list" id="crmList"></div>
+        <div class="list-pagination" id="crmPagination"></div>
+      </div>
+      <!-- 우: 지도 분포 카드 — §요청 14-19. 기존 팝업(openMapDistributionModal)이 쓰던
+           것과 완전히 같은 렌더 함수(renderMapModalBody/renderMapModalMain/
+           renderMapInfoPanel)를 그대로 재사용하되, 팝업으로 열지 않고 이 자리에 항상
+           마운트해 둔다(아래 mountMapDistributionInline, renderList()에서 최초 1회만 호출). -->
+      <div class="crm-panel crm-map-col">
+        <div class="crm-panel-title">시공사 지역 분포</div>
+        <div id="mapDistributionModalRoot" class="map-embed-root"></div>
+      </div>
+    </div>
+    <!-- §요청 21/22 — "실적 상승 업체"를 페이지 맨 아래, 전체 폭 1줄로 옮긴다. 계산
+         함수(computeRisingCompanies/buildRisingCompaniesTop5)와 렌더 함수(renderRisingSection)
+         는 전혀 바꾸지 않았다 — #crmRisingSection의 위치만 옮겼다. -->
+    <div class="analysis-panel analysis-panel-rising crm-rising-bottom">
       <div class="rising-section" id="crmRisingSection"></div>
     </div>
-    <div class="list-filter-row" id="crmFilterRow"></div>
-    <div class="list-search-row">
-      <!-- §검색창 클릭 영역 수정 라운드 — div였을 때는 아이콘·좌우 padding·input 세로 여백을
-           클릭해도 아무 반응이 없었다. label로 바꾸면 새 JS 이벤트 없이도 "label 영역 클릭
-           -> 그 안의 input에 포커스"라는 표준 브라우저 동작만으로 박스 전체가 클릭 가능해진다
-           (§확인 4 "CSS/label 구조만으로 해결되면 불필요한 이벤트 추가 안 함"). -->
-      <label class="search-box">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input type="text" id="crmSearchInput" placeholder="업체명 / 담당자 / 활동내용 검색" />
-      </label>
-      <!-- §정렬 드롭다운 정리 라운드: "전체 실적순"(pour, 옛 co.pourTrackRecords 상태값
-           기준)/"최근 1년 매출순"(revenue, co.partnerDashboard.gradeSales 단일 스냅샷
-           기준)은 메인 테이블에 더 이상 없는 옛 용어라 드롭다운에서 뺐다(계산 코드 자체는
-           지우지 않음, applySort 안에 그대로 남아있음). 새 6개 옵션은 전부 메인 컬럼명과
-           동일한 함수를 그대로 재사용한다(계산 새로 안 만듦) — 총 실적순(yearPour)/총
-           매출순(totalRevDesc, "총 매출" 헤더 클릭 정렬과 완전히 같은 모드)/2026
-           매출순(revenue2026)/실적↔매출 높은순(contribDesc)/최근 흐름순(trend)/
-           업체명순(name). -->
-      <select class="list-sort-select" id="crmSortSelect">
-        <option value="yearPour">총 실적순</option>
-        <option value="totalRevDesc">총 매출순</option>
-        <option value="revenue2026">2026 매출순</option>
-        <option value="contribDesc">실적↔매출 높은순</option>
-        <option value="trend">최근 흐름순</option>
-        <option value="name">업체명순</option>
-        <!-- §신규 협약사 탭 라운드(신규) — "신규 협약사" 탭에서만 의미가 있는 정렬이라
-             평소엔 숨겨 둔다(renderList에서 filterKey에 따라 hidden 토글). -->
-        <option value="newPartnerUrgent" id="crmSortOptNewUrgent" hidden>90일 임박순</option>
-        <option value="newPartnerRecent" id="crmSortOptNewRecent" hidden>최근 체결순</option>
-        <!-- §디자인 개편 라운드(신규) — "정렬 select 최근 활동순을 검색창 오른쪽에 배치"
-             (§요청 2-9). 새 정렬 기준을 만들지 않고, 이미 각 행에 있는 r.summary.createdAt
-             (최근 활동 컬럼과 같은 값)를 그대로 내림차순 정렬만 한다. -->
-        <option value="newPartnerActivity" id="crmSortOptNewActivity" hidden>최근 활동순</option>
-      </select>
-      <!-- §고객관리 목록 출력(PDF) 라운드(신규) — 내부용/시공사 발송용/외부 발송용 3종
-           출력. 클릭 시 열리는 모달 안에서 유형·지역·검색을 다시 선택한 뒤에만 실제
-           출력 대상이 정해진다(§요청 "화면 필터와 출력 필터를 혼동하지 않게"). -->
-      <button type="button" class="co-text-action" id="crmPdfExportBtn">목록 출력</button>
-    </div>
-    <!-- §최근 실적 독립 컬럼 복원 라운드: "최근 시공"을 업체명 옆에 붙이던 걸 취소하고
-         독립 컬럼(라벨은 "최근 실적"으로 변경)으로 되돌렸다(§1/§2/§3) — 협력사 컬럼에는
-         등급/업체명/미수금 배지만 남는다(§5). §업체명 왼쪽 금액 이동 라운드: 업체명 옆에
-         붙어있던 2025년 매출 금액을 "총 매출" 독립 컬럼(2026 매출 바로 왼쪽)으로 옮겼다.
-         §시공실적 컬럼 재배치/Drawer 완전통일 라운드: "최근 실적"과 "총 실적"이 같은 POUR
-         실적을 보여주는 한 세트라 "총 실적"을 "최근 실적" 바로 오른쪽으로 옮겼다(§1).
-         §단계 진행상황/다음 행동 컬럼 라운드: "주요 공종"은 메인 목록에서 숨겼다(§1, 계산
-         함수/Drawer/원본 데이터는 그대로 — buildTopCategoriesText/openConstructionDrawer
-         호출부는 지우지 않았다) — 그 자리에 "단계 진행상황"(4단계 stepper)과 "다음
-         행동"(1개만 표시)을 새로 추가했다(§2/§7). 최종 컬럼 순서: 협력사/최근 실적/총
-         실적/최근 요청/총 매출/2026 매출/실적↔매출/최근 흐름/단계 진행상황/다음 행동. -->
-    <div class="co-table-head" id="crmCoTableHead">
-      <div class="col-name">협력사</div>
-      <div class="col-pour">최근 실적</div>
-      <!-- §고객 성향 컬럼 라운드 — "최근 요청" 컬럼을 "고객 성향"으로 교체(§1). 최근 요청
-           데이터/계산(requestHistoryIndex 등)과 고객카드의 최근 요청/메모 기능은 전혀 안
-           지웠다 — 이 목록 칸에서만 더 이상 렌더링하지 않을 뿐이다(§9 "화면 목록에서만
-           숨기는 것"). -->
-      <!-- §P1-1 목록 열 재구성 라운드(신규) — 진단 보고서 P1-1. "고객 성향" 열은 전 행이
-           "성향 미등록"으로 비어 있어 정보량이 없다는 지적에 따라 목록에서 뺐다(계산 함수
-           buildInsightListSummary·insightHtml 변수/고객카드 쪽 표시는 그대로 둠 — §9와 같은
-           "화면 목록에서만 숨기는 것" 관례). "총 매출"+"2026 매출"을 한 컬럼(2줄)으로,
-           "실적↔매출"+"최근 흐름"을 한 컬럼으로 합쳐 컬럼 수를 줄이고 가로 스크롤을
-           없앤다(계산/클릭 핸들러는 전혀 안 바꿈 — 기존 버튼을 새 wrapper div 안으로
-           옮기기만 했다). -->
-      <div class="col-revenue-combo col-total-revenue-head" id="totalRevenueSortHeader">총 매출 · 2026 매출 <span class="total-revenue-sort-arrow" id="totalRevenueSortArrow"></span></div>
-      <div class="col-request">최근 요청</div>
-      <div class="col-contrib-trend" title="실적 1건당 평균 매출을 전체 업체와 비교한 상대 순위(하위 30%=낮음·중간 40%=보통·상위 30%=높음)와 POUR 시공실적 건수의 전년 대비 증감(작년 vs 재작년, ±10% 기준)을 함께 보여줍니다. 클릭하면 각 근거를 볼 수 있습니다.">최근 흐름 · 실적↔매출</div>
-      <!-- §단계 진행상황 이전 라운드: "단계 진행상황"(4단계 stepper) 컬럼을 목록 화면에서
-           뺐다(요청 "정보를 지우는 게 아니라 창에서 안 보이게, 업무관리 창으로 이전"—
-           buildStageStepperHtml 함수/r.progress 데이터/§업무관리 화면 쪽 렌더링은 그대로
-           보존, 아래 renderWorkQueueView 표에 새로 추가했다). -->
-    </div>
-    <div class="co-list" id="crmList"></div>
-    <div class="list-pagination" id="crmPagination"></div>
   </div>
 
   <div id="cardView" style="display:none;"></div>
@@ -11568,69 +11637,39 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 그래서 caseByCase는 이제 팝오버 정리 그룹에도 없다(아래 renderFilterChips의 새
   // list-filter-trash-btn 참고).
   const FILTER_GROUP_CLEANUP = ['subsidiary'];
+  // §고객관리 메인화면 재배치 라운드(신규, §요청 6) — pill 필터를 정확히 6개(전체/협약종료/
+  // 실적있음·미체결/쓰레기통업체/의지박약/건바이건)로 줄인다. 판정 로직(matchesFilter)과
+  // filterKey 대입/renderList() 재호출은 손대지 않았다 — data-filter 값은 전부 이미 다른
+  // 화면(지도분포 MAP_FILTER_DEFS, KPI 클릭 등)이 계속 재사용 중인 기존 키 그대로다:
+  //   전체→'all', 협약종료→'agreementTerminated', 실적있음·미체결→'revenueNoMou'
+  //   (matchesFilter 안에서 기존 'nonPartnerRevenue' 판정을 그대로 재호출하는 키),
+  //   쓰레기통업체→'deleted', 의지박약→'willpower', 건바이건→'nonPartnerRevenue'
+  //   (건바이건 전용 화면 renderNonPartnerRevenueTab을 여는 기존 키, counts.caseByCase 사용).
+  // 이 6개 밖(협약 진행/신규 협약사/최근흐름 상승세/이전 상호/L2→L3 전환관리)은 pill에서만
+  // 빠질 뿐 matchesFilter 분기·데이터 자체는 전혀 지우지 않았다 — 다른 화면(KPI 카드 클릭
+  // 등)이 여전히 그 filterKey로 이동할 수 있다.
+  const MAIN_PILL_DEFS = [
+    ['all','전체'],
+    ['agreementTerminated','협약종료'],
+    // §요청 6 — 파일 안에 이미 있는 두 표기("실적있음·MOU미체결"/"실적 있음 · MOU 미체결")
+    // 중 pill처럼 짧은 자리에 맞는 표기를 그대로 가져다 쓴다(새 라벨 창작 아님).
+    ['revenueNoMou','실적있음·MOU미체결'],
+    ['deleted','쓰레기통업체'],
+    ['willpower','의지박약'],
+    ['nonPartnerRevenue','건바이건'],
+  ];
+  function pillCount(key, counts){
+    if(key === 'nonPartnerRevenue') return counts.caseByCase || 0; // 건바이건 전용 카운트(기존 아이콘 버튼과 동일 소스)
+    return counts[key] || 0;
+  }
   function renderFilterChips(counts){
     const wrap = document.getElementById('crmFilterRow');
     if(!wrap) return;
-    // §고객관리 탭 4개 재구성 라운드: 탭 좌측 아이콘 + 우측 작은 숫자 배지(.chip-count)로
-    // 한 줄 컴팩트 탭 UI를 만든다(§요청 "카드형으로 과하게 크게 만들지 말 것" — 기존
-    // .list-filter-chip 높이/폰트는 그대로 재사용, 새 크기 체계를 만들지 않았다).
-    // §업체 삭제(휴지통) 라운드(신규) — "삭제된 업체" 탭도 같은 칩 UI/클릭 위임을 그대로
-    // 재사용한다(DELETED_FILTER_DEF만 목록 끝에 덧붙임, 새 템플릿·새 이벤트 바인딩 없음).
-    const allDefs = FILTER_DEFS.concat([DELETED_FILTER_DEF, WILLPOWER_FILTER_DEF, L2L3_MANAGE_FILTER_DEF, CASE_BY_CASE_FILTER_DEF]);
-    const defByKey = {}; allDefs.forEach(d=> defByKey[d[0]] = d);
     const chipHtml = ([key,label])=>
-      `<button type="button" class="list-filter-chip${filterKey===key?' is-active':''}${key==='deleted'?' is-trash':''}" data-filter="${esc(key)}">${FILTER_ICON_SVG[key]||''}<span>${esc(label)}</span><span class="chip-count">${counts[key]||0}</span></button>`;
-    // §P2 보조 필터 원형 버튼 라운드(신규) — 진단 보고서 §2: "분석"(신규 협약사/
-    // 최근흐름 상승세/L2→L3 전환관리)·"정리"(이전 상호/삭제된 업체/건바이건 업체) 6개
-    // 텍스트 링크가 메인 탭(상태 4칩) 옆에 항상 늘어서 있어 상단이 산만했다(§요청
-    // "그 뒤 항목들을 평소 화면에서 숨김"). 기능은 하나도 빼지 않고 DOM 위치만
-    // 원형 더보기 버튼 뒤 팝오버로 옮긴다 — data-filter 속성/클릭 위임(아래
-    // wrap.querySelectorAll('[data-filter]') 한 곳)과 filterKey/sortMode 로직은 100%
-    // 그대로 재사용, 카운트도 새로 계산하지 않고 그대로 받은 counts[key]를 쓴다.
-    const popoverItemHtml = ([key,label])=>
-      `<button type="button" class="list-filter-popover-item${filterKey===key?' is-active':''}" data-filter="${esc(key)}" role="menuitem"><span class="popover-item-label">${esc(label)}</span><span class="popover-item-count">${counts[key]||0}</span></button>`;
+      `<button type="button" class="list-filter-chip${filterKey===key?' is-active':''}" data-filter="${esc(key)}">${FILTER_ICON_SVG[key]||''}<span>${esc(label)}</span><span class="chip-count">${pillCount(key, counts)}</span></button>`;
     wrap.innerHTML = `
       <div class="list-filter-group list-filter-group-state">
-        ${FILTER_GROUP_STATE.filter(k=> defByKey[k]).map(k=> chipHtml(defByKey[k])).join('')}
-      </div>
-      <!-- §삭제 업체 휴지통 분리 라운드(신규) — 정리 팝오버에 묻혀있던 "삭제된 업체"를
-           독립된 휴지통 아이콘 버튼으로 뺀다. data-filter="deleted"는 기존 클릭 위임
-           (아래 wrap.querySelectorAll('[data-filter]'))에 그대로 잡히므로 새 핸들러 없음. -->
-      <button type="button" class="list-filter-trash-btn${filterKey==='deleted'?' is-active':''}" data-filter="deleted" title="삭제된 업체">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4.8c0-.44.36-.8.8-.8h4.4c.44 0 .8.36.8.8V7"/><path d="M6.5 7 7.3 19.2c.04.6.55 1.05 1.15 1.05h6.1c.6 0 1.11-.45 1.15-1.05L16.5 7"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
-        ${counts.deleted ? `<span class="trash-btn-count">${counts.deleted}</span>` : ''}
-      </button>
-      <!-- §의지박약 자동관리 라운드(신규) — 실제 업체 데이터를 지우지 않는 파생 분류라
-           deletedAt은 전혀 쓰지 않지만(§목표 "삭제하면 안 된다"), 사용자에게는 같은
-           쓰레기통 UI 자리에 나란히 보이는 게 요구사항(§목표 "쓰레기통 안에 새 구분")이라
-           같은 아이콘 버튼 스타일을 그대로 재사용해 옆에 붙인다. -->
-      <button type="button" class="list-filter-trash-btn${filterKey==='willpower'?' is-active':''}" data-filter="willpower" title="의지박약(장기 미응답)">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
-        ${counts.willpower ? `<span class="trash-btn-count">${counts.willpower}</span>` : ''}
-      </button>
-      <!-- §실적있음·MOU미체결 탭·건바이건 통합 정리 라운드(신규) — 사용자가 이 아이콘과
-           위 메인 탭("실적 있음 · MOU 미체결")이 같은 데이터를 중복으로 보여주는 게
-           헷갈린다고 확인(§요청 "저 두개가 같은건가?" → "합쳐줘"). 실적있음·MOU미체결
-           부분은 이제 메인 탭 하나로만 보이게 하고, 이 아이콘은 건바이건 업체 전용으로
-           좁힌다 — 건바이건 업체(caseByCaseCompanies 컬렉션)는 매출/실적 데이터가 아예
-           없는 미등록 업체라 표준 7컬럼 테이블(메인 탭)에는 원래도 들어갈 수 없어서
-           별도 진입점이 계속 필요하다. renderNonPartnerRevenueTab 내부에서 실적있음
-           섹션만 뺐고(아래), 건바이건 판정/집계 로직은 전혀 안 바뀌었다. -->
-      <button type="button" class="list-filter-trash-btn${filterKey==='nonPartnerRevenue'?' is-active':''}" data-filter="nonPartnerRevenue" title="건바이건 업체">
-        ${FILTER_ICON_SVG.nonPartnerRevenue}
-        ${counts.caseByCase ? `<span class="trash-btn-count">${counts.caseByCase}</span>` : ''}
-      </button>
-      <div class="list-filter-more" id="crmFilterMore">
-        <button type="button" class="list-filter-more-btn" id="crmFilterMoreBtn" title="추가 관리 항목" aria-haspopup="true" aria-expanded="false">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>
-        </button>
-        <div class="list-filter-popover" id="crmFilterPopover" role="menu" hidden>
-          <div class="list-filter-popover-label">분석</div>
-          ${FILTER_GROUP_ANALYSIS.filter(k=> defByKey[k]).map(k=> popoverItemHtml(defByKey[k])).join('')}
-          <div class="list-filter-popover-divider"></div>
-          <div class="list-filter-popover-label">정리</div>
-          ${FILTER_GROUP_CLEANUP.filter(k=> defByKey[k]).map(k=> popoverItemHtml(defByKey[k])).join('')}
-        </div>
+        ${MAIN_PILL_DEFS.map(chipHtml).join('')}
       </div>
     `;
     wrap.querySelectorAll('[data-filter]').forEach(btn=> btn.addEventListener('click', ()=>{
@@ -11715,7 +11754,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(!wrap) return;
     const l2l3 = computeL2L3ManageAnalysis(npCmpPeriodDays);
     const items = [
-      { key:'all', label:'전체 고객', value: counts.all || 0, cls:'', sub:'' },
+      // §고객관리 메인화면 재배치 라운드(신규, §요청 2/3) — "고객사"→"업체" 표기 통일:
+      // "전체 고객" 카드 라벨만 "전체 업체"로 바꾼다. 이 파일에는 "활성 고객사"/"MOU 진행"/
+      // "올해 누적 매출" 카드가 애초에 없었다(renderKpiStrip의 실제 items 배열 확인 결과 —
+      // 전체 고객/MOU 체결/상승 업체/L2→L3 전환율/리마인드 필요 5개뿐) — 없는 카드를 지어내
+      // 새로 추가하거나 없는 카드를 삭제하지 않는다(§요청 3 "새 KPI 발명 금지").
+      { key:'all', label:'전체 업체', value: counts.all || 0, cls:'', sub:'' },
       { key:'mouDone', label:'MOU 체결', value: counts.mouDone || 0, cls:'', sub: counts.all ? `전체 ${counts.all}곳 중` : '' },
       { key:'trendUp', label:'상승 업체', value: counts.trendUp || 0, cls:'is-up', sub: counts.all ? `전체 ${counts.all}곳 중` : '' },
       { key:'l2l3Manage', label:'L2→L3 전환율', value: `${l2l3.rate}%`, cls: l2l3.rate < 50 ? 'is-warn' : '', sub: `${l2l3.total}곳 중 ${l2l3.converted.length}곳 · 5/20 이후 협약 기준` },
@@ -12016,6 +12060,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 호출만 없앴다 — renderManagementTodayPanel 함수 정의와 managementNeedCache
     // 계산(관리필요 버튼/모달/고객카드 배너가 계속 씀) 자체는 그대로 둔다.
     renderKpiStrip(filterCounts);
+    // §고객관리 메인화면 재배치 라운드(신규) — 지도 분포를 팝업이 아니라 페이지에 항상
+    // 인라인으로 마운트한다(§요청 14-17). mountMapDistributionInline 내부에서 mapModalOpen
+    // 플래그로 최초 1회만 실제로 마운트하므로, 필터/검색/페이지 이동으로 renderList()가
+    // 반복 호출돼도 카카오맵 인스턴스를 매번 새로 만들지 않는다.
+    if(typeof mountMapDistributionInline === 'function') mountMapDistributionInline();
 
     // §업체 삭제(휴지통) 라운드(신규) — "삭제된 업체" 탭은 위에서 이미 칩/KPI 스트립까지
     // 정상적으로 그린 뒤(다른 탭과 똑같이 계속 클릭 가능해야 하므로), 여기서부터 이어지는
@@ -12342,6 +12391,9 @@ window.SHIN2_CRM_APP_INIT = function(){
           <div class="col-name-top">
             <span class="co-name-badges">${partnerGlyphHtml(co)}<span class="co-name-text">${esc(co.name)}</span>${agreementTerminatedBadgeHtml(co)}</span>
           </div>
+          <!-- §고객관리 메인화면 재배치 라운드(신규, §요청 8) — 업체명 아래 B2B 코드(co.code).
+               새 코드를 발급하지 않고, 이미 있는 값이 있을 때만 표시한다(없으면 빈 문자열). -->
+          ${co.code ? `<div class="co-code-sub">${esc(co.code)}</div>` : ''}
           ${formerNameSubtextHtml(co)}
         </div>
         <div class="col-pour">${lastActHtml}</div>
@@ -12352,15 +12404,12 @@ window.SHIN2_CRM_APP_INIT = function(){
           <div class="revenue-combo-line revenue-combo-yr"><span class="revenue-combo-yr-label">2026년</span>${yrRevenueHtml}</div>
         </div>
         <div class="col-request">${nameRequestCellHtml}</div>
-        <!-- §최근 흐름·실적↔매출 겹침 수정 라운드(신규) — 한 줄 flex(트렌드·기여 라벨·
-             값)로 욱여넣었더니 칸 폭이 좁을 때 "기여" 라벨이 줄바꿈되며 값과 겹쳐 보였다
-             (§요청 "서로 너무 엉겨있어"). "총 매출·2026 매출" 칸과 같은 2줄 세로 배치로
-             바꿔 겹침 자체가 생길 수 없게 한다 — 계산(trendHtml/contribHtml)은 그대로,
-             레이아웃만 변경. -->
-        <div class="col-contrib-trend">
-          <div class="contrib-trend-line contrib-trend-trend">${trendHtml}</div>
-          <div class="contrib-trend-line contrib-trend-contrib"><span class="contrib-trend-prefix">기여</span>${contribHtml}</div>
-        </div>
+        <!-- §고객관리 메인화면 재배치 라운드(신규, §요청 7/12) — "최근 흐름"·"실적-매출"을
+             각각 독립된 그리드 칸(col-trend/col-contrib)으로 분리했다. trendHtml/contribHtml
+             값·클릭 핸들러(data-trend-detail/data-contrib-detail 위임)는 전혀 안 바꿨다 —
+             감싸던 wrapper(.col-contrib-trend, 2줄 세로 배치)만 칸 2개로 나눴다. -->
+        <div class="col-trend">${trendHtml}</div>
+        <div class="col-contrib">${contribHtml}</div>
         <!-- §단계 진행상황 이전 라운드: 이 컬럼은 목록에서 뺐다(업무관리 화면으로 이전,
              stageStepperHtml 변수/buildStageStepperHtml 함수는 그대로 계산돼 있다 —
              §"데이터 제거가 아니라 숨김" 관례 그대로). -->
@@ -22111,7 +22160,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(!data.available){
       root.innerHTML = `
         <div class="rising-head">
-          <div class="rising-title"><span class="rising-arrow">▲</span> 실적 상승 업체 <span class="rising-sub">(2025년 vs 2024년 POUR 실적 기준)</span></div>
+          <div class="rising-title"><span class="rising-arrow">▲</span> 실적상승 업체 TOP 5 <span class="rising-sub">(2025년 vs 2024년 POUR 실적 기준)</span></div>
         </div>
         <div class="rising-empty">비교 가능한 실적 데이터가 없습니다.</div>
       `;
@@ -22119,7 +22168,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     }
     root.innerHTML = `
       <div class="rising-head">
-        <div class="rising-title"><span class="rising-arrow">▲</span> 실적 상승 업체 <span class="rising-sub">(2025년 vs 2024년 POUR 실적 기준)</span></div>
+        <div class="rising-title"><span class="rising-arrow">▲</span> 실적상승 업체 TOP 5 <span class="rising-sub">(2025년 vs 2024년 POUR 실적 기준)</span></div>
       </div>
       <div class="rising-grid">${data.items.map((it, i)=> {
         // §TOP5 카드 그래프 변경 라운드: 하단의 "증가율" 단일 막대 대신, 2024건/2025건
@@ -29329,6 +29378,61 @@ window.SHIN2_CRM_APP_INIT = function(){
     renderMapModalBody();
   }
 
+  // §고객관리 메인화면 재배치 라운드(신규, §요청 14-17/30) — 위 openMapDistributionModal과
+  // 완전히 같은 렌더 파이프라인(renderMapModalBody → renderMapModalMain → 카카오맵 초기화 +
+  // renderMapInfoPanel)을 그대로 재사용하되, 팝업(.map-modal-overlay가 position:fixed 전체
+  // 화면 덮개)으로 열지 않고 #mapDistributionModalRoot(이제 "지도 분포" 카드 안에 항상
+  // 자리 잡은 인라인 mount point)에 한 번만 마운트해 둔다. mapModalOpen 플래그를 그대로
+  // 재사용해서(§동기화 규칙 "팝업이 열려 있으면 다시 그린다"의 refreshMapIfOpen이 그대로
+  // 작동) 업체 데이터가 바뀔 때마다 자동으로 갱신된다. ESC/배경클릭으로 닫는 로직은
+  // 아예 붙이지 않는다 — 인라인 카드는 "닫을 수 없는" 상시 노출 영역이기 때문이다(§요청
+  // "팝업이 아니라 페이지에 항상 보이게"). 닫기 버튼(X)도 CSS로 숨긴다(.map-embed-root
+  // 아래 #mapModalCloseBtn, 아래 스타일 참고) — 버튼 자체를 지우지 않은 이유는 같은
+  // 헤더 템플릿(renderMapModalBody가 다시 그리지 않는 고정 영역)을 그대로 재사용하기
+  // 위해서다(§요청 30 "새 템플릿을 만들지 말고 기존 마운트 지점만 바꿔서 재사용").
+  function mountMapDistributionInline(){
+    if(mapModalOpen) return; // 이미 마운트됨 — 카카오맵 인스턴스를 매 renderList마다 새로 만들지 않는다
+    const root = document.getElementById('mapDistributionModalRoot');
+    if(!root) return;
+    mapModalOpen = true;
+    invalidateMapCompaniesCache();
+    root.innerHTML = `
+      <div class="map-modal-overlay map-embedded" id="mapModalOverlay">
+        <div class="map-modal-panel" role="region" aria-label="시공사 지역 분포">
+          <div class="map-modal-head">
+            <div class="map-modal-title-wrap">
+              <div class="map-modal-title" id="mapModalTitle">시공사 지역 분포</div>
+              <div class="map-modal-subtitle" id="mapModalSubtitle">전국 등록 업체의 위치와 영업 현황</div>
+            </div>
+            <button type="button" class="map-modal-close" id="mapModalCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="map-modal-tabs" id="mapModalTabs">
+            <button type="button" class="map-modal-tab-btn is-active" data-map-tab="company">시공사</button>
+            <button type="button" class="map-modal-tab-btn" data-map-tab="apartment">시공 아파트</button>
+          </div>
+          <div id="mapModalBody"></div>
+        </div>
+      </div>
+    `;
+    root.querySelectorAll('[data-map-tab]').forEach(btn=> btn.addEventListener('click', ()=>{
+      const tab = btn.getAttribute('data-map-tab');
+      if(tab === mapActiveTab) return;
+      mapActiveTab = tab;
+      mapFocusedCompanyList = null;
+      root.querySelectorAll('[data-map-tab]').forEach(b=> b.classList.toggle('is-active', b === btn));
+      const titleEl = document.getElementById('mapModalTitle');
+      const subEl = document.getElementById('mapModalSubtitle');
+      if(titleEl) titleEl.textContent = tab === 'apartment' ? 'POUR 시공 아파트 분포' : '시공사 지역 분포';
+      if(subEl) subEl.textContent = tab === 'apartment' ? '고객관리카드에 등록된 업체의 실제 POUR 시공실적 기준' : '전국 등록 업체의 위치와 영업 현황';
+      if(mapCanvasState && typeof mapCanvasState.destroy === 'function'){ try{ mapCanvasState.destroy(); }catch(err){ /* 무시 */ } }
+      mapCanvasState = null; updateMapMarkers = null; focusMapRegion = null; focusMapCompany = null;
+      if(aptCanvasState && typeof aptCanvasState.destroy === 'function'){ try{ aptCanvasState.destroy(); }catch(err){ /* 무시 */ } }
+      aptCanvasState = null; updateAptMarkers = null; focusAptItem = null; focusAptNearCenter = null;
+      renderMapModalBody();
+    }));
+    renderMapModalBody();
+  }
+
   // §4/§9: 키가 없거나 SDK 로드에 실패해도 나머지 CRM은 전혀 영향받지 않는다 — 이
   // 팝업 내부에서만 안내와 재시도 버튼을 보여준다.
   // §카카오 키 배포 진단 라운드: kind에 따라 제목/안내를 다르게 보여준다 —
@@ -29876,7 +29980,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="map-info-stat-row"><span>위치 미확인</span><b>${unlocated.length}개</b></div>
       </div>
       <div>
-        <div class="map-info-block-title">업체 밀집 지역</div>
+        <div class="map-info-block-title">지역별 업체 수</div>
         ${regionRows.length ? regionRows.map(([name,count])=> `
           <div class="map-region-row" data-map-region="${esc(name)}">
             <span>${esc(name)}</span><span class="map-region-count">${count}개</span>
@@ -31492,7 +31596,9 @@ window.SHIN2_CRM_APP_INIT = function(){
   }
 
   // ---------------- 진입 ----------------
-  document.getElementById('crmMapDistributionBtn').addEventListener('click', openMapDistributionModal);
+  // §고객관리 메인화면 재배치 라운드(신규) — "지도 분포" 버튼을 화면에서 없앴으므로(위
+  // HTML 수정 참고, 지도는 이제 mountMapDistributionInline으로 항상 인라인 표시) 이 버튼
+  // 클릭 바인딩도 함께 지운다. openMapDistributionModal 함수 자체는 그대로 남겨뒀다.
   document.getElementById('crmPdfExportBtn').addEventListener('click', openPdfExportModal);
   document.getElementById('crmMouPdfBtn').addEventListener('click', openMouPdfMenuModal);
   // §업체 추가 폼 이관 라운드에서 함께 수정: addEventListener('click', openAddCompanyForm)로
