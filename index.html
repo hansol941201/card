@@ -23755,39 +23755,81 @@ window.SHIN2_CRM_APP_INIT = function(){
         needsReview.push({ row, reason: excelDupName && excelDupCode ? '엑셀 내 업체명·B2B 코드 중복' : (excelDupName ? '엑셀 내 업체명 중복' : '엑셀 내 B2B 코드 중복') });
         return;
       }
-      // 매칭: ①사업자번호 완전일치 ②정규화 업체명 완전일치(§요청 4, matchMasterRowToCompany와 동일 우선순위)
-      let hits = [];
-      let matchedBy = null;
+      // §최상위 공통 규칙(2026-09) — 업체명 자동매칭 보수적 운영. 자동확정은 아래 4가지
+      // "핵심 상호 토큰 보존" 매칭만 인정한다: A) B2B코드+이름교차확인 B) 사업자번호+이름교차확인
+      // C) 정규화 업체명 완전일치 D) formerNames 명시적 일치. 코드/사업자번호가 일치해도
+      // 이름이 다르면(=이름 신호로 확인되지 않으면) 절대 자동확정하지 않고 "확인 필요"로만
+      // 내린다 — "자동매칭보다 오매칭 방지가 우선".
+      const nameHits = nameNorm ? companies.filter(c=> D.normCompanyName(c.name) === nameNorm) : [];
+      const formerHits = nameNorm ? companies.filter(c=> Array.isArray(c.formerNames) && c.formerNames.some(n=> D.normCompanyName(n) === nameNorm)) : [];
+      const nameConfirmedMap = new Map();
+      nameHits.forEach(c=> nameConfirmedMap.set(c.id, c));
+      formerHits.forEach(c=> nameConfirmedMap.set(c.id, c));
+      const nameConfirmed = Array.from(nameConfirmedMap.values());
+      const codeHits = row.code ? companies.filter(c=> (c.code||'').trim() === row.code) : [];
+      let biznoHits = [];
       if(row.bizno){
         const nb = partnerExcelNormBizNo(row.bizno);
-        if(nb){ hits = companies.filter(c=> c.bizRegNo && partnerExcelNormBizNo(c.bizRegNo) === nb); if(hits.length) matchedBy = '사업자번호 완전일치'; }
+        if(nb) biznoHits = companies.filter(c=> c.bizRegNo && partnerExcelNormBizNo(c.bizRegNo) === nb);
       }
-      if(!hits.length && nameNorm){
-        hits = companies.filter(c=> D.normCompanyName(c.name) === nameNorm);
-        if(hits.length) matchedBy = '정규화 업체명 완전일치';
-      }
-      // §상호변경 업체 매칭 라운드(신규) — 실제 테스트로 발견: CRM에 이미 "상호 변경"
-      // 처리된 업체(예: co.name이 새 이름으로 바뀌고 옛 이름이 co.formerNames에 들어간
-      // 경우, 기존 §상호 변경 기능이 이미 만들어 둔 데이터 구조)는 엑셀이 옛 이름으로
-      // 부르면 co.name 매칭에서 빠진다. 두레이앤씨 병합 라운드에서 만든 것과 같은
-      // "formerNames도 같이 본다" 원칙(revenueNormsForCompany)을 매칭에도 적용한다 —
-      // 새 필드를 만들지 않고 이미 있는 formerNames만 추가로 검사한다.
-      if(!hits.length && nameNorm){
-        hits = companies.filter(c=> Array.isArray(c.formerNames) && c.formerNames.some(n=> D.normCompanyName(n) === nameNorm));
-        if(hits.length) matchedBy = '이전 상호(과거 사명) 일치';
-      }
-      if(hits.length > 1){
-        needsReview.push({ row, reason: '동일 ' + (matchedBy||'기준')  + '의 CRM 업체가 여러 건', candidates: hits.map(c=>({id:c.id,name:c.name})) });
+      if(nameConfirmed.length > 1){
+        needsReview.push({ row, label:'[확인 필요] 1:N 충돌', reason: '동일 정규화 업체명/formerNames로 CRM 업체가 여러 건 겹침', candidates: nameConfirmed.map(c=>({id:c.id,name:c.name})) });
         return;
       }
-      if(!hits.length){
-        notInCrm.push({ row, reason: 'CRM에서 매칭되는 업체를 찾지 못함' });
+      if(nameConfirmed.length === 0){
+        // 이름으로는 전혀 못 찾았는데 코드/사업자번호만 겹치는 경우 — 절대 자동확정 금지.
+        if(codeHits.length === 1){
+          needsReview.push({ row, companyId: codeHits[0].id, companyName: codeHits[0].name, label:'[확인 필요] 코드-업체명 충돌', reason: `B2B 코드(${row.code})는 CRM 업체("${codeHits[0].name}")와 일치하지만 업체명("${row.name}")이 완전히 다름 — 오매칭 방지를 위해 자동 반영하지 않음` });
+          return;
+        }
+        if(codeHits.length > 1){
+          needsReview.push({ row, label:'[확인 필요] 코드-업체명 충돌', reason: `B2B 코드(${row.code})를 쓰는 CRM 업체가 여러 건이며 업체명도 일치하지 않음`, candidates: codeHits.map(c=>({id:c.id,name:c.name})) });
+          return;
+        }
+        if(biznoHits.length === 1){
+          needsReview.push({ row, companyId: biznoHits[0].id, companyName: biznoHits[0].name, label:'[확인 필요] 사업자번호-업체명 불일치', reason: `사업자번호는 CRM 업체("${biznoHits[0].name}")와 일치하지만 업체명("${row.name}")이 완전히 다름 — 오매칭 방지를 위해 자동 반영하지 않음` });
+          return;
+        }
+        if(biznoHits.length > 1){
+          needsReview.push({ row, label:'[확인 필요] 사업자번호-업체명 불일치', reason: '사업자번호가 일치하는 CRM 업체가 여러 건이며 업체명도 일치하지 않음', candidates: biznoHits.map(c=>({id:c.id,name:c.name})) });
+          return;
+        }
+        // §부분일치 후보 제시 전용 — 절대 자동확정 없음. 부분(포함)관계만 있으면 후보만 보여준다.
+        const partialHits = nameNorm ? companies.filter(c=>{
+          const cn = D.normCompanyName(c.name);
+          return cn && cn !== nameNorm && (cn.includes(nameNorm) || nameNorm.includes(cn));
+        }) : [];
+        if(partialHits.length){
+          needsReview.push({ row, label:'[확인 필요] 부분일치', reason: '업체명이 CRM 업체명과 부분적으로만 겹침 — 별개 업체일 수 있어 자동 반영하지 않음', candidates: partialHits.map(c=>({id:c.id,name:c.name})) });
+          return;
+        }
+        notInCrm.push({ row, label:'[미등록] CRM 후보 없음', reason: 'CRM에서 매칭되는 업체를 찾지 못함' });
         return;
       }
-      const co = hits[0];
+      const co = nameConfirmed[0];
+      // 이름으로 이미 확정된 업체에 대해, 코드/사업자번호가 "다른 CRM 업체"를 가리키면
+      // (=코드가 겹치는데 그 코드 주인이 이 업체가 아니면) 이것도 자동확정하지 않는다.
+      const conflictingCodeOwner = codeHits.find(c=> c.id !== co.id);
+      if(conflictingCodeOwner){
+        needsReview.push({ row, companyId: co.id, companyName: co.name, label:'[확인 필요] 코드-업체명 충돌', reason: `업체명은 CRM 업체("${co.name}")와 일치하지만, 엑셀 B2B 코드(${row.code})는 이미 다른 CRM 업체("${conflictingCodeOwner.name}")가 사용 중` });
+        return;
+      }
+      const conflictingBiznoOwner = biznoHits.find(c=> c.id !== co.id);
+      if(conflictingBiznoOwner){
+        needsReview.push({ row, companyId: co.id, companyName: co.name, label:'[확인 필요] 사업자번호-업체명 불일치', reason: `업체명은 CRM 업체("${co.name}")와 일치하지만, 엑셀 사업자번호는 이미 다른 CRM 업체("${conflictingBiznoOwner.name}")와 일치` });
+        return;
+      }
+      let matchedBy, label;
+      const biznoConfirms = biznoHits.some(c=> c.id === co.id);
+      const codeConfirms = codeHits.some(c=> c.id === co.id);
+      const isFormerOnly = !nameHits.some(c=> c.id === co.id) && formerHits.some(c=> c.id === co.id);
+      if(biznoConfirms){ matchedBy = '사업자번호 + 이름 일치'; label = '[확정] 사업자번호 + 이름 일치'; }
+      else if(codeConfirms){ matchedBy = 'B2B 코드 + 이름 일치'; label = '[확정] B2B 코드 + 이름 일치'; }
+      else if(isFormerOnly){ matchedBy = 'formerNames 명시적 일치'; label = '[확정] formerNames 명시적 일치'; }
+      else { matchedBy = '정규화 업체명 완전일치'; label = '[확정] 정규화 업체명 완전일치'; }
       const codeDecision = resolvePartnerExcelCode(co, row.code, codeOwnerIndex);
       if(codeDecision.status === 'conflict'){
-        needsReview.push({ row, companyId: co.id, companyName: co.name, reason: 'B2B 코드 충돌 — ' + codeDecision.reason });
+        needsReview.push({ row, companyId: co.id, companyName: co.name, label:'[확인 필요] 코드-업체명 충돌', reason: 'B2B 코드 충돌 — ' + codeDecision.reason });
         return;
       }
       // 체결일: 엑셀 값이 있으면 그 값, 없으면 현재 화면에 실제로 표시되는 기존 체결일을
@@ -23797,7 +23839,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       const progress = buildProgressStages(co);
       const currentStatusLabel = isConfirmedPartner(co, progress) ? 'MOU 체결' : '미체결/진행중';
       matched.push({
-        row, companyId: co.id, companyName: co.name, matchedBy,
+        row, companyId: co.id, companyName: co.name, matchedBy, label,
         currentStatusLabel,
         existingCode: co.code || '', existingMasterCode: co.masterCode || '',
         existingMouDateDisplay: existingEffective ? existingEffective.display : '',
@@ -23818,7 +23860,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     const finalMatched = [];
     matchedByCompany.forEach(group=>{
       if(group.length > 1){
-        group.forEach(m=> needsReview.push({ row: m.row, companyId: m.companyId, companyName: m.companyName, reason: `같은 CRM 업체("${m.companyName}")가 엑셀 여러 행(${group.map(g=> g.row.name).join(', ')})과 매칭됨 — 별개 업체일 수 있음` }));
+        group.forEach(m=> needsReview.push({ row: m.row, companyId: m.companyId, companyName: m.companyName, label:'[확인 필요] 1:N 충돌', reason: `같은 CRM 업체("${m.companyName}")가 엑셀 여러 행(${group.map(g=> g.row.name).join(', ')})과 매칭됨 — 별개 업체일 수 있음` }));
       } else {
         finalMatched.push(group[0]);
       }
@@ -23935,7 +23977,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   function partnerExcelMatchedRowHtml(m){
     const codeLabel = { keep:'기존 유지', copyExcel:'엑셀 코드 반영', copyMaster:'masterCode 반영', issueNew:'신규 발급' }[m.codeDecision.status] || m.codeDecision.status;
     return `<div class="local-cloud-diag-section">
-      <div class="local-cloud-diag-title">${esc(m.row.name)} → ${esc(m.companyName)} <span style="font-weight:normal;opacity:.65;">(매칭: ${esc(m.matchedBy)})</span></div>
+      <div class="local-cloud-diag-title">${esc(m.label || ('[확정] ' + m.matchedBy))} · ${esc(m.row.name)} → ${esc(m.companyName)} <span style="font-weight:normal;opacity:.65;">(매칭: ${esc(m.matchedBy)})</span></div>
       <div class="local-cloud-diag-row">현재 상태: ${esc(m.currentStatusLabel)} → <b>MOU 체결</b></div>
       <div class="local-cloud-diag-row">체결일: 기존 ${esc(m.existingMouDateDisplay || '(없음)')} · 엑셀 ${esc(m.excelMouDate || '(없음)')} → 최종 <b>${esc(m.finalMouDate || '(빈칸 유지)')}</b></div>
       <div class="local-cloud-diag-row">B2B 코드: 기존 ${esc(m.existingCode || '(없음)')}${m.existingMasterCode ? ' · masterCode ' + esc(m.existingMasterCode) : ''} · 엑셀 ${esc(m.row.code || '(없음)')} → <b>${esc(m.finalCode || '(미정)')}</b> (${esc(codeLabel)})</div>
@@ -23978,11 +24020,11 @@ window.SHIN2_CRM_APP_INIT = function(){
         ${p.matched.length ? p.matched.map(partnerExcelMatchedRowHtml).join('') : `<div class="local-cloud-diag-empty">없음</div>`}
       </details>
       <details><summary><b>확인 필요 — 자동 반영 안 함 (${p.needsReview.length}건)</b></summary>
-        ${p.needsReview.length ? p.needsReview.map(r=> `<div class="local-cloud-diag-row">${esc(r.row.name)}${r.row.code ? ' · ' + esc(r.row.code) : ''} — ${esc(r.reason)}${r.candidates ? ': ' + r.candidates.map(c=>esc(c.name)).join(', ') : ''}</div>`).join('') : `<div class="local-cloud-diag-empty">없음</div>`}
+        ${p.needsReview.length ? p.needsReview.map(r=> `<div class="local-cloud-diag-row">${esc(r.label || '[확인 필요]')} · ${esc(r.row.name)}${r.row.code ? ' · ' + esc(r.row.code) : ''} — ${esc(r.reason)}${r.candidates ? ': ' + r.candidates.map(c=>esc(c.name)).join(', ') : ''}</div>`).join('') : `<div class="local-cloud-diag-empty">없음</div>`}
       </details>
       <details><summary><b>CRM 미등록 — 신규 생성 안 함, 검토용 (${p.notInCrm.length}건)</b></summary>
         ${p.notInCrm.length ? `<table class="pi-sample-table" style="width:100%;"><thead><tr><th>Excel 업체명</th><th>정규화 업체명</th><th>Excel 체결일</th><th>매칭 실패 이유</th></tr></thead><tbody>
-          ${p.notInCrm.map(r=> `<tr><td>${esc(r.row.name)}</td><td>${esc(D.normCompanyName(r.row.name))}</td><td>${esc(r.row.mouDateRaw || '—')}</td><td>${esc(r.reason)}</td></tr>`).join('')}
+          ${p.notInCrm.map(r=> `<tr><td>${esc(r.row.name)}</td><td>${esc(D.normCompanyName(r.row.name))}</td><td>${esc(r.row.mouDateRaw || '—')}</td><td>${esc(r.label || '[미등록]')} ${esc(r.reason)}</td></tr>`).join('')}
         </tbody></table>` : `<div class="local-cloud-diag-empty">없음</div>`}
       </details>` : ''}
     `;
