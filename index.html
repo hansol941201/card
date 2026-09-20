@@ -22079,6 +22079,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   function closeUnregisteredPanel(){
     const root = document.getElementById('unregModalRoot');
     if(root) root.innerHTML = '';
+    unregManualLinkOpenFor = null;
   }
   // §애매한 일치 체크리스트 라운드 → §동일 시공사 묶기 라운드(신규) — 사용자 확인:
   // "두레이앤씨는 협약업체에도 있고 CRM 미등록 목록에도 있는데(실적은 서로 다르게),
@@ -22094,6 +22095,27 @@ window.SHIN2_CRM_APP_INIT = function(){
     const co = D.findCompany(companyId);
     if(!co) return false;
     return Array.isArray(co.formerNames) && co.formerNames.some(n=> D.normCompanyName(n) === D.normCompanyName(unregName));
+  }
+  // §수동 동일 업체 연결 라운드(신규) — 사용자 확인 사례: "삼정ING건설"(엑셀 표기)과
+  // "삼정아이엔지건설(주)"(CRM 실제 업체명)은 같은 회사지만, "ING"(영문)과 "아이엔지"
+  // (한글 발음 표기)는 정규화(normCompanyName)로도, 유사후보 편집거리로도 절대 같다고
+  // 안 나온다 — 이런 표기 차이는 무한히 다양해서(LG↔엘지, SK↔에스케이 등) 규칙으로
+  // 전부 예측할 수 없다. 편집거리 임계값을 넓히는 대신(§요청 "에스제이/에이치제이
+  // 자동매칭 금지"를 깨는 위험한 방향), 전체 미등록 목록의 모든 행에 사람이 직접
+  // 검색해서 연결하는 수동 진입점을 추가한다 — 실제 연결 동작 자체는 위
+  // "동일 업체로 묶기"(D.addFormerName)와 완전히 같다, 새 병합 로직 없음.
+  let unregManualLinkOpenFor = null;
+  // 부분 문자열 검색 — 원본 이름과 normCompanyName() 정규화 이름 양쪽으로 매칭해서
+  // 공백/괄호/법인 표기 차이는 자연스럽게 흡수하고, 나머지(ING/아이엔지 같은 표기
+  // 차이)는 사람이 검색어를 다르게 입력해서 찾게 한다(예: "아이엔지"로 검색).
+  function searchActiveCompaniesForManualLink(query){
+    const q = String(query || '').trim();
+    if(!q) return [];
+    const qNorm = D.normCompanyName(q);
+    const qLower = q.toLowerCase();
+    return D.loadActiveCompanies()
+      .filter(c=> (c.name || '').toLowerCase().includes(qLower) || (qNorm && D.normCompanyName(c.name).includes(qNorm)))
+      .slice(0, 15);
   }
   function openUnregisteredPanel(){
     const root = document.getElementById('unregModalRoot');
@@ -22146,9 +22168,9 @@ window.SHIN2_CRM_APP_INIT = function(){
             ` : ''}
             ${list.length ? `
               <table class="pi-sample-table" style="margin-top:10px;">
-                <thead><tr><th>업체명</th><th>2026 매출</th><th>최근 매출일</th><th>최근 현장명</th><th>상태</th><th>분류</th></tr></thead>
+                <thead><tr><th>업체명</th><th>2026 매출</th><th>최근 매출일</th><th>최근 현장명</th><th>상태</th><th>분류</th><th></th></tr></thead>
                 <tbody>
-                  ${list.map(x=> { const c = classificationByName.get(x.name); return `
+                  ${list.map(x=> { const c = classificationByName.get(x.name); const isOpen = unregManualLinkOpenFor === x.name; return `
                     <tr class="unreg-row" data-name="${esc(x.name)}" style="cursor:pointer;">
                       <td>${esc(x.name)}</td>
                       <td>${esc(fmtKrwCompact(x.revenue2026))}</td>
@@ -22156,7 +22178,19 @@ window.SHIN2_CRM_APP_INIT = function(){
                       <td>${x.latestSite ? esc(x.latestSite) : '—'}</td>
                       <td><span style="color:#B91C1C;font-weight:600;">CRM 미등록</span></td>
                       <td>${c && c.mouClassification === 'mouDone' ? 'MOU 체결' : '건바이건'}</td>
-                    </tr>`; }).join('')}
+                      <td><button type="button" class="co-text-action" data-unreg-manual-toggle="${esc(x.name)}">${isOpen ? '닫기' : '🔗 동일 업체 연결'}</button></td>
+                    </tr>
+                    ${isOpen ? `
+                    <tr data-unreg-manual-row="${esc(x.name)}">
+                      <td colspan="7" style="background:#F6F7F9;">
+                        <div style="padding:8px;">
+                          <div class="pi-note" style="margin-bottom:6px;">"${esc(x.name)}"와(과) 같은 업체를 CRM에서 검색해서 연결하세요 — 연결하면 이 이름이 그 업체의 이전 상호로 저장되고, 매출도 합산됩니다(예: 표기가 완전히 달라도 "ING"↔"아이엔지"처럼 사람이 직접 판단해서 연결).</div>
+                          <input type="text" data-unreg-manual-search="${esc(x.name)}" placeholder="CRM 업체명 검색" style="width:260px;padding:4px 8px;border:1px solid var(--line);border-radius:5px;font-size:12.5px;" />
+                          <div data-unreg-manual-results="${esc(x.name)}" style="margin-top:6px;"></div>
+                        </div>
+                      </td>
+                    </tr>` : ''}
+                    `; }).join('')}
                 </tbody>
               </table>
             ` : `<div class="pi-note" style="margin-top:10px;">미등록 업체가 없습니다.</div>`}
@@ -22211,6 +22245,49 @@ window.SHIN2_CRM_APP_INIT = function(){
         const id = btn.getAttribute('data-ambiguous-open-card');
         closeUnregisteredPanel();
         openCard(id);
+      });
+    });
+    // §수동 동일 업체 연결 라운드(신규) — "🔗 동일 업체 연결" 토글: 행 클릭(등록 폼 열기)으로
+    // 전파되지 않도록 stopPropagation. 검색창은 입력할 때마다 결과 <div>만 새로 그려서
+    // (전체 모달을 다시 그리지 않음) 한글 조합 입력이 끊기지 않게 한다(§업무관리 검색
+    // 한글 조합 깨짐 수정과 같은 이유 — input 재생성 금지).
+    root.querySelectorAll('[data-unreg-manual-toggle]').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const name = btn.getAttribute('data-unreg-manual-toggle');
+        unregManualLinkOpenFor = (unregManualLinkOpenFor === name) ? null : name;
+        openUnregisteredPanel();
+      });
+    });
+    root.querySelectorAll('[data-unreg-manual-search]').forEach(input=>{
+      input.addEventListener('click', (e)=> e.stopPropagation());
+      input.addEventListener('input', ()=>{
+        const name = input.getAttribute('data-unreg-manual-search');
+        const resultsEl = root.querySelector(`[data-unreg-manual-results="${CSS.escape(name)}"]`);
+        if(!resultsEl) return;
+        const hits = searchActiveCompaniesForManualLink(input.value);
+        resultsEl.innerHTML = !input.value.trim() ? ''
+          : hits.length ? hits.map(c=> `
+              <div style="display:flex;align-items:center;gap:8px;padding:2px 0;">
+                <span>${esc(c.name)}</span>
+                <button type="button" class="co-text-action" data-unreg-manual-connect-company="${esc(c.id)}" data-unreg-manual-connect-name="${esc(name)}">이 업체와 연결</button>
+              </div>`).join('')
+            : `<div style="color:var(--text-muted);font-size:12px;">일치하는 CRM 업체가 없습니다.</div>`;
+        resultsEl.querySelectorAll('[data-unreg-manual-connect-company]').forEach(btn=>{
+          btn.addEventListener('click', (e)=>{
+            e.stopPropagation();
+            const companyId = btn.getAttribute('data-unreg-manual-connect-company');
+            const unregName = btn.getAttribute('data-unreg-manual-connect-name');
+            const co = D.findCompany(companyId);
+            if(!co) return;
+            if(!confirm(`"${unregName}"을(를) "${co.name}"의 이전 상호로 연결할까요?\n두 업체의 매출이 합산되고, 이 이름은 미등록 목록에서 빠집니다.`)) return;
+            D.addFormerName(companyId, unregName);
+            unregManualLinkOpenFor = null;
+            renderUnregisteredBadge();
+            if(typeof renderList === 'function') renderList();
+            openUnregisteredPanel();
+          });
+        });
       });
     });
   }
