@@ -31127,12 +31127,16 @@ window.SHIN2_CRM_APP_INIT = function(){
      정보 수정/등록 폼에서 이미 쓰던 실제 필드)만 보고, 첨부서류·활동기록·Firebase 경로·
      인증정보 등은 이 코드가 아예 읽지 않는다(§6 "PDF 전용 복제 데이터 금지").
      ========================================================================== */
+  // §사용자 확인 2건 반영(신규) — ①"시공사 발송용" 탭 완전 제거(내부용/외부 발송용
+  // 2종만 남긴다). ②외부 발송용은 co.distributionLists 수동 태그가 아니라 "MOU 체결
+  // 업체"만 대상이어야 한다(사용자 확인: "외부발송용은 mou체결업체야") — 아래
+  // pdfExportFilteredCompanies에서 type==='external'일 때 getMouSignedCompanies()
+  // (§PDF 내보내기(MOU 체결 협력사) 라운드에서 이미 쓰던, KPI "MOU 체결" 카드와 완전히
+  // 같은 판정)를 그대로 재사용한다 — 새 판정 로직을 만들지 않는다.
   const PDF_EXPORT_TYPES = [
     { key:'internal', label:'내부용', desc:'사내 보관용 전체 정보', fileLabel:'내부용', landscape:true,
       columns:['no','region','name','code','repName','bizRegNo','address','phone','fax','email','mouDate','capital','note'] },
-    { key:'contractor', label:'시공사 발송용', desc:'시공사에 전달 가능한 업무 연락처 목록', fileLabel:'시공사용', landscape:false,
-      columns:['no','region','name','code','repName','address','phone','fax'] },
-    { key:'external', label:'외부 발송용', desc:'외부 공유용 최소 정보', fileLabel:'외부용', landscape:false,
+    { key:'external', label:'외부 발송용', desc:'MOU 체결 업체 · 외부 공유용 최소 정보', fileLabel:'외부용', landscape:false,
       columns:['no','region','name','code','repName','address','phone'] }
   ];
   const PDF_EXPORT_COLUMN_LABELS = {
@@ -31182,10 +31186,18 @@ window.SHIN2_CRM_APP_INIT = function(){
     return hay.includes(s);
   }
   let pdfExportState = { type:'internal', regions: new Set(), search:'' };
+  function pdfExportEligibleForType(co, mouSignedIdSet){
+    // §external은 co.distributionLists 태그가 아니라 "MOU 체결" 판정(mouSignedIdSet,
+    // getMouSignedCompanies 기반)만 본다 — 사용자 확인: "외부발송용은 mou체결업체야".
+    if(pdfExportState.type === 'external') return mouSignedIdSet.has(co.id);
+    return D.isInDistributionList(co, pdfExportState.type);
+  }
   function pdfExportFilteredCompanies(){
     const regions = pdfExportState.regions;
+    const mouSignedIdSet = pdfExportState.type === 'external'
+      ? new Set(getMouSignedCompanies().map(c=> c.id)) : null;
     return D.loadCompanies().filter(co=>{
-      if(!D.isInDistributionList(co, pdfExportState.type)) return false;
+      if(!pdfExportEligibleForType(co, mouSignedIdSet)) return false;
       if(regions.size){
         const coRegions = resolveCompanyRegionList(co);
         if(!coRegions.some(r=> regions.has(r))) return false;
@@ -31255,7 +31267,7 @@ window.SHIN2_CRM_APP_INIT = function(){
               </div>
               <div class="pdf-export-count">출력 대상 업체 수: <b id="pdfExportCountVal">${filtered.length}</b>건 · 전체 고객 수: ${all.length}건</div>
               ${pdfExportState.type === 'internal' ? `<div class="dist-list-warn">내부용 문서에는 사업자번호·이메일 등 개인정보가 포함될 수 있습니다. 외부 공유에 사용하지 마세요.</div>` : ''}
-              ${pdfExportState.type === 'external' ? `<div class="mail-settings-help">외부 발송용은 FAX·이메일·사업자번호·협약일·자본금·비고·내부 메모 등 민감정보가 자동으로 제외됩니다.</div>` : ''}
+              ${pdfExportState.type === 'external' ? `<div class="mail-settings-help">외부 발송용은 MOU 체결 업체만 대상이며(위 KPI "MOU 체결" 숫자와 같은 기준), FAX·이메일·사업자번호·협약일·자본금·비고·내부 메모 등 민감정보가 자동으로 제외됩니다.</div>` : ''}
             </div>
             <div class="pdf-export-right">
               <div class="pdf-export-actions">
@@ -31310,7 +31322,10 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 현재 출력 조건에서 제외된 이유 — 기존 필터 로직(D.isInDistributionList/지역/
   // pdfMatchesSearch)에서 바로 알 수 있는 것만 표시한다(§요청 24 "추측 금지").
   function pdfExportConfirmExcludeReason(co){
-    if(!D.isInDistributionList(co, pdfExportState.type)){
+    const mouSignedIdSet = pdfExportState.type === 'external'
+      ? new Set(getMouSignedCompanies().map(c=> c.id)) : null;
+    if(!pdfExportEligibleForType(co, mouSignedIdSet)){
+      if(pdfExportState.type === 'external') return 'MOU 체결 업체가 아님(외부 발송용은 MOU 체결 업체만 대상)';
       const t = PDF_EXPORT_TYPES.find(x=> x.key === pdfExportState.type);
       return `현재 출력 유형(${t ? t.label : pdfExportState.type}) 대상 목록에 포함되지 않음`;
     }
