@@ -4059,6 +4059,85 @@ table.pdf-doc-table thead{ background:var(--bg); }
    퍼지지 않게 max-width로 살짝 눌러준다. */
 .kpi-strip{ max-width:920px!important; }
 .kpi-item{ flex:1 1 0!important; }
+
+/* ==========================================================================
+   §고객 상세 팝업 단순화 라운드(신규) — 탭/기업요약/상담메모/질문지요약/서류현황
+   컨테이너를 뺀 뒤 남은 3열 그리드(고객인사이트/매출현황/최근POUR시공실적) 비율을
+   재조정하고, 최근 접촉 기록을 그 아래 전체 폭 1줄로 배치. 파일 끝쪽(캐스케이드
+   마지막)이라 위쪽의 .cdash2-body-grid-3col/.cdash2-card 관련 선언들을 이긴다.
+   ========================================================================== */
+.cdash2-body-grid.cdash2-body-grid-3col{
+  grid-template-columns: 0.8fr 1.4fr 1.3fr!important;
+  align-items:stretch!important;
+}
+@media(max-width:1200px){ .cdash2-body-grid.cdash2-body-grid-3col{ grid-template-columns:1fr 1fr!important; } }
+@media(max-width:900px){ .cdash2-body-grid.cdash2-body-grid-3col{ grid-template-columns:1fr!important; } }
+/* §요청 9 "고객 인사이트는 컴팩트하게" — 기업요약/상담메모가 빠지면서 이 카드 하나만
+   남은 왼쪽 열이 인사이트 통합카드 스타일(merged-card 전용) 여백을 그대로 물려받지
+   않도록 일반 카드 패딩으로 되돌린다. */
+#cdashColLeft #cdashInsightTagsCard .cdash2-card{ min-height:0; }
+/* §요청 11 "최근 POUR 시공실적 카드를 본문에서 쓸 수 있는 세로 공간까지 확장, 6~10건
+   스크롤" — 오른쪽 열/카드를 그리드 셀 높이(align-items:stretch로 왼쪽·가운데 열과
+   같은 높이)까지 늘리고, 안쪽 표 스크롤 영역만 flex:1로 남는 공간을 전부 먹게 한다. */
+#cdashColRight{ height:100%; }
+#cdashColRight #cdashPourResultsCard .cdash2-card{ height:100%; display:flex; flex-direction:column; min-height:340px; }
+#cdashPourResultsCard .cdash2-table-scroll{ flex:1 1 auto; min-height:0; overflow-y:auto; }
+/* §요청 21/22 "팝업 전체 높이 활용, 아래 빈 공간 없이" — 가운데 열의 매출 카드도 같은
+   높이로 늘려 3열 상단이 나란히 맞도록. */
+#cdashColMid{ height:100%; }
+#cdashColMid .cdash2-revenue-card{ height:100%; }
+/* §요청 18 최근 접촉 기록 — 이제 그리드 밖 전체 폭 1줄. */
+#cdashTimelineCard{ margin-top:11px; }
+#cdashTimelineCard .cdash2-card{ padding:14px 16px; }
+
+/* §요청 13 "올해 누적" 뱃지 삭제 — 텍스트/뱃지 자체를 렌더링 단(renderSummaryRow2)에서
+   뺐다(아래 JS 수정 참고). 여기 CSS는 남겨진 흔적이 없도록 선택자만 대비용으로 둔다. */
+.cdash2-revenue-yearly-tag{ display:none!important; }
+
+/* §요청 14/16 매출 그래프 카드 안에서 더 크고 중심적으로 — 그래프 wrap 높이 확대. */
+.cdash2-chart-outer{ min-height:190px!important; }
+.cdash2-chart-wrap{ min-height:190px!important; }
+
+/* §요청 15 최고 매출 월 왕관 — 작은 골드 아이콘, 14~18px. */
+.cdash2-chart-crown{ font-size:15px; }
+
+/* §요청 19/20 닫기 X 버튼 확대 — 44~48px 클릭 영역, 아이콘 22~26px, 흰색, hover 시
+   밝은 반투명 배경, radius 8px. 네이비 헤더(.cdash2-header) 안에서 바로 눈에 띄게. */
+.cdash2-header-close{
+  width:46px!important; height:46px!important; border-radius:8px!important;
+  font-size:24px!important; color:#fff!important; background:transparent!important;
+  display:flex!important; align-items:center!important; justify-content:center!important;
+}
+.cdash2-header-close:hover{ background:rgba(255,255,255,.18)!important; color:#fff!important; }
+.cdash2-header{ padding-right:14px!important; }
+
+/* §요청 2 "전체 접촉 기록 모달"은 상세 팝업(.chart-overlay, z-index:420) 위에 떠야
+   하므로 .pi-overlay 기본값(300)보다 확실히 높게 스코프를 좁혀 올린다(§버그 원인과
+   같은 종류의 문제를 새로 만들지 않기 위해 처음부터 여유 있게 430으로). */
+#contactHistoryModalRoot .pi-overlay{ z-index:430; }
+/* §버그 원인과 같은 종류(신규) — "전체 실적 N건 보기"(openConstructionModal)도 상세
+   팝업 안에서 열리는데 #constructionModalRoot .pi-overlay에는 이런 스코프 오버라이드가
+   없어서 기본값 300으로 .chart-overlay(420) 뒤에 가려질 수 있었다 — 같은 원인이 재발할
+   여지를 여기서도 없앤다(항목 14 "실적 전체보기 정상" 검증 과정에서 함께 확인). */
+#constructionModalRoot .pi-overlay{ z-index:430; }
+.contact-hist-body{ max-height:60vh; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+.contact-hist-row{ display:flex; gap:10px; padding:8px 10px; border:1px solid var(--line); border-radius:7px; background:#fff; }
+.contact-hist-date{ flex:none; width:78px; font-size:11.5px; font-weight:700; color:var(--text-muted); }
+.contact-hist-text{ flex:1; min-width:0; font-size:12.5px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* §요청 1/3 "최근 요청 보기(28)" → "전체 N건 보기 >" — 클릭 가능함이 분명히 보이게. */
+#cdashContactReqBtn{ cursor:pointer; }
+#cdashContactReqBtn:hover{ text-decoration:underline; }
+
+/* §버그 원인 수정(신규) — "최근 접촉 기록" 카드의 "최근 요청 보기(N)"가 열던 작은
+   팝오버(.rev-popover, 다른 4개 미니팝업과 공유하는 컴포넌트)는 z-index:401이었는데,
+   고객 상세 팝업 오버레이(.chart-overlay)가 나중에 z-index:420으로 올라가면서(§정답
+   시안 정밀 반영 라운드, 위 3006번째 줄 근처) 상세 팝업 "안"에서 여는 이 팝오버가
+   항상 그 뒤에 가려 보였다(클릭은 정상 동작해서 DOM엔 생기지만 화면엔 안 보임) — 이번
+   라운드에서 이 버튼의 동작 자체를 아래 큰 모달로 바꿨지만, .rev-popover를 다른 곳
+   (예: 목록 화면의 "최근 요청" 컬럼)에서 계속 쓰므로 같은 종류의 가려짐 버그가 다시
+   생기지 않도록 기준 z-index 자체도 420보다 확실히 높여 둔다. */
+.rev-popover{ z-index:430!important; }
 </style>
 </head>
 <body>
@@ -4385,6 +4464,10 @@ table.pdf-doc-table thead{ background:var(--bg); }
        position:fixed 작은 카드만, 바깥클릭/ESC로 닫힘). 큰 "요청자료" 중앙 모달
        (openMemoPanel)은 이 팝업 안의 "전체 기록 보기" 버튼을 눌러야만 열린다. -->
   <div id="requestPopoverRoot"></div>
+  <!-- §고객 상세 팝업 단순화 라운드(신규) — "최근 접촉 기록" 카드의 "전체 N건 보기"가
+       여는 전체 목록 모달 전용 root. 다른 중앙 확인 모달과 같은 .pi-overlay/.pi-panel
+       패턴 재사용(새 시각 언어 없음). -->
+  <div id="contactHistoryModalRoot"></div>
   <!-- §지도 분포 라운드(신규): "지도 분포" 버튼이 여는 중앙 대형 모달 전용 root. -->
   <div id="mapDistributionModalRoot"></div>
   <!-- §엑셀/Google Sheets 가져오기 제거 라운드(신규) — 엑셀 실적 가져오기 전용
@@ -14517,12 +14600,11 @@ window.SHIN2_CRM_APP_INIT = function(){
             </div>
             <div id="cdashMgmtNeedBanner"></div>
             <div id="cdashInfoStrip"></div>
-            <!-- §디자인 개편 라운드(신규, 참고 시안 반영) — 시각적 탭 메뉴만 추가한다(§ "실제
-                 탭 전환 로직이 없으면 시각 탭바만 만들고 전부 스크롤로 보이게 유지" 지시 그대로).
-                 클릭하면 이미 화면에 렌더돼 있는 해당 카드로 스크롤만 하고, 어떤 카드도
-                 숨기거나 다시 그리지 않는다(§ 데이터 소실 위험 없음) — renderTabBar가 여는 새
-                 상태/저장소는 전혀 없다. -->
-            <div id="cdashTabBar"></div>
+            <!-- §상세 팝업 단순화 라운드(신규) — 이전엔 여기에 시각적 탭바(#cdashTabBar,
+                 renderTabBar)가 있었다. 실제 탭 전환 로직은 없었고(클릭하면 해당 카드로
+                 스크롤만 함) 사용자 요청대로 완전히 뺐다 — CDASH_TABS 배열과
+                 renderTabBar 함수 자체는 지우지 않았다(호출부도 그대로 둠, 대상 컨테이너가
+                 없으면 조용히 no-op). -->
             <!-- §정답 시안 정밀 반영 라운드(신규) — 사용자가 첨부한 상세 참고 스크린샷을
                  "정답"으로 못박고 배치를 다시 맞췄다: 좌(기업요약/업체관계/고객인사이트/
                  상담메모) · 중(매출현황/최근접촉기록) · 우(최근POUR시공실적/질문지상담요약).
@@ -14533,46 +14615,31 @@ window.SHIN2_CRM_APP_INIT = function(){
                  무변경(§ "기존 함수 출력 그대로, 컨테이너만 재배치" 원칙 유지). 시공실적을
                  가운데 열 맨 아래→오른쪽 열 맨 위로 옮긴 것이 이번 라운드의 핵심 변경점
                  (§요청 "시공실적을 보려고 한참 스크롤해야 하는 구조 금지"). -->
+            <!-- §상세 팝업 단순화 라운드(신규) — 사용자 확인 반영: 탭 메뉴(#cdashTabBar)/
+                 기업 요약(#cdashCompanySummaryCard)/상담 메모(#cdashMemoPreviewCard)/
+                 질문지 상담 요약(#cdashQuestionnaireCard)/서류 현황(#cdashDocsSectionWrap)
+                 컨테이너를 화면에서 뺐다. 렌더 함수(renderTabBar/renderCompanySummaryCard/
+                 renderMemoPreviewCard/renderQuestionnaireSummaryCard/renderDocStatusBlock/
+                 renderDocsSection) 자체와 데이터는 전혀 안 지웠다 — 전부 "const wrap =
+                 document.getElementById(...); if(!wrap) return;" 가드가 이미 있어(이
+                 파일의 기존 관례, §고객카드 전면 개선 라운드가 먼저 세운 패턴) 대상 컨테이너가
+                 없으면 조용히 아무 것도 안 그리고 끝난다 — renderChart() 안의 호출부도 그대로
+                 둬서 안전하다(다른 곳에서 이 함수들을 다시 쓸 때도 그대로 재사용 가능).
+                 핵심 4개(고객 인사이트/매출 현황/최근 POUR 시공실적/최근 접촉 기록)만 남기고,
+                 "최근 접촉 기록"은 표 아래 전체 폭 1줄로 뺐다(§요청 10 "아래: 최근 접촉
+                 기록"). -->
             <div class="cdash2-body-grid cdash2-body-grid-3col">
               <div class="cdash2-col-stack" id="cdashColLeft">
-                <!-- §신규 — 참고 시안의 "기업 요약" 카드. 새 데이터/계산 없음 — 이미 있는
-                     co.name/repName/address/phone 필드만 읽는다(§ "없는 필드 지어내지
-                     않기" — 고객구분/업종은 현재 데이터 모델에 해당 필드 자체가 없어 넣지
-                     않았다, 완료 보고에 명시). 수정 아이콘은 기존 편집 진입점
-                     (openHeaderSection('info'), 고객 정보 아코디언)을 그대로 연다 — 새 편집
-                     폼을 만들지 않는다. -->
-                <div id="cdashCompanySummaryCard"></div>
-                <!-- §고객인사이트·상담메모·질문지요약 통합 라운드(신규) — 사용자 요청("고객인사이트
-                     .상담메모.질문지상담요약 하나로 합칠거야")에 따라 세 카드를 하나의 카드
-                     테두리 안에 담는다. renderInsightTagsCard/renderMemoPreviewCard/
-                     renderQuestionnaireSummaryCard 세 함수는 전혀 안 바뀌었다 — 각자 여전히
-                     자기 id(cdashInsightTagsCard/cdashMemoPreviewCard/cdashQuestionnaireCard)
-                     에만 그린다. 이 wrapper는 시각적 테두리 하나로 묶어주는 역할만 하고, CSS가
-                     안쪽 3개의 개별 카드 테두리를 없애고 구분선만 넣는다(§ 아래 CSS 참고). -->
-                <div class="cdash2-card cdash2-merged-card" id="cdashInsightMergedCard">
-                  <div id="cdashInsightTagsCard"></div>
-                  <div id="cdashMemoPreviewCard"></div>
-                  <div id="cdashQuestionnaireCard"></div>
-                </div>
+                <div id="cdashInsightTagsCard"></div>
               </div>
               <div class="cdash2-col-stack" id="cdashColMid">
                 <div id="cdashSummaryRow"></div>
-                <div id="cdashTimelineCard"></div>
               </div>
               <div class="cdash2-col-stack" id="cdashColRight">
-                <!-- §정답 시안 정밀 반영 라운드 — "최근 POUR 시공실적"을 가운데 열 맨 아래에서
-                     오른쪽 열 맨 위로 옮겨, 스크롤 없이 매출현황과 나란히 바로 보이게 한다
-                     (§요청). renderPourResultsCard 자체는 전혀 안 바뀌었다. -->
                 <div id="cdashPourResultsCard"></div>
               </div>
             </div>
-            <!-- §디자인 개편 라운드(신규) — "관련 문서"를 아코디언 팝오버 안에서 상시 노출
-                 섹션으로 옮긴다. renderDocStatusBlock/renderDocsSection 함수와 내부 마크업은
-                 한 글자도 바꾸지 않았다 — #cdashDocStatusBlock 컨테이너의 위치만 옮겼다
-                 (§ "기존 함수 출력 그대로, 컨테이너만 재배치"). -->
-            <div class="cdash2-docs-section" id="cdashDocsSectionWrap">
-              <div id="cdashDocStatusBlock"></div>
-            </div>
+            <div id="cdashTimelineCard"></div>
           </div>
           <div id="cdashFooterBar"></div>
         </div>
@@ -14921,17 +14988,22 @@ window.SHIN2_CRM_APP_INIT = function(){
     let chartHtml = `<div class="cdash2-chart-empty">월별 매출 데이터 없음</div>`;
     let maxBadgeText = '';
     let maxIdx = -1;
+    // §요청 15 "최고 매출 월 왕관, 동률이면 동률 최고월 모두 표시" — 특정 달을
+    // 하드코딩하지 않고 월별 매출 배열(vals)에서 max를 계산해 그 값과 같은 인덱스를
+    // 전부 모은다(maxIdxList). 배지 문구(maxBadgeText)는 기존처럼 마지막(가장 최근) 최고
+    // 월 하나만 대표로 보여준다(§8 관례 유지) — 그래프의 왕관 표시만 동률 전부에 붙인다.
+    let maxIdxList = [];
     if(monthly && monthly.points.length){
       const vals = monthly.points.map(p=> p.total);
       const maxRaw = Math.max.apply(null, vals);
       if(maxRaw > 0){
-        // §8 동률이면 가장 최근 달 — 뒤에서부터 훑어 마지막으로 만나는 최고값 인덱스를 남긴다.
-        for(let i=0;i<vals.length;i++){ if(vals[i] === maxRaw) maxIdx = i; }
+        for(let i=0;i<vals.length;i++){ if(vals[i] === maxRaw) maxIdxList.push(i); }
+        maxIdx = maxIdxList[maxIdxList.length - 1];
         maxBadgeText = `최고 ${monthly.points[maxIdx].month}월 · ${fmtKrwCompact(maxRaw)}`;
       } else {
         maxBadgeText = '올해 매출 없음'; // §8/§13
       }
-      chartHtml = buildRevenueBarChart(monthly.points, maxIdx);
+      chartHtml = buildRevenueBarChart(monthly.points, maxIdxList);
     }
 
     // §정답 시안 정밀 반영 라운드 §4: 첨부 시안의 가운데 열 최상단은 "매출 현황" 카드
@@ -14949,7 +15021,7 @@ window.SHIN2_CRM_APP_INIT = function(){
           </div>
           <div class="cdash2-revenue-head">
             <div class="cdash2-revenue-kpi"><div class="cdash2-revenue-stat-label">총 매출</div><div class="cdash2-revenue-stat-value">${esc(totalRevenueText)}</div></div>
-            <div class="cdash2-revenue-kpi"><div class="cdash2-revenue-stat-label">${esc(currentYear)}년 매출</div><div class="cdash2-revenue-stat-value">${esc(yearRevenueText)}<span class="cdash2-revenue-yearly-tag">올해 누적</span></div></div>
+            <div class="cdash2-revenue-kpi"><div class="cdash2-revenue-stat-label">${esc(currentYear)}년 매출</div><div class="cdash2-revenue-stat-value">${esc(yearRevenueText)}</div></div>
           </div>
           <div class="cdash2-chart-outer"><div class="cdash2-chart-wrap" id="cdashRevenueChartWrap">${chartHtml}</div></div>
         </div>
@@ -14996,18 +15068,23 @@ window.SHIN2_CRM_APP_INIT = function(){
   // maxIdx는 renderSummaryRow2가 "최고 N월 · 금액" 배지와 동일하게 한 번만 계산해서
   // 넘겨준다(§9 "그래프와 서로 다른 데이터 기준을 사용하지 않게 통합") — 이 함수 안에서
   // 따로 다시 계산하지 않는다.
-  function buildRevenueBarChart(points, maxIdx){
-    const W = 560, H = 150, padX = 26, padTop = 32, padBottom = 26;
+  // §요청 14/15/16 매출 그래프 개선 라운드(신규) — maxIdx(단일) 대신 maxIdxList(배열)를
+  // 받는다(동률 최고월 전부 표시). 전체 svg 높이(H)와 막대 폭(barW 상한)을 키워 카드
+  // 안에서 그래프가 더 중심적으로 보이게 했다(§17). 데이터/계산 방식(buildMonthlyRevenueForCurrentYear,
+  // 색상 네이비/블루 두 톤)은 그대로 두고 크기·왕관 표시만 추가했다.
+  function buildRevenueBarChart(points, maxIdxList){
+    maxIdxList = Array.isArray(maxIdxList) ? maxIdxList : (maxIdxList >= 0 ? [maxIdxList] : []);
+    const maxIdxSet = new Set(maxIdxList);
+    const W = 560, H = 190, padX = 26, padTop = 42, padBottom = 26;
     const axisY = H - padBottom;
     const plotH = axisY - padTop;
     const values = points.map(p=> p.total);
     const maxV = Math.max.apply(null, values.concat([1]));
     const n = points.length;
     const slotW = (W - padX*2) / Math.max(1, n);
-    // Chart.js의 categoryPercentage/barPercentage에 해당 — 슬롯의 절반 정도로 막대 폭을
-    // 제한해 "너무 두껍지 않은 중간 크기"(§3)를 만들되, 월이 아주 적을 땐 과하게 넓어지지
-    // 않도록 26px을 상한으로 둔다.
-    const barW = Math.max(10, Math.min(26, slotW * 0.5));
+    // Chart.js의 categoryPercentage/barPercentage에 해당 — §14 "막대 너비 증가"를 반영해
+    // 상한을 26→34px로 키웠다(슬롯이 좁은 달이 많을 땐 여전히 비율로 줄어든다).
+    const barW = Math.max(12, Math.min(34, slotW * 0.58));
     const xCenter = i=> padX + slotW * (i + 0.5);
     const yAt = v=> axisY - (v / maxV) * plotH;
 
@@ -15023,7 +15100,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     const minRawPositive = (()=>{ const pos = values.filter(v=>v>0); return pos.length ? Math.min.apply(null, pos) : null; })();
     const minIdx = minRawPositive != null ? values.indexOf(minRawPositive) : -1;
     const keyIdx = new Set([n-1]); // §11 좁은 화면: 최근 월은 항상 표시
-    if(maxIdx >= 0) keyIdx.add(maxIdx);
+    maxIdxSet.forEach(idx=> keyIdx.add(idx));
     if(minIdx >= 0) keyIdx.add(minIdx);
 
     const bars = points.map((p,i)=>{
@@ -15032,7 +15109,7 @@ window.SHIN2_CRM_APP_INIT = function(){
         // §5 0원인 달 — 막대 없이 기준선 위 작은 회색 '–'만 표시(말풍선/큰 회색 막대 금지).
         return `<text x="${cx.toFixed(1)}" y="${(axisY-4).toFixed(1)}" font-size="13" font-weight="700" fill="#B7C0CD" text-anchor="middle">–</text>`;
       }
-      const isMax = i === maxIdx;
+      const isMax = maxIdxSet.has(i);
       const barTop = yAt(p.total);
       const barH = Math.max(1, axisY - barTop);
       const r = Math.min(5, barW/2, barH); // §3 상단 모서리만 4~6px 라운드
@@ -15045,10 +15122,13 @@ window.SHIN2_CRM_APP_INIT = function(){
         + `L${x1.toFixed(1)},${axisY.toFixed(1)} Z`; // 아래쪽은 기준선에 정확히 붙음(§3)
       const color = isMax ? '#2563EB' : '#17305C'; // §3 일반=진한 남색, 최고=선명한 파란색, 그라데이션/3D 없음
       const manwonLabel = Math.round(p.total / 10000).toLocaleString('ko-KR'); // §4 "만원"은 반복하지 않음, 천단위 쉼표만
-      const labelY = Math.max(12, barTop - 8); // §4 막대 위 6~10px, 최고 막대가 상단에서 안 잘리게 클램프
+      const labelY = Math.max(24, barTop - 8); // §4 막대 위 6~10px, 최고 막대가 상단에서 안 잘리게 클램프(왕관 자리만큼 여유 12→24)
       const showLabel = !isNarrow || keyIdx.has(i); // §11 좁은 화면에서는 주요 지점만(글자를 줄이지 않고 개수를 줄임)
+      // §요청 15 최고 매출 월 왕관 — 작은 골드 이모지, <title>로 네이티브 툴팁("최고 매출 월").
+      const crownHtml = isMax ? `<text x="${cx.toFixed(1)}" y="${Math.max(12, labelY - 13).toFixed(1)}" text-anchor="middle" class="cdash2-chart-crown"><title>최고 매출 월</title>👑</text>` : '';
       return `<path d="${path}" fill="${color}"/>`
-        + (showLabel ? `<text x="${cx.toFixed(1)}" y="${labelY.toFixed(1)}" font-size="11.5" font-weight="700" fill="${color}" text-anchor="middle">${esc(manwonLabel)}</text>` : '');
+        + (showLabel ? `<text x="${cx.toFixed(1)}" y="${labelY.toFixed(1)}" font-size="11.5" font-weight="700" fill="${color}" text-anchor="middle">${esc(manwonLabel)}</text>` : '')
+        + (showLabel ? crownHtml : '');
     }).join('');
 
     const monthLabels = points.map((p,i)=>{
@@ -15105,28 +15185,75 @@ window.SHIN2_CRM_APP_INIT = function(){
     const p = n=> String(n).padStart(2,'0');
     return p(d.getMonth()+1) + '.' + p(d.getDate());
   }
+  // §최근 접촉 전체보기 버그 수정 라운드(신규) — 원인: "최근 요청 보기(N)" 버튼은
+  // openRequestPopover(co, reqBtn)를 정상 호출하고 있었다(클릭 핸들러 자체는 있었음).
+  // 문제는 그 팝오버(.rev-popover)의 z-index가 401인데, 고객 상세 팝업 오버레이
+  // (.chart-overlay)가 이후 다른 라운드에서 420으로 올라가면서(§정답 시안 정밀 반영
+  // 라운드) 상세 팝업 "안"에서 여는 이 팝오버가 항상 상세 팝업 뒤에 가려져 있었다 —
+  // DOM에는 생기고 위치도 맞게 계산되지만 화면에는 아예 안 보였다(§버그 원인 확인
+  // 완료). 이번 라운드에서는 그 작은 팝오버 대신 사용자 요청대로 전체 목록을 보여주는
+  // 별도 큰 모달(openContactHistoryModal, 아래)로 바꿨고, 그 모달의 오버레이는 처음부터
+  // .chart-overlay보다 높은 z-index(430)로 만들어 같은 종류의 버그가 재발하지 않게 했다.
+  // 데이터는 새로 만들지 않고 이 카드가 이미 쓰던 acts+memos 조합을 그대로 재사용한다
+  // (§요청 "새로 복제하지 말고 실제 activity/request 데이터 그대로").
+  function buildContactHistoryItems(co){
+    const acts = D.activitiesForCompany(co.id).map(a=> ({ text: (a.activityText || a.originalText || '').trim(), raw: a.createdAt }));
+    const memos = D.memosFor(co.id).map(m=> ({ text: (m.text || '').trim(), raw: m.updatedAt || m.createdAt }));
+    return acts.concat(memos)
+      .filter(x=> x.text && x.raw != null && !isNaN(new Date(x.raw).getTime()))
+      .sort((a,b)=> new Date(b.raw).getTime() - new Date(a.raw).getTime());
+  }
+  function closeContactHistoryModal(){
+    const root = document.getElementById('contactHistoryModalRoot');
+    if(root) root.innerHTML = '';
+  }
+  function openContactHistoryModal(co){
+    const root = document.getElementById('contactHistoryModalRoot');
+    if(!root) return;
+    const items = buildContactHistoryItems(co); // 이미 최신순 정렬됨(§요청 "최신순 정렬")
+    const rowsHtml = items.length ? items.map(it=> `
+      <div class="contact-hist-row">
+        <div class="contact-hist-date">${esc(fmtDate(it.raw))}</div>
+        <div class="contact-hist-text" title="${esc(it.text)}">${esc(it.text)}</div>
+      </div>`).join('') : `<div class="chart-empty">접촉 기록이 없습니다.</div>`;
+    root.innerHTML = `
+      <div class="pi-overlay" id="contactHistoryOverlay">
+        <div class="pi-panel" style="max-width:560px;" role="dialog" aria-modal="true" aria-label="최근 접촉 기록">
+          <div class="pi-head">
+            <div class="pi-title">최근 접촉 기록</div>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <span style="font-size:12px;color:var(--text-muted);white-space:nowrap;">총 ${esc(items.length)}건</span>
+              <button type="button" class="chart-close-btn" id="contactHistoryCloseBtn" aria-label="닫기">&times;</button>
+            </div>
+          </div>
+          <div class="pi-body contact-hist-body">${rowsHtml}</div>
+        </div>
+      </div>`;
+    document.getElementById('contactHistoryCloseBtn').addEventListener('click', closeContactHistoryModal);
+    bindSafeBackdropClose(document.getElementById('contactHistoryOverlay'), closeContactHistoryModal);
+    // §요청 21 "ESC 닫기 정상" — 이 리스너와 상세 팝업의 전역 chartEscHandler는 둘 다
+    // document에 직접 addEventListener로 붙어 있어(부모-자식 관계 아님) stopPropagation
+    // 만으로는 같은 노드의 다른 리스너 실행을 못 막는다 — stopImmediatePropagation을
+    // 써서 같은 Escape 입력에 상세 팝업까지 같이 닫히지 않게 한다. 이 리스너는 열 때마다
+    // document 맨 앞이 아니라 맨 뒤에 등록되므로(chartEscHandler가 상세 팝업이 열릴 때
+    // 이미 먼저 등록돼 있음) 실행 순서상 chartEscHandler가 먼저 불릴 수 있어, 아예
+    // capture 단계에서 가로챈다.
+    const onEsc = (e)=>{ if(e.key === 'Escape'){ e.stopImmediatePropagation(); closeContactHistoryModal(); } };
+    document.addEventListener('keydown', onEsc, { once:true, capture:true });
+  }
+  // ---- §고객카드 전면 개선 라운드 [4] 최근 접촉 기록 — D.activitiesForCompany +
+  // D.memosFor를 합쳐 최신순 3건만 보여준다(§요청, NEXT/다음 행동/후속 일정 등록은 만들지
+  // 않는다). "다음 할 일" 관련 UI는 이 카드에 전혀 없다. ----
   function renderContactTimelineCard(co){
     const wrap = document.getElementById('cdashTimelineCard');
     if(!wrap) return;
-    const acts = D.activitiesForCompany(co.id).map(a=> ({ text: (a.activityText || a.originalText || '').trim(), raw: a.createdAt }));
-    const memos = D.memosFor(co.id).map(m=> ({ text: (m.text || '').trim(), raw: m.updatedAt || m.createdAt }));
-    const items = acts.concat(memos)
-      .filter(x=> x.text && x.raw != null && !isNaN(new Date(x.raw).getTime()))
-      .sort((a,b)=> new Date(b.raw).getTime() - new Date(a.raw).getTime())
-      .slice(0, 3);
-    // §삭제된 업체 매칭-불일치 예방 라운드(신규) — 카드에 Google Sheets 요청(sheetRequests)을
-    // 보여주는 진입점이 전혀 없던 기존 갭을 메운다. git blame으로 확인한 결과 renderReqPreview/
-    // #cdashReqPreviewBlock("최근 요청 / 고객 메모" 박스)은 §고객카드 전면 개선 라운드(§9
-    // 요청)에서 의도적으로 화면에서 뺀 것("함수는 보존, 화면에서만 뺐다" 관례)이라 그 박스를
-    // 그대로 되살리지 않는다 — 대신 목록 화면 "최근 요청" 컬럼이 이미 쓰는 openRequestPopover
-    // (buildRequestListItems 재사용, sheetRequests 포함)를 그대로 호출하는 작은 진입점 버튼만
-    // "최근 접촉 기록" 카드 제목 옆에 추가한다(새 데이터/새 팝업 로직 없음).
-    const reqCount = buildRequestListItems(co).length;
+    const allItems = buildContactHistoryItems(co);
+    const items = allItems.slice(0, 3);
     wrap.innerHTML = `
       <div class="cdash2-card">
         <div class="cdash2-card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
           <span><span aria-hidden="true">⭐</span> 최근 접촉 기록</span>
-          <button type="button" class="co-text-action" id="cdashContactReqBtn" style="font-size:11px;padding:2px 8px;white-space:nowrap;">최근 요청 보기${reqCount ? ` (${reqCount})` : ''}</button>
+          ${allItems.length ? `<button type="button" class="co-text-action" id="cdashContactReqBtn" style="font-size:11px;padding:2px 8px;white-space:nowrap;">전체 ${esc(allItems.length)}건 보기 &gt;</button>` : ''}
         </div>
         ${items.length ? `
           <div class="cdash2-timeline">
@@ -15144,7 +15271,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       </div>
     `;
     const reqBtn = document.getElementById('cdashContactReqBtn');
-    if(reqBtn) reqBtn.addEventListener('click', (e)=>{ e.stopPropagation(); openRequestPopover(co, reqBtn); });
+    if(reqBtn) reqBtn.addEventListener('click', (e)=>{ e.stopPropagation(); openContactHistoryModal(co); });
   }
 
   // ---- §고객카드 전면 개선 라운드 [5] 고객 인사이트 — buildInsightRepTagsFull(co)(이미
@@ -15223,9 +15350,14 @@ window.SHIN2_CRM_APP_INIT = function(){
 
   // ---- §고객카드 전면 개선 라운드 [6] 최근 POUR 시공실적 — getTotalPourRecordsForCompany
   // (이미 있는 로컬 함수, 연도 desc/sourceRow desc 정렬까지 끝난 배열)를 그대로 조회만
-  // 해서 최신 4건만 표에 보여준다. "전체 N건 보기"는 새 화면을 만들지 않고 기존
+  // 해서 보여준다. "전체 N건 보기"는 새 화면을 만들지 않고 기존
   // openConstructionModal(co, null)(목록 화면에서 쓰던 그 모달, .pi-overlay 패턴이라
-  // 이미 열려 있는 고객카드 위에 그대로 쌓인다)을 그대로 연다. ----
+  // 이미 열려 있는 고객카드 위에 그대로 쌓인다)을 그대로 연다.
+  // §카드 확대 라운드(신규, §요청 11) — 카드 높이를 본문에서 쓸 수 있는 세로 공간까지
+  // 늘리면서(위 CSS #cdashColRight 관련 참고) 미리보기 건수도 4→10건으로 늘렸다. 표가
+  // 넘치면 카드 내부(.cdash2-table-scroll)만 세로 스크롤(위 CSS flex:1;overflow-y:auto)
+  // 되고 팝업 전체가 늘어나지는 않는다. 계산/정렬 로직(getTotalPourRecordsForCompany)은
+  // 전혀 안 바꿨다 — 잘라내는 개수만 바꿨다. ----
   function renderPourResultsCard(co){
     const wrap = document.getElementById('cdashPourResultsCard');
     if(!wrap) return;
@@ -15233,7 +15365,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     const total = all.length;
     const thisYear = new Date().getFullYear();
     const thisYearCount = all.filter(r=> r.year === thisYear).length;
-    const recent4 = all.slice(0, 4);
+    const recent4 = all.slice(0, 10);
     wrap.innerHTML = `
       <div class="cdash2-card">
         <div class="cdash2-pour-card-head">
@@ -27748,6 +27880,14 @@ window.SHIN2_CRM_APP_INIT = function(){
 
   function renderDocsSection(co){
     const wrap = document.getElementById('crmDocsSection');
+    // §상세 팝업 단순화 라운드(신규) — 이 요소는 renderDocStatusBlock이 #cdashDocStatusBlock
+    // 안에 그릴 때만 만들어지는 중첩 컨테이너다. 서류 현황 카드를 화면에서 뺀 뒤
+    // (#cdashDocStatusBlock 컨테이너 자체가 없어짐) renderDocStatusBlock은 이미 있는
+    // `if(!wrap) return;` 가드로 조용히 no-op되지만, 이 함수는 그 가드가 없어서 널 참조
+    // 오류로 renderChart() 전체가 중간에 멎는 버그가 있었다(§실제 발견 — 고객 상세 팝업을
+    // 열자마자 Escape가 안 먹히는 등 이후 렌더가 전부 끊겼다) — 다른 서류 관련 렌더
+    // 함수와 같은 가드를 추가했을 뿐, 서류 데이터/업로드 로직은 전혀 안 건드렸다.
+    if(!wrap) return;
     wrap.innerHTML = `
       <div class="doc-blocked-note${docNoteIsPlain() ? ' is-plain' : ''}" id="crmDocNote">${esc(docNoteText())}</div>
       <div class="doc-grid">
