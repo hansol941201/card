@@ -9513,6 +9513,38 @@ window.SHIN2_CRM_APP_INIT = function(){
         <button type="button" class="co-text-action primary" data-revenue-no-mou-confirm="${esc(co.id)}">MOU 체결</button>
       </div>`;
   }
+  // §미등록 업체 리스트 통합 라운드(신규) — 사용자 요청: "관리도구 미등록업체 목록을
+  // 통째로 옮기지 말고, 실적있음·MOU미체결 탭의 리스트 안에 같은 모양으로 넣어달라."
+  // 위 .co-row 그리드(col-name/col-pour/col-revenue-combo/col-request/col-contrib-trend)
+  // 를 그대로 재사용하되, 이 업체는 아직 CRM 레코드가 없어(buildUnregisteredCompanies2026
+  // 결과, co 객체 아님) 실적 건수·최근 요청·실적↔매출/최근흐름처럼 CRM 데이터에서만
+  // 계산되는 값은 지어내지 않고 "—"로 비워둔다 — 엑셀에 실제로 있는 값(2026 매출/최근
+  // 매출일/최근 현장명)만 그대로 보여준다. data-id=""라 기존 .co-row 클릭 위임
+  // (openCard(''))은 조용히 no-op이다(§openCard 자체가 findCompany 실패 시 그냥 return).
+  function renderRevenueNoMouUnregRowHtml(x){
+    const revenueHtml = (typeof x.revenue2026 === 'number')
+      ? esc(fmtKrwCompact(x.revenue2026)) : '<span class="data-none">매출자료 없음</span>';
+    return `
+      <div class="co-row" data-id="">
+        <div class="col-name">
+          <div class="col-name-top">
+            <span class="co-name-badges"><span class="co-name-text">${esc(x.name)}</span></span>
+          </div>
+          <div class="col-name-relation" style="color:#B91C1C;">CRM 미등록</div>
+        </div>
+        <div class="col-pour">${x.latestSite ? esc(x.latestSite) : '<span class="data-none">최근 현장 정보 없음</span>'}</div>
+        <div class="col-revenue-combo">
+          <div class="revenue-combo-line revenue-combo-total">${revenueHtml}</div>
+          <div class="revenue-combo-line revenue-combo-yr"><span class="revenue-combo-yr-label">최근 매출일</span>${x.latestDate ? esc(fmtDate(x.latestDate)) : '—'}</div>
+        </div>
+        <div class="col-request">—</div>
+        <div class="col-contrib-trend">—</div>
+      </div>
+      <div class="terminated-info-row" data-revenue-no-mou-unreg-info="${esc(x.name)}">
+        <span class="terminated-info-item"><b>업체코드</b> 미발급</span>
+        <button type="button" class="co-text-action primary" data-revenue-no-mou-unreg-confirm="${esc(x.name)}">MOU 체결</button>
+      </div>`;
+  }
   // §신규 협약사 탭 라운드 → §요청 발생 UI 보류 라운드(신규) — terminatedInfoRowHtml과
   // 완전히 같은 패턴(행 아래 별도 정보 줄). r은 renderList()의 enriched 행(co/acts/
   // summary/progress/pourCount) 그대로. "요청 발생"은 사용자 확정: 컨설팅 내역서 요청/
@@ -12335,12 +12367,22 @@ window.SHIN2_CRM_APP_INIT = function(){
       listEl.insertAdjacentHTML('afterbegin', classifiedUnregisteredTableHtml(classifiedMouRows, '엑셀 기준 MOU 체결 · CRM 미등록', 'MOU 체결'));
       bindClassifiedUnregisteredRows(listEl);
     }
-    // §매출자료 미등록 업체 재분류 라운드(신규) — 위 classifiedRevenueNoMouRows와 같은 패턴
-    // (mouDone 탭의 "엑셀 기준 MOU 체결 · CRM 미등록"과 완전히 동일한 구조). 클릭하면
-    // 기존 openAddCompanyForm(업체명 미리 입력된 등록 화면)으로 연결 — 새 로직 없음.
+    // §미등록 업체 리스트 통합 라운드(신규) — 사용자 확인: "옮겨달라는게 통째로 옮기라는게
+    // 아니라, 리스트에 넣어달라는거야" — 별도 박스 표(classifiedUnregisteredTableHtml)
+    // 대신 위 등록된 업체들과 완전히 같은 .co-row 모양으로 리스트 맨 끝에 섞어 넣는다.
+    // 실적(POUR 건수)·최근 요청·실적↔매출/최근흐름은 엑셀에 없는 값이라 지어내지 않고
+    // "—"로만 비워둔다 — 있는 값(매출2026/최근 매출일/최근 현장명)만 그대로 보여준다.
+    // "MOU 체결" 버튼은 기존 registerAndConfirmMou 핸들러(아래 신설, D.addCompany +
+    // genCompanyCode + saveStageCorrection — 전부 기존 함수 재사용)를 한 번에 호출한다:
+    // 사용자가 "번호 등록 + 업체코드 발급 + MOU체결까지 한번에" 방식을 확정했다.
     if(filterKey === 'revenueNoMou' && currentPage === 1 && classifiedRevenueNoMouRows.length){
-      listEl.insertAdjacentHTML('afterbegin', classifiedUnregisteredTableHtml(classifiedRevenueNoMouRows, '엑셀 기준 실적있음·MOU미체결 · CRM 미등록', 'MOU 미체결'));
-      bindClassifiedUnregisteredRows(listEl);
+      listEl.insertAdjacentHTML('beforeend', classifiedRevenueNoMouRows.map(renderRevenueNoMouUnregRowHtml).join(''));
+      listEl.querySelectorAll('[data-revenue-no-mou-unreg-confirm]').forEach(btn=>{
+        btn.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          handleRegisterAndConfirmMouFromExcelName(btn.getAttribute('data-revenue-no-mou-unreg-confirm'));
+        });
+      });
     }
     // §실적↔매출 실제 구현 라운드: "실적↔매출" 클릭 -> 실적·매출 분석 Drawer(다른 컬럼과
     // 같은 패턴, 옛 popover 방식은 없앰). 행 클릭(고객카드 열기)으로 전파되지 않도록
@@ -13801,6 +13843,32 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 통과하므로 겉보기엔 정상 동작하는 것처럼 보였지만, 실제 협약일 데이터는 비어있었다.
     saveStageCorrection(companyId, 'mouDone', { status:'done', dateText: fmtDate(new Date().toISOString()), owner: null },
       { reason:'기타', reasonOther:'실적있음·MOU미체결 탭에서 MOU 체결 처리' });
+    renderList();
+  }
+  // §미등록 업체 리스트 통합 라운드(신규) — 사용자 확정: 아직 CRM에 없는(buildUnregisteredCompanies2026
+  // 결과) 업체의 "MOU 체결" 버튼은 "번호 등록 + 업체코드 발급 + MOU체결까지 한번에" 처리한다.
+  // 등록은 §확인 필요 복원 라운드의 convertCaseByCaseToCompany와 완전히 같은 안전 패턴
+  // (D.addCompany → confirmCloudSave('companies')로 원격 반영 확인 → 실패하면
+  // D.removeCompanyHard로 되돌림, §낙관적 로컬 반영 롤백 원칙)을 그대로 재사용한다.
+  // 코드 발급/MOU 체결 처리 자체는 handleConfirmMouFromNonPartnerTab과 동일한 로직.
+  async function handleRegisterAndConfirmMouFromExcelName(excelName){
+    if(!confirm(`"${excelName}"을(를) 신규 등록하고 MOU 체결 처리하시겠습니까?\n오늘 날짜로 기록되며, 업체코드가 자동으로 발급됩니다.`)) return;
+    const dup = findActiveCompanyByExactName(excelName, D.loadCompanies());
+    if(dup){ alert(`이미 같은 이름의 CRM 업체가 있습니다: "${dup.name}" — 그 업체 카드에서 처리해주세요.`); renderList(); return; }
+    const newCo = D.addCompany({ name: excelName });
+    const companiesResult = await confirmCloudSave('companies');
+    if(!companiesResult.ok){
+      D.removeCompanyHard(newCo.id);
+      alert('저장에 실패했습니다(네트워크 확인 필요): ' + (companiesResult.err && companiesResult.err.message));
+      return;
+    }
+    let code = genCompanyCode(D.loadCompanies());
+    if(findCompanyByCodeExcept(code, D.loadCompanies(), newCo.id)) code = genCompanyCode(D.loadCompanies());
+    D.updateCompany(newCo.id, { code, partnerStatus:'partner' });
+    saveStageCorrection(newCo.id, 'mouDone', { status:'done', dateText: fmtDate(new Date().toISOString()), owner: null },
+      { reason:'기타', reasonOther:'실적있음·MOU미체결 탭에서 신규 등록 + MOU 체결 처리' });
+    D.addActivity(newCo.id, '[신규 등록] 실적있음·MOU미체결 탭에서 등록 + MOU 체결 처리');
+    renderUnregisteredBadge();
     renderList();
   }
   // §실적있음·MOU미체결 탭·건바이건 통합 정리 라운드(신규) — 원래 이 함수는 "실적있음·
