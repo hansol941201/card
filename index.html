@@ -3255,9 +3255,12 @@ body.map-modal-lock{ overflow:hidden; }
 .dist-list-check input{ width:auto; }
 .dist-list-warn{ font-size:11.5px; color:#B3261E; margin-top:6px; }
 /* §고객관리 목록 출력(PDF) 라운드(신규) */
-.pdf-export-panel{ max-width:980px; width:96vw; }
+/* §PDF 내보내기/목록 출력 통합 라운드(신규) — §요청 20 "width: min(1100px, 92vw)",
+   왼쪽 약 35%/오른쪽 약 65% 비율에 맞춰 폭/좌측 기본폭만 살짝 키웠다. 나머지 규칙은
+   그대로. */
+.pdf-export-panel{ max-width:1100px; width:96vw; }
 .pdf-export-body{ display:flex; gap:22px; align-items:flex-start; }
-.pdf-export-left{ flex:0 0 320px; min-width:260px; }
+.pdf-export-left{ flex:0 0 370px; min-width:260px; }
 .pdf-export-right{ flex:1 1 auto; min-width:0; }
 @media (max-width: 860px){
   .pdf-export-body{ flex-direction:column; }
@@ -3270,9 +3273,33 @@ body.map-modal-lock{ overflow:hidden; }
 .pdf-type-name{ font-size:13px; font-weight:700; color:var(--text); }
 .pdf-type-desc{ font-size:11.5px; color:var(--text-muted); margin-top:2px; }
 .pdf-export-count{ font-size:12.5px; color:var(--text); margin:8px 0; }
-.pdf-export-actions{ display:flex; gap:8px; margin-bottom:10px; }
-.pdf-preview-wrap{ border:1px solid var(--line); border-radius:8px; padding:12px; max-height:56vh; overflow:auto; background:#fff; }
+.pdf-export-actions{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+.pdf-preview-heading{ font-size:14px; font-weight:700; color:var(--text); }
+.pdf-preview-wrap{ border:1px solid var(--line); border-radius:8px; padding:12px; max-height:44vh; overflow:auto; background:#fff; }
 .pdf-preview-note{ font-size:11px; color:var(--text-muted); margin-bottom:8px; }
+/* §요청 6~13/21~24 "업체 포함 여부 확인 검색" — 왼쪽 출력조건 UI(.pdf-type-card 등)와
+   다르게 확인 전용이라는 게 한눈에 보이도록 옅은 배경 박스로 분리했다. */
+.pdf-confirm-box{ border:1px solid var(--line); border-radius:8px; padding:10px 12px; background:var(--bg); margin-bottom:10px; }
+.pdf-confirm-label{ font-size:12.5px; font-weight:600; color:var(--text); margin-bottom:6px; }
+.pdf-confirm-label-sub{ font-weight:400; color:var(--text-muted); }
+.pdf-confirm-input-row{ display:flex; gap:8px; }
+.pdf-confirm-input-row input{ flex:1 1 auto; min-width:0; }
+.pdf-confirm-result{ margin-top:8px; display:flex; flex-direction:column; gap:6px; }
+.pdf-confirm-hit{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; padding:7px 9px; border-radius:6px; font-size:12px; background:#fff; border:1px solid var(--line); }
+.pdf-confirm-hit.is-included{ cursor:pointer; border-color:#1E7D3A; background:#F0FAF3; }
+.pdf-confirm-hit.is-included:hover{ background:#E3F5E9; }
+.pdf-confirm-hit.is-excluded{ border-color:#B26A00; background:#FFF7EA; }
+.pdf-confirm-hit.is-notfound{ border-color:var(--line); background:var(--bg); }
+.pdf-confirm-badge{ font-size:11px; font-weight:700; white-space:nowrap; }
+.pdf-confirm-badge.is-ok{ color:#1E7D3A; }
+.pdf-confirm-badge.is-warn{ color:#B26A00; }
+.pdf-confirm-badge.is-no{ color:#8A93A3; }
+.pdf-confirm-name{ font-weight:700; color:var(--text); }
+.pdf-confirm-sub{ color:var(--text-muted); font-size:11.5px; }
+/* 미리보기 표 안에서 확인 검색으로 찾은 행을 강조 — data-co-id는 pdfExportBuildDocHtml이
+   행마다 이미 심어둔 속성(시각적으로는 원래 아무 효과 없음)을 그대로 셀렉터로 쓴다. */
+tr[data-co-id].pdf-preview-row-hit{ background:#FFF3C4 !important; box-shadow:inset 0 0 0 1.5px #B28900; }
+tr[data-co-id].pdf-preview-row-hit td{ font-weight:600; }
 .pdf-doc-title{ font-size:15px; font-weight:700; color:var(--navy); margin-bottom:4px; }
 .pdf-doc-meta{ display:flex; gap:12px; flex-wrap:wrap; font-size:11px; color:var(--text-muted); margin-bottom:8px; }
 table.pdf-doc-table{ width:100%; border-collapse:collapse; font-size:11px; }
@@ -4160,8 +4187,15 @@ table.pdf-doc-table thead{ background:var(--bg); }
              재사용해서 이 인라인 자리에 붙이기만 한다. -->
         <!-- §P1-4 PDF 버튼 이동 라운드(신규) — 진단 보고서 P1-4: KPI 스트립 안(5번째 칸처럼
              보이던 kpi-strip-row 구조)에 있던 "PDF 내보내기"를 목록 제목줄의 "관리 도구"/
-             "지도 분포" 버튼 옆으로 옮긴다. 클릭 핸들러(#crmMouPdfBtn 이벤트 바인딩)는
-             그대로 재사용 — 위치만 이동. -->
+             "지도 분포" 버튼 옆으로 옮긴다.
+             §PDF 내보내기/목록 출력 통합 라운드(신규) — 이 버튼(id는 이전 그대로
+             #crmMouPdfBtn 유지, 위치·문구도 그대로)의 클릭 대상만 바꿨다: 예전엔 MOU
+             체결 협력사 전용 2택(내부/외부) 소형 모달(openMouPdfMenuModal)을 열었지만,
+             이제는 검색창 옆에 있던 "목록 출력"(내부용/시공사발송용/외부발송용 3종,
+             지역·검색 필터, 실시간 미리보기)과 같은 openPdfExportModal을 연다 — 사용자가
+             PDF/목록 출력 기능에 들어가는 대표 진입점을 이 버튼 하나로 통일. 기존
+             openMouPdfMenuModal/doMouPdfSave 함수 자체는 지우지 않고 그대로 남겨뒀다
+             (다른 곳에서 참조하지 않는 죽은 코드일 뿐, 실수로 재사용하더라도 안전). -->
         <button type="button" class="list-phone-btn" id="crmMouPdfBtn">PDF 내보내기</button>
         <!-- §전화 요청 기록 제거 라운드(신규) — "전화 요청 기록" 버튼을 화면에서 뺐다
              (§요청 "화면 기능만 제거, 이미 저장된 과거 기록은 그대로 둔다"). 기존
@@ -4220,10 +4254,14 @@ table.pdf-doc-table thead{ background:var(--bg); }
                  (최근 활동 컬럼과 같은 값)를 그대로 내림차순 정렬만 한다. -->
             <option value="newPartnerActivity" id="crmSortOptNewActivity" hidden>최근 활동순</option>
           </select>
-          <!-- §고객관리 목록 출력(PDF) 라운드(신규) — 내부용/시공사 발송용/외부 발송용 3종
-               출력. 클릭 시 열리는 모달 안에서 유형·지역·검색을 다시 선택한 뒤에만 실제
-               출력 대상이 정해진다(§요청 "화면 필터와 출력 필터를 혼동하지 않게"). -->
-          <button type="button" class="co-text-action" id="crmPdfExportBtn">목록 출력</button>
+          <!-- §PDF 내보내기/목록 출력 통합 라운드(신규) — 이전엔 이 자리의 "목록 출력"
+               텍스트버튼(#crmPdfExportBtn, 내부용/시공사발송용/외부발송용 3종)과 상단
+               "PDF 내보내기" 버튼(#crmMouPdfBtn, MOU 체결 협력사 전용 내부/외부 2택)이
+               별개 진입점으로 공존해 중복 기능처럼 보였다. 사용자가 눌러 들어가는 대표
+               진입점을 상단 "PDF 내보내기" 버튼 하나로 통일하고(아래 openPdfExportModal
+               바인딩 참고), 이 자리의 중복 텍스트버튼만 제거한다 — 열리던 모달의 실제
+               로직(pdfExportState/PDF_EXPORT_TYPES/co.distributionLists 판정)은 전혀
+              안 지우고 그대로 재사용한다. -->
         </div>
         <!-- §고객관리 메인화면 재배치 라운드(신규) — 컬럼 재구성(§요청 7): 업체명/최근실적/
              총매출/최근요청/최근흐름/실적-매출 6개만 남긴다. 지역/업종/고객상태/담당자/
@@ -31162,7 +31200,12 @@ window.SHIN2_CRM_APP_INIT = function(){
     const genLabel = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
     const regionLabel = pdfExportState.regions.size ? Array.from(pdfExportState.regions).join(', ') : '전체 지역';
     const theadHtml = `<tr>${type.columns.map(c=> `<th>${esc(PDF_EXPORT_COLUMN_LABELS[c])}</th>`).join('')}</tr>`;
-    const tbodyHtml = rows.map((co,i)=> `<tr>${type.columns.map(c=> `<td>${esc(pdfExportResolveField(co,c,i))}</td>`).join('')}</tr>`).join('')
+    // data-co-id는 시각적으로는 아무 것도 안 바꾸는 속성이다 — 오른쪽 "업체 포함 여부
+    // 확인 검색"이 미리보기 표에서 해당 행을 scrollIntoView로 찾아가기 위한 용도로만
+    // 쓴다. 이 html 문자열은 미리보기 화면과 실제 PDF 인쇄창(doPdfExportSave) 양쪽에
+    // 그대로 재사용되므로, 인쇄 결과에는 어차피 눈에 보이지 않는 속성 하나가 늘 뿐 실제
+    // 인쇄 내용(열/값)은 전혀 달라지지 않는다.
+    const tbodyHtml = rows.map((co,i)=> `<tr data-co-id="${esc(co.id)}">${type.columns.map(c=> `<td>${esc(pdfExportResolveField(co,c,i))}</td>`).join('')}</tr>`).join('')
       || `<tr><td colspan="${type.columns.length}" class="pdf-doc-empty">출력 대상 업체가 없습니다.</td></tr>`;
     return {
       type, rows,
@@ -31196,9 +31239,9 @@ window.SHIN2_CRM_APP_INIT = function(){
       <button type="button" class="list-filter-chip${pdfExportState.regions.has(r)?' is-active':''}" data-pdf-region="${esc(r)}">${esc(r)}</button>`).join('');
     return `
       <div class="pi-overlay" id="pdfExportOverlay">
-        <div class="pi-panel pdf-export-panel" role="dialog" aria-modal="true" aria-label="목록 출력">
+        <div class="pi-panel pdf-export-panel" role="dialog" aria-modal="true" aria-label="PDF 내보내기">
           <div class="pi-head">
-            <div class="pi-title">목록 출력</div>
+            <div class="pi-title">PDF 내보내기</div>
             <button type="button" class="chart-close-btn" id="pdfExportCloseBtn" aria-label="닫기">&times;</button>
           </div>
           <div class="pi-body pdf-export-body">
@@ -31216,10 +31259,22 @@ window.SHIN2_CRM_APP_INIT = function(){
             </div>
             <div class="pdf-export-right">
               <div class="pdf-export-actions">
-                <button type="button" class="co-text-action primary" id="pdfExportPreviewBtn">미리보기</button>
-                <button type="button" class="co-text-action" id="pdfExportSaveBtn">PDF 저장</button>
+                <div class="pdf-preview-heading">미리보기</div>
+                <button type="button" class="co-text-action primary" id="pdfExportSaveBtn">PDF 저장</button>
               </div>
-              <div class="pdf-preview-wrap" id="pdfExportPreviewWrap"><div class="chart-empty">"미리보기" 버튼을 눌러 실제 출력 내용을 확인하세요. 미리보기는 파일 저장·발송·업로드를 하지 않습니다.</div></div>
+              <!-- §요청 6/7/16 "업체 포함 여부 검색" — 왼쪽 출력 조건(pdfExportState)과
+                   완전히 분리된 별도 상태(pdfExportConfirmQuery)로만 동작한다. 이 검색은
+                   출력 대상을 절대 바꾸지 않고(runPdfExportConfirmSearch는 pdfExportState를
+                   읽기만 하고 쓰지 않음), 미리보기 표에서 해당 행을 찾아 스크롤+강조만 한다. -->
+              <div class="pdf-confirm-box">
+                <div class="pdf-confirm-label">업체 포함 여부 확인 검색 <span class="pdf-confirm-label-sub">(이 검색은 출력 대상을 바꾸지 않습니다)</span></div>
+                <div class="pdf-confirm-input-row">
+                  <input type="text" id="pdfExportConfirmInput" value="${esc(pdfExportConfirmQuery)}" placeholder="예: 한솔시공사" />
+                  <button type="button" class="co-text-action" id="pdfExportConfirmBtn">찾기</button>
+                </div>
+                <div id="pdfExportConfirmResult"></div>
+              </div>
+              <div class="pdf-preview-wrap" id="pdfExportPreviewWrap"></div>
             </div>
           </div>
         </div>
@@ -31241,6 +31296,94 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="pdf-preview-note">포함되는 열: ${type.columns.map(c=> esc(PDF_EXPORT_COLUMN_LABELS[c])).join(', ')} · 여러 페이지가 되면 표 머리글이 자동으로 반복되고 브라우저 인쇄 옵션에서 페이지 번호를 켤 수 있습니다. 아래는 실제 PDF와 같은 내용/열 구성입니다(파일 저장·발송·업로드 없음).</div>
       <div class="pdf-preview-frame">${html}</div>`;
   }
+  // §요청 6~9/16/22~24 "업체 포함 여부 확인 검색" — 왼쪽 출력 조건(pdfExportState)과는
+  // 별개인 확인 전용 상태. 절대 pdfExportState를 쓰지 않는다(=출력 대상을 바꾸지 않음).
+  // 이름 비교는 기존 보수적 매칭 규칙과 같은 원칙(§업체명 자동매칭 보수적 운영)을 따라
+  // D.normCompanyName 정규화 완전일치/부분 문자열 포함만 쓰고, 유사도·발음·초성·fuzzy는
+  // 전혀 쓰지 않는다.
+  let pdfExportConfirmQuery = '';
+  function pdfConfirmNameMatches(coName, qNorm){
+    const cn = D.normCompanyName(coName);
+    if(!cn || !qNorm) return false;
+    return cn === qNorm || cn.includes(qNorm) || qNorm.includes(cn);
+  }
+  // 현재 출력 조건에서 제외된 이유 — 기존 필터 로직(D.isInDistributionList/지역/
+  // pdfMatchesSearch)에서 바로 알 수 있는 것만 표시한다(§요청 24 "추측 금지").
+  function pdfExportConfirmExcludeReason(co){
+    if(!D.isInDistributionList(co, pdfExportState.type)){
+      const t = PDF_EXPORT_TYPES.find(x=> x.key === pdfExportState.type);
+      return `현재 출력 유형(${t ? t.label : pdfExportState.type}) 대상 목록에 포함되지 않음`;
+    }
+    if(pdfExportState.regions.size){
+      const coRegions = resolveCompanyRegionList(co);
+      if(!coRegions.some(r=> pdfExportState.regions.has(r))) return '선택한 지역과 다름';
+    }
+    if(!pdfMatchesSearch(co, pdfExportState.search)) return '현재 출력 화면의 검색조건과 불일치';
+    return '현재 출력 조건에서 제외됨';
+  }
+  function pdfExportConfirmMatches(query){
+    const qNorm = D.normCompanyName(query);
+    if(!qNorm) return null;
+    const included = pdfExportFilteredCompanies().filter(co=> pdfConfirmNameMatches(co.name, qNorm));
+    if(included.length) return { status:'included', companies: included };
+    const excluded = D.loadCompanies().filter(co=> pdfConfirmNameMatches(co.name, qNorm));
+    if(excluded.length) return { status:'excluded', companies: excluded };
+    return { status:'notfound', companies: [] };
+  }
+  function pdfExportConfirmResultHtml(query){
+    const q = (query || '').trim();
+    if(!q) return `<div class="mail-settings-help">업체명을 입력하고 "찾기"를 누르면 지금 왼쪽 조건으로 만들어질 PDF에 그 업체가 포함되는지 확인합니다. 이 확인은 출력 대상을 바꾸지 않습니다.</div>`;
+    const result = pdfExportConfirmMatches(q);
+    if(!result) return '';
+    if(result.status === 'included'){
+      return `<div class="pdf-confirm-result">` + result.companies.map(co=> `
+        <div class="pdf-confirm-hit is-included" data-confirm-goto="${esc(co.id)}">
+          <span class="pdf-confirm-badge is-ok">✅ 포함됨</span>
+          <span class="pdf-confirm-name">${esc(co.name)}</span>
+          <span class="pdf-confirm-sub">${esc(co.code || '(코드 없음)')} · ${esc(resolveCompanyRegionList(co).join(', ') || '지역 미상')} · ${esc(pdfExportResolveField(co,'phone',0))}</span>
+        </div>`).join('') + `</div>`;
+    }
+    if(result.status === 'excluded'){
+      return `<div class="pdf-confirm-result">` + result.companies.map(co=> `
+        <div class="pdf-confirm-hit is-excluded">
+          <span class="pdf-confirm-badge is-warn">⚠ 조건에서 제외됨</span>
+          <span class="pdf-confirm-name">${esc(co.name)}</span>
+          <span class="pdf-confirm-sub">CRM에는 있지만 현재 출력 조건에서는 제외되었습니다 — ${esc(pdfExportConfirmExcludeReason(co))}</span>
+        </div>`).join('') + `</div>`;
+    }
+    return `<div class="pdf-confirm-result"><div class="pdf-confirm-hit is-notfound"><span class="pdf-confirm-badge is-no">❌ 없음</span><span class="pdf-confirm-sub">현재 출력 대상 목록에 "${esc(q)}"가 없습니다. CRM에서도 찾을 수 없습니다.</span></div></div>`;
+  }
+  function pdfExportClearRowHighlights(){
+    document.querySelectorAll('#pdfExportPreviewWrap [data-co-id].pdf-preview-row-hit')
+      .forEach(row=> row.classList.remove('pdf-preview-row-hit'));
+  }
+  function pdfExportHighlightRow(companyId){
+    const row = document.querySelector('#pdfExportPreviewWrap [data-co-id="' + CSS.escape(companyId) + '"]');
+    if(!row) return;
+    row.classList.add('pdf-preview-row-hit');
+    row.scrollIntoView({ behavior:'smooth', block:'center' });
+  }
+  function renderPdfExportConfirmResult(){
+    const el = document.getElementById('pdfExportConfirmResult');
+    if(!el) return;
+    el.innerHTML = pdfExportConfirmResultHtml(pdfExportConfirmQuery);
+    el.querySelectorAll('[data-confirm-goto]').forEach(node=> node.addEventListener('click', ()=>{
+      pdfExportClearRowHighlights();
+      pdfExportHighlightRow(node.getAttribute('data-confirm-goto'));
+    }));
+  }
+  function runPdfExportConfirmSearch(){
+    pdfExportClearRowHighlights();
+    renderPdfExportConfirmResult();
+    // §요청 13 "검색 결과가 여러 건이면 자동으로 하나를 고르지 말 것" — 후보가 정확히
+    // 1건일 때만 자동으로 스크롤+강조하고, 2건 이상이면 목록만 보여주고 클릭을 기다린다.
+    const q = pdfExportConfirmQuery.trim();
+    if(!q) return;
+    const result = pdfExportConfirmMatches(q);
+    if(result && result.status === 'included' && result.companies.length === 1){
+      pdfExportHighlightRow(result.companies[0].id);
+    }
+  }
   function renderPdfExportModal(){
     const root = document.getElementById('pdfExportModalRoot');
     if(!root) return;
@@ -31258,13 +31401,33 @@ window.SHIN2_CRM_APP_INIT = function(){
     }));
     const searchInput = document.getElementById('pdfExportSearchInput');
     if(searchInput){
-      searchInput.addEventListener('input', ()=>{ pdfExportState.search = searchInput.value; refreshPdfExportCount(); });
+      // §요청 10 "왼쪽 조건을 바꾸면 오른쪽 미리보기도 즉시 갱신" — 타이핑 중 포커스가
+      // 끊기지 않도록 이 입력만은 전체 재렌더(renderPdfExportModal) 대신 카운트/미리보기/
+      // 확인검색결과만 그 자리에서 갱신한다.
+      searchInput.addEventListener('input', ()=>{
+        pdfExportState.search = searchInput.value;
+        refreshPdfExportCount();
+        renderPdfExportPreview();
+        renderPdfExportConfirmResult();
+      });
     }
-    document.getElementById('pdfExportPreviewBtn').addEventListener('click', renderPdfExportPreview);
     document.getElementById('pdfExportSaveBtn').addEventListener('click', doPdfExportSave);
+    const confirmInput = document.getElementById('pdfExportConfirmInput');
+    const confirmBtn = document.getElementById('pdfExportConfirmBtn');
+    if(confirmInput){
+      confirmInput.addEventListener('input', ()=>{ pdfExportConfirmQuery = confirmInput.value; });
+      confirmInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter'){ e.preventDefault(); runPdfExportConfirmSearch(); } });
+    }
+    if(confirmBtn) confirmBtn.addEventListener('click', runPdfExportConfirmSearch);
+    // §요청 10/11 "왼쪽 조건을 바꾸면 오른쪽 미리보기도 즉시 갱신" — 더 이상 "미리보기"
+    // 버튼을 눌러야만 보이지 않고, 모달을 열 때/유형·지역을 바꿀 때마다 항상 최신 상태로
+    // 자동 렌더링한다.
+    renderPdfExportPreview();
+    renderPdfExportConfirmResult();
   }
   function openPdfExportModal(){
     pdfExportState = { type:'internal', regions:new Set(), search:'' };
+    pdfExportConfirmQuery = '';
     renderPdfExportModal();
   }
   // §4 "미리보기는 저장/발송/업로드를 실행하면 안 됨" — PDF 저장은 완전히 별도 함수이며,
@@ -31599,8 +31762,10 @@ window.SHIN2_CRM_APP_INIT = function(){
   // §고객관리 메인화면 재배치 라운드(신규) — "지도 분포" 버튼을 화면에서 없앴으므로(위
   // HTML 수정 참고, 지도는 이제 mountMapDistributionInline으로 항상 인라인 표시) 이 버튼
   // 클릭 바인딩도 함께 지운다. openMapDistributionModal 함수 자체는 그대로 남겨뒀다.
-  document.getElementById('crmPdfExportBtn').addEventListener('click', openPdfExportModal);
-  document.getElementById('crmMouPdfBtn').addEventListener('click', openMouPdfMenuModal);
+  // §PDF 내보내기/목록 출력 통합 라운드(신규) — crmPdfExportBtn(중복 "목록 출력" 텍스트
+  // 버튼)은 HTML에서 제거했으므로 그 바인딩도 함께 없앤다. 상단 "PDF 내보내기" 버튼
+  // 하나만 openPdfExportModal을 연다(예전엔 openMouPdfMenuModal이었음).
+  document.getElementById('crmMouPdfBtn').addEventListener('click', openPdfExportModal);
   // §업체 추가 폼 이관 라운드에서 함께 수정: addEventListener('click', openAddCompanyForm)로
   // 직접 등록하면 클릭 이벤트(MouseEvent)가 그대로 prefillName 인자로 들어가 이름칸에
   // "[object MouseEvent]"가 채워지는 기존 버그가 있었다 — 인자 없이 호출하도록 감싼다.
