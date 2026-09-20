@@ -4015,10 +4015,13 @@ table.pdf-doc-table thead{ background:var(--bg); }
                  2건 중복, §보고서 참고). 클릭하면 먼저 중복 후보 목록(읽기 전용)을 보여주고,
                  거기서 "병합하기"를 눌러야만 선택→미리보기→적용 병합 도구로 넘어간다. -->
             <button type="button" id="crmMergeDupBtn">중복 업체 병합 <span id="crmMergeDupCount" class="update-menu-count"></span></button>
-            <!-- §디자인 진단 P2-5: 목록 위에 이미 있던 "미등록 업체 N개" 경고 배지(§미등록 업체
-                 관리 라운드, renderUnregisteredBadge/openUnregisteredPanel)를 그대로 재사용해
-                 관리 도구 드롭다운에서도 열 수 있게 항목만 추가했다 — 새 판정 로직 없음. -->
-            <button type="button" id="crmUnregMenuBtn">미등록 업체 <span id="crmUnregMenuCount" class="update-menu-count"></span></button>
+            <!-- §관리도구 미등록업체 메뉴 제거 라운드(신규) — 사용자 요청: "실적 있음·MOU
+                 미체결" 탭 리스트에 이 업체들이 이미 같은 모양으로 섞여 보이게 됐으니
+                 (§미등록 업체 리스트 통합 라운드), 관리도구 드롭다운의 중복 진입점은
+                 없앤다. 목록 위 상단 배지(#crmUnregBadge)는 그대로 유지 — 사용자가
+                 그건 남겨달라고 확정함. 판정 로직(buildUnregisteredCompanies2026)과
+                 openUnregisteredPanel(애매한 일치 체크리스트·동일 업체 연결 검색)은
+                 전혀 안 지웠다 — 상단 배지를 눌러 계속 열 수 있다. -->
             <!-- §계열사 관계 후보 검토 라운드(신규) — 실제 관계는 여기서 자동 저장하지 않고,
                  후보만 뽑아 보여준 뒤 사람이 한 건씩(또는 여러 건 일괄) 확인해야만
                  기존 addCompanyRelation/removeCompanyRelation으로 저장된다. -->
@@ -31398,9 +31401,6 @@ window.SHIN2_CRM_APP_INIT = function(){
   document.getElementById('crmMasterImportBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openMasterImportModal(); });
   document.getElementById('crmPartnerExcelImportBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openPartnerExcelImportModal(); });
   document.getElementById('crmMergeDupBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openDupListModal(); });
-  // §디자인 진단 P2-5: 새로 추가한 "미등록 업체" 항목 — 이미 있는 openUnregisteredPanel을
-  // 그대로 재사용(새 판정/새 모달 없음), 목록 위 배지(#crmUnregBadge)와 같은 진입점이다.
-  document.getElementById('crmUnregMenuBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openUnregisteredPanel(); });
   function closeUpdateMenu(){ document.getElementById('crmUpdateMenu').classList.remove('is-open'); }
   // §디자인 진단 P2-5: 드롭다운을 열 때만 건수를 계산해 배지에 채운다(무거운 연산을
   // 매 렌더마다 돌리지 않기 위해 열 때만 호출) — 이미 있는 조회 함수만 재사용한다.
@@ -31411,12 +31411,6 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(dupEl) dupEl.textContent = dupGroups.length ? String(dupGroups.length) : '';
       if(dupEl) dupEl.style.display = dupGroups.length ? '' : 'none';
     }catch(e){ /* 배지 계산 실패는 무시 — 드롭다운 자체는 계속 열린다 */ }
-    try{
-      const unregList = D.buildUnregisteredCompanies2026();
-      const unregEl = document.getElementById('crmUnregMenuCount');
-      if(unregEl) unregEl.textContent = unregList.length ? String(unregList.length) : '';
-      if(unregEl) unregEl.style.display = unregList.length ? '' : 'none';
-    }catch(e){ /* 위와 동일 */ }
   }
   document.getElementById('crmDataUpdateBtn').addEventListener('click', (e)=>{
     e.stopPropagation();
