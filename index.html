@@ -769,9 +769,11 @@
   .workq-state-badge{ display:inline-block; padding:2px 7px; border-radius:5px; font-size:10.5px; font-weight:700; color:var(--navy); background:#EEF2FA; border:1px solid #DCE5EF; white-space:nowrap; }
   .workq-reason-badge{ display:inline-block; padding:2px 7px; border-radius:5px; font-size:10.5px; color:var(--text-muted); background:#F4F6F9; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .workq-remark{ display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
-  /* §업무관리 표 캡션/비고열 제거 라운드(신규) — "해야 할 일" 열: 액션 버튼(1차미팅 잡기 등)
-     아래에 메일 버튼(있는 경우)을 세로로 쌓는다. */
-  .workq-task-cell{ display:flex; flex-direction:column; align-items:flex-start; gap:5px; }
+  /* §재발송 위치 수정 라운드(신규) — "해야 할 일" 열: 액션 버튼(1차미팅 잡기 등) 아래로
+     메일 버튼(재발송/메일발송)이 세로로 떨어지던 것을, 사용자 요청대로 같은 줄에 가로로
+     붙인다("[1차미팅 잡기] [재발송]" 형태) — flex-direction을 column에서 기본값(row)으로
+     바꾸고 세로 중앙 정렬만 추가, 다른 속성/버튼 자체 스타일은 그대로. */
+  .workq-task-cell{ display:flex; align-items:center; gap:6px; flex-wrap:nowrap; }
   .workq-delay-badge{ display:inline-block; font-size:10px; font-weight:700; border-radius:4px; padding:1px 5px; margin-left:5px; }
   /* §P1-3 경과일 배지 3단계 라운드(신규) — 진단 보고서 P1-3: 기존엔 7일 이상이면 전부
      같은 빨간 "지연" 배지라 36건 중 거의 전부가 같은 색이었다(변별력 없음). 실제 경과일
