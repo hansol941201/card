@@ -31134,8 +31134,11 @@ window.SHIN2_CRM_APP_INIT = function(){
   // (§PDF 내보내기(MOU 체결 협력사) 라운드에서 이미 쓰던, KPI "MOU 체결" 카드와 완전히
   // 같은 판정)를 그대로 재사용한다 — 새 판정 로직을 만들지 않는다.
   const PDF_EXPORT_TYPES = [
+    // §사용자 확인(신규) — 내부용 문서에서 "업체코드" 컬럼 제거 요청. 외부 발송용은
+    // 그대로 code 컬럼 유지(업체코드는 이 배열의 표시 컬럼 목록에서만 뺀 것이고,
+    // co.code 데이터/발급 로직 자체는 전혀 안 건드렸다).
     { key:'internal', label:'내부용', desc:'사내 보관용 전체 정보', fileLabel:'내부용', landscape:true,
-      columns:['no','region','name','code','repName','bizRegNo','address','phone','fax','email','mouDate','capital','note'] },
+      columns:['no','region','name','repName','bizRegNo','address','phone','fax','email','mouDate','capital','note'] },
     { key:'external', label:'외부 발송용', desc:'MOU 체결 업체 · 외부 공유용 최소 정보', fileLabel:'외부용', landscape:false,
       columns:['no','region','name','code','repName','address','phone'] }
   ];
