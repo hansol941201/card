@@ -2781,10 +2781,16 @@ html,body{background:radial-gradient(circle at 75% -10%,rgba(11,91,211,.055),tra
 body.map-modal-lock{ overflow:hidden; }
 /* §POUR 시공 아파트 지도 라운드: 지도 상단 탭(시공사/시공 아파트). 기존 .map-modal-toggle-*
    (클러스터/히트맵)와 같은 톤·크기로 만들어 새 색상 체계를 추가하지 않는다. */
-.map-modal-tabs{ flex:none; padding:0 22px; display:flex; gap:4px; border-bottom:1px solid var(--line); }
+.map-modal-tabs{ flex:none; padding:0 22px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid var(--line); }
+.map-modal-tabs-list{ display:flex; gap:4px; min-width:0; }
 .map-modal-tab-btn{ height:38px; padding:0 14px; font-size:13px; font-weight:650; color:var(--text-muted); background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; font-family:inherit; }
 .map-modal-tab-btn.is-active{ color:var(--navy); border-bottom-color:var(--navy); }
 .map-modal-tab-btn:hover{ color:var(--navy); }
+/* §요청 — "필터 초기화"/"PDF 내보내기"를 탭 옆(오른쪽)으로 이동. 시공 아파트 탭일
+   때만 renderMapModalMainApartment가 이 자리를 채운다(비어 있으면 자연히 안 보임,
+   레이아웃도 안 흔들림 — justify-content:space-between이 빈 div도 그대로 처리). */
+.map-modal-tabs-actions{ display:flex; align-items:center; gap:8px; flex:none; }
+.map-modal-tabs-actions .map-modal-retry-btn{ height:30px; padding:0 12px; font-size:12px; }
 /* §근처 아파트 검색 재요청("따로 검색창 만들어줘") — 이름/지역/시공사 검색 필터 바와
    시각적으로 구분되는 옅은 파란 바탕의 전용 줄. 새 색상 체계 없음(기존 --flat 계열). */
 .map-apt-near-row{ background:var(--flat-bg,#EFF6FF); border-bottom-color:var(--line); }
@@ -29933,8 +29939,15 @@ window.SHIN2_CRM_APP_INIT = function(){
             <button type="button" class="map-modal-close" id="mapModalCloseBtn" aria-label="닫기">&times;</button>
           </div>
           <div class="map-modal-tabs" id="mapModalTabs">
-            <button type="button" class="map-modal-tab-btn is-active" data-map-tab="company">시공사</button>
-            <button type="button" class="map-modal-tab-btn" data-map-tab="apartment">시공 아파트</button>
+            <div class="map-modal-tabs-list">
+              <button type="button" class="map-modal-tab-btn is-active" data-map-tab="company">시공사</button>
+              <button type="button" class="map-modal-tab-btn" data-map-tab="apartment">시공 아파트</button>
+            </div>
+            <!-- §요청 — "필터 초기화"/"PDF 내보내기"를 탭 옆으로 이동. 이 자리는 항상
+                 비어 있다가 시공 아파트 탭일 때만 renderMapModalMainApartment가 채운다
+                 (§아래 참고) — 새 버튼/로직을 만들지 않고 기존 aptFilterResetBtn/
+                 aptPdfExportBtn을 여기로 옮겨 렌더링할 뿐이다. -->
+            <div class="map-modal-tabs-actions" id="mapModalTabsActions"></div>
           </div>
           <div id="mapModalBody"></div>
         </div>
@@ -29999,8 +30012,15 @@ window.SHIN2_CRM_APP_INIT = function(){
             <button type="button" class="map-modal-close" id="mapModalCloseBtn" aria-label="닫기">&times;</button>
           </div>
           <div class="map-modal-tabs" id="mapModalTabs">
-            <button type="button" class="map-modal-tab-btn is-active" data-map-tab="company">시공사</button>
-            <button type="button" class="map-modal-tab-btn" data-map-tab="apartment">시공 아파트</button>
+            <div class="map-modal-tabs-list">
+              <button type="button" class="map-modal-tab-btn is-active" data-map-tab="company">시공사</button>
+              <button type="button" class="map-modal-tab-btn" data-map-tab="apartment">시공 아파트</button>
+            </div>
+            <!-- §요청 — "필터 초기화"/"PDF 내보내기"를 탭 옆으로 이동. 이 자리는 항상
+                 비어 있다가 시공 아파트 탭일 때만 renderMapModalMainApartment가 채운다
+                 (§아래 참고) — 새 버튼/로직을 만들지 않고 기존 aptFilterResetBtn/
+                 aptPdfExportBtn을 여기로 옮겨 렌더링할 뿐이다. -->
+            <div class="map-modal-tabs-actions" id="mapModalTabsActions"></div>
           </div>
           <div id="mapModalBody"></div>
         </div>
@@ -30464,6 +30484,11 @@ window.SHIN2_CRM_APP_INIT = function(){
       return;
     }
     if(!wrap) return;
+    // §요청 — "필터 초기화"/"PDF 내보내기"는 시공 아파트 탭 전용이라, 시공사 탭에서는
+    // 탭 옆 자리(#mapModalTabsActions)를 비워 둔다(§renderMapModalMainApartment가
+    // 채우는 것과 대칭).
+    const tabsActionsElCompany = document.getElementById('mapModalTabsActions');
+    if(tabsActionsElCompany) tabsActionsElCompany.innerHTML = '';
     mapPerfMark('data prepare start');
     const allEntries = buildMapCompanies();
     mapPerfMark('company aggregation done', 'companies=' + allEntries.length);
@@ -31629,12 +31654,6 @@ window.SHIN2_CRM_APP_INIT = function(){
           <option value="ge2000"${aptFilterState.households==='ge2000'?' selected':''}>2,000세대 이상</option>
           <option value="none"${aptFilterState.households==='none'?' selected':''}>세대수 미등록</option>
         </select>
-        <button type="button" class="map-modal-retry-btn" id="aptFilterResetBtn">필터 초기화</button>
-        <!-- §시공 아파트 PDF 내보내기 라운드(신규) — "시공 아파트" 탭 전용 버튼. 이
-             함수(renderMapModalMainApartment)는 mapActiveTab === 'apartment'일 때만
-             호출되므로(§renderMapModalMain 분기), 이 버튼은 시공사 탭에는 전혀 그려지지
-             않는다(별도 숨김 처리 불필요, 애초에 다른 탭 렌더 함수엔 존재하지 않음). -->
-        <button type="button" class="map-modal-retry-btn" id="aptPdfExportBtn">PDF 내보내기</button>
       </div>
       <div class="map-modal-filters map-apt-near-row">
         <span class="map-apt-near-label">📍 근처 검색</span>
@@ -31661,6 +31680,18 @@ window.SHIN2_CRM_APP_INIT = function(){
         <div class="map-modal-infocol" id="mapModalInfoCol"></div>
       </div>
     `;
+    // §요청 — "필터 초기화"/"PDF 내보내기"를 탭(시공사/시공 아파트) 옆으로 이동.
+    // #mapModalTabsActions는 openMapDistributionModal/mountMapDistributionInline이
+    // 이미 그려 둔 탭 줄 안의 빈 자리(§위 마크업 참고) — 여기서 채우기만 한다.
+    // 버튼 id(aptFilterResetBtn/aptPdfExportBtn)와 그 아래 이벤트 바인딩은 그대로라
+    // 새 로직을 만들지 않았다.
+    const tabsActionsEl = document.getElementById('mapModalTabsActions');
+    if(tabsActionsEl){
+      tabsActionsEl.innerHTML = `
+        <button type="button" class="map-modal-retry-btn" id="aptFilterResetBtn">필터 초기화</button>
+        <button type="button" class="map-modal-retry-btn" id="aptPdfExportBtn">PDF 내보내기</button>
+      `;
+    }
     // §근처 아파트 검색 라운드 → 재요청("따로 검색창 만들어줘"): 이름/지역/시공사를 즉시
     // 필터링하는 기존 검색창과, "주소로 찾기" 전용 검색창을 완전히 분리했다 — 서로 다른
     // 의미(문자열 검색 vs 좌표 반경 검색)를 한 칸에서 Enter로 구분하던 첫 시도가 헷갈릴 수
