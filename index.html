@@ -3581,28 +3581,36 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .agr-top-item b{ font-weight:600; }
 .agr-section-title{ font-size:12.5px; font-weight:700; color:var(--text); margin-bottom:8px; }
 .agr-mid{ display:grid; grid-template-columns:1.3fr 1fr; gap:20px; margin-bottom:16px; }
-.agr-stage-list{ display:flex; flex-direction:column; gap:6px; }
-.agr-stage-row{ position:relative; display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:var(--surface); }
-.agr-stage-label{ font-size:12.5px; font-weight:600; flex:0 0 auto; white-space:nowrap; }
-.agr-stage-date{ font-size:11px; color:var(--text-muted); flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.agr-stage-corrected-mark{ font-size:10.5px; font-weight:500; color:#B5620A; }
-/* §협약 진행단계 수정·완료 취소 라운드(신규) */
-.agr-stage-more-btn{ flex:0 0 auto; border:none; background:transparent; color:var(--text-muted); cursor:pointer; font-size:15px; line-height:1; padding:3px 7px; border-radius:5px; }
-.agr-stage-more-btn:hover, .agr-stage-more-btn:focus-visible{ background:var(--bg); color:var(--navy); outline:none; }
-.agr-stage-more-menu{ position:absolute; top:100%; right:0; margin-top:2px; z-index:30; background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 6px 18px rgba(20,40,70,.16); padding:4px; display:flex; flex-direction:column; min-width:150px; }
-.agr-stage-more-menu[hidden]{ display:none; }
-.agr-stage-more-menu button{ text-align:left; border:none; background:transparent; padding:7px 10px; font-size:12.5px; border-radius:5px; cursor:pointer; color:var(--text); white-space:nowrap; }
-.agr-stage-more-menu button:hover, .agr-stage-more-menu button:focus-visible{ background:var(--bg); outline:none; }
-.agr-stage-more-menu button.danger{ color:#B3261E; }
-/* §협약 진행단계 행 병합 라운드(신규) — 병합된 행 하나의 ⋯ 메뉴 안에 두 하위 단계(예: 예정/완료)
-   섹션을 함께 보여줄 때만 쓰는 구획선/소제목. 메뉴 항목 자체(버튼)는 기존 것 그대로 재사용한다. */
-.agr-stage-more-menu{ min-width:190px; }
-.agr-stage-submenu-title{ font-size:10.5px; font-weight:700; color:var(--text-muted); padding:6px 10px 2px; }
-.agr-stage-submenu-section + .agr-stage-submenu-section{ border-top:1px solid var(--line); margin-top:4px; padding-top:2px; }
+/* §협약 진행단계 UI 단순화 라운드(신규) — 사용자 요청대로 "..." 메뉴/상태 뱃지/완료·예정
+   토글을 전부 걷어내고, 단계당 둥근 카드 + 작은 알약(칩) 날짜 표시로 바꿨다. 기존
+   --surface/--line/--soft-blue/--radius-card 등 이 파일에 이미 있는 토큰만 재사용한다
+   (새 색상표를 만들지 않음). */
+.agr-section-title-row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.agr-section-title-row .agr-section-title{ margin-bottom:0; }
+.agr-save-status-pill{ font-size:11px; font-weight:600; padding:2px 9px; border-radius:999px; }
+.agr-save-status-pill.is-progress{ background:var(--soft-blue); color:var(--blue); }
+.agr-save-status-pill.is-ok{ background:#E9F6EF; color:#0F7A42; }
+.agr-save-status-pill.is-error{ background:var(--danger-bg); color:var(--danger); }
+.agr-stage-cards{ display:flex; flex-direction:column; gap:10px; }
+.agr-stage-card{ padding:12px 14px; border:1px solid var(--line); border-radius:14px; background:var(--surface); box-shadow:0 1px 2px rgba(19,36,62,.04); }
+.agr-stage-card.is-done{ background:var(--soft-blue); border-color:var(--soft-blue-2); }
+.agr-stage-card-label{ font-size:12.5px; font-weight:700; color:var(--text); margin-bottom:8px; }
+.agr-stage-card-dates{ display:flex; flex-wrap:wrap; gap:8px; }
+.agr-date-chip{ display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 13px; border-radius:999px; font-size:12px; font-family:inherit; cursor:pointer; white-space:nowrap; }
+.agr-date-chip.is-filled{ border:1px solid var(--soft-blue-2); background:#fff; color:var(--text); }
+.agr-date-chip.is-filled:hover, .agr-date-chip.is-filled:focus-visible{ border-color:var(--blue); outline:none; }
+.agr-date-chip.is-empty{ border:1px dashed var(--line); background:transparent; color:var(--text-muted); }
+.agr-date-chip.is-empty:hover, .agr-date-chip.is-empty:focus-visible{ border-color:var(--blue); color:var(--blue); outline:none; }
+.agr-date-chip-sublabel{ color:var(--text-muted); font-weight:600; }
+.agr-date-chip-value{ font-weight:700; font-variant-numeric:tabular-nums; }
+.agr-date-chip-edit{ color:var(--blue); font-weight:600; font-size:11px; }
+.agr-date-chip-add{ font-weight:600; }
+/* 아래 4개는 이 협약 진행관리 팝업 전용이 아니라 다른 화면(협약 종료/복구, 계열사 관계
+   후보 검토 등)도 공유하는 클래스라 §협약 진행단계 UI 단순화 라운드에서도 그대로 남겨둔다
+   (§조사: 지우면 16322/16353/23582/25143/25145줄 등 다른 팝업이 스타일을 잃는다). */
 .stage-edit-impact{ font-size:11.5px; color:var(--text-muted); background:var(--bg); border-radius:6px; padding:8px 10px; margin:6px 0; line-height:1.5; }
 .stage-edit-impact ul{ margin:4px 0 0; padding-left:18px; }
 .stage-cancel-warn{ font-size:12px; color:#9A6B00; background:#FFF7E6; border:1px solid #F0DDA8; border-radius:6px; padding:8px 10px; margin-bottom:10px; }
-.stage-history-list{ display:flex; flex-direction:column; gap:8px; max-height:320px; overflow-y:auto; }
 .stage-history-item{ font-size:12px; border-bottom:1px solid var(--line); padding-bottom:8px; }
 .stage-history-item:last-child{ border-bottom:none; }
 .stage-history-meta{ color:var(--text-muted); font-size:11px; margin-bottom:2px; }
@@ -6905,6 +6913,20 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     saveCompanies(list);
     return rec;
   }
+  // §협약 진행관리 저장 성능 개선 라운드(신규) — updateCompany와 완전히 같은 저장 로직이지만,
+  // 방금 로컬에 쓴 그 배열(list)을 호출부에 그대로 돌려준다. 기존 updateCompany의 반환값
+  // (record만 반환)과 모든 호출부는 전혀 바꾸지 않는다 — 이 함수는 새로 추가된 것일 뿐이다.
+  // 목적: confirmCloudSave가 "방금 저장한 그 배열"을 다시 얻으려고 loadCompanies()로
+  // localStorage 전체를 다시 읽고 다시 JSON.parse하는 중복 작업(§조사 결과, 아래
+  // confirmCloudSave 주석 참고)을 피할 수 있게, 이미 메모리에 있는 배열을 그대로 넘긴다.
+  function updateCompanyReturningAll(id, patch, opts){
+    const list = loadCompanies();
+    const rec = list.find(c=> c.id === id);
+    if(!rec) return { rec:null, list:null };
+    applyPatchToRecord(rec, normalizeCompanyPatch(patch), !!(opts && opts.onlyFillEmpty));
+    saveCompanies(list);
+    return { rec, list };
+  }
   // §주식회사 표기 정규화 라운드(신규) — 기존 데이터 일괄 백필(backfill). applyPartnerImport와
   // 같은 preview/apply 분리 관례를 그대로 따른다(§6276 previewPartnerImport 주석 참고) —
   // preview는 아무것도 저장하지 않고 "무엇이 바뀔지"만 계산해서 돌려주고, apply만 실제로
@@ -9559,7 +9581,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   }
 
   window.SHIN2_CRM_DATA = {
-    loadCompanies, findCompany, addCompany, updateCompany, normalizeCorpSuffix,
+    loadCompanies, findCompany, addCompany, updateCompany, updateCompanyReturningAll, normalizeCorpSuffix,
     loadCompanyCodeCounters, bumpCompanyCodeCounter,
     loadCompanyCodeB2BCounter, bumpCompanyCodeB2BCounter,
     previewCorpSuffixMigration, applyCorpSuffixMigration,
@@ -10096,12 +10118,18 @@ window.SHIN2_CRM_APP_INIT = function(){
     memos: ()=> D.loadMemos(),
     mailAssets: ()=> D.loadMailAssets()
   };
-  async function confirmCloudSave(syncName){
+  // §협약 진행관리 저장 성능 개선 라운드(신규) — preloadedData(선택)를 넘기면 loader()로
+  // localStorage를 다시 읽어 다시 JSON.parse하지 않고 그 값을 그대로 쓴다(§조사 결과: 호출부가
+  // 방금 저장 직후라 이미 메모리에 같은 배열을 들고 있는 경우가 있음 — 예: saveStageCorrection
+  // 쪽 updateCompanyReturningAll). 인자를 안 넘기던 기존 호출부는 전부 그대로 loader()를 쓰므로
+  // 동작이 전혀 바뀌지 않는다.
+  async function confirmCloudSave(syncName, preloadedData){
     try{
       if(!window.SHIN2_CRM_SHARED_SYNC || !window.SHIN2_CRM_SHARED_SYNC.pushAsync) throw new Error('SYNC_UNAVAILABLE');
       const loader = CLOUD_CONFIRM_LOADERS[syncName];
       if(!loader) throw new Error('알 수 없는 저장소: ' + syncName);
-      await window.SHIN2_CRM_SHARED_SYNC.pushAsync(syncName, loader());
+      const data = preloadedData !== undefined ? preloadedData : loader();
+      await window.SHIN2_CRM_SHARED_SYNC.pushAsync(syncName, data);
       return { ok:true };
     }catch(err){ return { ok:false, err }; }
   }
@@ -16623,7 +16651,9 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 값이 화면에 보이는 최종 상태이고, 정정을 지우면(=완료 취소를 다시 취소) 원래 계산 결과로
   // 돌아간다. 모든 변경은 stageCorrectionLog에 이전/이후/사유와 함께 남아 "변경 이력 보기"의
   // 근거가 된다 — 별도 이력 스키마를 새로 만들지 않고 이 로그 하나만 쓴다.
-  const STAGE_CORRECTION_REASONS = ['실수로 완료 처리', '일정 취소', '일정 변경', '실제 미진행', '담당자 변경', '기타'];
+  // §협약 진행단계 UI 단순화 라운드(신규) — 사유 선택 UI(STAGE_CORRECTION_REASONS 상수로
+  // 채우던 <select>)를 없앴다. 로그 자체는 계속 남기되 reason은 openStageDateModal이 고정
+  // 문자열('날짜 수정'/'날짜 삭제')로 채운다(§위 새 팝업 구현부 참고).
   function getStageCorrections(co){
     return (co.partnerDashboard && co.partnerDashboard.stageCorrections) || {};
   }
@@ -16653,9 +16683,14 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 로그에 남는다. co.partnerDashboard의 다른 필드(newMou 등)는 전혀 건드리지 않는다 —
   // §요청 [4] "이메일 발송기록/첨부파일/서류/메모·활동기록/MOU 기록/고객 기본정보는 보존"을
   // 자동으로 지킨다(애초에 안 건드리니까).
+  // §협약 진행관리 저장 성능 개선 라운드(신규) — 반환값이 boolean에서 { ok, list }로
+  // 바뀌었다. 이 함수의 유일한 호출부(openStageDateModal, 아래 §날짜 전용 팝업 라운드)가
+  // 이번에 함께 새로 작성돼 새 반환 형태를 바로 쓰므로 하위 호환을 깰 기존 호출부가 없다
+  // (§조사 결과 — 예전 상태 수정/완료 취소 모달은 이번 라운드에서 삭제됨). list는
+  // confirmCloudSave에 그대로 넘겨 §업데이트 직후 localStorage 재파싱 중복을 피하는 데만 쓴다.
   function saveStageCorrection(companyId, stageKey, patch, meta){
     const co = D.findCompany(companyId);
-    if(!co) return false;
+    if(!co) return { ok:false, list:null };
     const pd = co.partnerDashboard || {};
     const before = (pd.stageCorrections && pd.stageCorrections[stageKey]) || null;
     const corrections = Object.assign({}, pd.stageCorrections);
@@ -16672,8 +16707,8 @@ window.SHIN2_CRM_APP_INIT = function(){
       reason: meta && meta.reason, reasonOther: (meta && meta.reason === '기타') ? meta.reasonOther : null,
       at: new Date().toISOString(), by: crmCurrentUserLabel()
     });
-    D.updateCompany(companyId, { partnerDashboard: Object.assign({}, pd, { stageCorrections: corrections, stageCorrectionLog: log }) });
-    return true;
+    const { rec, list } = D.updateCompanyReturningAll(companyId, { partnerDashboard: Object.assign({}, pd, { stageCorrections: corrections, stageCorrectionLog: log }) });
+    return { ok: !!rec, list };
   }
   function buildProgressStages(co){
     const sourceNm = resolveNewMouForCompany(co);
@@ -20502,7 +20537,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 상태값(status/done/dateText/owner/corrected)은 전혀 새로 계산하지 않고 그대로 가져다
   // 화면에 몇 줄로 묶어 보여줄지만 조합한다 — 새 판정 로직 없음. postMail은 이 배열에
   // 아예 포함하지 않는 방식으로 "숨김" 처리한다(buildAgreementStageRows 자체는 그대로 둬서
-  // stageEditImpactText/openStageEditModal 등 postMail을 참조하는 다른 코드는 영향 없음).
+  // openStageDateModal 등 postMail을 참조하는 다른 코드는 영향 없음).
   function buildAgreementDisplayGroups(rows){
     const byKey = {}; rows.forEach(r=> byKey[r.key] = r);
     const qSend = byKey.qSend, qReply = byKey.qReply;
@@ -20543,6 +20578,24 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 자체(mailAlreadySentInfo/data-agr-do="mail-post-second")는 전혀 건드리지 않는다.
     return [questionnaire, meeting1, meeting2, mou];
   }
+  // §협약 진행단계 UI 단순화 라운드(신규) — 하위 날짜 한 건(subRow)을 작은 알약 모양 칩
+  // 하나로 그린다. 날짜가 있으면 날짜 값 + "수정", 없으면 "+ 날짜 등록"만 보여준다 — 완료/
+  // 예정/대기 같은 상태 뱃지는 전혀 그리지 않는다(§요청 "상태 개념을 사용자에게 노출하지 마").
+  // showLabel(하위 항목이 2개 이상일 때만, 예: "발송"/"회신")은 buildAgreementDisplayGroups가
+  // 이미 만들어 둔 sr.label을 그대로 쓴다 — 새 라벨을 짓지 않는다.
+  function agrStageDateChipHtml(sr, showLabel){
+    const r = sr.row;
+    const hasDate = !!(r.dateText && r.dateText !== '—');
+    const labelHtml = showLabel ? `<span class="agr-date-chip-sublabel">${esc(sr.label)}</span>` : '';
+    if(hasDate){
+      return `<button type="button" class="agr-date-chip is-filled" data-agr-date-key="${esc(r.key)}" data-agr-date-label="${esc(sr.label)}">
+        ${labelHtml}<span class="agr-date-chip-value">${esc(r.dateText)}</span><span class="agr-date-chip-edit">수정</span>
+      </button>`;
+    }
+    return `<button type="button" class="agr-date-chip is-empty" data-agr-date-key="${esc(r.key)}" data-agr-date-label="${esc(sr.label)}">
+      ${labelHtml}<span class="agr-date-chip-add">+ 날짜 등록</span>
+    </button>`;
+  }
   // §요청 [3] "다음 해야 할 일" — 미완료 단계 중 첫 번째를 그대로 안내 문구로 쓴다(새 판정
   // 아님, 위 rows의 순서/완료여부만 본다).
   function agreementNextActionText(rows){
@@ -20550,29 +20603,58 @@ window.SHIN2_CRM_APP_INIT = function(){
     return next ? `${next.label} 필요` : '모든 단계 완료';
   }
   // ==========================================================================
-  // §협약 진행단계 수정·완료 취소 라운드(신규) — 상태 수정/날짜·담당자 수정/완료 취소/
-  // 변경 이력 보기 4개 메뉴의 실제 팝업 구현. 데이터 쓰기는 전부 위 saveStageCorrection
-  // 하나로만 이뤄진다(정정 레이어만 건드림, newMou/서류/메일기록/메모는 전혀 안 건드림).
+  // §협약 진행단계 UI 단순화 라운드(신규) — 기존 "상태 수정/완료 취소/변경 이력 보기/예정·
+  // 완료 토글" 4개 메뉴를 사용자 요청대로 걷어내고, "날짜만 등록·수정"하는 팝업 하나로
+  // 합쳤다. 상태(완료/예정/대기/미진행) 개념은 화면에서 전혀 노출하지 않지만, 내부적으로는
+  // 지금까지와 똑같이 날짜 유무·오늘 날짜와의 비교로만 자동 계산한다(§16689 dateState와
+  // 같은 규칙 — 과거·오늘 날짜=완료, 미래 날짜=예정) — 계산 로직 자체(buildProgressStages/
+  // buildAgreementStageRows)는 전혀 건드리지 않았고, 그 위에 쌓이는 정정 레이어(saveStage
+  // Correction)에 쓰는 값만 이 팝업에서 계산해서 넘긴다. 변경 이력 기록(stageCorrectionLog)
+  // 자체는 계속 남긴다 — 다른 곳에서 읽지는 않지만, 이미 있는 저장 한 번에 얹혀가는 값이라
+  // 굳이 지울 이유가 없고 나중에 다시 필요해질 수 있다(§요청 "판단해서 하라" 반영).
   // ==========================================================================
-  function stageEditImpactText(co, stageKey){
-    const notes = [];
-    if(['m1Scheduled','m1Done','m2Scheduled','m2Done','qSend','qReply','mouDone'].indexOf(stageKey) !== -1){
-      notes.push('고객카드·업무관리의 진행 단계 배지에도 즉시 반영됩니다.');
-    }
-    if(stageKey === 'mouDone'){
-      const dateLabel = resolvePartnerAgreementDate(co);
-      if(dateLabel) notes.push(`참고: 파트너 대시보드 원본에 협약체결일(${dateLabel})이 남아 있습니다 — 다음 동기화 후에도 이 정정값이 유지되는지 다시 확인해주세요.`);
-    }
-    notes.push('이메일 발송기록·첨부파일·서류·메모/활동기록은 전혀 삭제되지 않습니다.');
-    return notes;
+  // §협약 진행관리 저장 성능 개선 라운드(신규) — 저장 상태(저장 중.../저장됨/저장 실패)를
+  // 보여주는 작은 알약 배지 하나만 갱신한다. 팝업 전체를 다시 그리거나 흐리게 하지 않는다
+  // (§요청 "화면 전체를 잠그거나 블러 처리하지 말고").
+  function setAgrSaveStatus(text, kind){
+    const el = document.getElementById('agrSaveStatusPill');
+    if(!el) return;
+    el.textContent = text || '';
+    el.className = 'agr-save-status-pill' + (kind ? ' is-' + kind : '');
+    el.style.display = text ? '' : 'none';
   }
-  function closeStageEditModal(){
+  function closeStageDateModal(){
     const root = document.getElementById('agreementModalRoot');
-    const el = root && document.getElementById('stageEditModalOverlay');
+    const el = root && document.getElementById('stageDateModalOverlay');
     if(el) el.remove();
   }
-  function openStageEditModal(companyId, stageKey, opts){
-    opts = opts || {};
+  // 날짜를 저장한 뒤 클라우드 확인은 기다리지 않고 곧바로 로컬 반영 + 화면 갱신을 한다
+  // (§낙관적 UI 요청 — "저장 중" 상태를 먼저 보여주고 실제 네트워크 확인은 배경에서).
+  // saveStageCorrection이 이미 동기적으로 로컬(list)까지 저장을 끝내 두므로, 그 결과를 그대로
+  // confirmCloudSave에 넘겨 localStorage를 다시 읽어 다시 파싱하는 중복도 함께 없앤다.
+  function commitStageDateSave(companyId, stageKey, patch, meta){
+    const result = saveStageCorrection(companyId, stageKey, patch, meta);
+    closeStageDateModal();
+    if(document.getElementById('agreementPopupBody')) renderAgreementPopupBody(companyId);
+    if(!result.ok) { setAgrSaveStatus('저장 실패 · 로컬 저장에 실패했습니다', 'error'); return; }
+    setAgrSaveStatus('저장 중...', 'progress');
+    confirmCloudSave('companies', result.list).then(r=>{
+      if(r.ok){
+        setAgrSaveStatus('저장됨', 'ok');
+        setTimeout(()=>{ const el = document.getElementById('agrSaveStatusPill'); if(el && el.classList.contains('is-ok')) setAgrSaveStatus(''); }, 2200);
+      } else {
+        setAgrSaveStatus('저장 실패 · ' + cloudSaveErrorMessage(r.err), 'error');
+      }
+    });
+  }
+  // §요청 — 상태 선택 UI는 없앴지만 "완료" 판정은 여전히 자동으로 계산해야 한다. 기존
+  // dateState()(§16689)와 정확히 같은 규칙: 날짜가 오늘 이하면 완료, 미래면 예정.
+  function stageDateAutoStatus(dateText){
+    const p = parsePartnerDateLabel(dateText);
+    if(!p) return 'none';
+    return p.ts <= Date.now() ? 'done' : 'scheduled';
+  }
+  function openStageDateModal(companyId, stageKey, label){
     const co = D.findCompany(companyId);
     if(!co) return;
     const rows = buildAgreementStageRows(co);
@@ -20580,247 +20662,51 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(!row) return;
     const root = document.getElementById('agreementModalRoot');
     if(!root) return;
+    const hasDate = !!(row.dateText && row.dateText !== '—');
     // dateText는 "2026.03.02" 표시용 문자열 — <input type="date">에 넣으려면 yyyy-mm-dd로
     // 바꿔야 한다(parsePartnerDateLabel이 만드는 표시 포맷의 역변환, 다른 곳에 없어 여기서만).
     const m = /^(\d{4})\.(\d{2})\.(\d{2})/.exec(row.dateText || '');
     const currentDateVal = m ? `${m[1]}-${m[2]}-${m[3]}` : '';
-    const impactNotes = stageEditImpactText(co, stageKey);
     const wrap = document.createElement('div');
     wrap.innerHTML = `
-      <div class="pi-overlay" id="stageEditModalOverlay" style="z-index:10005;">
-        <div class="pi-panel" style="max-width:420px;" role="dialog" aria-modal="true" aria-label="${esc(row.label)} 수정">
+      <div class="pi-overlay" id="stageDateModalOverlay" style="z-index:10005;">
+        <div class="pi-panel" style="max-width:340px;" role="dialog" aria-modal="true" aria-label="${esc(label || row.label)} 날짜 ${hasDate?'수정':'등록'}">
           <div class="pi-head">
-            <div class="pi-title">${esc(row.label)} 수정</div>
-            <button type="button" class="chart-close-btn" id="stageEditCloseBtn" aria-label="닫기">&times;</button>
+            <div class="pi-title">${esc(label || row.label)} 날짜 ${hasDate?'수정':'등록'}</div>
+            <button type="button" class="chart-close-btn" id="stageDateCloseBtn" aria-label="닫기">&times;</button>
           </div>
           <div class="pi-body">
-            <div class="co-form-field"><label>단계명</label><input type="text" value="${esc(row.label)}" disabled /></div>
-            <div class="co-form-field"><label>현재 상태</label><input type="text" value="${esc(AGREEMENT_STAGE_BADGE_LABEL[row.status])}" disabled /></div>
-            <div class="co-form-field"><label>변경할 상태</label>
-              <select id="stageEditStatus">
-                <option value="none" ${row.status==='none'?'selected':''}>미진행</option>
-                <option value="waiting" ${row.status==='waiting'?'selected':''}>대기</option>
-                <option value="scheduled" ${row.status==='scheduled'?'selected':''}>예정</option>
-                <option value="done" ${row.status==='done'?'selected':''}>완료</option>
-              </select>
-            </div>
-            <div class="co-form-field" id="stageEditDateField"><label id="stageEditDateLabel">예정일 또는 완료일</label><input type="date" id="stageEditDate" value="${esc(currentDateVal)}" /></div>
-            <div class="co-form-field"><label>담당자</label><input type="text" id="stageEditOwner" value="${esc(row.owner || '')}" /></div>
-            <div class="co-form-field"><label>수정 사유 <span style="color:#B3261E;">*</span></label>
-              <select id="stageEditReason">
-                ${STAGE_CORRECTION_REASONS.map(r2=> `<option value="${esc(r2)}">${esc(r2)}</option>`).join('')}
-              </select>
-            </div>
-            <div class="co-form-field" id="stageEditReasonOtherField" style="display:none;"><label>사유 직접 입력</label><input type="text" id="stageEditReasonOther" /></div>
-            <div class="stage-edit-impact"><b>변경 영향 안내</b><ul>${impactNotes.map(n=> `<li>${esc(n)}</li>`).join('')}</ul></div>
-            <div id="stageEditMsg" class="mail-settings-help" style="color:#B3261E; display:none;"></div>
+            <div class="co-form-field"><label>날짜</label><input type="date" id="stageDateInput" value="${esc(currentDateVal)}" /></div>
+            <div id="stageDateMsg" class="mail-settings-help" style="color:#B3261E; display:none;"></div>
           </div>
-          <div class="pi-actions">
-            <button type="button" class="co-text-action" id="stageEditCancelBtn">취소</button>
-            <button type="button" class="co-text-action primary" id="stageEditSaveBtn">저장</button>
+          <div class="pi-actions" style="justify-content:space-between;">
+            <span>${hasDate ? `<button type="button" class="co-text-action danger" id="stageDateDeleteBtn">날짜 삭제</button>` : ''}</span>
+            <span style="display:flex; gap:8px;">
+              <button type="button" class="co-text-action" id="stageDateCancelBtn">취소</button>
+              <button type="button" class="co-text-action primary" id="stageDateSaveBtn">저장</button>
+            </span>
           </div>
         </div>
       </div>`;
     root.appendChild(wrap.firstElementChild);
-    document.getElementById('stageEditCloseBtn').addEventListener('click', closeStageEditModal);
-    document.getElementById('stageEditCancelBtn').addEventListener('click', closeStageEditModal);
-    bindSafeBackdropClose(document.getElementById('stageEditModalOverlay'), closeStageEditModal);
-    const statusSel = document.getElementById('stageEditStatus');
-    const dateField = document.getElementById('stageEditDateField');
-    const dateLabelEl = document.getElementById('stageEditDateLabel');
-    function syncDateField(){
-      const st = statusSel.value;
-      dateField.style.display = (st === 'scheduled' || st === 'done') ? '' : 'none';
-      dateLabelEl.textContent = st === 'done' ? '완료일' : '예정일';
-    }
-    statusSel.addEventListener('change', syncDateField);
-    syncDateField();
-    const reasonSel = document.getElementById('stageEditReason');
-    const reasonOtherField = document.getElementById('stageEditReasonOtherField');
-    reasonSel.addEventListener('change', ()=>{ reasonOtherField.style.display = reasonSel.value === '기타' ? '' : 'none'; });
-    if(opts.focus === 'date') setTimeout(()=>{ const el = document.getElementById('stageEditDate'); if(el) el.focus(); }, 0);
-    let stageEditApplied = false; // §요청 3 재시도 시 중복 저장 방지 — saveStageCorrection은
-    // 호출될 때마다 변경 이력(stageCorrectionLog)에 새 항목을 append한다(§조사: 클라우드 확인만
-    // 실패한 뒤 같은 버튼을 다시 누르면 이력이 두 번 쌓이는 문제 실제 재현). 로컬 반영은 이
-    // 모달 인스턴스당 한 번만, 재시도는 확인만 다시 한다.
-    document.getElementById('stageEditSaveBtn').addEventListener('click', async (e)=>{
-      const reason = reasonSel.value;
-      const reasonOther = document.getElementById('stageEditReasonOther').value.trim();
-      const msgEl = document.getElementById('stageEditMsg');
-      if(reason === '기타' && !reasonOther){ msgEl.textContent = '수정 사유를 입력해주세요.'; msgEl.style.display = 'block'; return; }
-      const status = statusSel.value;
-      const dateVal = document.getElementById('stageEditDate').value;
-      const dateText = dateVal ? dateVal.replace(/-/g,'.') : null;
-      const owner = document.getElementById('stageEditOwner').value.trim() || null;
-      const btn = e.currentTarget;
-      btn.disabled = true;
-      if(!stageEditApplied){ saveStageCorrection(companyId, stageKey, { status, dateText, owner }, { reason, reasonOther }); stageEditApplied = true; }
-      const r = await confirmCloudSave('companies');
-      btn.disabled = false;
-      if(!r.ok){ msgEl.textContent = cloudSaveErrorMessage(r.err); msgEl.style.display = 'block'; return; } // §요청 3 입력값은 폼에 그대로 남는다
-      closeStageEditModal();
-      renderAgreementPopupBody(companyId);
+    document.getElementById('stageDateCloseBtn').addEventListener('click', closeStageDateModal);
+    document.getElementById('stageDateCancelBtn').addEventListener('click', closeStageDateModal);
+    bindSafeBackdropClose(document.getElementById('stageDateModalOverlay'), closeStageDateModal);
+    setTimeout(()=>{ const el = document.getElementById('stageDateInput'); if(el) el.focus(); }, 0);
+    document.getElementById('stageDateSaveBtn').addEventListener('click', ()=>{
+      const dateVal = document.getElementById('stageDateInput').value;
+      const msgEl = document.getElementById('stageDateMsg');
+      if(!dateVal){ msgEl.textContent = '날짜를 선택해주세요.'; msgEl.style.display = 'block'; return; }
+      const dateText = dateVal.replace(/-/g,'.');
+      const status = stageDateAutoStatus(dateText);
+      // 담당자(owner)는 이 팝업에서 아예 다루지 않는다 — 기존 값을 그대로 보존한다(§요청
+      // "필드 자체를 건드리지 마" 원칙).
+      commitStageDateSave(companyId, stageKey, { status, dateText, owner: row.owner || null }, { reason: '날짜 수정' });
     });
-  }
-  // §요청 [3] "완료 취소를 누르면 기본적으로 다음 상태로 되돌려줘: 일정이 남아있으면 예정,
-  // 일정도 함께 취소하면 미진행" — 문자열로 고정하지 않고 원본 예정 필드(m1ScheduledLabel 등,
-  // §기존 계산 로직이 읽는 것과 동일한 원본)가 실제로 있는지 확인해서 판단한다.
-  function stageCancelDefaults(co, stageKey){
-    const nm = resolveNewMouForCompany(co) || {};
-    const cascadeMap = { m1Done:'m1Scheduled', m2Done:'m2Scheduled' };
-    const cascadeKey = cascadeMap[stageKey] || null;
-    let keepScheduleTarget;
-    if(stageKey === 'm1Done'){
-      const sched = parsePartnerDateLabel(nm.m1ScheduledLabel);
-      keepScheduleTarget = sched ? { status:'scheduled', dateText: sched.display, owner: nm.m1Owner||null } : { status:'none', dateText:null, owner:null };
-    } else if(stageKey === 'm2Done'){
-      const sched = parsePartnerDateLabel(nm.m2ScheduledLabel);
-      keepScheduleTarget = sched ? { status:'scheduled', dateText: sched.display, owner: nm.m2Owner||null } : { status:'none', dateText:null, owner:null };
-    } else if(stageKey === 'qReply'){
-      const sent = parsePartnerDateLabel(nm.qSentLabel);
-      keepScheduleTarget = { status: sent ? 'waiting' : 'none', dateText:null, owner:null };
-    } else {
-      keepScheduleTarget = { status:'none', dateText:null, owner:null };
-    }
-    return { cascadeKey, keepScheduleTarget, cascadeTarget: { status:'none', dateText:null, owner:null } };
-  }
-  // §요청 [4] 후속 기록 보호 — 취소 전에 이미 존재하는 후속 활동/메일/MOU/서류 기록을
-  // 보여준다. 이 정보만으로 취소를 막지는 않는다(§요청 "사용자의 선택 없이 삭제하지 마" —
-  // 여기서도 삭제하지 않고 그냥 안내만 한다, 실제로 삭제되는 게 하나도 없으므로).
-  function stageCancelImpactInfo(co, stageKey){
-    const rows = buildAgreementStageRows(co);
-    const byKey = {}; rows.forEach(r=> byKey[r.key] = r);
-    const facts = [];
-    if(byKey.postMail && byKey.postMail.done) facts.push('협약 후속 메일이 이미 발송된 기록이 있습니다(삭제되지 않습니다).');
-    if(byKey.mouDone && byKey.mouDone.done && stageKey !== 'mouDone') facts.push('MOU 체결 완료 기록이 있습니다(그대로 유지됩니다 — 상태가 서로 어긋나 보일 수 있습니다).');
-    const docSummary = (typeof buildAgreementDocSummary === 'function') ? buildAgreementDocSummary(co.id) : null;
-    if(docSummary && docSummary.registeredCount > 0) facts.push(`등록된 서류 ${docSummary.registeredCount}건이 있습니다(그대로 유지됩니다).`);
-    if(stageKey === 'mouDone'){
-      const mouDateLabel = resolvePartnerAgreementDate(co);
-      if(mouDateLabel) facts.push(`주의: 파트너 대시보드 원본에는 협약체결일(${mouDateLabel})이 남아 있어 상태가 다시 충돌할 수 있습니다.`);
-    }
-    facts.push('이메일 발송기록·첨부파일·고객 서류·메모/활동기록·고객 기본정보는 전혀 삭제·변경되지 않습니다.');
-    return facts;
-  }
-  function closeStageCancelModal(){
-    const root = document.getElementById('agreementModalRoot');
-    const el = root && document.getElementById('stageCancelModalOverlay');
-    if(el) el.remove();
-  }
-  function openStageCancelModal(companyId, stageKey){
-    const co = D.findCompany(companyId);
-    if(!co) return;
-    const rows = buildAgreementStageRows(co);
-    const row = rows.find(r=> r.key === stageKey);
-    if(!row) return;
-    const root = document.getElementById('agreementModalRoot');
-    if(!root) return;
-    const defaults = stageCancelDefaults(co, stageKey);
-    const impactFacts = stageCancelImpactInfo(co, stageKey);
-    const cascadeRow = defaults.cascadeKey ? rows.find(r=> r.key === defaults.cascadeKey) : null;
-    const wrap = document.createElement('div');
-    wrap.innerHTML = `
-      <div class="pi-overlay" id="stageCancelModalOverlay" style="z-index:10005;">
-        <div class="pi-panel" style="max-width:420px;" role="dialog" aria-modal="true" aria-label="${esc(row.label)} 완료 취소">
-          <div class="pi-head">
-            <div class="pi-title">${esc(row.label)} 완료 취소</div>
-            <button type="button" class="chart-close-btn" id="stageCancelCloseBtn" aria-label="닫기">&times;</button>
-          </div>
-          <div class="pi-body">
-            <div class="stage-cancel-warn">"${esc(row.label)}" 완료 기록을 취소하시겠습니까?<br/>상태와 날짜가 변경되며, 기존 메일 발송기록과 첨부파일은 삭제되지 않습니다.</div>
-            ${impactFacts.length ? `<div class="stage-edit-impact"><b>영향 안내</b><ul>${impactFacts.map(f=> `<li>${esc(f)}</li>`).join('')}</ul></div>` : ''}
-            ${cascadeRow ? `
-              <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;margin:8px 0;">
-                <input type="checkbox" id="stageCancelCascade" style="width:auto;" />
-                ${esc(cascadeRow.label)} 기록도 함께 취소
-              </label>` : ''}
-            <div class="co-form-field"><label>취소 사유</label>
-              <select id="stageCancelReason">
-                ${STAGE_CORRECTION_REASONS.map(r2=> `<option value="${esc(r2)}" ${r2==='실수로 완료 처리'?'selected':''}>${esc(r2)}</option>`).join('')}
-              </select>
-            </div>
-            <div class="co-form-field" id="stageCancelReasonOtherField" style="display:none;"><label>사유 직접 입력</label><input type="text" id="stageCancelReasonOther" /></div>
-            <div class="cdash-cloud-save-status" id="stageCancelStatus"></div>
-          </div>
-          <div class="pi-actions">
-            <button type="button" class="co-text-action" id="stageCancelBackBtn">돌아가기</button>
-            <button type="button" class="co-text-action danger" id="stageCancelConfirmBtn">완료 취소</button>
-          </div>
-        </div>
-      </div>`;
-    root.appendChild(wrap.firstElementChild);
-    document.getElementById('stageCancelCloseBtn').addEventListener('click', closeStageCancelModal);
-    document.getElementById('stageCancelBackBtn').addEventListener('click', closeStageCancelModal);
-    bindSafeBackdropClose(document.getElementById('stageCancelModalOverlay'), closeStageCancelModal);
-    const reasonSel = document.getElementById('stageCancelReason');
-    const otherField = document.getElementById('stageCancelReasonOtherField');
-    reasonSel.addEventListener('change', ()=>{ otherField.style.display = reasonSel.value === '기타' ? '' : 'none'; });
-    let stageCancelApplied = false; // §요청 3 재시도 시 중복 저장 방지(stageEditSaveBtn과 동일한
-    // 이유 — saveStageCorrection은 호출마다 이력에 append하므로 재시도 시 로컬 반영은 건너뛴다).
-    document.getElementById('stageCancelConfirmBtn').addEventListener('click', async (e)=>{
-      const cascadeChecked = !!(document.getElementById('stageCancelCascade') && document.getElementById('stageCancelCascade').checked);
-      const reason = reasonSel.value;
-      const reasonOtherEl = document.getElementById('stageCancelReasonOther');
-      const reasonOther = reasonOtherEl ? reasonOtherEl.value.trim() : '';
-      const target = cascadeChecked ? defaults.cascadeTarget : defaults.keepScheduleTarget;
-      const btn = e.currentTarget;
-      const statusEl = document.getElementById('stageCancelStatus');
-      btn.disabled = true;
-      if(!stageCancelApplied){
-        saveStageCorrection(companyId, stageKey, target, { reason, reasonOther });
-        if(cascadeChecked && defaults.cascadeKey){
-          saveStageCorrection(companyId, defaults.cascadeKey, defaults.cascadeTarget, { reason, reasonOther });
-        }
-        stageCancelApplied = true;
-      }
-      const r = await confirmCloudSave('companies');
-      btn.disabled = false;
-      showCloudSaveStatus(statusEl, r.ok, r.err);
-      if(!r.ok) return; // §요청 3 — 선택 내용은 폼에 그대로 남는다, 다시 눌러 재시도 가능
-      closeStageCancelModal();
-      renderAgreementPopupBody(companyId);
+    const deleteBtn = document.getElementById('stageDateDeleteBtn');
+    if(deleteBtn) deleteBtn.addEventListener('click', ()=>{
+      commitStageDateSave(companyId, stageKey, null, { reason: '날짜 삭제' });
     });
-  }
-  function closeStageHistoryModal(){
-    const root = document.getElementById('agreementModalRoot');
-    const el = root && document.getElementById('stageHistoryModalOverlay');
-    if(el) el.remove();
-  }
-  function openStageHistoryModal(companyId, stageKey){
-    const co = D.findCompany(companyId);
-    if(!co) return;
-    const rows = buildAgreementStageRows(co);
-    const row = rows.find(r=> r.key === stageKey);
-    const log = getStageCorrectionLog(co).filter(l=> l.stageKey === stageKey).slice().reverse();
-    const root = document.getElementById('agreementModalRoot');
-    if(!root) return;
-    const fmtCorr = (c)=> c ? `${AGREEMENT_STAGE_BADGE_LABEL[c.status] || c.status}${c.dateText ? ' · ' + c.dateText : ''}${c.owner ? ' · ' + c.owner : ''}` : '(정정 없음 — 원래 계산값)';
-    const wrap = document.createElement('div');
-    wrap.innerHTML = `
-      <div class="pi-overlay" id="stageHistoryModalOverlay" style="z-index:10005;">
-        <div class="pi-panel" style="max-width:440px;" role="dialog" aria-modal="true" aria-label="${esc(row ? row.label : '')} 변경 이력">
-          <div class="pi-head">
-            <div class="pi-title">${esc(row ? row.label : '')} 변경 이력</div>
-            <button type="button" class="chart-close-btn" id="stageHistoryCloseBtn" aria-label="닫기">&times;</button>
-          </div>
-          <div class="pi-body">
-            <div class="stage-history-list">
-              ${log.length ? log.map(l=> `
-                <div class="stage-history-item">
-                  <div class="stage-history-meta">${esc(fmtDateTimeSmart(l.at))} · ${esc(l.by || '')} · 사유: ${esc(l.reason === '기타' ? (l.reasonOther || '기타') : (l.reason || '—'))}</div>
-                  <div>${esc(fmtCorr(l.before))} → ${esc(fmtCorr(l.after))}</div>
-                </div>`).join('') : '<div class="agr-recent-item is-empty">변경 이력이 없습니다</div>'}
-            </div>
-          </div>
-          <div class="pi-actions">
-            <button type="button" class="co-text-action" id="stageHistoryCloseBtn2">닫기</button>
-          </div>
-        </div>
-      </div>`;
-    root.appendChild(wrap.firstElementChild);
-    document.getElementById('stageHistoryCloseBtn').addEventListener('click', closeStageHistoryModal);
-    document.getElementById('stageHistoryCloseBtn2').addEventListener('click', closeStageHistoryModal);
-    bindSafeBackdropClose(document.getElementById('stageHistoryModalOverlay'), closeStageHistoryModal);
   }
   // §질문서 회신 확인 — 기존 workq* 함수들(workqSaveMeetingSchedule 등)과 같은 패턴으로
   // co.partnerDashboard.newMou.qReplyLabel만 채운다(원본 다른 필드는 건드리지 않음).
@@ -21657,23 +21543,16 @@ window.SHIN2_CRM_APP_INIT = function(){
       </div>
       <div class="agr-mid">
         <div class="agr-mid-left">
-          <div class="agr-section-title">진행 단계</div>
-          <div class="agr-stage-list">
+          <div class="agr-section-title-row">
+            <div class="agr-section-title">진행 단계</div>
+            <span class="agr-save-status-pill" id="agrSaveStatusPill" style="display:none;"></span>
+          </div>
+          <div class="agr-stage-cards">
             ${displayGroups.map(g=> `
-              <div class="agr-stage-row">
-                <span class="status-badge ${AGREEMENT_STAGE_BADGE_CLASS[g.status]}">${esc(AGREEMENT_STAGE_BADGE_LABEL[g.status])}</span>
-                <span class="agr-stage-label">${esc(g.label)}${g.corrected ? ` <span class="agr-stage-corrected-mark" title="정정된 값입니다${g.correctionReason ? ' — ' + esc(g.correctionReason) : ''}">(정정됨)</span>` : ''}</span>
-                <span class="agr-stage-date" title="${esc(g.dateText)}${g.owner ? ' · ' + esc(g.owner) : ''}">${esc(g.dateText)}${g.owner ? ' · ' + esc(g.owner) : ''}</span>
-                <button type="button" class="agr-stage-more-btn" data-agr-stage-more="${esc(g.key)}" aria-haspopup="true" aria-expanded="false" aria-label="${esc(g.label)} 더보기">⋯</button>
-                <div class="agr-stage-more-menu" data-agr-stage-menu="${esc(g.key)}" hidden role="menu">
-                  ${g.subRows.map(sr=> `
-                    <div class="agr-stage-submenu-section">
-                      ${g.subRows.length > 1 ? `<div class="agr-stage-submenu-title">${esc(sr.label)}</div>` : ''}
-                      <button type="button" role="menuitem" data-agr-stage-action="edit-status" data-agr-stage-key="${esc(sr.row.key)}">상태 수정</button>
-                      <button type="button" role="menuitem" data-agr-stage-action="edit-date" data-agr-stage-key="${esc(sr.row.key)}">날짜·담당자 수정</button>
-                      ${sr.row.done ? `<button type="button" role="menuitem" class="danger" data-agr-stage-action="cancel" data-agr-stage-key="${esc(sr.row.key)}">완료 취소</button>` : ''}
-                      <button type="button" role="menuitem" data-agr-stage-action="history" data-agr-stage-key="${esc(sr.row.key)}">변경 이력 보기</button>
-                    </div>`).join('')}
+              <div class="agr-stage-card ${g.done ? 'is-done' : ''}">
+                <div class="agr-stage-card-label">${esc(g.label)}</div>
+                <div class="agr-stage-card-dates">
+                  ${g.subRows.map(sr=> agrStageDateChipHtml(sr, g.subRows.length > 1)).join('')}
                 </div>
               </div>`).join('')}
           </div>
@@ -21724,38 +21603,12 @@ window.SHIN2_CRM_APP_INIT = function(){
         openAgreementSubActionModal(co.id, item);
       }
     }));
-    // §협약 진행단계 수정·완료 취소 라운드(신규) — 더보기 버튼은 기존 행 전체 클릭 동작이
-    // 없어서(§요청 "행 전체 클릭 동작을 방해하지 않도록") 새로 방해할 것도 없지만, 그래도
-    // 버튼 자체의 클릭이 상위로 번지지 않게 stopPropagation한다. 메뉴는 §doc-card 더보기
-    // 패턴(bindCustomerCardDocExtras)과 동일하게 한 번에 하나만 열리게 한다.
-    body.querySelectorAll('[data-agr-stage-more]').forEach(btn=>{
-      btn.addEventListener('click', (e)=>{
-        e.stopPropagation();
-        const key = btn.getAttribute('data-agr-stage-more');
-        const menu = body.querySelector(`[data-agr-stage-menu="${key}"]`);
-        if(!menu) return;
-        const willOpen = menu.hidden;
-        body.querySelectorAll('.agr-stage-more-menu').forEach(m=> m.hidden = true);
-        body.querySelectorAll('[data-agr-stage-more]').forEach(b=> b.setAttribute('aria-expanded','false'));
-        if(willOpen){ menu.hidden = false; btn.setAttribute('aria-expanded','true'); }
-      });
-    });
-    body.querySelectorAll('[data-agr-stage-action]').forEach(btn=>{
+    // §협약 진행단계 UI 단순화 라운드(신규) — "..." 메뉴를 없애고, 날짜 칩(등록됨/미등록)을
+    // 누르면 바로 날짜 전용 팝업(openStageDateModal)이 뜬다.
+    body.querySelectorAll('[data-agr-date-key]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
-        const action = btn.getAttribute('data-agr-stage-action');
-        const key = btn.getAttribute('data-agr-stage-key');
-        body.querySelectorAll('.agr-stage-more-menu').forEach(m=> m.hidden = true);
-        if(action === 'edit-status') openStageEditModal(co.id, key, { focus:'status' });
-        else if(action === 'edit-date') openStageEditModal(co.id, key, { focus:'date' });
-        else if(action === 'cancel') openStageCancelModal(co.id, key);
-        else if(action === 'history') openStageHistoryModal(co.id, key);
+        openStageDateModal(co.id, btn.getAttribute('data-agr-date-key'), btn.getAttribute('data-agr-date-label') || undefined);
       });
-    });
-    // 메뉴 바깥 클릭 시 닫기 — 더보기 버튼 자신의 클릭은 위에서 stopPropagation하므로
-    // 여기까지 전파되지 않는다(그 클릭으로 열자마자 바로 닫히는 문제 없음).
-    body.addEventListener('click', ()=>{
-      body.querySelectorAll('.agr-stage-more-menu').forEach(m=> m.hidden = true);
-      body.querySelectorAll('[data-agr-stage-more]').forEach(b=> b.setAttribute('aria-expanded','false'));
     });
     bindAgreementDocChecklistHandlers(co.id);
     bindQuestionnaireWork(co.id);
