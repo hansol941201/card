@@ -3107,6 +3107,12 @@ body.map-modal-lock{ overflow:hidden; }
 .deleted-co-row:last-child{ border-bottom:none; }
 .deleted-co-date{ color:var(--text-muted); white-space:nowrap; }
 .deleted-co-name{ font-weight:600; word-break:break-word; }
+/* §쓰레기통 통합 라운드(신규) — 소프트삭제/협약종료 두 상태를 구분하는 작은 배지
+   (§요청 4). 업체명 앞에 붙는 inline 배지라 .deleted-co-name의 font-weight/word-break는
+   그대로 두고 배지만 별도 스타일로 추가한다. */
+.trash-status-badge{ display:inline-block; font-size:10.5px; font-weight:700; padding:1.5px 6px; border-radius:5px; margin-right:6px; vertical-align:1px; }
+.trash-status-badge.is-deleted{ color:#8A93A3; background:#F1F3F6; }
+.trash-status-badge.is-agreementTerminated{ color:#8A5A1E; background:#FBF0DE; }
 .deleted-co-reason{ color:var(--text-muted); word-break:break-word; }
 .deleted-co-actions{ text-align:right; white-space:nowrap; }
 @media (max-width:600px){
@@ -3512,6 +3518,22 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .kpi-strip-row{ display:flex; align-items:stretch; gap:10px; }
 .kpi-strip-row .kpi-strip{ flex:1; min-width:0; }
 .kpi-strip-actions{ display:flex; align-items:center; }
+/* §협약종료·쓰레기통 아이콘 라운드(신규) — 원형 테두리 라인 스타일 아이콘 버튼. 기존
+   .chart-close-btn(원형/투명 배경/hover시 옅은 회색) 패턴을 톤만 맞춰 재사용한다 — 이
+   버튼은 삭제 같은 파괴적 동작이 아니라 단순 이동(네비게이션)이라 빨간색 등 경고색은
+   쓰지 않고 CRM 전체가 쓰는 무채색 네이비/회색 라인 톤(var(--text-muted)/var(--navy))만
+   쓴다. */
+.kpi-trash-summary-btn{
+  position:relative; width:34px; height:34px; flex:none; display:flex; align-items:center;
+  justify-content:center; border:1px solid var(--line); border-radius:50%; background:#fff;
+  color:var(--text-muted); cursor:pointer; padding:0;
+}
+.kpi-trash-summary-btn:hover{ background:var(--bg); color:var(--navy); border-color:var(--navy); }
+.kpi-trash-summary-badge{
+  position:absolute; top:-6px; right:-6px; min-width:16px; height:16px; padding:0 4px;
+  border-radius:999px; background:var(--navy); color:#fff; font-size:10px; font-weight:700;
+  line-height:16px; text-align:center; box-shadow:0 0 0 2px #fff;
+}
 .analysis-grid{ display:grid; grid-template-columns:62% 1fr; gap:14px; margin-bottom:16px; align-items:stretch; }
 .analysis-panel{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 16px; min-width:0; }
 .analysis-panel-rising{ padding:12px 14px 14px; }
@@ -4008,22 +4030,59 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .map-embed-root .map-modal-tabs{ padding:0 0 8px; }
 .map-embed-root .map-modal-filters{ padding:8px 0; flex-wrap:wrap; }
 .map-embed-root .map-modal-search{ flex:1 1 160px; min-width:120px; }
-/* §요청 14 — 지도는 정사각형에 가깝게. mapcol을 aspect-ratio 1/1로 고정하고, 그 아래
-   info col(지역 요약/지역별 업체 수)이 옆이 아니라 밑으로 쌓이게 flex-direction만
-   column으로 바꾼다(§요청 18-19 "지도 아래에"). */
-.map-embed-root .map-modal-body-main{ flex-direction:column; overflow:visible; }
+/* §요청 14 — 지도는 정사각형에 가깝게. mapcol을 aspect-ratio 1/1로 고정한다. */
+.map-embed-root .map-modal-body-main{ flex-direction:column; overflow:visible; position:relative; }
 .map-embed-root .map-modal-mapcol{
-  flex:none; width:100%; aspect-ratio:1/1; height:auto; border-right:0; border-bottom:1px solid var(--line); border-radius:8px 8px 0 0; overflow:hidden;
+  flex:none; width:100%; aspect-ratio:1/1; height:auto; border-right:0; border-radius:8px; overflow:hidden;
+  cursor:pointer; /* §지역 요약 패널 라운드: 지도 배경을 클릭하면 좌측 플로팅 패널이 열린다 */
 }
-.map-embed-root .map-modal-infocol{ flex:none; width:100%; overflow-y:visible; padding:12px 2px 0; }
-/* §요청 20 — "지도+지역요약+지역별업체수"만 남기고 그 외(현재 지도 내 업체 목록/위치
-   미확인 안내)는 인라인 카드에서는 숨긴다. 계산(listEntries 등)은 그대로 실행되고
-   DOM에도 그려지지만 화면에만 안 보인다 — renderMapInfoPanel 자체는 안 건드린다. */
+/* §지역 요약 패널 라운드(신규) — "지역 요약"/"지역별 업체 수" 블록이 지도 아래로
+   쌓이며 카드 전체를 길게 늘어뜨리던 것을, 기본적으로 숨겨진 채로 두고(카드 높이는
+   지도 정사각형 높이만으로 고정) 지도를 클릭하면 지도 위에 겹쳐 뜨는 좌측 플로팅
+   패널로 바꾼다. 계산(regionRows/capital/nonCapital/located/unlocated 등)과 렌더
+   함수(renderMapInfoPanel)는 전혀 안 건드리고, 같은 #mapModalInfoCol을 화면에 다른
+   방식(절대 위치 오버레이)으로만 올려 놓는다 — DOM 내용/데이터는 100% 동일하다.
+   "현재 지도 내 업체 목록"/"위치 미확인" 블록은 이전과 동일하게 인라인 카드에서는
+   숨긴다(§요청 20 유지). */
 .map-embed-root #mapCompanyListBlock,
 .map-embed-root .map-unlocated-summary{ display:none; }
 .map-embed-root .map-info-block-title{ font-size:12.5px; }
+.map-embed-root .map-modal-infocol{
+  display:none; /* 기본 상태: 지도만 보인다(§요청 1) */
+  position:absolute; left:8px; top:6%; bottom:6%;
+  width:32%; max-width:240px;
+  overflow-y:auto; /* §요청 4 — 목록이 길어도 패널 자체 높이는 안 늘어나고 내부 스크롤 */
+  padding:30px 11px 10px;
+  gap:10px;
+  background:rgba(255,255,255,.94);
+  border:1px solid var(--line);
+  border-radius:11px;
+  box-shadow:0 10px 26px rgba(15,23,42,.16);
+  z-index:6;
+  font-size:11.5px;
+}
+.map-embed-root .map-modal-infocol .map-info-stat-row{ font-size:11px; }
+.map-embed-root .map-modal-infocol .map-region-row{ font-size:11px; padding:4px 0; }
+/* 지도를 클릭(토글)해 이 클래스가 붙으면 패널이 나타난다 — mountMapDistributionInline이
+   그려 넣는 루트(#mapDistributionModalRoot.map-embed-root)에 붙는 상태 클래스다. */
+.map-embed-root.map-embed-panel-open .map-modal-infocol{ display:flex; flex-direction:column; }
+.map-embed-panel-close-btn{
+  display:none; position:absolute; right:8px; top:8px; width:22px; height:22px;
+  align-items:center; justify-content:center; border:1px solid var(--line); border-radius:99px;
+  background:#fff; color:var(--text-muted); font-size:14px; line-height:1; cursor:pointer; z-index:7;
+}
+.map-embed-root.map-embed-panel-open .map-embed-panel-close-btn{ display:flex; }
 @media(max-width:1180px){
   .map-embed-root .map-modal-mapcol{ aspect-ratio:1/1; height:auto; }
+}
+/* §요청 7 — 좁은/모바일 폭에서는 좌측 플로팅 패널 대신, 지도 하단에 붙는
+   바텀시트 형태로 전환한다(기존 §요청 1180px 단일 컬럼 전환 기준과 별개로, 카드
+   자체가 더 좁아지는 760px 기준 — 파일 내 다른 반응형 분기(.crm-list-col 등)와
+   같은 breakpoint를 재사용). */
+@media(max-width:760px){
+  .map-embed-root .map-modal-infocol{
+    left:8px; right:8px; top:auto; bottom:8px; width:auto; max-width:none; height:56%; max-height:56%;
+  }
 }
 
 /* ==========================================================================
@@ -4457,7 +4516,37 @@ table.gift-grade-table .gift-grade-num{ text-align:right; white-space:nowrap; }
          채우게 한다 — renderKpiStrip()이 채우는 대상 id(#crmKpiStrip)는 그대로라
          KPI 계산/렌더 로직은 전혀 안 건드렸다. -->
     <div class="crm-main-grid">
-      <div class="kpi-strip crm-kpi-cell" id="crmKpiStrip"></div>
+      <!-- §협약종료·쓰레기통 아이콘 라운드(신규) — 사용자 스크린샷 상 KPI 스트립 오른쪽 빈
+           공간에 새 아이콘 버튼 하나만 얹는다(기존 요소 대체 아님). 이미 스타일시트에
+           준비돼 있었지만 실제 마크업에서는 한 번도 쓰인 적 없던 .kpi-strip-row/
+           .kpi-strip-actions 래퍼를 그대로 재사용한다(§P1-4 PDF 버튼용으로 준비됐다가
+           실제로는 #crmMouPdfBtn이 상단 네이비 도구줄에 붙어 결국 안 쓰인 클래스 —
+           전수 검색으로 확인). 원래 #crmKpiStrip에 있던 .crm-kpi-cell(그리드 배치용
+           클래스, grid-column/row 지정)은 그대로 유지하되 바깥 래퍼로 옮기고, 안쪽
+           #crmKpiStrip은 .kpi-strip만 남긴다 — renderKpiStrip()이 채우는 대상 id는
+           동일하므로 KPI 계산/렌더 로직은 전혀 안 건드린다. -->
+      <div class="kpi-strip-row crm-kpi-cell">
+        <div class="kpi-strip" id="crmKpiStrip"></div>
+        <div class="kpi-strip-actions">
+          <!-- §쓰레기통 통합 라운드(신규) — "협약종료"+"쓰레기통업체"를 합친 "쓰레기통"
+               pill(MAIN_PILL_DEFS)과 완전히 같은 배지(filterCounts.trash)를 보여주고,
+               클릭하면 그 pill과 완전히 같은 동작(filterKey='trash' → renderList() →
+               renderTrashTab())으로 연다 — 배지 숫자와 클릭 시 열리는 목록 범위가
+               항상 일치한다. -->
+          <button type="button" class="kpi-trash-summary-btn" id="crmTrashSummaryBtn" title="쓰레기통(협약종료·삭제된 업체)" aria-label="쓰레기통(협약종료·삭제된 업체)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10.2" stroke-width="1.4"></circle>
+              <path d="M9 10v5"></path>
+              <path d="M12 10v5"></path>
+              <path d="M15 10v5"></path>
+              <path d="M7.5 8.2h9"></path>
+              <path d="M9.3 8.2l.5-1.6a1 1 0 0 1 .95-.6h2.5a1 1 0 0 1 .95.6l.5 1.6"></path>
+              <path d="M8.3 8.2l.5 8.2a1 1 0 0 0 1 .9h4.4a1 1 0 0 0 1-.9l.5-8.2"></path>
+            </svg>
+            <span class="kpi-trash-summary-badge" id="crmTrashSummaryBadge" hidden>0</span>
+          </button>
+        </div>
+      </div>
       <!-- 좌: 업체 목록 카드 — 검색/정렬/필터 pill/표는 전부 기존 DOM·id·렌더 함수
            (renderFilterChips/renderList/applySort 등) 그대로, 카드 틀만 새로 씌운다. -->
       <div class="crm-panel crm-list-col">
@@ -11315,8 +11404,8 @@ window.SHIN2_CRM_APP_INIT = function(){
   // §삭제된 업체 매칭-불일치 소급 탐지 라운드(신규) — 관리 도구 줄에 sitewide 집계 한 줄만
   // 보여준다(§요청 3, 새 모달 없음). computeOrphanedDeletedCompanies(§renderDeletedCompaniesTab
   // 바로 위, 소프트 삭제 라운드에서 정의)를 그대로 재사용해 따로 계산하지 않는다. 클릭하면
-  // 기존 "삭제된 업체" 필터 칩과 완전히 같은 동작(filterKey='deleted')으로 그 탭을 연다
-  // (nice-to-have, 새 모달/새 화면 없음).
+  // §쓰레기통 통합 라운드(신규) — "삭제된 업체" 전용 pill이 "쓰레기통"으로 합쳐졌으므로
+  // 이 클릭도 같은 새 키(filterKey='trash')로 그 탭을 연다(nice-to-have, 새 모달/새 화면 없음).
   function updateOrphanedDeletedNote(){
     const el = document.getElementById('orphanedDeletedNote');
     if(!el) return;
@@ -11325,7 +11414,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     if(!orphaned.length){ el.textContent = ''; el.onclick = null; return; }
     const totalReqs = orphaned.reduce((s,o)=> s + o.count, 0);
     el.textContent = `⚠ 삭제된 업체 중 삭제 후 요청이 들어온 업체 ${orphaned.length}곳(${totalReqs}건) — 클릭해 확인`;
-    el.onclick = ()=>{ filterKey = 'deleted'; currentPage = 1; renderList(); };
+    el.onclick = ()=>{ filterKey = 'trash'; currentPage = 1; renderList(); };
   }
 
   // §요청 "로그인·고객정보 로딩 완료 후 접속마다 1회" — 두 경로 모두 같은 idempotent
@@ -11964,13 +12053,17 @@ window.SHIN2_CRM_APP_INIT = function(){
   // 이 6개 밖(협약 진행/신규 협약사/최근흐름 상승세/이전 상호/L2→L3 전환관리)은 pill에서만
   // 빠질 뿐 matchesFilter 분기·데이터 자체는 전혀 지우지 않았다 — 다른 화면(KPI 카드 클릭
   // 등)이 여전히 그 filterKey로 이동할 수 있다.
+  // §쓰레기통 통합 라운드(신규) — "협약종료"와 "쓰레기통업체" 두 개 pill을 하나의
+  // "쓰레기통" pill로 합친다(§요청 1). 판정 로직(matchesFilter의 agreementTerminated/
+  // D.loadDeletedCompanies)은 전혀 안 바꾸고, 화면에 보여주는 탭 개수만 줄인다 —
+  // 'trash'는 이 pill 전용 새 키이고, renderList()가 filterKey==='trash'일 때
+  // renderTrashTab()으로 두 집합을 합쳐서 보여준다(아래 참고).
   const MAIN_PILL_DEFS = [
     ['all','전체'],
-    ['agreementTerminated','협약종료'],
+    ['trash','쓰레기통'],
     // §요청 6 — 파일 안에 이미 있는 두 표기("실적있음·MOU미체결"/"실적 있음 · MOU 미체결")
     // 중 pill처럼 짧은 자리에 맞는 표기를 그대로 가져다 쓴다(새 라벨 창작 아님).
     ['revenueNoMou','실적있음·MOU미체결'],
-    ['deleted','쓰레기통업체'],
     ['willpower','의지박약'],
     ['nonPartnerRevenue','건바이건'],
   ];
@@ -12096,6 +12189,33 @@ window.SHIN2_CRM_APP_INIT = function(){
       currentPage = 1;
       renderList();
     }));
+  }
+  // §협약종료·쓰레기통 아이콘 라운드(신규) — KPI 스트립 옆 새 아이콘 버튼의 배지 숫자만
+  // 채운다. 새 집계 로직을 만들지 않고 renderList()가 이미 계산해 둔 두 기존 값
+  // (filterCounts.agreementTerminated: MAIN_PILL_DEFS의 "협약종료" pill과 동일한
+  // matchesFilter 기반 카운트 / filterCounts.deleted: D.loadDeletedCompanies().length,
+  // "쓰레기통업체" pill과 동일)을 그대로 더하기만 한다(§요청 "협약종료+쓰레기통업체
+  // 합산 인원"). 클릭 시 열리는 화면은 기존 "삭제된 업체" 탭 하나뿐이라(§요청 "기존
+  // 삭제된 업체 목록 재사용") 배지 숫자(합산)와 클릭 시 실제로 보이는 목록(삭제된
+  // 업체만)의 범위가 다를 수 있음 — 사용자가 명시적으로 확인한 절충이라 새 통합 화면을
+  // 만들지 않는다.
+  function renderTrashSummaryBtn(counts){
+    const btn = document.getElementById('crmTrashSummaryBtn');
+    const badge = document.getElementById('crmTrashSummaryBadge');
+    if(!btn || !badge) return;
+    // §쓰레기통 통합 라운드(신규) — "쓰레기통" pill 배지와 완전히 같은 값
+    // (filterCounts.trash, 위에서 이미 agreementTerminated+deleted로 계산됨)을 그대로 읽는다.
+    const total = counts.trash || 0;
+    badge.textContent = String(total);
+    badge.hidden = total <= 0;
+    if(!btn.dataset.bound){
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', ()=>{
+        filterKey = 'trash';
+        currentPage = 1;
+        renderList();
+      });
+    }
   }
   // §전면 리디자인 라운드(신규) — "오늘의 관리 목록": managementNeedCache.list(이미
   // renderList()가 계산해 둔 값, §관리필요 업체 라운드)를 그대로 상위 몇 건만 보여준다.
@@ -12245,7 +12365,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 엘리먼트)는 "삭제된 업체"/"신규 협약사" 탭처럼 그 7컬럼 표를 아예 안 쓰는 화면에서는
     // 지금까지도 계속 보이고 있었다(다른 화면 구조/컬럼은 전혀 안 바꿈, 표시 여부만 토글).
     const coTableHeadEl = document.getElementById('crmCoTableHead');
-    if(coTableHeadEl) coTableHeadEl.hidden = (filterKey === 'deleted' || filterKey === 'willpower' || filterKey === 'newPartner' || filterKey === 'l2l3Manage' || filterKey === 'caseByCase' || filterKey === 'nonPartnerRevenue');
+    if(coTableHeadEl) coTableHeadEl.hidden = (filterKey === 'trash' || filterKey === 'willpower' || filterKey === 'newPartner' || filterKey === 'l2l3Manage' || filterKey === 'caseByCase' || filterKey === 'nonPartnerRevenue');
     const companies = D.loadActiveCompanies(); // §업체 삭제(휴지통) 라운드 — 소프트 삭제된 업체를 일반 목록/신규 협약사/협약 진행/MOU체결 탭에서 뺀다(§요청 10)
     const unregisteredClassification = D.classifyUnregisteredCompaniesByMouMaster(D.buildUnregisteredCompanies2026());
     // 기존 건바이건 컬렉션과 엑셀 분류 결과에 같은 업체가 있으면 한 번만 표시한다.
@@ -12331,6 +12451,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     // §업체 삭제(휴지통) 라운드(신규) — companies가 이미 활성 업체만이라 위 FILTER_DEFS.forEach
     // 루프로는 절대 못 세므로 따로 채운다(§요청 6 "삭제된 업체 탭").
     filterCounts.deleted = D.loadDeletedCompanies().length;
+    // §쓰레기통 통합 라운드(신규) — "쓰레기통" pill 배지 = 협약종료 + 소프트삭제 합산
+    // (§요청 3). 새 집계 없이 바로 위/FILTER_DEFS 루프에서 이미 계산된 두 값만 더한다.
+    // 실제 쓰레기통 목록(renderTrashTab)도 이 두 집합을 그대로 합쳐서 보여주므로 배지
+    // 숫자와 목록 건수가 항상 일치한다.
+    filterCounts.trash = (filterCounts.agreementTerminated || 0) + filterCounts.deleted;
     // §L2→L3 전환관리 탭 라운드(신규) — matchesFilter로는 못 세는 별도 판정(§9 근처
     // buildL2L3AnalysisBase, sheetRequests까지 봐야 함)이라 여기서 따로 채운다. N(30/60/90)과
     // 무관한 "전체 대상 수"만 필요하므로 가벼운 base(rows.length)만 조회한다.
@@ -12375,18 +12500,21 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 호출만 없앴다 — renderManagementTodayPanel 함수 정의와 managementNeedCache
     // 계산(관리필요 버튼/모달/고객카드 배너가 계속 씀) 자체는 그대로 둔다.
     renderKpiStrip(filterCounts);
+    renderTrashSummaryBtn(filterCounts);
     // §고객관리 메인화면 재배치 라운드(신규) — 지도 분포를 팝업이 아니라 페이지에 항상
     // 인라인으로 마운트한다(§요청 14-17). mountMapDistributionInline 내부에서 mapModalOpen
     // 플래그로 최초 1회만 실제로 마운트하므로, 필터/검색/페이지 이동으로 renderList()가
     // 반복 호출돼도 카카오맵 인스턴스를 매번 새로 만들지 않는다.
     if(typeof mountMapDistributionInline === 'function') mountMapDistributionInline();
 
-    // §업체 삭제(휴지통) 라운드(신규) — "삭제된 업체" 탭은 위에서 이미 칩/KPI 스트립까지
-    // 정상적으로 그린 뒤(다른 탭과 똑같이 계속 클릭 가능해야 하므로), 여기서부터 이어지는
-    // 무거운 7컬럼 목록 템플릿(매출/실적/MOU 등, 삭제된 업체에는 의미 없음)은 타지 않고
-    // 별도의 단순한 표(삭제일/업체명/삭제 사유/복구, §요청 6)로 갈아탄다.
-    if(filterKey === 'deleted'){
-      renderDeletedCompaniesTab();
+    // §쓰레기통 통합 라운드(신규) — "쓰레기통" 탭(구 "삭제된 업체"+"협약종료" 두 탭)은
+    // 위에서 이미 칩/KPI 스트립까지 정상적으로 그린 뒤(다른 탭과 똑같이 계속 클릭
+    // 가능해야 하므로), 여기서부터 이어지는 무거운 7컬럼 목록 템플릿(매출/실적/MOU 등,
+    // 쓰레기통 업체에는 의미 없음)은 타지 않고 별도의 단순한 표로 갈아탄다. 협약종료
+    // 업체 목록은 새로 계산하지 않고, 여기 이미 있는 enriched/relationIndex(위에서
+    // matchesFilter 루프에 쓰던 것과 완전히 동일)를 그대로 넘겨서 재사용한다.
+    if(filterKey === 'trash'){
+      renderTrashTab(enriched, relationIndex);
       return;
     }
     // §의지박약 자동관리 라운드(신규) — "삭제된 업체" 탭과 같은 이유(§7976 주석)로 무거운
@@ -14009,29 +14137,46 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
     return result;
   }
-  function renderDeletedCompaniesTab(){
-    const deleted = D.loadDeletedCompanies().slice().sort((a,b)=> new Date(b.deletedAt||0) - new Date(a.deletedAt||0));
+  // §쓰레기통 통합 라운드(신규) — 구 renderDeletedCompaniesTab(소프트삭제 전용)을
+  // 확장해, 협약종료 업체(enriched를 matchesFilter('agreementTerminated')로 거른 것,
+  // 새 판정 로직 없음)까지 같은 표에 합쳐서 보여준다(§요청 1/2). 상태 배지로 두 종류를
+  // 구분하고(§요청 4), 복구 버튼은 소프트삭제 업체에만 노출한다 — 협약종료 업체는
+  // deletedAt이 없어 D.restoreDeletedCompany를 불러도 아무 의미가 없으므로 버튼 자체를
+  // 만들지 않는다(§요청 5, "복원 버튼 노출 금지"). 정렬/복구 로직·삭제 사유 표시 등
+  // 기존 소프트삭제 동작은 전혀 안 바꿨다.
+  function renderTrashTab(enriched, relationIndex){
+    const deletedItems = D.loadDeletedCompanies().map(co=> ({
+      co, status:'deleted', dateVal: co.deletedAt || '', reason: co.deleteReason || '사유 미기재'
+    }));
+    const terminatedItems = (enriched || [])
+      .filter(r=> matchesFilter(r.co, r.progress, 'agreementTerminated', relationIndex))
+      .map(r=> ({
+        co:r.co, status:'agreementTerminated', dateVal: r.co.agreementEndedAt || '', reason: r.co.agreementEndReason || '사유 미기재'
+      }));
+    const items = deletedItems.concat(terminatedItems).sort((a,b)=> new Date(b.dateVal||0) - new Date(a.dateVal||0));
     renderPagination(0);
-    if(!deleted.length){
-      listEl.innerHTML = '<div class="empty-note">삭제된 업체가 없습니다.</div>';
+    if(!items.length){
+      listEl.innerHTML = '<div class="empty-note">쓰레기통에 업체가 없습니다.</div>';
       return;
     }
     // §삭제된 업체 매칭-불일치 소급 탐지 라운드(신규) — 업체별 "삭제 후 들어온 요청" 건수만
     // 빠르게 찾아 쓰기 위한 Map(위 computeOrphanedDeletedCompanies 결과를 companyId로 색인).
+    // 소프트삭제 업체에만 의미 있는 경고라 협약종료 업체에는 자연히 안 붙는다.
     const orphanedByCoId = new Map(computeOrphanedDeletedCompanies().map(o=> [o.company.id, o.count]));
+    const STATUS_BADGE = { deleted:'삭제됨', agreementTerminated:'협약종료' };
     listEl.innerHTML = `
       <div class="deleted-co-table">
         <div class="deleted-co-head">
-          <span>삭제일</span><span>업체명</span><span>삭제 사유</span><span></span>
+          <span>일자</span><span>업체명</span><span>사유</span><span></span>
         </div>
-        ${deleted.map(co=> `
+        ${items.map(({co,status,dateVal,reason})=> `
           <div class="deleted-co-row" data-deleted-co="${esc(co.id)}">
-            <span class="deleted-co-date">${esc(fmtDate(co.deletedAt))}</span>
-            <span class="deleted-co-name">${esc(co.name || '(업체명 없음)')}${orphanedByCoId.has(co.id) ? `<div style="color:#B23B3B;font-size:11.5px;font-weight:600;margin-top:2px;">⚠ 삭제 후 들어온 요청 ${orphanedByCoId.get(co.id)}건</div>` : ''}</span>
-            <span class="deleted-co-reason">${esc(co.deleteReason || '사유 미기재')}</span>
+            <span class="deleted-co-date">${esc(fmtDate(dateVal))}</span>
+            <span class="deleted-co-name"><span class="trash-status-badge is-${esc(status)}">${STATUS_BADGE[status]}</span>${esc(co.name || '(업체명 없음)')}${orphanedByCoId.has(co.id) ? `<div style="color:#B23B3B;font-size:11.5px;font-weight:600;margin-top:2px;">⚠ 삭제 후 들어온 요청 ${orphanedByCoId.get(co.id)}건</div>` : ''}</span>
+            <span class="deleted-co-reason">${esc(reason)}</span>
             <span class="deleted-co-actions">
-              <button type="button" class="co-text-action primary" data-restore-co="${esc(co.id)}">복구</button>
-              <span class="cdash-cloud-save-status" id="restoreStatus_${esc(co.id)}"></span>
+              ${status === 'deleted' ? `<button type="button" class="co-text-action primary" data-restore-co="${esc(co.id)}">복구</button>
+              <span class="cdash-cloud-save-status" id="restoreStatus_${esc(co.id)}"></span>` : ''}
             </span>
           </div>
         `).join('')}
@@ -14042,6 +14187,8 @@ window.SHIN2_CRM_APP_INIT = function(){
     // memos/documents 등은 애초에 이 기능이 한 번도 건드린 적이 없어 항상 그대로다).
     // §요청 9 "저장 실패 시 성공으로 표시 금지" — 다른 저장 지점과 같은 패턴(confirmCloudSave
     // 성공 후에만 재렌더링해 목록에서 빠짐, 실패하면 이 행이 그대로 남아 재시도 가능).
+    // 이 버튼은 status==='deleted' 행에만 존재하므로(위 템플릿) 협약종료 업체는 애초에
+    // 복구를 시도할 방법이 없다(§요청 5).
     listEl.querySelectorAll('[data-restore-co]').forEach(btn=> btn.addEventListener('click', async ()=>{
       const id = btn.getAttribute('data-restore-co');
       const co = D.findCompany(id);
@@ -14053,7 +14200,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       const r = await confirmCloudSave('companies');
       btn.disabled = false;
       if(!r.ok){ showCloudSaveStatus(statusEl, false, r.err); return; }
-      renderDeletedCompaniesTab();
+      renderList();
       if(typeof refreshMapIfOpen === 'function') refreshMapIfOpen();
     }));
   }
@@ -30474,6 +30621,18 @@ window.SHIN2_CRM_APP_INIT = function(){
     const block = document.getElementById('mapCompanyListBlock');
     if(block) block.scrollIntoView({ behavior:'smooth', block:'start' });
   }
+  // §지역 요약 패널 라운드(신규) — 지도 인라인 카드(#mapDistributionModalRoot.map-embed-root)
+  // 위에 겹쳐 뜨는 "지역 요약/지역별 업체 수" 플로팅 패널을 열고 닫는다. renderMapInfoPanel이
+  // 채우는 #mapModalInfoCol의 DOM/데이터는 전혀 건드리지 않고, 오직 루트에 상태 클래스
+  // (map-embed-panel-open)만 토글한다 — 실제 표시 여부는 위 CSS(.map-embed-root.map-embed-panel-open
+  // .map-modal-infocol)가 담당한다. force가 없으면 현재 상태를 뒤집는다(지도를 다시 클릭하면
+  // 닫히는 토글 동작, §요청 6).
+  function toggleMapEmbedInfoPanel(force){
+    const root = document.getElementById('mapDistributionModalRoot');
+    if(!root || !root.classList.contains('map-embed-root')) return; // 옛 중앙 팝업 경로는 건드리지 않음(항상 옆에 보임)
+    const nextOpen = typeof force === 'boolean' ? force : !root.classList.contains('map-embed-panel-open');
+    root.classList.toggle('map-embed-panel-open', nextOpen);
+  }
   function renderMapInfoPanel(allEntries){
     const infoCol = document.getElementById('mapModalInfoCol');
     if(!infoCol) return;
@@ -30501,6 +30660,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       ? '위치 미확인 업체'
       : (mapFocusedCompanyList ? `${mapFocusedCompanyList.label} 업체 (${listEntries.length}곳)` : '현재 지도 내 업체');
     infoCol.innerHTML = `
+      <button type="button" class="map-embed-panel-close-btn" id="mapEmbedPanelCloseBtn" aria-label="지역 요약 패널 닫기">&times;</button>
       <div>
         <div class="map-info-block-title">지역 요약</div>
         <div class="map-info-stat-row"><span>수도권</span><b>${capital.length}개 (${Math.round(capital.length/total*100)}%)</b></div>
@@ -30532,6 +30692,11 @@ window.SHIN2_CRM_APP_INIT = function(){
         </div>
       ` : ''}
     `;
+    const embedCloseBtn = document.getElementById('mapEmbedPanelCloseBtn');
+    if(embedCloseBtn) embedCloseBtn.addEventListener('click', (e)=>{
+      e.stopPropagation(); // 지도 클릭 토글(§지역 요약 패널 라운드)로 다시 열리지 않도록
+      toggleMapEmbedInfoPanel(false);
+    });
     infoCol.querySelectorAll('[data-map-region]').forEach(row=> row.addEventListener('click', ()=>{
       const region = row.getAttribute('data-map-region');
       if(typeof focusMapRegion === 'function') focusMapRegion(region);
@@ -30632,6 +30797,16 @@ window.SHIN2_CRM_APP_INIT = function(){
     }
     const clusterer = new kakao.maps.MarkerClusterer({ map, averageCenter:true, minLevel:6 });
     mapPerfMark('map init done');
+    // §지역 요약 패널 라운드(신규) — 지도 "배경"을 클릭하면 좌측 플로팅 패널을 열고,
+    // 열려 있을 때 다시 클릭하면 닫는다(§요청 2/6). kakao.maps.event의 map 'click'은
+    // 카카오 SDK가 지도 배경(타일)에서만 발생시키는 이벤트로, 마커 자체의 'click'
+    // (바로 위 buildMarkersFor의 kakao.maps.event.addListener(marker,'click',...))이나
+    // 클러스터 원(CustomOverlay, DOM에 stopPropagation()까지 걸려 있음, 아래
+    // buildClusterOverlaysFor 참고)을 눌렀을 때는 별도로 발생하지 않는다 — 즉 마커/
+    // 클러스터 클릭 동작은 이 리스너를 추가해도 전혀 달라지지 않는다.
+    if(document.querySelector('.map-embed-root')){
+      kakao.maps.event.addListener(map, 'click', ()=>{ toggleMapEmbedInfoPanel(); });
+    }
     const infoWindow = new kakao.maps.InfoWindow({ removable:true });
     let markerByCompanyId = new Map();
     let currentEntries = allEntries; // 마지막으로 그린 필터 결과 — idle(팬/줌)마다 다시 쓴다
