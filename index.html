@@ -4462,6 +4462,91 @@ table.gift-grade-table .gift-grade-num{ text-align:right; white-space:nowrap; }
 @media(max-width:900px){
   .gift-grade-panel{ width:98vw; }
 }
+
+/* ==========================================================================
+   §모바일 전용 최적화 라운드(신규) — 사용자 명시 조건: "PC 버전 절대 수정 금지,
+   반드시 모바일 media query 안에서만 override". 아래 블록 밖의 기존 CSS는 단
+   1줄도 건드리지 않았다 — 여기 추가된 규칙은 전부 max-width:768px 안에서만
+   적용되고, 데스크톱(>768px)에서는 이 블록 자체가 매칭되지 않아 시각적으로
+   아무 변화가 없다. 기존 desktop !important 규칙(.app/.kpi-item 등)을 이겨야
+   하는 속성만 !important를 같이 썼다 — 새 속성을 추가하는 곳은 !important
+   없이 뒀다.
+   ========================================================================== */
+@media (max-width:768px){
+  html, body{ overflow-x:hidden; }
+  .app{ width:auto!important; max-width:100%!important; box-sizing:border-box; }
+
+  /* §1/§8 상단 네비게이션 — .gnav-menu(주요 메뉴)는 이미 ≤767px에서 숨겨지고
+     햄버거(.gnav-hamburger)+드로어(.gnav-drawer)로 대체되는 기존 구조가 있어
+     새로 만들지 않는다(§조사: class="topbar"/class="top-tab-row"는 실제
+     마크업에 존재하지 않는 죽은 클래스라 손대지 않았다). 다만 "관리 도구"/
+     "PDF 내보내기"(.gnav-tool-btn, 드로어에는 없는 보조 버튼)는 숨겨지지
+     않아 좁은 화면에서 가로 스크롤/잘림의 실제 원인이었다 — 주요 메뉴가
+     이미 사라지는 지점과 같은 기준(≤767px)에서 같이 숨긴다(PC 동작 영향
+     없음, 데스크톱에서는 그대로 보임). */
+  .gnav-tool-btn, #crmMouPdfBtn.gnav-tool-btn, #crmDataUpdateBtn.gnav-tool-btn{ display:none!important; }
+  .gnav-tool-wrap{ display:none!important; }
+
+  /* §9 KPI — 4개를 2열×2행으로 */
+  .kpi-strip-row{ flex-direction:column; }
+  .kpi-strip{ display:grid!important; grid-template-columns:1fr 1fr!important; }
+  .kpi-item{ width:100%; min-width:0; border-right:1px solid var(--line)!important; border-bottom:1px solid var(--line)!important; padding:12px 14px!important; }
+  .kpi-item:nth-child(2n){ border-right:none!important; }
+  .kpi-item:nth-last-child(-n+2){ border-bottom:none!important; }
+  .kpi-item-value{ font-size:24px!important; }
+  .kpi-item-label{ font-size:12px!important; }
+
+  /* §2/§11 검색창 — ≤760px 블록이 강제하던 min-width:430px가 좁은 화면에서
+     가로 스크롤의 실제 원인이라 여기서 좁은 화면 한정으로 되돌린다(그 규칙
+     자체는 다른 화면 몫이라 지우지 않고, 더 좁은 이 media query가 나중에
+     선언돼 우선한다). */
+  .list-search-row{ min-width:0!important; width:100%; flex-direction:column!important; }
+  .search-box, .list-sort-select{ width:100%!important; }
+
+  /* §10 업체 목록 표 — 구조를 카드로 새로 짜는 대신(§요청 "구조 변경이 어려운
+     표만 overflow-x:auto 허용") 표 자기 영역에만 가로 스크롤을 가둔다.
+     §조사: 기존 ≤1180px 규칙이 overflow-x:auto를 .crm-list-col(필터 칩·검색창
+     까지 포함하는 큰 패널) 전체에 걸어 둬서, "한 축만 auto면 다른 축도
+     자동으로 auto로 바뀌는" CSS 규칙 때문에 overflow-y도 함께 갇혀 버리고
+     그 안의 필터 칩(.list-filter-row, 여러 줄로 줄바꿈되어야 함)이 잘려
+     보이는 부작용이 있었다 — 모바일에서는 .crm-list-col 자체는 다시
+     overflow-x:visible로 풀고, 실제로 가로로 넘치는 표(.co-table-head/
+     .co-list)에만 스크롤을 준다. */
+  .crm-list-col{ overflow-x:visible!important; }
+  .co-table-head, .co-list{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+
+  /* §12 지도 — .crm-main-grid는 이미 max-width:1180px에서 1열로 바뀌어 지도가
+     목록 아래로 내려간다(기존 규칙 재사용). 여기서는 지도 카드 높이만 모바일에
+     맞게 제한한다. */
+  .crm-map-col{ height:auto!important; min-height:300px; max-height:360px; }
+
+  /* §7 고객 상세창 3열(최근 접촉/매출/시공실적) → 1열 */
+  .cdash-bottom3{ grid-template-columns:1fr!important; }
+
+  /* §3/§4 협약 진행관리 팝업 — 거의 전체화면 + 2열(진행단계 | 다음 할 일) → 1열.
+     .pi-overlay/.pi-panel은 다른 팝업도 같이 쓰는 클래스라 #agreementModalRoot로
+     범위를 좁혀 이 팝업에만 적용한다. */
+  #agreementModalRoot .pi-overlay{ padding:8px; }
+  #agreementModalRoot .agr-panel{ width:calc(100vw - 16px)!important; max-width:calc(100vw - 16px)!important; height:100dvh; max-height:calc(100dvh - 16px)!important; margin:0; }
+  #agreementModalRoot .pi-title{ white-space:normal; word-break:break-word; }
+  #agreementModalRoot .chart-close-btn{ width:44px; height:44px; font-size:22px; }
+  .agr-mid{ grid-template-columns:1fr!important; }
+  .agr-doc-list{ grid-template-columns:1fr!important; }
+
+  /* §5 1차/2차미팅 — 강제 1줄 금지, 좁으면 자연스럽게 2줄로(기존 flex-wrap을
+     그대로 쓰되 상태 텍스트가 줄 전체를 먼저 차지하게 한다) + 버튼 터치 높이 확보 */
+  .agr-meeting-status{ width:100%; }
+  .agr-meeting-btn, .agr-meeting-complete-btn{ min-height:40px; padding:0 14px; }
+
+  /* §14 최근 활동 — 긴 문장이 화면 밖으로 안 튀어나가게 */
+  .agr-recent-item{ white-space:normal!important; word-break:break-word; overflow-wrap:anywhere; }
+
+  /* §18 주요 버튼 터치 영역 40~44px */
+  .co-text-action, .list-add-btn, .agr-date-chip{ min-height:40px; }
+
+  /* §20 하단 safe-area */
+  #agreementModalRoot .agr-panel{ padding-bottom:env(safe-area-inset-bottom); }
+}
 </style>
 </head>
 <body>
