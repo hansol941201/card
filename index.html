@@ -4027,70 +4027,92 @@ table.pdf-doc-table thead{ background:var(--bg); }
    페이지 인라인으로 바꾼다. 렌더 함수(renderMapModalBody/renderMapModalMain/
    renderMapInfoPanel)는 그대로 재사용하고, 이 규칙들은 오직 "팝업처럼 보이지 않게"
    포지셔닝만 되돌린다 — 지도/필터/마커/지역 집계 로직은 전혀 안 건드린다. */
+/* §지도 카드 고정 3단 스택 라운드(신규) — 왼쪽 "업체 목록" 카드(목록+페이지네이션)의
+   전체 높이와 이 카드(지도+지역요약+시공아파트목록)의 전체 높이를 맞추려면, 루트부터
+   #mapModalBody까지 전부 flex:1/min-height:0으로 높이를 100% 물려받아야 한다 —
+   .crm-map-col이 이미 height:100%(그리드가 정해준 실제 행 높이)이므로, 그 안의
+   .map-embed-root/.map-modal-overlay.map-embedded/.map-modal-panel/#mapModalBody가
+   전부 flex 세로 컨테이너로 그 높이를 그대로 이어받게 한다. */
+.map-embed-root{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
 .map-embed-root .map-modal-overlay.map-embedded{
-  position:static; inset:auto; background:none; z-index:auto; padding:0; display:block;
+  position:static; inset:auto; background:none; z-index:auto; padding:0; display:flex;
+  flex-direction:column; flex:1 1 auto; min-height:0;
 }
+.map-embed-root #mapModalBody{ display:flex; flex-direction:column; flex:1 1 auto; min-height:0; }
 .map-embed-root .map-modal-panel{
-  width:100%; max-width:none; height:auto; border-radius:0; box-shadow:none;
+  width:100%; max-width:none; height:100%; border-radius:0; box-shadow:none;
+  display:flex; flex-direction:column; min-height:0;
 }
 .map-embed-root .map-modal-close{ display:none; } /* §요청 30: 인라인 카드는 닫을 수 없는 상시 영역 — 버튼은 그대로 두되 숨김만 */
-.map-embed-root .map-modal-head{ padding:0 0 8px; }
-.map-embed-root .map-modal-tabs{ padding:0 0 8px; }
-.map-embed-root .map-modal-filters{ padding:8px 0; flex-wrap:wrap; }
+.map-embed-root .map-modal-head{ padding:0 0 8px; flex:none; }
+.map-embed-root .map-modal-tabs{ padding:0 0 8px; flex:none; }
+.map-embed-root .map-modal-filters{ padding:8px 0; flex-wrap:wrap; flex:none; }
 .map-embed-root .map-modal-search{ flex:1 1 160px; min-width:120px; }
-/* §요청 14 — 지도는 정사각형에 가깝게. mapcol을 aspect-ratio 1/1로 고정한다. */
-.map-embed-root .map-modal-body-main{ flex-direction:column; overflow:visible; position:relative; }
-.map-embed-root .map-modal-mapcol{
-  flex:none; width:100%; aspect-ratio:1/1; height:auto; border-right:0; border-radius:8px; overflow:hidden;
-  cursor:pointer; /* §지역 요약 패널 라운드: 지도 배경을 클릭하면 좌측 플로팅 패널이 열린다 */
-}
-/* §지역 요약 패널 라운드(신규) — "지역 요약"/"지역별 업체 수" 블록이 지도 아래로
-   쌓이며 카드 전체를 길게 늘어뜨리던 것을, 기본적으로 숨겨진 채로 두고(카드 높이는
-   지도 정사각형 높이만으로 고정) 지도를 클릭하면 지도 위에 겹쳐 뜨는 좌측 플로팅
-   패널로 바꾼다. 계산(regionRows/capital/nonCapital/located/unlocated 등)과 렌더
-   함수(renderMapInfoPanel)는 전혀 안 건드리고, 같은 #mapModalInfoCol을 화면에 다른
-   방식(절대 위치 오버레이)으로만 올려 놓는다 — DOM 내용/데이터는 100% 동일하다.
+/* ==========================================================================
+   §지도 카드 고정 3단 스택 라운드(신규) — "지도를 클릭하면 위에 겹쳐 뜨는 지역 요약
+   플로팅 패널"(옛 §지역 요약 패널 라운드, toggleMapEmbedInfoPanel + map-embed-panel-open)을
+   완전히 없애고, 대신 카드 안에 지도/지역 요약/시공 아파트 목록 3개 구획을 항상 같이
+   보이는 세로 스택으로 고정한다(§요청 "겹쳐서 뜨지 않고 항상 보이게"). 계산 함수
+   (regionRows/capital/nonCapital/located/unlocated 등, renderMapInfoPanel/
+   buildPourApartmentEntries)는 전혀 안 건드리고 같은 DOM(#mapModalInfoCol)/같은 데이터
+   소스를 그대로 재사용하되, 배치 방식만 절대위치 오버레이 → flex 세로 스택으로 바꾼다.
    "현재 지도 내 업체 목록"/"위치 미확인" 블록은 이전과 동일하게 인라인 카드에서는
-   숨긴다(§요청 20 유지). */
+   숨긴다(§요청 20 유지, 지역 요약 구획만 보여준다). ========================================================================== */
 .map-embed-root #mapCompanyListBlock,
 .map-embed-root .map-unlocated-summary{ display:none; }
 .map-embed-root .map-info-block-title{ font-size:12.5px; }
+/* 왼쪽 "업체 목록" 카드(.crm-list-col, 목록+페이지네이션)와 오른쪽 이 카드의 전체
+   높이를 맞추기 위한 flex 배분 — 지도 48~52%/지역요약 12~15%/시공아파트목록 33~38%
+   비율을 flex-grow 숫자로 표현한다(각 flex-basis:0, min-height:0으로 실제 남는
+   세로 공간만 이 비율대로 나눠 갖는다). */
+.map-embed-root .map-modal-body-main{
+  display:flex; flex-direction:column; overflow:hidden; position:relative;
+  flex:1 1 auto; min-height:0; gap:10px;
+}
+.map-embed-root .map-modal-mapcol{
+  flex:50 1 0; min-height:80px; width:100%; aspect-ratio:auto; height:auto;
+  border-right:0; border-radius:8px; overflow:hidden;
+}
 .map-embed-root .map-modal-infocol{
-  display:none; /* 기본 상태: 지도만 보인다(§요청 1) */
-  position:absolute; left:8px; top:6%; bottom:6%;
-  width:32%; max-width:240px;
-  overflow-y:auto; /* §요청 4 — 목록이 길어도 패널 자체 높이는 안 늘어나고 내부 스크롤 */
-  padding:30px 11px 10px;
-  gap:10px;
-  background:rgba(255,255,255,.94);
+  display:flex; flex-direction:column;
+  position:static; inset:auto; left:auto; top:auto; bottom:auto;
+  flex:13 1 0; min-height:56px; width:auto; max-width:none;
+  overflow-y:auto; /* §요청 — 목록이 길어도 구획 자체 높이는 안 늘어나고 내부 스크롤 */
+  padding:8px 10px;
+  gap:8px;
+  background:#F6F9FD;
   border:1px solid var(--line);
-  border-radius:11px;
-  box-shadow:0 10px 26px rgba(15,23,42,.16);
-  z-index:6;
+  border-radius:8px;
+  box-shadow:none;
   font-size:11.5px;
 }
 .map-embed-root .map-modal-infocol .map-info-stat-row{ font-size:11px; }
 .map-embed-root .map-modal-infocol .map-region-row{ font-size:11px; padding:4px 0; }
-/* 지도를 클릭(토글)해 이 클래스가 붙으면 패널이 나타난다 — mountMapDistributionInline이
-   그려 넣는 루트(#mapDistributionModalRoot.map-embed-root)에 붙는 상태 클래스다. */
-.map-embed-root.map-embed-panel-open .map-modal-infocol{ display:flex; flex-direction:column; }
-.map-embed-panel-close-btn{
-  display:none; position:absolute; right:8px; top:8px; width:22px; height:22px;
-  align-items:center; justify-content:center; border:1px solid var(--line); border-radius:99px;
-  background:#fff; color:var(--text-muted); font-size:14px; line-height:1; cursor:pointer; z-index:7;
+/* 옛 플로팅 패널의 닫기 버튼 — 이제 패널이 상시 보이는 고정 구획이라 더 이상 쓰이지
+   않는다(항상 숨김, JS도 map-embed-panel-open 클래스를 더 이상 토글하지 않는다). */
+.map-embed-panel-close-btn{ display:none; }
+/* §시공 아파트 목록 고정 구획(신규) — buildPourApartmentEntries를 그대로 재사용해
+   채우는 새 구획(renderMapEmbedApartmentList). 기본(오프-임베드, 옛 전체화면 팝업)에는
+   존재하지 않던 새 마크업이라 기본은 숨김, 인라인 카드(.map-embed-root)에서만 보인다. */
+.map-modal-aptlistcol{ display:none; }
+.map-embed-root .map-modal-aptlistcol{
+  display:flex; flex-direction:column; flex:37 1 0; min-height:110px;
+  border:1px solid var(--line); border-radius:8px; background:#fff; overflow:hidden;
 }
-.map-embed-root.map-embed-panel-open .map-embed-panel-close-btn{ display:flex; }
+.map-embed-aptlist-head{
+  flex:none; display:flex; align-items:baseline; justify-content:space-between;
+  padding:8px 10px 6px; font-size:12.5px; font-weight:800; color:var(--navy);
+  border-bottom:1px solid var(--line);
+}
+.map-embed-aptlist-count{ font-size:11px; font-weight:600; color:var(--text-muted); }
+.map-embed-aptlist-reset{ font-size:11px; font-weight:600; color:#2563EB; cursor:pointer; text-decoration:none; margin-left:6px; }
+.map-embed-aptlist-body{ flex:1 1 auto; min-height:0; overflow-y:auto; padding:2px 10px 8px; }
+.map-embed-apt-row{ padding:6px 0; border-bottom:1px dashed var(--line); font-size:11.5px; }
+.map-embed-apt-row:last-child{ border-bottom:0; }
+.map-embed-apt-row-name{ font-weight:700; color:var(--navy); }
+.map-embed-apt-row-sub{ margin-top:2px; color:var(--text-muted); font-size:11px; }
 @media(max-width:1180px){
-  .map-embed-root .map-modal-mapcol{ aspect-ratio:1/1; height:auto; }
-}
-/* §요청 7 — 좁은/모바일 폭에서는 좌측 플로팅 패널 대신, 지도 하단에 붙는
-   바텀시트 형태로 전환한다(기존 §요청 1180px 단일 컬럼 전환 기준과 별개로, 카드
-   자체가 더 좁아지는 760px 기준 — 파일 내 다른 반응형 분기(.crm-list-col 등)와
-   같은 breakpoint를 재사용). */
-@media(max-width:760px){
-  .map-embed-root .map-modal-infocol{
-    left:8px; right:8px; top:auto; bottom:8px; width:auto; max-width:none; height:56%; max-height:56%;
-  }
+  .map-embed-root .map-modal-mapcol{ min-height:220px; }
 }
 
 /* ==========================================================================
@@ -4351,6 +4373,30 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .contact-hist-row.is-clickable{ cursor:pointer; }
 .contact-hist-row.is-clickable:hover{ background:var(--bg); }
 .contact-hist-type{ flex:1; min-width:0; font-size:12.5px; color:var(--text); font-weight:600; }
+
+/* ==========================================================================
+   §고객 상세 팝업 정사각에 가깝게 축소 라운드(신규) — 사용자 요청: 지금(§2833
+   min(90vw,1420px) 폭 + §4188 min(85vh,820px) 높이 = 1420×820, 약 1.73:1로 "넓은
+   대시보드"로 읽힘)보다 폭 약 8~12%, 높이도 약간 줄여 정사각에 가깝게. 폭은 요청받은
+   명시적 목표치 width:min(1080px,84vw)를 그대로 적용(허용 범위 1040~1080px, 옛 1420px
+   대비 약 24% 축소 — 러프 추정치 8~12%보다 크지만 사용자가 준 정확한 숫자 스펙을
+   우선한다). 높이는 명시적으로 고정하지 않고 max-height:86vh 상한만 두어 .chart-panel이
+   내용물 높이에 맞춰 자연스럽게 줄어들게 한다(기존 §4188이 height를 min(85vh,820px)로
+   "고정"해 내용이 짧을 때 팝업 하단에 빈 공간이 남던 문제의 근본 원인 — §요청 "하단에
+   의미 없이 크게 비는 공간이 생기지 않게"). .chart-panel은 이미 display:flex;
+   flex-direction:column이라 height를 강제하지 않으면 flex 자식(#chartHeader/.cdash-body/
+   #cdashFooterBar) 실제 높이 합만큼만 커지고, max-height를 넘을 때만 .cdash-body가
+   내부 스크롤된다(기존 overflow-y:auto 그대로, 새 스크롤 로직 없음). 파일 맨 뒤(캐스케이드
+   마지막)이므로 위쪽 모든 .chart-panel 폭/높이 규칙(§1307/§1839/§2228/§2833/§4188 등)을
+   이긴다 — 새 클래스 없이 기존 .chart-panel/.chart-overlay 그대로 재사용, 모바일
+   (max-width:760px, §2857/§4289)은 건드리지 않는다. */
+@media (min-width:900px) and (min-height:700px){
+  .chart-panel{
+    width:min(1080px, 84vw)!important;
+    height:auto!important;
+    max-height:86vh!important;
+  }
+}
 
 /* ==========================================================================
    §MOU 체결 업체 선물 등급 산정 라운드(신규) — 기업용 분석 화면 톤(§요청 26): 네이비/
@@ -29820,6 +29866,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 그려진다(§동기화 규칙 "닫혀 있어도 다음에 열 때 최신 데이터 사용").
     mapFilterState = { search:'', filterKey:'all', category:'all', pourRange:'all', viewMode:'cluster', listView:'inBounds' };
     aptFilterState = { search:'', year:'all', category:'all', region:'all', households:'all', nearCenter:null, nearRadiusKm:5, nearQuery:'' };
+    mapEmbedFocusedRegion = null; // §지도 카드 고정 3단 스택: 다음에 열 때는 항상 "전체" 상태로 새로 시작
     mapActiveTab = 'company'; // §요청 "기본 선택은 시공사" — 매번 열 때 항상 기본 탭으로 시작
     invalidateMapCompaniesCache(); // §MAP-PERF: 닫을 때도 비워둔다(다음 open이 항상 새로 계산하도록, 방어적)
     if(mapCanvasState && typeof mapCanvasState.destroy === 'function'){
@@ -30289,6 +30336,43 @@ window.SHIN2_CRM_APP_INIT = function(){
   // PDF의 "현재 검색 결과만 내보내기" 옵션은 이 배열을 그대로 재사용할 뿐 별도로
   // 다시 계산하지 않는다(§요청 "재계산 금지, 화면에 실제 쓰이는 배열 그대로 재사용").
   let lastAptVisibleEntries = [];
+  // §지도 카드 고정 3단 스택 라운드(신규) — "시공사 지역 분포" 카드 안 고정 "시공 아파트
+  // 목록" 구획 전용, 최소한의 새 상태 하나. 지도 위 지역/클러스터를 클릭했을 때 어느
+  // 지역이 선택돼 있는지는 기존에 별도로 저장해 두지 않았다(mapFocusedCompanyList는
+  // 업체 id 목록만 들고 있어 "지역명" 자체를 따로 안 남김) — 그래서 focusMapRegion/
+  // focusClusterGroup(기존 지역·클러스터 클릭 훅, 그대로 재사용)이 이미 하던 일에
+  // 딱 한 줄씩만 더해 이 지역명만 별도로 기록한다. 새 클릭 감지 로직은 전혀 안 만든다.
+  let mapEmbedFocusedRegion = null;
+  // 아파트 그룹의 region(시/도)·city(시/군/구)이 클릭된 지역명과 일치하는지만 본다 —
+  // buildPourApartmentEntries가 이미 채워 둔 필드 그대로 비교할 뿐 새 집계는 없다.
+  function aptEntryMatchesEmbedRegion(e, key){
+    if(!key) return true;
+    if(e.region === key) return true;
+    if(e.city === key) return true;
+    if(normSigunguForApt(e.region, e.city) === key) return true;
+    return false;
+  }
+  // §요청 5 — "시공 아파트 목록" 고정 구획을 채운다. buildPourApartmentEntries()를 그대로
+  // 재사용하고(새 데이터 집계 없음), mapEmbedFocusedRegion이 있으면 그 지역만 좁힌다.
+  // 지도 임베드 카드가 마운트돼 있지 않으면(옛 전체화면 팝업 등) 아무 것도 하지 않는다.
+  function renderMapEmbedApartmentList(){
+    const bodyEl = document.getElementById('mapEmbedAptListBody');
+    if(!bodyEl) return;
+    let allEntries;
+    try{ allEntries = buildPourApartmentEntries(); }
+    catch(err){ console.warn('시공 아파트 목록(지도 카드) 계산 실패:', err); allEntries = []; }
+    const filtered = mapEmbedFocusedRegion ? allEntries.filter(e=> aptEntryMatchesEmbedRegion(e, mapEmbedFocusedRegion)) : allEntries;
+    const countEl = document.getElementById('mapEmbedAptListCount');
+    if(countEl) countEl.textContent = `총 ${filtered.length.toLocaleString('ko-KR')}건`;
+    const resetEl = document.getElementById('mapEmbedAptListReset');
+    if(resetEl) resetEl.style.display = mapEmbedFocusedRegion ? '' : 'none';
+    bodyEl.innerHTML = filtered.length ? filtered.map(e=> `
+      <div class="map-embed-apt-row">
+        <div class="map-embed-apt-row-name">${esc(e.name)}</div>
+        <div class="map-embed-apt-row-sub">${esc([e.region, e.city].filter(Boolean).join(' ') || '지역 미확인')} · ${esc(fmtAptHouseholds(e.households))} · ${esc(e.categories[0] || '공종 미상')} · ${esc(e.years.length ? e.years[0] + '년' : '연도 미상')}</div>
+      </div>
+    `).join('') : `<div class="map-modal-empty" style="padding:8px 0;">표시할 시공 아파트가 없습니다.</div>`;
+  }
   function aptEntryMatchesSearch(e, q){
     if(!q) return true;
     const norm = q.trim().toLowerCase();
@@ -30399,6 +30483,13 @@ window.SHIN2_CRM_APP_INIT = function(){
           <div class="map-modal-canvas" id="mapModalCanvas"></div>
         </div>
         <div class="map-modal-infocol" id="mapModalInfoCol"></div>
+        <div class="map-modal-aptlistcol" id="mapModalAptListCol">
+          <div class="map-embed-aptlist-head">
+            <span>시공 아파트 목록</span>
+            <span><span class="map-embed-aptlist-count" id="mapEmbedAptListCount"></span><a href="#" class="map-embed-aptlist-reset" id="mapEmbedAptListReset" style="display:none;">전체 보기</a></span>
+          </div>
+          <div class="map-embed-aptlist-body" id="mapEmbedAptListBody"></div>
+        </div>
       </div>
     `;
     document.getElementById('mapFilterSearch').addEventListener('input', (e)=>{
@@ -30440,6 +30531,13 @@ window.SHIN2_CRM_APP_INIT = function(){
     mapPerfMark('extra render start (info panel)');
     renderMapInfoPanel(allEntries);
     mapPerfMark('extra render done (info panel)');
+    const embedAptResetLink = document.getElementById('mapEmbedAptListReset');
+    if(embedAptResetLink) embedAptResetLink.addEventListener('click', (e)=>{
+      e.preventDefault();
+      mapEmbedFocusedRegion = null;
+      renderMapEmbedApartmentList();
+    });
+    renderMapEmbedApartmentList();
     mapPerfMark('visible');
     mapPerfMark('total');
   }
@@ -30455,6 +30553,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       try{ updateMapMarkers(allEntries); } catch(err){ console.warn('지도 마커 갱신 실패:', err); }
     }
     renderMapInfoPanel(allEntries);
+    renderMapEmbedApartmentList(); // §지도 카드 고정 3단 스택: 업체 데이터가 바뀌면 아파트 목록도 최신으로
   }
 
   // §지도분포4 동기화 훅: 지도 팝업이 열려 있을 때만 다시 그린다(§동기화 규칙 "팝업이
@@ -30579,7 +30678,9 @@ window.SHIN2_CRM_APP_INIT = function(){
       e.preventDefault();
       mapFocusedCompanyList = null;
       mapFilterState.listView = 'inBounds';
+      mapEmbedFocusedRegion = null; // §지도 카드 고정 3단 스택: "전체"로 돌아가면 시공 아파트 목록도 전체로
       renderMapInfoPanel(allEntries);
+      renderMapEmbedApartmentList();
     });
   }
 
@@ -30668,9 +30769,10 @@ window.SHIN2_CRM_APP_INIT = function(){
     // 클러스터 원(CustomOverlay, DOM에 stopPropagation()까지 걸려 있음, 아래
     // buildClusterOverlaysFor 참고)을 눌렀을 때는 별도로 발생하지 않는다 — 즉 마커/
     // 클러스터 클릭 동작은 이 리스너를 추가해도 전혀 달라지지 않는다.
-    if(document.querySelector('.map-embed-root')){
-      kakao.maps.event.addListener(map, 'click', ()=>{ toggleMapEmbedInfoPanel(); });
-    }
+    // §지도 카드 고정 3단 스택 라운드(신규) — 지도를 클릭하면 위에 겹쳐 뜨던 옛
+    // "지역 요약" 플로팅 패널(toggleMapEmbedInfoPanel)을 없앴다(§요청 "지도 위에 아무
+    // 것도 겹치지 않게, 지역 요약은 항상 아래 고정 구획에 보이게"). 지도 배경 클릭에는
+    // 이제 아무 동작도 붙이지 않는다 — 마커/클러스터 클릭 동작은 그대로 유지된다.
     const infoWindow = new kakao.maps.InfoWindow({ removable:true });
     let markerByCompanyId = new Map();
     let currentEntries = allEntries; // 마지막으로 그린 필터 결과 — idle(팬/줌)마다 다시 쓴다
@@ -30811,7 +30913,9 @@ window.SHIN2_CRM_APP_INIT = function(){
       console.log('[REGION-CLICK] matched companies=' + targets.length);
       mapFocusedCompanyList = { label:key, companyIds:targets.map(e=> e.co.id) };
       mapFilterState.listView = 'inBounds';
+      mapEmbedFocusedRegion = key; // §지도 카드 고정 3단 스택: 클러스터 클릭 → 시공 아파트 목록도 같은 지역으로 좁힌다
       renderMapInfoPanel(buildMapCompanies());
+      renderMapEmbedApartmentList();
       scrollMapCompanyListIntoView();
       console.log('[REGION-CLICK] open list');
       const bounds = new kakao.maps.LatLngBounds();
@@ -30924,7 +31028,9 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(!targets.length) return;
       mapFocusedCompanyList = { label:regionName, companyIds:targets.map(e=> e.co.id) };
       mapFilterState.listView = 'inBounds';
+      mapEmbedFocusedRegion = regionName; // §지도 카드 고정 3단 스택: "지역별 업체 수" 행 클릭 → 시공 아파트 목록도 같은 지역으로 좁힌다
       renderMapInfoPanel(buildMapCompanies());
+      renderMapEmbedApartmentList();
       scrollMapCompanyListIntoView();
       const bounds = new kakao.maps.LatLngBounds();
       targets.forEach(e=> bounds.extend(new kakao.maps.LatLng(e.co.latitude, e.co.longitude)));
@@ -31471,6 +31577,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       try{ updateAptMarkers(allEntries); } catch(err){ console.warn('아파트 마커 갱신 실패:', err); }
     }
     renderAptInfoPanel(allEntries);
+    renderMapEmbedApartmentList(); // §지도 카드 고정 3단 스택: 아파트 데이터가 바뀌면 목록도 최신으로
   }
 
   // §1 시공 아파트 탭 본문 — 시공사 탭(renderMapModalMain 위쪽 절반)과 같은 구조(필터 바 +
@@ -31528,6 +31635,13 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="map-modal-body-main">
         <div class="map-modal-mapcol" id="mapModalMapCol"><div class="map-modal-canvas" id="mapModalCanvas"></div></div>
         <div class="map-modal-infocol" id="mapModalInfoCol"></div>
+        <div class="map-modal-aptlistcol" id="mapModalAptListCol">
+          <div class="map-embed-aptlist-head">
+            <span>시공 아파트 목록</span>
+            <span><span class="map-embed-aptlist-count" id="mapEmbedAptListCount"></span><a href="#" class="map-embed-aptlist-reset" id="mapEmbedAptListReset" style="display:none;">전체 보기</a></span>
+          </div>
+          <div class="map-embed-aptlist-body" id="mapEmbedAptListBody"></div>
+        </div>
       </div>
     `;
     // §근처 아파트 검색 라운드 → 재요청("따로 검색창 만들어줘"): 이름/지역/시공사를 즉시
@@ -31574,6 +31688,13 @@ window.SHIN2_CRM_APP_INIT = function(){
       if(canvas) canvas.innerHTML = '<div class="map-modal-error">지도를 표시하지 못했습니다.</div>';
     }
     renderAptInfoPanel(allEntries);
+    const embedAptResetLink2 = document.getElementById('mapEmbedAptListReset');
+    if(embedAptResetLink2) embedAptResetLink2.addEventListener('click', (e)=>{
+      e.preventDefault();
+      mapEmbedFocusedRegion = null;
+      renderMapEmbedApartmentList();
+    });
+    renderMapEmbedApartmentList();
   }
 
   /* ==========================================================================
