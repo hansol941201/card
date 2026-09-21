@@ -1036,13 +1036,16 @@
   .stage-bar-seg{ flex:1 1 0; min-width:0; background:#E5EAF1; }
   .stage-bar-seg + .stage-bar-seg{ border-left:1px solid #fff; }
   .stage-bar-seg.is-done{ background:var(--navy); } /* 완료 — 남색(§3) */
-  .stage-bar-seg.is-current{ background:var(--blue); } /* 현재 진행 중 — 밝은 파랑(§4) */
-  .stage-bar-seg.is-pending{ background:#E5EAF1; } /* 미진행 — 연한 회색(§5) */
+  /* §진행상황 표시 단순화 라운드(신규) — "완료만 남색, 나머지는 전부 회색"(§요청 1/3).
+     완료 여부 계산(clsList/currentIdx)은 그대로 재사용하고, is-current에만 있던
+     파란색 강조만 지운다 — is-pending과 완전히 같은 회색으로 합친다. "다음에 해야
+     할 단계"는 오른쪽 "해야 할 일" 버튼(next-action-chip, buildNextActionCellHtml)
+     으로만 안내하고 이 단계 바에서는 완료 여부만 보여준다(§요청 4/5). */
+  .stage-bar-seg.is-current, .stage-bar-seg.is-pending{ background:#E5EAF1; } /* 미완료 — 연한 회색 */
   .stage-step-labels{ display:flex; width:100%; margin-top:4px; }
   .stage-step-label{ flex:1 1 0; min-width:0; text-align:center; font-size:11px; color:var(--text-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .stage-step-label.is-done{ color:var(--text); } /* 완료 — 기본 텍스트색(§7) */
-  .stage-step-label.is-current{ color:var(--blue); font-weight:600; } /* 현재 — 파랑+굵게(§7) */
-  .stage-step-label.is-pending{ color:var(--text-faint); } /* 미진행 — 회색(§7) */
+  .stage-step-label.is-current, .stage-step-label.is-pending{ color:var(--text-faint); font-weight:400; } /* 미완료 — 회색, 굵기 강조 없음 */
   .next-action-chip{
     display:inline-flex; align-items:center; height:22px; padding:0 8px; font-size:10.5px; font-weight:600;
     color:#fff; background:var(--navy); border:none; border-radius:5px; cursor:pointer; white-space:nowrap;
