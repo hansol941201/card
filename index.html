@@ -4432,38 +4432,25 @@ table.pdf-doc-table thead{ background:var(--bg); }
 }
 
 /* ==========================================================================
-   §MOU 체결 업체 선물 등급 산정 라운드(신규) — 기업용 분석 화면 톤(§요청 26): 네이비/
-   화이트/연한 블루그레이, 표 중심, 화려한 선물/명절 장식 없음. 기존 .pi-overlay/
-   .pi-panel/.list-filter-chip/.list-sort-select 패턴을 그대로 재사용한다.
+   §선물 등급 전면 단순화 라운드(신규) — 기업용 분석 화면 톤(§요청 26): 네이비/화이트/
+   연한 블루그레이, 표 중심, 화려한 선물/명절 장식 없음. 기존 .pi-overlay/.pi-panel/
+   .list-sort-select 패턴을 그대로 재사용한다. 등급 색상/기준 입력/필터 칩 스타일은
+   더 이상 쓰지 않아 제거했다(A/B/C·상위%·보조기준 UI 자체가 없어짐).
    ========================================================================== */
-.gift-grade-panel{ width:min(1400px, 96vw); max-height:92vh; }
+.gift-grade-panel{ width:min(1100px, 96vw); max-height:92vh; }
 .gift-grade-body{ display:flex; flex-direction:column; gap:12px; overflow:hidden; }
-.gift-grade-settings{
-  display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:10px 12px;
-  background:var(--bg); border:1px solid var(--line); border-radius:8px;
-}
-.gift-grade-settings label{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); font-weight:600; }
-.gift-grade-settings input[type="number"]{ width:56px; padding:4px 6px; border:1px solid var(--line); border-radius:5px; font-size:12.5px; }
-.gift-grade-settings select{ padding:4px 6px; border:1px solid var(--line); border-radius:5px; font-size:12.5px; }
-.gift-grade-summary{ display:flex; flex-wrap:wrap; gap:16px; font-size:13px; font-weight:600; color:var(--text); }
-.gift-grade-summary b{ font-size:15px; margin-left:3px; }
-.gift-grade-summary .is-a b{ color:#1E7D3A; }
-.gift-grade-summary .is-b b{ color:var(--navy); }
-.gift-grade-summary .is-c b{ color:#8A93A3; }
-.gift-grade-summary .is-exclude b{ color:#B23B3B; }
-.gift-grade-summary .is-review b{ color:#B26A00; }
+.gift-grade-summary{ font-size:13px; font-weight:600; color:var(--text); }
+.gift-grade-summary b{ font-size:15px; margin-left:3px; color:var(--navy); }
 .gift-grade-toolbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
 .gift-grade-table-wrap{ flex:1 1 auto; min-height:0; overflow:auto; border:1px solid var(--line); border-radius:8px; }
-table.gift-grade-table{ width:100%; min-width:1180px; border-collapse:collapse; font-size:12px; }
+table.gift-grade-table{ width:100%; min-width:820px; border-collapse:collapse; font-size:12px; }
 table.gift-grade-table thead{ position:sticky; top:0; background:#F4F7FB; z-index:1; }
 table.gift-grade-table th{ padding:8px 9px; text-align:left; font-weight:700; color:var(--navy); border-bottom:1px solid var(--line); white-space:nowrap; }
 table.gift-grade-table td{ padding:6px 9px; border-bottom:1px solid #EEF2F7; vertical-align:middle; }
 table.gift-grade-table .gift-grade-num{ text-align:right; white-space:nowrap; }
-.gift-grade-reason{ max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-muted); }
 .gift-grade-missing{ color:#B26A00; font-weight:600; }
 .gift-grade-row.is-review{ background:#FFF9EE; }
-.gift-grade-final-select{ padding:3px 5px; border:1px solid var(--line); border-radius:5px; font-size:12px; font-weight:700; min-width:76px; }
-.gift-grade-note-input{ width:110px; padding:3px 6px; border:1px solid var(--line); border-radius:5px; font-size:12px; }
+.gift-grade-note-input{ width:120px; padding:3px 6px; border:1px solid var(--line); border-radius:5px; font-size:12px; }
 @media(max-width:900px){
   .gift-grade-panel{ width:98vw; }
 }
@@ -32637,93 +32624,50 @@ window.SHIN2_CRM_APP_INIT = function(){
       });
   }
   /* ==========================================================================
-     §MOU 체결 업체 선물 등급 산정 — 순위 기반 전면 재작성 라운드(신규)
+     §선물 등급 전면 단순화 라운드(신규) — 사용자 확정 지시: A/B/C 등급·상위%
+     기준·보조 인정 기준·추천등급/최종등급·연도 설정 등 복잡한 판정을 전부
+     걷어내고, "실적 순위 / 매출 순위 / 이 둘로 계산한 종합점수" 3가지만
+     남긴다. 대상 선정(getMouSignedCompanies)·코드 폴백(co.code||co.masterCode)·
+     매출/실적 원본 조회(D.getCompanyTotalRevenueAllYears/
+     getTotalPourRecordsForCompany)·동일 코드 병합(giftGradeMergeRows)·표준
+     경쟁 순위(giftGradeComputeRanks, 1,2,2,4 방식)는 이전 라운드에서 이미
+     검증된 로직을 그대로 재사용 — 새로 만든 것은 종합점수 공식과 화면
+     구성뿐이다.
 
-     [배경 — 이전 60/40 가중치 점수 방식 폐기] 사용자 요청으로 "매출 가중치 +
-     시공실적 가중치를 합산한 점수" 방식을 완전히 버리고, 매출 순위와 시공실적
-     순위를 "절대 합치지 않는" 두 개의 독립 랭킹으로 바꾼다. 화면 어디에도 "점수"
-     숫자는 더 이상 존재하지 않는다.
+     [동기화 점검 — §요청 11~14] 조사 결과 giftGradeState는 순수 메모리
+     변수이고 localStorage/snapshot을 전혀 쓰지 않았다 — openGiftGradeModal()이
+     이미 매번 giftGradeState를 새로 만들고 즉시 giftGradeRecalc()(=
+     buildGiftGradeRows() → getMouSignedCompanies()로 최신 D.loadActiveCompanies
+     재조회 + 업체별 최신 매출/실적 재조회)를 호출해 팝업을 열 때마다 처음부터
+     다시 계산하고 있었다 — "예전 계산 결과를 캐시로 재사용"하는 코드 자체가
+     없었다(완료 보고에 그대로 밝힌다). 이 라운드도 같은 구조(열 때마다 전체
+     재계산)를 그대로 유지한다.
 
-     [실사용 화면에서 발견된 버그 — "MOU 체결 245 / 확인 필요 245" 원인 조사 결과]
-     예전 코드(giftGradeMergeRows)는 B2B 코드를 co.code 필드 하나만 읽었다. 그런데
-     이 CRM에는 co.code 말고도 co.masterCode(§마스터 업체 명단 가져오기 도구가
-     기존 협력사에 부여해 둔 B2B 코드, 8977줄 근처/32622줄 mouPdfSafeCompanyCode가
-     이미 [co.code, co.masterCode] 순으로 같이 보는 바로 그 필드)가 있고, co.code
-     자동발급은 "신규 고객 등록" 폼이 2026-09-01에 생기고 나서야 시작된 최근 기능
-     (§32589 근처 커밋 조사 주석)이라 그 이전부터 있던 기존 협력사 대부분은 co.code가
-     비어 있고 masterCode에만 B2B 코드가 들어있다. giftGradeMergeRows가 masterCode를
-     전혀 안 보고 co.code만 봤기 때문에, 거의 모든 MOU 체결 업체가 "코드 없음" →
-     "확인 필요"로 떨어져 실사용 화면에서 "분석 대상 0"처럼 보였다(Playwright로
-     실제 재현·확인함 — 완료 보고 참고). 이번 라운드에서 code를 (co.code ||
-     co.masterCode)로 읽도록 고쳐서 해결한다 — 새 필드를 만들지 않고 이미 다른
-     코드 경로(mouPdfSafeCompanyCode)가 쓰던 폴백 순서를 그대로 재사용한 것뿐이다.
+     [연도 설정 제거] 매출/실적 모두 연도별이 아니라 "전체 누적"
+     (D.getCompanyTotalRevenueAllYears/getTotalPourRecordsForCompany(co).length,
+     연도 필터 없이 전부)만 쓴다 — §요청 7 "기준연도 입력이 불필요하면 제거"에
+     따라 연도 선택 UI 자체를 없앴다.
 
-     [0과 결측 구분 — 두 번째로 발견된 원인] 예전 코드는 "매출 결측 && 시공실적
-     0건"일 때만 확인 필요로 보냈다(AND 조건). 이러면 "매출자료엔 없지만 POUR
-     실적은 있는" 업체가 정상적으로 랭킹에 들어가 버려 순위가 의미를 잃는다 —
-     매출 지수 자체가 비교 불가능한 상태이기 때문이다. 이번 라운드는 사용자가
-     확정한 스펙대로 "매출 결측 OR 시공실적 결측"(둘 중 하나라도 조회 자체가
-     안 되면) 확인 필요로 보낸다. 매출 0원(실제 조회는 됐고 값이 0)과 시공실적
-     0건(실제 배열은 반환됐고 길이 0)은 결측이 아니라 "정상적으로 낮은 값"이라
-     랭킹 맨 아래쪽으로 정상 반영되고 확인 필요로 보내지 않는다 — 이 구분은
-     getCompany{year}Revenue가 이미 하고 있던 null(결측)/숫자(실값, 0 포함) 구분을
-     그대로 존중한 것이고, 새 매출/실적 집계 로직은 전혀 만들지 않았다.
-
-     [POUR 쪽 "결측"이 구조적으로 없는 이유] getTotalPourRecordsForCompany(co)는
-     항상 배열을 반환한다(못 찾으면 빈 배열, 절대 null/undefined가 아님) — 그래서
-     "시공실적 데이터 자체가 조회 불가능"한 상태는 이 코드베이스 구조상 존재하지
-     않는다. 아래 pourMissing은 그래서 실질적으로 항상 false다(완료 보고에 그대로
-     밝힌다) — 스펙이 요구한 "POUR 결측이면 확인 필요"라는 조건 자체는 그대로
-     코드에 남겨두되(향후 정말 결측을 표현할 데이터가 생기면 바로 작동하도록),
-     지금 실제로 그 조건에 걸리는 업체는 0건이다.
-
-     - 대상 필터: getMouSignedCompanies()(바로 위, KPI "MOU 체결"과 완전히 같은
-       기준) 그대로 재사용 — 새 MOU 판정 로직 없음.
-     - 매출: D.getCompanyTotalRevenueAllYears(총매출, 참고용)와
-       D['getCompany'+year+'Revenue'](연도별 매출, REVENUE_YEAR_FN_NAMES와 같은
-       동적 함수명 규칙)를 그대로 조회만 한다 — 연도를 코드에 박지 않는다.
-     - 시공실적: getTotalPourRecordsForCompany(고객 상세 팝업 POUR 카드가 쓰는 바로
-       그 함수)를 그대로 읽기만 한다 — 별도 집계 로직 중복 금지.
-     - "최근 1년"의 정밀도: 매출은 연도별 확정 합계(그 해 누적)만 가능하고,
-       POUR 원본은 연도만 있고 월/일이 없어(§17188 근처 주석 — "연도만 있고 월/일은
-       없음") "최근 12개월" 롤링 윈도우를 계산할 데이터가 없다. 그래서 화면 라벨은
-       둘 다 "{year}년 누적/{year}년"으로 정직하게 표기한다 — 실제로 없는 정밀도를
-       지어내지 않는다.
+     [결측 처리] "정말 데이터 접근 실패"만 확인 필요로 남긴다: B2B 코드가
+     아예 없거나(co.code/masterCode 둘 다 없음) D.getCompanyTotalRevenueAllYears가
+     null/ambiguous(매출 데이터 자체를 못 찾음)인 경우뿐. 매출 0원·시공실적
+     0건은 정상값이라 순위에 그대로 반영된다(§요청 16). 확인 필요 행은
+     실적/매출/종합점수 칸에 "—"만 표시하고, 순위 계산(N=전체 대상 수)에서는
+     제외되지만 표·Excel에는 그대로 남는다(전체 MOU 대상에서 빠지지 않음).
      ========================================================================== */
-  function giftGradeRevenueForYear(co, year){
-    const fnName = 'getCompany' + year + 'Revenue';
-    if(typeof D[fnName] !== 'function') return null;
-    return D[fnName](co);
-  }
-  function giftGradeBuildBaseRow(co, year){
-    const yearRev = giftGradeRevenueForYear(co, year);
+  function giftGradeBuildBaseRow(co){
     const totalRev = D.getCompanyTotalRevenueAllYears(co);
     const pourAll = getTotalPourRecordsForCompany(co);
-    const pourYear = pourAll.filter(r=> r.year === year).length;
     return {
       ids: [co.id], names: [co.name],
-      // §근본 원인 수정 — co.code만 보지 않고 masterCode까지 같이 본다(위 라운드 설명 주석).
-      // §렌더링 버그 수정 — 실제 데이터에서 code/masterCode가 문자열이 아닌 경우(숫자 등)
-      // .trim()이 예외를 던져 buildGiftGradeRows 전체(.map)가 끊기고 tbody가 완전히
-      // 비어 버렸다(Playwright로 재현: 숫자 code 하나만 섞여도 전체 목록이 0건이 됨).
-      // String()으로 먼저 강제 변환해 타입에 상관없이 항상 안전하게 처리한다.
       code: String(co.code ?? co.masterCode ?? '').trim(),
-      yearRevenue: (yearRev && typeof yearRev.total === 'number') ? yearRev.total : 0,
-      // ambiguous(중복 후보)도 "값을 확신할 수 없다"는 점에서 결측과 같은 취급 — §요청 8.
-      yearRevenueMissing: !yearRev || !!yearRev.ambiguous,
       totalRevenue: (totalRev && typeof totalRev.total === 'number') ? totalRev.total : 0,
-      totalRevenueMissing: !totalRev,
-      // pourMissing: 위 라운드 설명 참고 — getTotalPourRecordsForCompany가 항상 배열을
-      // 반환하는 이 코드베이스 구조상 실질적으로 항상 false. 0건은 결측이 아니라 실값이다.
-      pourMissing: false,
-      pourYearCount: pourYear,
-      pourTotalCount: pourAll.length
+      revenueMissing: !totalRev || !!totalRev.ambiguous,
+      pourCount: pourAll.length
     };
   }
-  // 동일 B2B 코드는 하나로 합쳐서 표시, 업체명 기준 임의 병합 금지 — code가 있는
-  // 업체끼리만 code로 묶고, code가 없는 업체는 각자 별도 행("확인 필요")으로 남긴다.
-  // §요청 2 — code 없는 업체도 절대 목록에서 빠지지 않고, "MOU 체결 전체" 분모에도
-  // 그대로 포함된다(merged 배열에 그대로 들어간다 — 별도 필터링 없음).
+  // 동일 B2B 코드는 하나로 합쳐서 표시, code가 없는 업체는 각자 별도 "확인 필요" 행으로
+  // 남긴다(전체 대상에서 빠지지 않음) — 이전 라운드(giftGradeMergeRows)와 동일 로직.
   function giftGradeMergeRows(baseRows){
     const byCode = new Map();
     const noCode = [];
@@ -32735,25 +32679,19 @@ window.SHIN2_CRM_APP_INIT = function(){
     const merged = [];
     byCode.forEach((group, code)=>{
       if(group.length === 1){ merged.push(Object.assign({ key:'code:'+code, needsReview:false }, group[0])); return; }
-      const sum = (field)=> group.reduce((a,g)=> a + g[field], 0);
       merged.push({
         key:'code:'+code, code, needsReview:false,
         ids: group.flatMap(g=> g.ids), names: group.flatMap(g=> g.names),
-        yearRevenue: sum('yearRevenue'), totalRevenue: sum('totalRevenue'),
-        yearRevenueMissing: group.every(g=> g.yearRevenueMissing),
-        totalRevenueMissing: group.every(g=> g.totalRevenueMissing),
-        pourMissing: group.every(g=> g.pourMissing),
-        pourYearCount: sum('pourYearCount'), pourTotalCount: sum('pourTotalCount')
+        totalRevenue: group.reduce((a,g)=> a + g.totalRevenue, 0),
+        revenueMissing: group.every(g=> g.revenueMissing),
+        pourCount: group.reduce((a,g)=> a + g.pourCount, 0)
       });
     });
     noCode.forEach(r=> merged.push(Object.assign({ key:'nocode:'+r.ids[0], needsReview:true }, r)));
     return merged;
   }
-  // §요청 6/7 순위·백분위 — standard competition ranking(1,2,2,4 식 — 동점자는 같은
-  // 순위를 공유하고, 다음 서로 다른 값은 "몇 명이 앞서 있었는지"만큼 건너뛴다)을 쓴다.
-  // 이 방식을 고른 이유: 동점자가 같은 등수를 나눠 갖는 게 가장 직관적으로 설명하기
-  // 쉽고("공동 5위가 2명이면 다음은 7위"), 구현도 정렬 한 번 + 이전 값과 비교만 하면 돼
-  // 기존 코드 구조에 가장 단순하게 들어맞는다(완료 보고에 그대로 밝힘, §요청 5).
+  // standard competition ranking(1,2,2,4식 — 동점은 같은 순위를 공유) — 이전 라운드와
+  // 동일한 방식을 그대로 재사용.
   function giftGradeComputeRanks(scored, field){
     const sorted = scored.slice().sort((a,b)=> b[field] - a[field]);
     const rankMap = new Map();
@@ -32765,160 +32703,72 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
     return rankMap;
   }
-  function giftGradePercentile(rank, n){
-    if(!n || rank == null) return null;
-    return Math.round((rank / n) * 1000) / 10; // 소수점 1자리(§요청 6 "상위 2.2%" 예시와 동일)
-  }
-  function giftGradeFmtPct(p){ return p == null ? '—' : (p.toFixed(1) + '%'); }
-  // §요청 7 — A/B/C는 "합산 점수 임계값"이 아니라 "매출 순위와 시공실적 순위 각각의
-  // 백분위" 위에서 판단하는 OR 규칙이다. a(매출이 핵심 상위 + 시공실적이 보조 인정
-  // 상위)와 b(시공실적이 핵심 상위 + 매출이 보조 인정 상위)만 확인하면 되는 이유:
-  // c(둘 다 핵심 상위)는 coreTopPct <= secondaryTopPct(항상 그렇게 설정되므로 —
-  // "핵심" 기준이 "보조" 기준보다 더 좁거나 같은 게 정의상 당연)일 때 이미 a와 b
-  // 양쪽 조건을 동시에 만족시키는 c의 부분집합이라 별도로 검사할 필요가 없다
-  // (테스트 CASE 6 "둘 다 상위 20%"로 이 단순화가 A를 정확히 반환하는지 검증함).
-  function giftGradeGrade(pctRevenue, pctPour, th){
-    const aCond = (pctRevenue <= th.core && pctPour <= th.secondary) || (pctPour <= th.core && pctRevenue <= th.secondary);
-    if(aCond) return 'A';
-    const bCond = (pctRevenue <= th.bTop || pctPour <= th.bTop);
-    if(bCond) return 'B';
-    return 'C';
-  }
-  // §요청 9 — 선정사유는 순수 텍스트, "점수"/"점" 등 점수 용어를 전혀 쓰지 않는다.
-  // 실제로 발동한 조건에 맞는 문구를 고른다(사용자가 준 5개 예시 문구와 1:1 대응).
-  function giftGradeReasonText(row, pctR, pctP, th, grade){
-    if(!row.code) return 'B2B 코드 없음 — 확인 필요';
-    if(row.yearRevenueMissing && row.pourMissing) return '매출·시공실적 데이터 모두 확인 필요';
-    if(row.yearRevenueMissing) return '매출 데이터 확인 필요' + (row.pourYearCount ? ` · 시공실적 ${row.pourYearCount}건` : '');
-    if(row.pourMissing) return '시공실적 데이터 확인 필요';
-    const fR = giftGradeFmtPct(pctR), fP = giftGradeFmtPct(pctP);
-    if(grade === 'A'){
-      if(pctR <= th.core && pctP <= th.core) return `매출·실적 모두 상위 ${th.core}%`;
-      if(pctR <= th.core) return `매출 상위 ${fR} · 실적 상위 ${fP}`;
-      return `시공실적 상위 ${fP}`;
-    }
-    if(grade === 'B'){
-      if(pctR <= th.bTop && pctP <= th.bTop) return `매출 상위 ${fR} · 실적 상위 ${fP}`;
-      if(pctR <= th.bTop) return `매출 상위 ${fR}`;
-      return `시공실적 상위 ${fP}`;
-    }
-    return `매출·실적 모두 상위 ${th.bTop}% 밖`;
-  }
-  // §사용자 재확인 라운드(2차) — 순위를 "매길 대상"(등수 1,2,3...를 정하는 모집단)과
-  // 상위% 백분위의 "분모"를 분리한다. 순위 자체는 여전히 실제 데이터가 있는 업체
-  // (scored) 안에서만 매긴다 — 데이터가 없는 업체를 순위에 끼워 넣을 방법이 없으니
-  // 이 부분은 이전과 동일하게 둔다. 하지만 "상위 X%"의 분모는 scored.length가 아니라
-  // rows.length(= 이 모달의 "MOU 체결 전체" 숫자와 완전히 같은, merge까지 끝난 전체
-  // MOU 업체 수 — 확인 필요 행도 포함)를 쓴다. 확인 필요 업체도 실제로 존재하는
-  // MOU 체결 업체이므로 "상위 몇 %"는 전체 MOU 모집단을 기준으로 말해야 정확하다는
-  // 사용자 확정 — 등수(rank)는 그대로 1..scored.length지만, 화면/엑셀에 보이는
-  // "N위 / 전체" 및 "상위 X%"의 전체(분모)는 rows.length로 고정한다.
-  function giftGradeCompute(rows, th){
-    const scored = rows.filter(r=> !r.needsReview && !r.yearRevenueMissing && !r.pourMissing);
-    const totalPopulation = rows.length; // §분모 고정 — "MOU 체결 전체"와 동일한 수
-    const revRank = giftGradeComputeRanks(scored, 'yearRevenue');
-    const pourRank = giftGradeComputeRanks(scored, 'pourYearCount');
+  // §요청 4/5/16 — 매출과 실적은 서로 다른 지표라 순위도 완전히 독립적으로 매긴다:
+  // 실적순위는 "코드로 업체를 식별할 수 있는" 모든 행(pourCount는 0건도 정상값이라
+  // 항상 계산 가능)을 대상으로, 매출순위는 그중 매출 데이터가 실제로 있는 행만
+  // 대상으로 — 한쪽이 없다고 다른 쪽 순위까지 같이 비워지지 않는다(이전에 매출이
+  // 없는 업체가 섞이면 실적순위까지 전부 "—"가 되던 버그를 이 라운드에서 함께
+  // 고쳤다). 종합점수는 실적점수=(N-실적순위+1)/N*100, 매출점수=(N-매출순위+1)/N*100,
+  // 종합점수=(실적점수+매출점수)/2 — 둘 다 순위가 있을 때만 계산되고, 하나라도
+  // 없으면 종합점수는 "—"(한쪽 값으로 대체하지 않음, §요청 4).
+  function giftGradeCompute(rows){
+    const n = rows.length;
+    const pourScorable = rows.filter(r=> !r.needsReview);
+    const revScorable = rows.filter(r=> !r.needsReview && !r.revenueMissing);
+    const pourRankMap = giftGradeComputeRanks(pourScorable, 'pourCount');
+    const revRankMap = giftGradeComputeRanks(revScorable, 'totalRevenue');
     rows.forEach(r=>{
-      const isReviewable = r.needsReview || r.yearRevenueMissing || r.pourMissing;
-      if(isReviewable){
-        r.revenueRank = null; r.pourRank = null; r.revenuePercentile = null; r.pourPercentile = null;
-        r.__n = totalPopulation; r.recommendedGrade = '확인 필요';
-        r.reason = giftGradeReasonText(r, null, null, th, '확인 필요');
-        return;
-      }
-      const rr = revRank.get(r.key), pr = pourRank.get(r.key);
-      // 상위%의 분모는 scored.length가 아니라 totalPopulation(전체 MOU 업체 수) — 위 주석.
-      const pctR = giftGradePercentile(rr, totalPopulation), pctP = giftGradePercentile(pr, totalPopulation);
-      r.revenueRank = rr; r.pourRank = pr; r.revenuePercentile = pctR; r.pourPercentile = pctP; r.__n = totalPopulation;
-      r.recommendedGrade = giftGradeGrade(pctR, pctP, th);
-      r.reason = giftGradeReasonText(r, pctR, pctP, th, r.recommendedGrade);
+      r.__n = n;
+      r.pourRank = r.needsReview ? null : pourRankMap.get(r.key);
+      r.revenueRank = (r.needsReview || r.revenueMissing) ? null : revRankMap.get(r.key);
+      r.pourScore = r.pourRank != null ? Math.round(((n - r.pourRank + 1) / n * 100) * 10) / 10 : null;
+      r.revenueScore = r.revenueRank != null ? Math.round(((n - r.revenueRank + 1) / n * 100) * 10) / 10 : null;
+      r.compositeScore = (r.pourScore != null && r.revenueScore != null)
+        ? Math.round(((r.pourScore + r.revenueScore) / 2) * 10) / 10 : null;
     });
+    // §요청 18 — 종합순위: 종합점수 높은순, 동점이면 1)실적순위 2)매출순위로 순서를
+    // 끝까지 결정한다(공동 순위를 나누지 않고 항상 유일한 순서로 확정 — "일관된
+    // tie-break" 요구를 가장 단순하게 만족).
+    const rankable = rows.filter(r=> r.compositeScore != null);
+    rankable.sort((a,b)=>{
+      if(b.compositeScore !== a.compositeScore) return b.compositeScore - a.compositeScore;
+      if(a.pourRank !== b.pourRank) return a.pourRank - b.pourRank;
+      return a.revenueRank - b.revenueRank;
+    });
+    rankable.forEach((r,i)=> r.compositeRank = i + 1);
+    rows.filter(r=> r.compositeScore == null).forEach(r=> r.compositeRank = null);
     return rows;
   }
-  function buildGiftGradeRows(year, th){
-    const companies = getMouSignedCompanies(); // KPI "MOU 체결"과 완전히 같은 대상 — §요청 1
-    // §렌더링 버그 수정 — 업체 1곳의 데이터 형태가 예상과 달라 giftGradeBuildBaseRow가
-    // 예외를 던지면 .map() 전체가 끊겨 227곳 전부가 화면에서 사라지는 문제가 있었다.
-    // 업체 단위 try/catch로 감싸 한 곳의 오류가 나머지 전체 렌더를 막지 않게 하고,
-    // 실패한 업체는 "확인 필요"로 표시(데이터 자체를 지어내지 않음).
+  function buildGiftGradeRows(){
+    const companies = getMouSignedCompanies(); // KPI "MOU 체결"과 완전히 같은 대상
+    // 업체 1곳의 데이터 형태가 예상과 달라 예외가 나도 나머지 전체 렌더가 끊기지
+    // 않도록 업체 단위 try/catch로 방어(이전 라운드에서 이미 검증된 방어 패턴).
     const base = companies.map(co=>{
-      try{ return giftGradeBuildBaseRow(co, year); }
+      try{ return giftGradeBuildBaseRow(co); }
       catch(err){
-        console.warn('선물 등급: 업체 데이터 계산 실패 —', co && co.name, err);
-        return {
-          ids:[co.id], names:[co.name], code:'',
-          yearRevenue:0, yearRevenueMissing:true,
-          totalRevenue:0, totalRevenueMissing:true,
-          pourMissing:true, pourYearCount:0, pourTotalCount:0
-        };
+        console.warn('선물 분석: 업체 데이터 계산 실패 —', co && co.name, err);
+        return { ids:[co.id], names:[co.name], code:'', totalRevenue:0, revenueMissing:true, pourCount:0 };
       }
     });
-    return giftGradeCompute(giftGradeMergeRows(base), th);
+    return giftGradeCompute(giftGradeMergeRows(base));
   }
-  const GIFT_GRADE_ORDER = { 'A':0, 'B':1, 'C':2, '확인 필요':3, 'exclude':4 };
-  function giftGradeFinal(row){
-    const ov = giftGradeState.overrides[row.key];
-    if(ov && ov.finalGrade) return ov.finalGrade;
-    return row.recommendedGrade;
-  }
-  function giftGradeNote(row){ const ov = giftGradeState.overrides[row.key]; return (ov && ov.note) || ''; }
+  function giftGradeNote(row){ return giftGradeState.notes[row.key] || ''; }
   function giftGradeDefaultState(){
-    return {
-      year: new Date().getFullYear(),
-      // §요청 12 — 3개 독립 입력(코어/보조/B) 그대로 둔다. 보조 인정 기준·B 상위 기준
-      // 기본값은 같은 50이지만, 사용자가 화면에서 따로 조정할 수 있어야 해서 하나로
-      // 합치지 않는다.
-      thresholds: { core:20, secondary:50, bTop:50 },
-      overrides: {}, sort:'grade', filter:'all', rows: null
-    };
+    return { sort:'composite', notes:{}, rows: null };
   }
   let giftGradeState = giftGradeDefaultState();
+  // §요청 11~14 — 열 때마다 매번 처음부터 새로 계산한다(캐시/snapshot 없음, 위 라운드
+  // 설명 참고). 비고(notes)만 사용자가 같은 팝업을 여는 동안 입력한 값을 유지한다.
   function giftGradeRecalc(){
-    // §요청 12 — 다시 계산해도 giftGradeState.overrides(사용자가 이미 고른 최종등급/비고)는
-    // 절대 건드리지 않는다. buildGiftGradeRows는 rows를 새로 만들 뿐 overrides에는 손대지
-    // 않으므로 이 함수 자체가 그 보장을 자동으로 지킨다.
-    giftGradeState.rows = buildGiftGradeRows(giftGradeState.year, giftGradeState.thresholds);
+    giftGradeState.rows = buildGiftGradeRows();
   }
-  function giftGradeSortedFilteredRows(){
-    let rows = giftGradeState.rows.slice();
-    const f = giftGradeState.filter;
-    const core = giftGradeState.thresholds.core;
-    if(f === 'A' || f === 'B' || f === 'C' || f === 'exclude' || f === '확인 필요'){
-      rows = rows.filter(r=> giftGradeFinal(r) === f);
-    } else if(f === 'revenueTop'){
-      rows = rows.filter(r=> r.revenuePercentile !== null && r.revenuePercentile <= core);
-    } else if(f === 'pourTop'){
-      rows = rows.filter(r=> r.pourPercentile !== null && r.pourPercentile <= core);
-    } else if(f === 'bothTop'){
-      rows = rows.filter(r=> r.revenuePercentile !== null && r.pourPercentile !== null && r.revenuePercentile <= core && r.pourPercentile <= core);
-    }
+  function giftGradeSortedRows(){
+    const rows = giftGradeState.rows.slice();
     const s = giftGradeState.sort;
-    if(s === 'revenue') rows.sort((a,b)=> b.yearRevenue - a.yearRevenue);
-    else if(s === 'pour') rows.sort((a,b)=> b.pourYearCount - a.pourYearCount);
-    else if(s === 'revenueRank') rows.sort((a,b)=> (a.revenueRank ?? Infinity) - (b.revenueRank ?? Infinity));
-    else if(s === 'pourRank') rows.sort((a,b)=> (a.pourRank ?? Infinity) - (b.pourRank ?? Infinity));
-    else { // §요청 15 기본 정렬: A→B→C→확인 필요, 그다음 매출순위 오름차순, 그다음 시공실적순위
-      rows.sort((a,b)=>{
-        const fa = GIFT_GRADE_ORDER[giftGradeFinal(a)] ?? 9, fb = GIFT_GRADE_ORDER[giftGradeFinal(b)] ?? 9;
-        if(fa !== fb) return fa - fb;
-        const ra = a.revenueRank ?? Infinity, rb = b.revenueRank ?? Infinity;
-        if(ra !== rb) return ra - rb;
-        return (a.pourRank ?? Infinity) - (b.pourRank ?? Infinity);
-      });
-    }
+    if(s === 'revenue') rows.sort((a,b)=> (a.revenueRank ?? Infinity) - (b.revenueRank ?? Infinity));
+    else if(s === 'pour') rows.sort((a,b)=> (a.pourRank ?? Infinity) - (b.pourRank ?? Infinity));
+    else rows.sort((a,b)=> (a.compositeRank ?? Infinity) - (b.compositeRank ?? Infinity)); // 기본: 종합점수순
     return rows;
-  }
-  // §요청 13 — 요약 줄은 "MOU 체결 전체 / A / B / C / 확인 필요" 5개 숫자만(제외 줄
-  // 없음). 제외는 최종등급 값으로는 여전히 선택 가능하니 counts에는 계속 세어 두되
-  // (필터 칩에서 쓸 수 있게), 요약 줄 렌더링(giftGradeModalHtml)에서만 빼고 보여준다.
-  function giftGradeSummaryCounts(){
-    const counts = { total: giftGradeState.rows.length, A:0, B:0, C:0, exclude:0, needsReview:0 };
-    giftGradeState.rows.forEach(r=>{
-      const g = giftGradeFinal(r);
-      if(g === 'A') counts.A++; else if(g === 'B') counts.B++; else if(g === 'C') counts.C++;
-      else if(g === 'exclude') counts.exclude++; else counts.needsReview++;
-    });
-    return counts;
   }
   function closeGiftGradeModal(){
     const root = document.getElementById('giftGradeModalRoot');
@@ -32930,99 +32780,52 @@ window.SHIN2_CRM_APP_INIT = function(){
     giftGradeRecalc();
     renderGiftGradeModal();
   }
-  function giftGradeYearOptionsHtml(){
-    const cur = new Date().getFullYear();
-    const years = [cur-2, cur-1, cur, cur+1];
-    return years.map(y=> `<option value="${y}"${y===giftGradeState.year?' selected':''}>${y}</option>`).join('');
-  }
   function giftGradeRowHtml(row){
-    const finalGrade = giftGradeFinal(row);
-    const gradeOptions = ['A','B','C','exclude'].map(g=>
-      `<option value="${g}"${finalGrade===g?' selected':''}>${g==='exclude'?'제외':g}</option>`
-    ).join('') + `<option value=""${!giftGradeState.overrides[row.key]||!giftGradeState.overrides[row.key].finalGrade?' selected':''}>(추천 사용)</option>`;
-    const isReview = row.recommendedGrade === '확인 필요';
+    const isReview = row.compositeScore == null;
     return `
       <tr class="gift-grade-row${isReview ? ' is-review' : ''}" data-gift-row="${esc(row.key)}">
-        <td><select class="gift-grade-final-select" data-gift-final="${esc(row.key)}">${gradeOptions}</select></td>
-        <td>${esc(row.recommendedGrade)}</td>
-        <td>${row.code ? esc(row.code) : '<span class="gift-grade-missing">없음</span>'}</td>
+        <td class="gift-grade-num">${row.compositeRank ?? '—'}</td>
         <td title="${esc(row.names.join(', '))}">${esc(row.names.join(', '))}</td>
-        <td class="gift-grade-num">${row.yearRevenueMissing ? '—' : giftGradeFmtWon(row.yearRevenue)}</td>
-        <td class="gift-grade-num">${row.totalRevenueMissing ? '—' : giftGradeFmtWon(row.totalRevenue)}</td>
-        <td class="gift-grade-num">${row.revenueRank ? `${row.revenueRank} / ${row.__n}` : '—'}</td>
-        <td class="gift-grade-num">${giftGradeFmtPct(row.revenuePercentile)}</td>
-        <td class="gift-grade-num">${row.pourMissing ? '—' : row.pourYearCount + '건'}</td>
-        <td class="gift-grade-num">${row.pourMissing ? '—' : row.pourTotalCount + '건'}</td>
-        <td class="gift-grade-num">${row.pourRank ? `${row.pourRank} / ${row.__n}` : '—'}</td>
-        <td class="gift-grade-num">${giftGradeFmtPct(row.pourPercentile)}</td>
-        <td class="gift-grade-reason" title="${esc(row.reason)}">${esc(row.reason)}</td>
+        <td>${row.code ? esc(row.code) : '<span class="gift-grade-missing">확인 필요</span>'}</td>
+        <td class="gift-grade-num">${row.pourRank ?? '—'}</td>
+        <td class="gift-grade-num">${row.pourCount}건</td>
+        <td class="gift-grade-num">${row.revenueRank ?? '—'}</td>
+        <td class="gift-grade-num">${row.revenueMissing ? '<span class="gift-grade-missing">확인 필요</span>' : giftGradeFmtWon(row.totalRevenue)}</td>
+        <td class="gift-grade-num">${row.compositeScore == null ? '—' : row.compositeScore.toFixed(1)}</td>
         <td><input type="text" class="gift-grade-note-input" data-gift-note="${esc(row.key)}" value="${esc(giftGradeNote(row))}" placeholder="비고" /></td>
       </tr>`;
   }
   function giftGradeModalHtml(){
-    const counts = giftGradeSummaryCounts();
-    const rows = giftGradeSortedFilteredRows();
-    const th = giftGradeState.thresholds;
-    // §요청 14 — 필터 칩: 전체/A/B/C/확인 필요(요약 줄과 맞춤) + 빠른 필터 3개(코어
-    // 기준값을 설정과 동일하게 사용, 하드코딩 아님). "제외" 칩은 요약 숫자에서는 빠졌지만
-    // 사용자가 이미 제외로 지정한 행을 다시 찾아볼 방법은 필요해서 필터로는 남겨 둔다
-    // (완료 보고에 판단 근거 그대로 밝힘).
-    const FILTERS = [
-      { key:'all', label:'전체' }, { key:'A', label:'A' }, { key:'B', label:'B' }, { key:'C', label:'C' },
-      { key:'확인 필요', label:'확인 필요' }, { key:'exclude', label:'제외' },
-      { key:'revenueTop', label:`매출 상위 ${th.core}%` }, { key:'pourTop', label:`시공실적 상위 ${th.core}%` },
-      { key:'bothTop', label:`매출·실적 모두 상위 ${th.core}%` }
-    ];
+    const rows = giftGradeSortedRows();
     return `
       <div class="pi-overlay" id="giftGradeOverlay">
-        <div class="pi-panel gift-grade-panel" role="dialog" aria-modal="true" aria-label="MOU 체결 업체 선물 등급 산정">
+        <div class="pi-panel gift-grade-panel" role="dialog" aria-modal="true" aria-label="MOU 체결 업체 선물 분석">
           <div class="pi-head">
-            <div class="pi-title">MOU 체결 업체 선물 등급 산정</div>
+            <div class="pi-title">MOU 체결 업체 선물 분석</div>
             <button type="button" class="chart-close-btn" id="giftGradeCloseBtn" aria-label="닫기">&times;</button>
           </div>
           <div class="pi-body gift-grade-body">
-            <div class="gift-grade-settings">
-              <label>기준연도 <select id="giftGradeYearSelect">${giftGradeYearOptionsHtml()}</select></label>
-              <label>A 상위 기준 % <input type="number" min="0" max="100" id="giftGradeThCore" value="${th.core}" /></label>
-              <label>보조 인정 기준 % <input type="number" min="0" max="100" id="giftGradeThSecondary" value="${th.secondary}" /></label>
-              <label>B 상위 기준 % <input type="number" min="0" max="100" id="giftGradeThBTop" value="${th.bTop}" /></label>
-              <button type="button" class="co-text-action primary" id="giftGradeRecalcBtn">다시 계산</button>
-              <button type="button" class="co-text-action" id="giftGradeExcelBtn">Excel 다운로드</button>
-            </div>
-            <div class="gift-grade-note-line">매출 기준: ${giftGradeState.year}년 누적 · 시공실적 기준: ${giftGradeState.year}년(원본 데이터에 월/일 구분이 없어 연 단위로만 집계됩니다)</div>
-            <div class="gift-grade-summary">
-              <span>MOU 체결 전체 <b>${counts.total}</b></span>
-              <span class="is-a">A <b>${counts.A}</b></span>
-              <span class="is-b">B <b>${counts.B}</b></span>
-              <span class="is-c">C <b>${counts.C}</b></span>
-              <span class="is-review">확인 필요 <b>${counts.needsReview}</b></span>
-            </div>
+            <div class="gift-grade-summary"><span>평가 대상 <b>${giftGradeState.rows.length}</b>개 업체</span></div>
             <div class="gift-grade-toolbar">
-              <div class="list-filter-row" id="giftGradeFilterRow">
-                ${FILTERS.map(f=> `<button type="button" class="list-filter-chip${giftGradeState.filter===f.key?' is-active':''}" data-gift-filter="${f.key}">${esc(f.label)}</button>`).join('')}
-              </div>
               <select class="list-sort-select" id="giftGradeSortSelect">
-                <option value="grade"${giftGradeState.sort==='grade'?' selected':''}>등급순</option>
-                <option value="revenue"${giftGradeState.sort==='revenue'?' selected':''}>매출 높은순</option>
-                <option value="pour"${giftGradeState.sort==='pour'?' selected':''}>실적 많은순</option>
-                <option value="revenueRank"${giftGradeState.sort==='revenueRank'?' selected':''}>매출순위</option>
-                <option value="pourRank"${giftGradeState.sort==='pourRank'?' selected':''}>실적순위</option>
+                <option value="composite"${giftGradeState.sort==='composite'?' selected':''}>종합점수순</option>
+                <option value="pour"${giftGradeState.sort==='pour'?' selected':''}>실적순</option>
+                <option value="revenue"${giftGradeState.sort==='revenue'?' selected':''}>매출순</option>
               </select>
+              <button type="button" class="co-text-action" id="giftGradeExcelBtn">Excel 다운로드</button>
             </div>
             <div class="gift-grade-table-wrap">
               <table class="gift-grade-table">
                 <thead><tr>
-                  <th>최종등급</th><th>추천등급</th><th>B2B 코드</th><th>시공사명</th>
-                  <th>최근 1년 매출</th><th>총매출</th><th>매출순위</th><th>매출 상위%</th>
-                  <th>최근 1년 시공실적</th><th>총 시공실적</th><th>실적순위</th><th>실적 상위%</th>
-                  <th>선정사유</th><th>비고</th>
+                  <th>종합순위</th><th>시공사명</th><th>B2B 코드</th>
+                  <th>실적순위</th><th>시공실적 건수</th>
+                  <th>매출순위</th><th>매출액</th>
+                  <th>종합점수</th><th>비고</th>
                 </tr></thead>
                 <tbody>${rows.map(r=>{
-                  // §렌더링 버그 수정 — 행 하나가 giftGradeRowHtml에서 예외를 던지면 전체
-                  // tbody가 비는 문제를 막기 위한 방어(§요청 6 "row 단위 try/catch").
                   try{ return giftGradeRowHtml(r); }
-                  catch(err){ console.warn('선물 등급: 행 렌더 실패 —', r && r.key, err); return ''; }
-                }).join('') || `<tr><td colspan="14" class="pi-note">MOU 체결 업체가 없습니다.</td></tr>`}</tbody>
+                  catch(err){ console.warn('선물 분석: 행 렌더 실패 —', r && r.key, err); return ''; }
+                }).join('') || `<tr><td colspan="9" class="pi-note">MOU 체결 업체가 없습니다.</td></tr>`}</tbody>
               </table>
             </div>
           </div>
@@ -33035,82 +32838,38 @@ window.SHIN2_CRM_APP_INIT = function(){
     root.innerHTML = giftGradeModalHtml();
     document.getElementById('giftGradeCloseBtn').addEventListener('click', closeGiftGradeModal);
     bindSafeBackdropClose(document.getElementById('giftGradeOverlay'), closeGiftGradeModal);
-    document.getElementById('giftGradeRecalcBtn').addEventListener('click', ()=>{
-      const y = parseInt(document.getElementById('giftGradeYearSelect').value, 10);
-      const core = parseInt(document.getElementById('giftGradeThCore').value, 10);
-      const secondary = parseInt(document.getElementById('giftGradeThSecondary').value, 10);
-      const bTop = parseInt(document.getElementById('giftGradeThBTop').value, 10);
-      giftGradeState.year = isNaN(y) ? giftGradeState.year : y;
-      giftGradeState.thresholds = {
-        core: isNaN(core) ? 20 : core,
-        secondary: isNaN(secondary) ? 50 : secondary,
-        bTop: isNaN(bTop) ? 50 : bTop
-      };
-      // §요청 12 "사람이 직접 수정한 최종등급/제외/비고는 유지" — 재계산해도
-      // overrides(사용자가 이미 고른 값)는 지우지 않는다. key(코드/업체id) 기준이라
-      // 연도를 바꿔도 같은 업체면 그대로 이어진다.
-      giftGradeRecalc();
-      renderGiftGradeModal();
-    });
     document.getElementById('giftGradeExcelBtn').addEventListener('click', doGiftGradeExcelExport);
-    root.querySelectorAll('[data-gift-filter]').forEach(btn=> btn.addEventListener('click', ()=>{
-      giftGradeState.filter = btn.getAttribute('data-gift-filter');
-      renderGiftGradeModal();
-    }));
     document.getElementById('giftGradeSortSelect').addEventListener('change', (e)=>{
       giftGradeState.sort = e.target.value;
       renderGiftGradeModal();
     });
-    root.querySelectorAll('[data-gift-final]').forEach(sel=> sel.addEventListener('change', (e)=>{
-      const key = sel.getAttribute('data-gift-final');
-      const val = e.target.value;
-      if(!giftGradeState.overrides[key]) giftGradeState.overrides[key] = { finalGrade:null, note:'' };
-      giftGradeState.overrides[key].finalGrade = val || null;
-      renderGiftGradeModal();
-    }));
     root.querySelectorAll('[data-gift-note]').forEach(inp=> inp.addEventListener('change', (e)=>{
-      const key = inp.getAttribute('data-gift-note');
-      if(!giftGradeState.overrides[key]) giftGradeState.overrides[key] = { finalGrade:null, note:'' };
-      giftGradeState.overrides[key].note = e.target.value;
+      giftGradeState.notes[inp.getAttribute('data-gift-note')] = e.target.value;
     }));
   }
-  // §요청 16/17 "Excel 다운로드" — 기존 SheetJS 로더(loadXlsxSdk, 협력사 엑셀 일괄
-  // 반영에서 이미 쓰던 것)를 그대로 재사용한다. 새 라이브러리 추가 없음. 점수 컬럼 없음.
+  // §요청 19 — Excel 다운로드도 화면과 같은 8개 컬럼만, 과거 등급 컬럼 없음. 기존
+  // SheetJS 로더(loadXlsxSdk)를 그대로 재사용 — 새 라이브러리 추가 없음.
   function giftGradeExcelRow(row){
     return {
-      '최종등급': giftGradeFinal(row) === 'exclude' ? '제외' : giftGradeFinal(row),
-      '추천등급': row.recommendedGrade,
-      'B2B 코드': row.code || '',
+      '종합순위': row.compositeRank ?? '',
       '시공사명': row.names.join(', '),
-      '최근 1년 매출': row.yearRevenueMissing ? '' : row.yearRevenue,
-      '총매출': row.totalRevenueMissing ? '' : row.totalRevenue,
-      '매출순위': row.revenueRank || '',
-      '매출 상위%': row.revenuePercentile == null ? '' : row.revenuePercentile,
-      '최근 1년 시공실적': row.pourMissing ? '' : row.pourYearCount,
-      '총 시공실적': row.pourMissing ? '' : row.pourTotalCount,
-      '실적순위': row.pourRank || '',
-      '실적 상위%': row.pourPercentile == null ? '' : row.pourPercentile,
-      '선정사유': row.reason,
+      'B2B 코드': row.code || '',
+      '실적순위': row.pourRank ?? '',
+      '시공실적 건수': row.pourCount,
+      '매출순위': row.revenueRank ?? '',
+      '매출액': row.revenueMissing ? '' : row.totalRevenue,
+      '종합점수': row.compositeScore == null ? '' : row.compositeScore,
       '비고': giftGradeNote(row)
     };
   }
   function doGiftGradeExcelExport(){
     loadXlsxSdk().then(XLSX=>{
-      // §요청 16 — A→B→C→확인 필요→제외, 등급 안에서는 매출순위 오름차순.
-      const allRows = giftGradeState.rows.slice().sort((a,b)=>{
-        const fa = GIFT_GRADE_ORDER[giftGradeFinal(a)] ?? 9, fb = GIFT_GRADE_ORDER[giftGradeFinal(b)] ?? 9;
-        if(fa !== fb) return fa - fb;
-        return (a.revenueRank ?? Infinity) - (b.revenueRank ?? Infinity);
-      });
+      const rows = giftGradeState.rows.slice().sort((a,b)=> (a.compositeRank ?? Infinity) - (b.compositeRank ?? Infinity));
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allRows.map(giftGradeExcelRow)), '전체');
-      ['A','B','C'].forEach(g=>{
-        const sub = allRows.filter(r=> giftGradeFinal(r) === g);
-        if(sub.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sub.map(giftGradeExcelRow)), g + '등급');
-      });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.map(giftGradeExcelRow)), '전체');
       const now = new Date();
       const dateStr = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
-      XLSX.writeFile(wb, `선물등급_${giftGradeState.year}_${dateStr}.xlsx`);
+      XLSX.writeFile(wb, `선물분석_${dateStr}.xlsx`);
     }).catch(err=>{
       alert('엑셀 파서를 불러오지 못했습니다: ' + (err && err.message ? err.message : err));
     });
