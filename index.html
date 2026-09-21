@@ -25976,14 +25976,25 @@ window.SHIN2_CRM_APP_INIT = function(){
   function buildInsightPopoverSummary(co){
     const ci = co.customerInsight;
     if(!ci) return null;
-    const hasAny = !!(ci.oneLiner || (ci.interestTraits && ci.interestTraits.length) || (ci.competitorCompanies && ci.competitorCompanies.length)
+    const hasStructured = !!(ci.oneLiner || (ci.interestTraits && ci.interestTraits.length) || (ci.competitorCompanies && ci.competitorCompanies.length)
       || (ci.relationshipTraits && ci.relationshipTraits.length) || (ci.relatedContacts && ci.relatedContacts.length) || ci.nextAction);
-    if(!hasAny) return null;
+    // §고객 인사이트 팝업 렌더링 버그 수정 — "1차미팅 메모"만 적고 [인사이트 자동 정리]를
+    // 거치지 않은 채 바로 [저장]을 누르면(ciQuickSaveBtn→finishInsightSave) rawMeetingNote는
+    // 실제로 저장되지만 oneLiner/interestTraits 등 구조화된 태그는 전부 빈 채로 남는다
+    // (자동 정리는 미리보기 확인 후 별도로 [저장]해야만 태그가 채워지는 구조, §1차미팅 메모
+    // 자동정리 라운드 설계 그대로 — 여기서는 안 바꾼다). 이 함수의 hasAny 판정이 태그만
+    // 보고 rawMeetingNote/keyQuote 등 자유 텍스트 필드는 전혀 안 봐서, 실제로 저장된
+    // 내용이 있는데도 "등록된 고객 인사이트가 없습니다"로 잘못 보였다(실사용 스크린샷으로
+    // 재현 확인). 구조화된 태그가 비어 있으면 자유 텍스트 필드 중 있는 것을 그대로
+    // oneLiner 자리에 보여준다 — 새 필드/저장 로직 없이 이미 저장된 값을 놓치지 않고
+    // 읽기만 한다.
+    const freeText = ci.rawMeetingNote || ci.keyQuote || ci.businessNote || ci.backgroundNote || ci.methodNote || '';
+    if(!hasStructured && !freeText) return null;
     const compact2 = (arr)=> arr.length ? (arr.slice(0,2).join(' · ') + (arr.length > 2 ? ` +${arr.length - 2}` : '')) : '';
     const interestText = compact2(ci.interestTraits || []);
     const methodText = compact2(ci.competitorCompanies || []);
     const relationText = (ci.relationshipTraits && ci.relationshipTraits[0]) || (ci.relatedContacts && ci.relatedContacts[0] && ci.relatedContacts[0].name) || '';
-    return { oneLiner: ci.oneLiner || '', interestText, methodText, relationText, nextAction: ci.nextAction || '' };
+    return { oneLiner: ci.oneLiner || freeText, interestText, methodText, relationText, nextAction: ci.nextAction || '' };
   }
   let closeInsightPopoverOutsideHandlers = null;
   function closeInsightPopover(){
