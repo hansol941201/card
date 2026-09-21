@@ -3614,6 +3614,18 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .agr-date-chip-value{ font-weight:700; font-variant-numeric:tabular-nums; }
 .agr-date-chip-edit{ color:var(--blue); font-weight:600; font-size:11px; }
 .agr-date-chip-add{ font-weight:600; }
+/* §1차/2차미팅 예정·완료 탭 통합 라운드(신규) — "예정"/"완료" 두 칩으로 나눠 보이던
+   1차·2차미팅 한 그룹을, 지금 상태(미등록/예정/완료) 1줄 + [수정]/[완료] 버튼으로
+   합쳤다. 값 계산(agrMeetingRowHtml이 읽는 row.status/dateText)은 buildAgreementStageRows/
+   buildAgreementDisplayGroups 그대로, 여기는 표시 방식만 바꾼다. */
+.agr-meeting-row{ display:flex; align-items:center; flex-wrap:wrap; gap:8px 10px; width:100%; }
+.agr-meeting-status{ font-size:12.5px; font-weight:700; color:var(--text); }
+.agr-meeting-row.is-done .agr-meeting-status{ color:#0F7A42; }
+.agr-meeting-btn, .agr-meeting-complete-btn{ height:28px; padding:0 12px; border-radius:999px; font-size:11.5px; font-weight:650; font-family:inherit; cursor:pointer; white-space:nowrap; }
+.agr-meeting-btn{ border:1px solid var(--soft-blue-2); background:#fff; color:var(--blue); }
+.agr-meeting-btn:hover, .agr-meeting-btn:focus-visible{ border-color:var(--blue); outline:none; }
+.agr-meeting-complete-btn{ border:1px solid var(--blue); background:var(--blue); color:#fff; }
+.agr-meeting-complete-btn:hover, .agr-meeting-complete-btn:focus-visible{ opacity:.9; outline:none; }
 /* 아래 4개는 이 협약 진행관리 팝업 전용이 아니라 다른 화면(협약 종료/복구, 계열사 관계
    후보 검토 등)도 공유하는 클래스라 §협약 진행단계 UI 단순화 라운드에서도 그대로 남겨둔다
    (§조사: 지우면 16322/16353/23582/25143/25145줄 등 다른 팝업이 스타일을 잃는다). */
@@ -20658,6 +20670,37 @@ window.SHIN2_CRM_APP_INIT = function(){
       ${labelHtml}<span class="agr-date-chip-add">+ 날짜 등록</span>
     </button>`;
   }
+  // §1차/2차미팅 예정·완료 탭 통합 라운드(신규) — 사용자 요청: "1차미팅/2차미팅이 예정 탭·
+  // 완료 탭 2개로 나뉘어 보인다, 상태 1줄 + [수정]/[완료] 버튼으로 합쳐달라." meeting1/
+  // meeting2 그룹(subRows = [예정 row, 완료 row])에서만 쓴다 — 질문서/MOU 그룹은 기존
+  // agrStageDateChipHtml 그대로 둔다. 값 계산은 전혀 새로 하지 않고 buildAgreementStageRows가
+  // 이미 만들어 둔 sched(m1Scheduled/m2Scheduled)·done(m1Done/m2Done) row를 그대로 읽기만
+  // 한다. [수정]/[날짜 등록]은 openStageDateModal(기존 날짜 수정 팝업)을 그대로 재사용하고,
+  // [완료]는 현재 예정일(sched.dateText)을 완료일로 그대로 써서 commitStageDateSave(기존
+  // saveStageCorrection 저장 경로)를 호출한다 — 새 저장 로직 없음.
+  function agrMeetingRowHtml(g){
+    const schedSr = g.subRows[0], doneSr = g.subRows[1];
+    const sched = schedSr.row, done = doneSr.row;
+    const meetingLabel = g.label;
+    if(done.done){
+      return `<div class="agr-meeting-row is-done">
+        <span class="agr-meeting-status">✓ ${esc(meetingLabel)} 완료 ${esc(done.dateText)}</span>
+        <button type="button" class="agr-meeting-btn" data-agr-date-key="${esc(done.key)}" data-agr-date-label="${esc(doneSr.label)}">수정</button>
+      </div>`;
+    }
+    const hasSchedDate = !!(sched.dateText && sched.dateText !== '—');
+    if(!hasSchedDate){
+      return `<div class="agr-meeting-row">
+        <span class="agr-meeting-status">${esc(meetingLabel)} 예정 · 날짜 등록</span>
+        <button type="button" class="agr-meeting-btn" data-agr-date-key="${esc(sched.key)}" data-agr-date-label="${esc(schedSr.label)}">날짜 등록</button>
+      </div>`;
+    }
+    return `<div class="agr-meeting-row">
+      <span class="agr-meeting-status">${esc(meetingLabel)} 예정 ${esc(sched.dateText)}</span>
+      <button type="button" class="agr-meeting-btn" data-agr-date-key="${esc(sched.key)}" data-agr-date-label="${esc(schedSr.label)}">수정</button>
+      <button type="button" class="agr-meeting-complete-btn" data-agr-meeting-complete="${esc(done.key)}" data-agr-meeting-complete-label="${esc(doneSr.label)}" data-agr-meeting-complete-date="${esc(sched.dateText)}" data-agr-meeting-owner="${esc(sched.owner || '')}">완료</button>
+    </div>`;
+  }
   // §요청 [3] "다음 해야 할 일" — 미완료 단계 중 첫 번째를 그대로 안내 문구로 쓴다(새 판정
   // 아님, 위 rows의 순서/완료여부만 본다).
   function agreementNextActionText(rows){
@@ -21614,7 +21657,7 @@ window.SHIN2_CRM_APP_INIT = function(){
               <div class="agr-stage-card ${g.done ? 'is-done' : ''}">
                 <div class="agr-stage-card-label">${esc(g.label)}</div>
                 <div class="agr-stage-card-dates">
-                  ${g.subRows.map(sr=> agrStageDateChipHtml(sr, g.subRows.length > 1)).join('')}
+                  ${(g.key === 'meeting1' || g.key === 'meeting2') ? agrMeetingRowHtml(g) : g.subRows.map(sr=> agrStageDateChipHtml(sr, g.subRows.length > 1)).join('')}
                 </div>
               </div>`).join('')}
           </div>
@@ -21670,6 +21713,18 @@ window.SHIN2_CRM_APP_INIT = function(){
     body.querySelectorAll('[data-agr-date-key]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         openStageDateModal(co.id, btn.getAttribute('data-agr-date-key'), btn.getAttribute('data-agr-date-label') || undefined);
+      });
+    });
+    // §1차/2차미팅 예정·완료 탭 통합 라운드(신규) — [완료] 버튼: 현재 예정일(data-agr-
+    // meeting-complete-date)을 그대로 완료일로 써서 commitStageDateSave(기존 날짜 저장
+    // 경로, saveStageCorrection)를 그대로 호출한다 — 새 저장 로직 없음, owner도 예정 행에
+    // 있던 값을 그대로 유지한다.
+    body.querySelectorAll('[data-agr-meeting-complete]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const stageKey = btn.getAttribute('data-agr-meeting-complete');
+        const dateText = btn.getAttribute('data-agr-meeting-complete-date');
+        const owner = btn.getAttribute('data-agr-meeting-owner') || null;
+        commitStageDateSave(co.id, stageKey, { status:'done', dateText, owner }, { reason:'완료 처리' });
       });
     });
     bindAgreementDocChecklistHandlers(co.id);
