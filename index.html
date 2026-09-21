@@ -3944,6 +3944,14 @@ table.pdf-doc-table thead{ background:var(--bg); }
 .crm-main-grid{
   display:grid; grid-template-columns: minmax(0,1fr) minmax(0,420px);
   grid-template-rows: auto 1fr; gap:16px; align-items:start;
+  /* §상단바-KPI 여백 라운드(신규) — 남색 상단 네비게이션(.gnav)과 KPI 카드 사이 세로
+     여백이 0이라 붙어 보였다. .crm-kpi-cell(grid-row:1)에 직접 margin-top을 주면
+     같은 grid-row:1에서 시작하는 .crm-map-col(지도 카드, grid-row:1/span 2)과 위쪽이
+     어긋나 보이므로, 대신 그리드 컨테이너 자체를 14px 내려서 KPI/지도 카드가 함께
+     같은 높이에서 시작하도록 유지한다. KPI 카드 크기/상단바 높이/좌우 정렬/지도·목록
+     그리드 구조는 전혀 건드리지 않음 — 이 한 줄만 추가.
+     ========================================================================== */
+  margin-top:14px;
 }
 @media(min-width:1400px){ .crm-main-grid{ grid-template-columns: 70% 30%; } }
 .crm-panel{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px 16px; box-shadow:0 2px 8px rgba(22,44,78,.035); }
@@ -32280,7 +32288,11 @@ window.SHIN2_CRM_APP_INIT = function(){
     return {
       ids: [co.id], names: [co.name],
       // §근본 원인 수정 — co.code만 보지 않고 masterCode까지 같이 본다(위 라운드 설명 주석).
-      code: (co.code || co.masterCode || '').trim(),
+      // §렌더링 버그 수정 — 실제 데이터에서 code/masterCode가 문자열이 아닌 경우(숫자 등)
+      // .trim()이 예외를 던져 buildGiftGradeRows 전체(.map)가 끊기고 tbody가 완전히
+      // 비어 버렸다(Playwright로 재현: 숫자 code 하나만 섞여도 전체 목록이 0건이 됨).
+      // String()으로 먼저 강제 변환해 타입에 상관없이 항상 안전하게 처리한다.
+      code: String(co.code ?? co.masterCode ?? '').trim(),
       yearRevenue: (yearRev && typeof yearRev.total === 'number') ? yearRev.total : 0,
       // ambiguous(중복 후보)도 "값을 확신할 수 없다"는 점에서 결측과 같은 취급 — §요청 8.
       yearRevenueMissing: !yearRev || !!yearRev.ambiguous,
@@ -32410,7 +32422,22 @@ window.SHIN2_CRM_APP_INIT = function(){
   }
   function buildGiftGradeRows(year, th){
     const companies = getMouSignedCompanies(); // KPI "MOU 체결"과 완전히 같은 대상 — §요청 1
-    const base = companies.map(co=> giftGradeBuildBaseRow(co, year));
+    // §렌더링 버그 수정 — 업체 1곳의 데이터 형태가 예상과 달라 giftGradeBuildBaseRow가
+    // 예외를 던지면 .map() 전체가 끊겨 227곳 전부가 화면에서 사라지는 문제가 있었다.
+    // 업체 단위 try/catch로 감싸 한 곳의 오류가 나머지 전체 렌더를 막지 않게 하고,
+    // 실패한 업체는 "확인 필요"로 표시(데이터 자체를 지어내지 않음).
+    const base = companies.map(co=>{
+      try{ return giftGradeBuildBaseRow(co, year); }
+      catch(err){
+        console.warn('선물 등급: 업체 데이터 계산 실패 —', co && co.name, err);
+        return {
+          ids:[co.id], names:[co.name], code:'',
+          yearRevenue:0, yearRevenueMissing:true,
+          totalRevenue:0, totalRevenueMissing:true,
+          pourMissing:true, pourYearCount:0, pourTotalCount:0
+        };
+      }
+    });
     return giftGradeCompute(giftGradeMergeRows(base), th);
   }
   const GIFT_GRADE_ORDER = { 'A':0, 'B':1, 'C':2, '확인 필요':3, 'exclude':4 };
@@ -32482,7 +32509,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     const root = document.getElementById('giftGradeModalRoot');
     if(root) root.innerHTML = '';
   }
-  function giftGradeFmtWon(n){ return n.toLocaleString('ko-KR') + '원'; }
+  function giftGradeFmtWon(n){ return (typeof n === 'number' && !isNaN(n) ? n : 0).toLocaleString('ko-KR') + '원'; }
   function openGiftGradeModal(){
     giftGradeState = giftGradeDefaultState();
     giftGradeRecalc();
@@ -32575,7 +32602,12 @@ window.SHIN2_CRM_APP_INIT = function(){
                   <th>최근 1년 시공실적</th><th>총 시공실적</th><th>실적순위</th><th>실적 상위%</th>
                   <th>선정사유</th><th>비고</th>
                 </tr></thead>
-                <tbody>${rows.map(giftGradeRowHtml).join('') || `<tr><td colspan="14" class="pi-note">MOU 체결 업체가 없습니다.</td></tr>`}</tbody>
+                <tbody>${rows.map(r=>{
+                  // §렌더링 버그 수정 — 행 하나가 giftGradeRowHtml에서 예외를 던지면 전체
+                  // tbody가 비는 문제를 막기 위한 방어(§요청 6 "row 단위 try/catch").
+                  try{ return giftGradeRowHtml(r); }
+                  catch(err){ console.warn('선물 등급: 행 렌더 실패 —', r && r.key, err); return ''; }
+                }).join('') || `<tr><td colspan="14" class="pi-note">MOU 체결 업체가 없습니다.</td></tr>`}</tbody>
               </table>
             </div>
           </div>
