@@ -4456,6 +4456,56 @@ table.gift-grade-table .gift-grade-num{ text-align:right; white-space:nowrap; }
 }
 
 /* ==========================================================================
+   §매출 Excel 업로드 라운드(신규) — 기존 .pi-overlay/.pi-panel/.pi-note 패턴 재사용,
+   표/요약/상태배지 스타일만 새로 추가(협력사 엑셀 일괄 반영의 .local-cloud-diag-*와
+   같은 톤).
+   ========================================================================== */
+.sales-import-summary{ display:flex; flex-wrap:wrap; gap:14px; font-size:12.5px; font-weight:600; color:var(--text); margin:10px 0; padding:8px 10px; background:var(--bg); border:1px solid var(--line); border-radius:8px; }
+.sales-import-summary b{ font-size:14px; margin-left:3px; }
+.sales-import-summary .is-new b{ color:#1E7B34; }
+.sales-import-summary .is-mod b{ color:#B26A00; }
+.sales-import-summary .is-dup b{ color:#8A93A3; }
+.sales-import-summary .is-notincrm b{ color:#5B4EE0; }
+.sales-import-summary .is-review b{ color:#B23B3B; }
+.sales-import-skip-note{ font-size:12px; color:#B26A00; margin-bottom:8px; }
+.sales-import-table-wrap{ max-height:46vh; overflow:auto; border:1px solid var(--line); border-radius:8px; }
+table.sales-import-table{ width:100%; min-width:920px; border-collapse:collapse; font-size:12px; }
+table.sales-import-table thead{ position:sticky; top:0; background:#F4F7FB; z-index:1; }
+table.sales-import-table th{ padding:7px 8px; text-align:left; font-weight:700; color:var(--navy); border-bottom:1px solid var(--line); white-space:nowrap; }
+table.sales-import-table td{ padding:5px 8px; border-bottom:1px solid #EEF2F7; vertical-align:middle; white-space:nowrap; }
+.sales-import-amount{ text-align:right; font-variant-numeric:tabular-nums; }
+.sales-import-status-badge{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; background:#EEF1F5; color:#4B607C; }
+.sales-import-row.is-new .sales-import-status-badge{ background:#E9F6EF; color:#1E7B34; }
+.sales-import-row.is-mod .sales-import-status-badge{ background:#FFF3E0; color:#B26A00; }
+.sales-import-row.is-dup .sales-import-status-badge{ background:#F1F3F5; color:#8A93A3; }
+.sales-import-row.is-notincrm .sales-import-status-badge{ background:#EFECFC; color:#5B4EE0; }
+.sales-import-row.is-review .sales-import-status-badge{ background:#FBE9E9; color:#B23B3B; }
+.sales-import-history{ margin-top:12px; padding:8px 10px; background:var(--bg); border:1px solid var(--line); border-radius:8px; }
+.sales-import-history-title{ font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:6px; }
+.sales-import-history-row{ font-size:12px; color:var(--text); padding:3px 0; }
+
+/* ==========================================================================
+   §매출 집계 기준 안내 아이콘 라운드(신규) — 작은 ⓘ 버튼 + 가벼운 팝오버.
+   ========================================================================== */
+.revenue-info-icon-btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; padding:0; margin-left:2px; vertical-align:middle;
+  border:none; background:transparent; color:var(--text-faint); font-size:13px;
+  line-height:1; cursor:pointer; border-radius:50%;
+}
+.revenue-info-icon-btn:hover, .revenue-info-icon-btn:focus-visible{ color:var(--navy); background:var(--soft-blue); outline:none; }
+.revenue-info-pop{
+  position:fixed; z-index:2000; background:#fff; border:1px solid var(--line); border-radius:10px;
+  box-shadow:0 8px 24px rgba(23,48,92,.14); padding:12px 14px; font-size:12px; color:var(--text);
+  max-width:calc(100vw - 16px);
+}
+.revenue-info-pop-title{ font-size:12.5px; font-weight:800; color:var(--navy); margin-bottom:6px; }
+.revenue-info-pop-list{ margin:0 0 8px; padding-left:16px; line-height:1.5; color:var(--text-muted); }
+.revenue-info-pop-list li{ margin-bottom:4px; }
+.revenue-info-pop-highlight{ font-weight:800; color:var(--navy); font-size:12.5px; margin-bottom:2px; }
+.revenue-info-pop-sub{ font-size:11px; color:var(--text-faint); }
+
+/* ==========================================================================
    §모바일 전용 최적화 라운드(신규) — 사용자 명시 조건: "PC 버전 절대 수정 금지,
    반드시 모바일 media query 안에서만 override". 아래 블록 밖의 기존 CSS는 단
    1줄도 건드리지 않았다 — 여기 추가된 규칙은 전부 max-width:768px 안에서만
@@ -4611,6 +4661,7 @@ table.gift-grade-table .gift-grade-num{ text-align:right; white-space:nowrap; }
           <div class="update-menu-group-label">가져오기</div>
           <button type="button" id="crmMasterImportBtn">마스터 업체 명단 가져오기</button>
           <button type="button" id="crmPartnerExcelImportBtn">협력사 엑셀 일괄 반영</button>
+          <button type="button" id="crmSalesImportBtn">매출 Excel 업로드</button>
           <button type="button" id="crmLocalCloudDiagBtn">로컬-클라우드 비교</button>
           <div class="update-menu-divider"></div>
           <div class="update-menu-group-label">분석</div>
@@ -4869,6 +4920,8 @@ table.gift-grade-table .gift-grade-num{ text-align:right; white-space:nowrap; }
        .pi-overlay/.pi-panel 패턴이지만 완전히 별도의 도구(이 파일은 절대 안 건드림).
        업로드한 엑셀을 그때그때 파싱해서 미리보기 → 확정 반영하는 전용 모달 root. -->
   <div id="partnerExcelImportModalRoot"></div>
+  <!-- §매출 Excel 업로드 라운드(신규) — 업로드→Preview→확정 반영 전용 모달 root. -->
+  <div id="salesImportModalRoot"></div>
   <!-- §중복 업체 병합 라운드(신규) — 중복 후보 목록(읽기 전용) + 선택/미리보기/적용 병합
        도구, 두 개의 전용 root. 같은 .pi-overlay/.pi-panel 패턴(새 시각 언어 없음). -->
   <div id="dupListModalRoot"></div>
@@ -5702,7 +5755,7 @@ window.SHIN2_CRM_OCR = (function(){
       // mailAssets(공통 발송자료 메타데이터, §첨부파일 라운드 신규) — 데이터 레이어의
       // MAIL_ASSETS_KEY 상수와 반드시 같은 문자열이어야 한다(다른 <script> 블록이라 직접
       // 참조 불가, 위 CO_KEY 등과 같은 이유로 리터럴을 그대로 옮겨 적음).
-      const SHARED_ARRAY_KEYS = { companies: 'shin2-companies-staging', customerActivities: 'shin2-customer-activities-v1', memos: 'shin2-memos-v1', mailAssets: 'shin2-mail-assets-v1' };
+      const SHARED_ARRAY_KEYS = { companies: 'shin2-companies-staging', customerActivities: 'shin2-customer-activities-v1', memos: 'shin2-memos-v1', mailAssets: 'shin2-mail-assets-v1', salesLedger: 'shin2-sales-ledger-v1' };
       const sharedSyncStarted = {};
       const sharedPushTimers = {};
       function sharedLocalRevKey(storageKey){ return 'shin2-sync-rev-' + storageKey; }
@@ -6659,7 +6712,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     // 위 Firebase 모듈 정의). 아직 로그인 전이거나 이 기기에서 최초 병합이 안 끝났으면 함수 내부
     // 가드가 조용히 무시한다 — 로컬 저장
     // 자체는 항상 그대로 이루어진다.
-    const SYNC_NAME_BY_KEY = { [CO_KEY]: 'companies', [ACT_KEY]: 'customerActivities', [MEMO_KEY]: 'memos', [MAIL_ASSETS_KEY]: 'mailAssets' };
+    const SYNC_NAME_BY_KEY = { [CO_KEY]: 'companies', [ACT_KEY]: 'customerActivities', [MEMO_KEY]: 'memos', [MAIL_ASSETS_KEY]: 'mailAssets', [SALES_LEDGER_KEY]: 'salesLedger' };
     const syncName = SYNC_NAME_BY_KEY[key];
     if(syncName){ try{ if(window.SHIN2_CRM_SHARED_SYNC) window.SHIN2_CRM_SHARED_SYNC.push(syncName, arr); }catch(e){} }
     return true;
@@ -9394,10 +9447,110 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
   // §렉 수정 라운드: 정적 스냅샷 기반 — buildRevenue2025Index와 같은 이유로 캐시. 이
   // 함수는 "총 매출"/"실적↔매출" 계산 경로를 통해 업체마다 반복 호출되어(348개 × 목록
   // 렌더링마다) 캐시 없이는 특히 무거웠다.
+  /* ==========================================================================
+     §매출 Excel 업로드 라운드(신규) — window.SHIN2_REVENUE_2026_SNAPSHOT(정적 임베드
+     배열)만 읽던 것을, "정적 스냅샷 + 사용자가 업로드·확정한 거래(shin2-sales-ledger-v1)"
+     를 합친 하나의 runtime ledger로 바꾼다. getCompany2026Revenue/
+     getCompanyTotalRevenueAllYears 등 기존 매출 계산 함수는 단 한 줄도 안 바꿨다 —
+     이 함수들이 내부에서 부르는 buildRevenue2026Index()의 "입력 소스"만 바뀐다
+     (index를 만드는 집계 로직 자체, byType 분류, total 합산 방식은 그대로).
+
+     [§운영 안전 검증 라운드 — dual-key로 교체] 거래의 "완전히 같은가"(identityKey,
+     금액 포함)와 "혹시 금액만 수정된 걸 수도 있는 후보인가"(correctionCandidateKey,
+     금액 제외)를 분리했다 — 자세한 설명/실제 시트별 컬럼은 아래 SALES_SHEET_ADAPTERS
+     주석(같은 파일의 app-layer 블록) 참고. 이 데이터 레이어에는 identityKey 계산과
+     "정적 스냅샷을 절대 서로 합치지 않는다"는 안전 병합만 남긴다.
+
+     [정적 스냅샷 보호] 실제 검증 중 실측으로 발견한 회귀 — 정적 스냅샷 행들끼리도
+     같은 키로 Map에 접으면, 같은 업체·현장·날짜·유형·금액인데 실제로는 별개인 거래가
+     우연히 겹칠 때 서로를 지워 실제 매출이 사라졌다(㈜부영씨엔씨 16.7억→15.8억로 실측
+     확인). 정적 스냅샷은 절대 서로 합치지 않고 배열 그대로 전부 보존한다 — identity
+     기반 병합은 "우리가 직접 만들어 identity를 신뢰할 수 있는" 확정 업로드 거래
+     (ledger)끼리만 적용한다. ========================================================================== */
+  const SALES_LEDGER_KEY = 'shin2-sales-ledger-v1';
+  function loadSalesLedger(){ return readArr(SALES_LEDGER_KEY); }
+  // saveSalesLedgerConfirmed: preview에서 "신규"/"수정"으로 분류된 행만(호출부가 이미
+  // 걸러서 넘김, §요청 17 "확인 필요/CRM 미등록은 반영 제외") identityKey 기준으로
+  // 기존 ledger에 병합 저장한다 — 같은 identityKey가 이미 있으면 교체(수정 반영),
+  // 없으면 추가. 여러 번 같은 내용을 저장해도(재업로드 등) identityKey가 같으면 항상
+  // 1건만 남는다(§요청 19 이중 계산 방지).
+  function saveSalesLedgerConfirmed(newRows){
+    const existing = loadSalesLedger();
+    const byId = new Map(existing.map(r=> [salesTxnIdentityKey(r), r]));
+    newRows.forEach(r=> byId.set(salesTxnIdentityKey(r), r));
+    const merged = Array.from(byId.values());
+    const ok = writeArr(SALES_LEDGER_KEY, merged);
+    if(ok) invalidateRevenue2026IndexCache();
+    return ok;
+  }
+  // §요청 6A — 거래 식별키(identity): 고유번호가 있으면 그것만, 없으면 업체+현장+날짜+
+  // 유형+금액(금액 포함) 전부를 묶는다. ledger 내부에서 "같은 거래의 금액이 정정된
+  // 새 업로드가 이전 ledger 저장분을 교체"하는 용도로만 쓴다(우리가 직접 저장한
+  // ledger 행끼리는 uniqueKey를 항상 대칭으로 갖고 있어 안전).
+  function salesTxnIdentityKey(r){
+    if(r.uniqueKey) return 'uk:' + String(r.uniqueKey).trim();
+    return salesTxnFingerprintKey(r);
+  }
+  // §운영 안전 검증 라운드 — 실측으로 발견한 심각한 버그: 정적 스냅샷은 원래 승인번호
+  // (uniqueKey) 필드 자체를 저장하지 않는다(임베드 당시 그 필드가 없었음 — 실측 확인:
+  // 2026 스냅샷 1,461행 전체에 uniqueKey 필드 0건). 그런데 salesTxnIdentityKey는
+  // uniqueKey가 있으면 무조건 'uk:...'를 쓰므로, 업로드한 자재판매 행(대부분 승인번호
+  // 보유, 실측 1,205건 중 1,195건)은 정적 스냅샷의 'fp:...' 키와 절대 비교되지 않는다
+  // — 이미 스냅샷에 있는 자재판매 거래 1,033건이 "중복"을 하나도 못 잡고 전부 "신규/
+  // CRM미등록"으로 잘못 분류되는 실측 버그였다(자재판매 dup 10건만 잡힘, 기대 1,033건).
+  // 그래서 "이미 완전히 같은 거래인가"(중복 판정)는 uniqueKey 유무와 무관하게 항상
+  // fingerprintKey(사업자번호+정규화 업체명+현장명+매출일+매출유형+금액, 금액 포함)로만
+  // 대조한다 — uniqueKey는 아래 "수정" 판정에서만 별도로 쓴다(§요청 9).
+  // §운영 안전 검증 라운드 — 사업자번호는 fingerprint에서 뺀다: 정적 스냅샷은 애초에
+  // bizNo 필드 자체를 저장한 적이 없어(실측: 2026 스냅샷 자재판매 1,033행 전부 bizNo
+  // 없음) 포함하면 실제 파일의 bizNo('416-81-21999' 등)와 절대 같아질 수 없는 비대칭
+  // 필드가 되어, 이미 스냅샷에 있는 자재판매 거래를 전부 "다른 거래"로 오판하게 만든다
+  // (실측 확인: bizNo 포함 시 자재판매 중복 318건, 제외 시 1,033건 — 정적 스냅샷의
+  // 자재판매 행 수와 정확히 일치). 회사명+현장명+매출일+매출유형+금액만으로도 이미
+  // 충분히 구체적이다.
+  function salesTxnFingerprintKey(r){
+    return ['fp', normCompanyNameForRevenue(r.name) || normCompanyName(r.name), String(r.site||'').trim().toLowerCase(), String(r.date||'').trim(), r.sourceType, r.amount].join('|');
+  }
+  // §요청 6B — 수정후보키(correction candidate): 금액을 뺀 업체+현장+날짜+유형만.
+  // 절대 이 키만으로 자동 덮어쓰지 않는다 — "혹시 같은 거래의 금액이 바뀐 걸 수도
+  // 있다"는 후보를 찾아 사람에게 보여주는 용도로만 쓴다(§요청 7).
+  function salesTxnCorrectionCandidateKey(r){
+    return ['cc', normCompanyNameForRevenue(r.name) || normCompanyName(r.name), String(r.site||'').trim().toLowerCase(), String(r.date||'').trim(), r.sourceType].join('|');
+  }
+  // buildMergedSalesRowsForYear: 정적 스냅샷(window.SHIN2_REVENUE_{year}_SNAPSHOT, 원본
+  // 필드 그대로, 절대 서로 합치지 않고 전부 보존) + 확정된 업로드 거래(loadSalesLedger)를
+  // 합친다. 위 주석의 "정적 스냅샷 보호" 원칙 참고.
+  // §운영 안전 검증 라운드 — ledger는 "2026 매출현황" 업로드 전용이라 항상 2026
+  // 버킷에만 합친다(정적 2026 스냅샷 자체도 개별 매출일이 2025년인 행을 섞어 담고
+  // 있다 — 예: 2025년에 인식된 설치금이 2026 워크북에 포함된 실제 사례. 매출일
+  // 캘린더 연도로 걸러내면 이런 행들이 스냅샷과 대조가 안 돼 실측으로 이중 집계
+  // 오류가 확인됐다). 다른 연도(2024/2025)는 정적 스냅샷 그대로만 돌려준다 — 아직
+  // 그 연도용 업로드 기능이 없다.
+  function buildMergedSalesRowsForYear(year){
+    const snapshotKey = 'SHIN2_REVENUE_' + year + '_SNAPSHOT';
+    const staticRows = (window[snapshotKey] || []).map(r=> ({ name:r.name, site:r.site||'', date:r.date||(String(year)+'-01-01'), amount:r.amount, sourceSheet:r.sourceSheet, sourceRow:r.sourceRow, sourceType:r.sourceType }));
+    if(year !== 2026) return staticRows;
+    // 정적 스냅샷과 "완전히 같은 거래인가"는 fingerprintKey로만 비교한다(위 주석 —
+    // 정적 스냅샷은 uniqueKey를 저장하지 않으므로 identityKey로 비교하면 uniqueKey를
+    // 가진 ledger 행이 전혀 안 걸러짐).
+    const staticFingerprintSet = new Set(staticRows.map(r=> salesTxnFingerprintKey(r)));
+    const byLedgerIdentity = new Map();
+    loadSalesLedger().forEach(r=>{
+      const row = { name:r.name, bizNo:r.bizNo||'', site:r.site||'', date:r.date, amount:r.amount, sourceSheet:r.sourceSheet, sourceRow:r.sourceRow, sourceType:r.sourceType, uniqueKey:r.uniqueKey };
+      byLedgerIdentity.set(salesTxnIdentityKey(row), row); // ledger끼리는 같은 identity(uniqueKey 우선)면 덮어써 "수정" 반영 — 우리가 만든 데이터라 대칭적으로 안전.
+    });
+    const ledgerRows = Array.from(byLedgerIdentity.values())
+      .filter(r=> !staticFingerprintSet.has(salesTxnFingerprintKey(r)));
+    return staticRows.concat(ledgerRows);
+  }
+  // §요청 13/24 — 업로드 확정 직후 총매출/2026 매출/그래프/순위/선물분석이 즉시 새
+  // 값을 읽도록 캐시를 지운다. 그 외에는 아무도 이 함수를 부를 필요가 없다(집계 로직
+  // 자체는 그대로라 다른 호출부는 변경 없음).
+  function invalidateRevenue2026IndexCache(){ _revenue2026IndexCache = null; }
   let _revenue2026IndexCache = null;
   function buildRevenue2026Index(){
     if(_revenue2026IndexCache) return _revenue2026IndexCache;
-    const snapshot = window.SHIN2_REVENUE_2026_SNAPSHOT || [];
+    const snapshot = buildMergedSalesRowsForYear(2026); // §매출 Excel 업로드 라운드 — 정적 스냅샷 + 확정 업로드 거래 병합(위 설명). 집계 로직(아래)은 전혀 안 바뀜.
     const index = new Map(); // normName -> { sampleName, rows:[], total, byType:{} }
     snapshot.forEach(r=>{
       const norm = normCompanyNameForRevenue(r.name);
@@ -9772,6 +9925,7 @@ window.SHIN2_RECEIVABLES_2024_SNAPSHOT = []; // 2024년 미수금 원본 파일 
     normCompanyName, findSimilarCompanySuggestions,
     buildUnregisteredCompanies, getCompany2025Revenue, getCompany2024Revenue, getCompanyTotalRevenueAllYears,
     buildRevenue2026Index, getCompany2026Revenue, buildUnregisteredCompanies2026, classifyUnregisteredCompaniesByMouMaster,
+    loadSalesLedger, saveSalesLedgerConfirmed, invalidateRevenue2026IndexCache, buildMergedSalesRowsForYear, salesTxnIdentityKey, salesTxnFingerprintKey, salesTxnCorrectionCandidateKey,
     getCompanyReceivable, buildReceivableCompanies,
     getLatestPourRecordForCompany, getAllPourRecordsForCompany, buildPourLatestIndex, invalidatePourRecordIndexCache,
     buildRequestHistory, buildRequestHistoryIndex,
@@ -15615,7 +15769,7 @@ window.SHIN2_CRM_APP_INIT = function(){
       <div class="cdash2-summary-row">
         <div class="cdash2-card cdash2-revenue-card">
           <div class="cdash2-revenue-card-head">
-            <div class="cdash2-card-title" style="margin-bottom:0;"><span aria-hidden="true">📊</span> 매출 현황</div>
+            <div class="cdash2-card-title" style="margin-bottom:0;"><span aria-hidden="true">📊</span> 매출 현황 ${revenueInfoIconHtml('cdash')}</div>
             ${maxBadgeText ? `<div class="cdash2-revenue-max-badge">${esc(maxBadgeText)}</div>` : ''}
           </div>
           <div class="cdash2-revenue-head">
@@ -15627,6 +15781,73 @@ window.SHIN2_CRM_APP_INIT = function(){
       </div>
     `;
     if(monthly && monthly.points.length) wireRevenueChartHover(monthly.points);
+    bindRevenueInfoIcon('cdash');
+  }
+
+  /* ==========================================================================
+     §매출 집계 기준 안내 아이콘 라운드(신규) — "매출이 어떤 기준으로 집계되는지"를
+     다른 사용자도 바로 확인할 수 있게, 고객 상세 매출 카드 제목 옆에 작은 안내
+     아이콘(ⓘ)을 붙인다. 순수 안내 UI다 — 매출 계산/합계/그래프/순위/선물순위/Excel
+     업로드/Firebase 저장 로직은 이 라운드에서 단 한 줄도 안 건드렸다. 고객 상세와
+     선물 분석(매출순위 헤더) 두 곳에서 같은 컴포넌트(revenueInfoIconHtml/
+     bindRevenueInfoIcon)를 재사용한다 — 중복 UI를 새로 만들지 않는다.
+     ========================================================================== */
+  const REVENUE_INFO_POPOVER_HTML = `
+    <div class="revenue-info-pop-title">매출 집계 기준</div>
+    <ul class="revenue-info-pop-list">
+      <li>고객관리카드의 매출은 계약금액이 아닌 실제 발생한 매출 기준으로 집계합니다.</li>
+      <li>매출현황 원장의 실제 매출금액을 기준으로 컨설팅, 기술자문료, 특허료, 자재판매, 공사 등의 매출을 업체별로 합산합니다.</li>
+      <li>계약금액, 낙찰가, 실행금액, 계약규모는 매출에 포함하지 않습니다.</li>
+      <li>입금액과 미수금도 매출과 별도로 관리합니다.</li>
+      <li>매출 Excel 업로드 시 기존 거래와 중복 여부를 확인한 뒤 신규/수정 거래만 반영합니다.</li>
+    </ul>
+    <div class="revenue-info-pop-highlight">매출 = 실제 발생한 매출</div>
+    <div class="revenue-info-pop-sub">계약규모와 실제 매출은 별도 기준입니다.</div>
+  `;
+  function revenueInfoIconHtml(idSuffix){
+    return `<button type="button" class="revenue-info-icon-btn" id="revenueInfoIconBtn_${esc(idSuffix)}" title="매출 집계 기준" aria-label="매출 집계 기준 안내">ⓘ</button>`;
+  }
+  function closeRevenueInfoPopover(){
+    const existing = document.getElementById('revenueInfoPopover');
+    if(existing) existing.remove();
+  }
+  // 모바일에서 화면 밖으로 잘리지 않도록, 앵커 버튼의 실제 위치를 기준으로 좌우 clamp만
+  // 계산한다(§요청 5) — 새 팝업 시스템을 만들지 않고 document.body에 붙는 가벼운
+  // position:fixed 카드 하나만 쓴다(기존 update-menu 드롭다운과 같은 성격의 가벼운
+  // 오버레이, 큰 모달 아님).
+  function openRevenueInfoPopover(anchorBtn){
+    const wasOpenForThis = document.getElementById('revenueInfoPopover')?.dataset.anchor === anchorBtn.id;
+    closeRevenueInfoPopover();
+    if(wasOpenForThis) return;
+    const pop = document.createElement('div');
+    pop.id = 'revenueInfoPopover';
+    pop.className = 'revenue-info-pop';
+    pop.dataset.anchor = anchorBtn.id;
+    pop.innerHTML = REVENUE_INFO_POPOVER_HTML;
+    document.body.appendChild(pop);
+    const rect = anchorBtn.getBoundingClientRect();
+    const popWidth = Math.min(340, window.innerWidth - 16);
+    let left = rect.left;
+    if(left + popWidth > window.innerWidth - 8) left = window.innerWidth - popWidth - 8;
+    if(left < 8) left = 8;
+    let top = rect.bottom + 6;
+    if(top + 220 > window.innerHeight) top = Math.max(8, rect.top - 226); // 아래 공간이 부족하면 버튼 위로
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+    pop.style.width = popWidth + 'px';
+    setTimeout(()=>{
+      document.addEventListener('click', function onDocClick(ev){
+        if(pop.contains(ev.target) || ev.target === anchorBtn) return;
+        closeRevenueInfoPopover();
+        document.removeEventListener('click', onDocClick, true);
+      }, true);
+    }, 0);
+  }
+  function bindRevenueInfoIcon(idSuffix){
+    const btn = document.getElementById('revenueInfoIconBtn_' + idSuffix);
+    if(!btn || btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', (e)=>{ e.stopPropagation(); openRevenueInfoPopover(btn); });
   }
 
   // §고객카드 전면 개선 라운드 — 연도별 매출 데이터 소스 함수 이름표. 함수를 새로 만들지
@@ -24941,6 +25162,440 @@ window.SHIN2_CRM_APP_INIT = function(){
     });
   }
 
+
+  /* ==========================================================================
+     §매출 Excel 업로드 라운드(신규) — "관리 도구 ▸ 매출 Excel 업로드"가 여는 모달.
+     기존 협력사 엑셀 일괄 반영(위)과 같은 흐름(파일 선택 → 분석 → Preview → 사용자가
+     [확정 반영]을 눌러야만 저장)을 그대로 따른다. 업체 매칭도 새로 만들지 않고
+     matchCompanyForExcelRow(위, 협력사 엑셀과 공유하는 공통 유틸)를 그대로 쓴다.
+
+     [§운영 안전 검증 라운드 — 실제 파일 분석 결과 반영] 실제 첨부 파일("매출현황 -
+     2026-09-10T082100.614.xlsx")을 직접 열어 시트별 정확한 헤더를 확인했다 — 더 이상
+     "후보 헤더를 순서대로 탐색"하지 않는다(추측으로 엉뚱한 금액 컬럼을 고를 위험을
+     원천 차단, §요청 1). SALES_SHEET_ADAPTERS에 시트별 정확한 컬럼명을 고정 지정했고,
+     이 목록에 없는 시트(예: "대시보드", "2025현장 미수금관리" — 미수금 시트라 매출이
+     아님)는 자동 집계 대상에서 완전히 제외하고 Preview에 "지원하지 않는 시트"로만
+     표시한다(§요청 4).
+
+     [조사 결과 — 실제 컬럼]
+       컨설팅     : 업체명 O, 사업자번호 X, 매출금액(v-)  (계약금액(V-)/총실행가와 구분됨)
+       기술자문료 : 업체명 O, 사업자번호 X, 매출금액(v-)  (계약금액(V-)와 구분됨)
+       특허료     : 업체명 O, 사업자번호 X, 매출액(v-)    (낙찰금액(v-)/자재판매(v-)와 구분됨)
+       자재판매   : 업체명 O, 사업자번호 O(공급받는자사업자등록번호), 매출액(v-)
+                    (합계금액=VAT포함 총액/세액과 구분됨), 승인번호 O(전자세금계산서 고유ID)
+       공사       : 업체명 컬럼 자체가 없음(현장명만 있음), 매출금액(v-)
+                    → 업체 자동매칭이 원천적으로 불가능하므로 전부 "확인 필요"로만
+                      보낸다(§요청 16 "애매하면 확인 필요 우선" — 임의로 현장명을
+                      업체명으로 대체하지 않는다).
+     승인번호/고유ID가 있는 시트는 자재판매뿐이다 — 나머지 4개 시트는 고유키가 없어
+     "수정" 자동판정을 절대 하지 않는다(아래 dual-key 설명 참고).
+
+     [§요청 6/7 — 거래 식별키(identity)와 수정후보키(correction candidate)를 분리]
+     한 업체가 같은 현장·같은 날짜·같은 유형으로 매출을 2건 이상 낼 수 있으므로(§요청
+     5), "업체+현장+날짜+유형"만으로 같은 거래라고 단정하면 서로 다른 진짜 거래를
+     합쳐버릴 위험이 있다 — 그래서 두 종류의 키를 분리했다(정확한 정의는 데이터 레이어
+     블록의 salesTxnIdentityKey/salesTxnCorrectionCandidateKey 참고).
+       A. identityKey  = "이 거래가 이미 정확히 반영돼 있는가"를 판단하는 키. 고유번호
+          (승인번호 등)가 있으면 그것만, 없으면 업체+현장+날짜+유형+금액(금액까지
+          포함)을 전부 묶는다 — 겹치면 "완전히 같은 내용의 거래"라서 안전하게 중복.
+       B. correctionCandidateKey = "혹시 금액만 바뀐 수정본일 수도 있다"를 찾기 위한
+          후보 검색 전용 키(업체+현장+날짜+유형, 금액 제외). 이 키가 같다는 이유만으로
+          절대 자동 덮어쓰지 않는다(§요청 6 명시) — 고유번호가 있어서 "확실히 같은
+          거래의 금액이 바뀌었다"고 판단할 수 있을 때만 "수정"으로 확정하고, 고유번호가
+          없으면 아무리 후보키가 같아도 "확인 필요 - 동일 조건 복수 거래 가능"으로만
+          보낸다(§요청 7). 실무에서 고유번호 있는 시트는 자재판매뿐이므로, 다른 4개
+          시트는 "수정" 자동판정이 사실상 없다 — 전부 신규 아니면 정확히 같은 금액의
+          중복, 또는 확인 필요다.
+
+     [§요청 8 — 정적 스냅샷 보호] 정적 스냅샷은 서로 절대 합치지 않고 원본 배열 그대로
+     보존, identity 기반 병합은 "우리가 직접 만든" 확정 업로드 거래(ledger)끼리만
+     적용한다(데이터 레이어의 buildMergedSalesRowsForYear 참고).
+     ========================================================================== */
+  // §요청 3 — 시트별 정확한 컬럼명 고정. 헤더 문자열이 하나라도 안 맞으면(엑셀 양식이
+  // 바뀌면) 그 시트는 자동으로 "확인 필요"로 빠진다(아래 parseSalesExcelWorkbook) —
+  // 조용히 엉뚱한 컬럼을 골라 쓰는 일이 없다.
+  const SALES_SHEET_ADAPTERS = {
+    '컨설팅':     { sourceType:'consulting',    nameCol:'업체명', bizNoCol:null, siteCol:'현장명', dateCol:'매출일', amountCol:'매출금액(v-)', uniqueKeyCol:null },
+    '기술자문료': { sourceType:'techAdvisory',  nameCol:'업체명', bizNoCol:null, siteCol:'현장명', dateCol:'매출일', amountCol:'매출금액(v-)', uniqueKeyCol:null },
+    '특허료':     { sourceType:'patent',        nameCol:'업체명', bizNoCol:null, siteCol:'현장명', dateCol:'매출일', amountCol:'매출액(v-)',   uniqueKeyCol:null },
+    '자재판매':   { sourceType:'materialSales', nameCol:'업체명', bizNoCol:'공급받는자사업자등록번호', siteCol:'현장명', dateCol:'매출일', amountCol:'매출액(v-)', uniqueKeyCol:'승인번호' },
+    '공사':       { sourceType:'construction',  nameCol:null,     bizNoCol:null, siteCol:'현장명', dateCol:'매출일', amountCol:'매출금액(v-)', uniqueKeyCol:null }
+  };
+  function detectSalesExcelColumn(headerRow, exactName){
+    if(!exactName) return -1;
+    return headerRow.findIndex(h=> String(h||'').trim() === exactName);
+  }
+  // 회계 표기 "(1,234)" = 음수, 콤마/원화기호/공백 제거 후 숫자만 남으면 반영(§요청 10
+  // "음수 거래 정상 반영 — 삭제/무시 금지"). 숫자로 못 읽으면 null(그 행은 계산 불가로
+  // 스킵 — 파싱 실패를 0으로 지어내지 않는다).
+  function salesExcelParseAmount(raw){
+    if(raw === '' || raw == null) return null;
+    let s = String(raw).trim();
+    if(!s) return null;
+    let neg = false;
+    if(/^\(.*\)$/.test(s)){ neg = true; s = s.slice(1, -1); }
+    s = s.replace(/[,₩\s]/g, '');
+    if(!/^-?\d+(\.\d+)?$/.test(s)) return null;
+    let n = parseFloat(s);
+    if(neg) n = -Math.abs(n);
+    return Math.round(n);
+  }
+  // 실제 파일은 엑셀 날짜 셀이라 sheet_to_json({raw:false})가 'YYYY-MM-DD'로 이미
+  // 문자열화해 준다 — 흔한 구분자만 추가로 정규화하고, 못 알아보면 원문을 보존한다
+  // (임의로 오늘 날짜를 넣지 않음, §협력사 엑셀과 같은 원칙).
+  function salesExcelNormalizeDate(raw){
+    if(raw == null || raw === '') return '';
+    const s = String(raw).trim();
+    const m = /^(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/.exec(s);
+    if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+    return s;
+  }
+  // parseSalesExcelWorkbook: SALES_SHEET_ADAPTERS에 있는 시트만 정확한 고정 컬럼으로
+  // 분석한다(§요청 1/3). 목록에 없는 시트(대시보드/2025현장 미수금관리 등)나, 어댑터에
+  // 지정된 컬럼명이 실제 헤더에서 하나라도 안 보이는 시트는 전부 "지원하지 않는 시트 /
+  // 확인 필요"로만 표시하고 자동 반영 대상에서 뺀다(§요청 4).
+  function parseSalesExcelWorkbook(wb){
+    return wb.SheetNames.map(sheetName=>{
+      const adapter = SALES_SHEET_ADAPTERS[sheetName];
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:'' });
+      if(!adapter){
+        return { sheetName, headerRow:[], dataRows:[], colMap:null, skipped:true, skipReason:'지원하지 않는 시트 / 확인 필요' };
+      }
+      if(!rows.length) return { sheetName, headerRow:[], dataRows:[], colMap:null, skipped:true, skipReason:'빈 시트' };
+      const headerRow = rows[0].map(h=> String(h||'').trim());
+      const dataRows = rows.slice(1).filter(r=> r.some(c=> String(c||'').trim() !== ''));
+      const colMap = {
+        name: detectSalesExcelColumn(headerRow, adapter.nameCol),
+        bizno: detectSalesExcelColumn(headerRow, adapter.bizNoCol),
+        site: detectSalesExcelColumn(headerRow, adapter.siteCol),
+        date: detectSalesExcelColumn(headerRow, adapter.dateCol),
+        amount: detectSalesExcelColumn(headerRow, adapter.amountCol),
+        uniqueKey: detectSalesExcelColumn(headerRow, adapter.uniqueKeyCol)
+      };
+      // amount/date/site는 어댑터가 지정했다면 반드시 실제 헤더에도 있어야 한다(양식이
+      // 바뀌었을 가능성) — name은 공사 시트처럼 원래 없는(null) 경우가 있어 별도 체크.
+      const requiredMissing = (adapter.amountCol && colMap.amount < 0) || (adapter.dateCol && colMap.date < 0) || (adapter.siteCol && colMap.site < 0);
+      if(requiredMissing){
+        return { sheetName, headerRow, dataRows, colMap, adapter, skipped:true, skipReason:'예상 헤더와 실제 시트 헤더가 달라 확인 필요(양식 변경 의심)' };
+      }
+      return { sheetName, headerRow, dataRows, colMap, adapter, skipped:false, noCompanyColumn: !adapter.nameCol };
+    });
+  }
+  // buildSalesExcelRows: colMap이 확정된 시트만 실제 거래 행으로 변환한다. 금액 파싱
+  // 실패 행은 조용히 스킵(계산 불가). 업체명 컬럼이 아예 없는 시트(공사)는 행을
+  // 버리지 않고 name:''로 남겨 Preview에서 "확인 필요"로 보이게 한다(§요청 16 — 조용히
+  // 사라지지 않고 사람이 보고 판단하게).
+  function buildSalesExcelRows(parsedSheets, fileName){
+    const rows = [];
+    parsedSheets.forEach(sheet=>{
+      if(sheet.skipped) return;
+      const { colMap, adapter } = sheet;
+      sheet.dataRows.forEach((r, i)=>{
+        const name = colMap.name >= 0 ? String(r[colMap.name] || '').trim() : '';
+        if(!name && !sheet.noCompanyColumn) return; // 업체명 컬럼은 있는데 이 행만 빈 경우(빈 줄 등)만 스킵
+        const amount = salesExcelParseAmount(colMap.amount >= 0 ? r[colMap.amount] : '');
+        if(amount === null) return;
+        rows.push({
+          name,
+          noCompanyColumn: !!sheet.noCompanyColumn,
+          bizNo: colMap.bizno >= 0 ? String(r[colMap.bizno] || '').trim() : '',
+          code: '',
+          site: colMap.site >= 0 ? String(r[colMap.site] || '').trim() : '',
+          date: colMap.date >= 0 ? salesExcelNormalizeDate(r[colMap.date]) : '',
+          amount,
+          sourceSheet: sheet.sheetName,
+          sourceType: adapter.sourceType,
+          sourceRow: i + 2,
+          uniqueKey: colMap.uniqueKey >= 0 ? String(r[colMap.uniqueKey] || '').trim() : '',
+          sourceFileName: fileName
+        });
+      });
+    });
+    return rows;
+  }
+  // previewSalesImport: 아무것도 저장하지 않는 순수 분석 함수. §운영 안전 검증
+  // 라운드에서 실측으로 발견한 버그 수정 반영 — 정적 스냅샷은 승인번호(uniqueKey)를
+  // 저장하지 않으므로(실측: 2026 스냅샷 1,461행 전체 uniqueKey 필드 0건), "이미 완전히
+  // 같은 거래인가"는 uniqueKey 유무와 무관하게 항상 fingerprintKey(사업자번호+정규화
+  // 업체명+현장명+매출일+매출유형+금액)로 먼저 대조한다 — 그렇지 않으면 우연히
+  // 승인번호가 있는 시트(자재판매)의 기존 거래가 전부 "신규"로 잘못 잡힌다(실측:
+  // 수정 전 코드에서 자재판매 1,205건 중 중복 10건만 잡힘, 기대 1,033건 — 정적
+  // 스냅샷의 자재판매 행 수와 정확히 일치). 분류 순서:
+  //   1) fingerprintKey가 이미 존재(금액까지 완전 일치)       → 중복
+  //   2) uniqueKey가 있고, 그 uniqueKey로 찾은 기존 거래의 금액만 다름 → 수정(확정,
+  //      고유번호가 동일해 확실히 같은 거래로 판단 가능할 때만)
+  //   3) correctionCandidateKey(금액 제외)가 같은 기존 거래가 있고 금액만 다름
+  //                                                → 확인 필요("동일 조건 복수 거래 가능",
+  //      고유번호가 없거나 있어도 대조 대상에 없으면 자동 수정판정 안 함, §요청 7)
+  //   4) 위 전부 해당 없음                          → 신규
+  // 업체 매칭은 matchCompanyForExcelRow(기존 협력사 엑셀과 완전히 같은 공통 유틸)를
+  // 그대로 쓴다. 공사 시트처럼 업체명 컬럼 자체가 없는 행은 매칭을 아예 시도하지 않고
+  // 바로 확인 필요로 보낸다(§요청 16).
+  // §운영 안전 검증 라운드 — 실측으로 발견한 버그: 처음에는 각 행의 "매출일" 캘린더
+  // 연도로 어느 연도 버킷과 대조할지 정했었다(salesYearOfDate(raw.date)). 그런데 실제
+  // 정적 2026 스냅샷 자체가 "2026년도 매출현황 워크북"이라는 소속으로 묶인 것이지,
+  // 그 안의 개별 매출일이 전부 2026년인 건 아니다(예: 2025년에 인식된 설치금이 2026
+  // 워크북에 포함된 실제 사례 다수 확인 — ㈜부영씨엔씨 2025-10-17/2025-11-15 등).
+  // salesYearOfDate로 연도를 따로 판단하면 이런 행들이 실제로는 이미 스냅샷에 있는데도
+  // "다른 연도 버킷"과 대조돼 중복을 못 잡고 매번 "신규"로 잘못 분류됐다(실측 확인:
+  // ㈜부영씨엔씨 등 7건, 4.2억원 상당이 매번 새로 잡힘). 이 매출 Excel 업로드 기능은
+  // 애초에 "2026 매출현황" 워크북 전용이고 buildRevenue2026Index도 항상
+  // buildMergedSalesRowsForYear(2026)만 부른다 — 그래서 개별 행의 매출일과 무관하게
+  // 이 업로드의 모든 행은 항상 2026 버킷으로만 대조한다(정적 스냅샷과 동일한 소속
+  // 기준).
+  const SALES_IMPORT_BUCKET_YEAR = 2026;
+  function previewSalesImport(rawRows){
+    const companies = D.loadActiveCompanies();
+    const merged = D.buildMergedSalesRowsForYear(SALES_IMPORT_BUCKET_YEAR);
+    const fingerprintSet = new Set();
+    const candidateMap = new Map(); // correctionCandidateKey -> [row...]
+    const uniqueKeyMap = new Map(); // uniqueKey -> row (정적 스냅샷 행은 uniqueKey가 없어 여기 안 들어감 — ledger 저장분만)
+    merged.forEach(r=>{
+      fingerprintSet.add(D.salesTxnFingerprintKey(r));
+      const cck = D.salesTxnCorrectionCandidateKey(r);
+      if(!candidateMap.has(cck)) candidateMap.set(cck, []);
+      candidateMap.get(cck).push(r);
+      if(r.uniqueKey) uniqueKeyMap.set(String(r.uniqueKey).trim(), r);
+    });
+    const seenFingerprintInBatch = new Set();
+    const items = rawRows.map(raw=>{
+      const hasValidDate = !!raw.date && /^\d{4}/.test(String(raw.date));
+      const fingerprintKey = D.salesTxnFingerprintKey(raw);
+      let dedupStatus, existingRow = null, dedupReason = '';
+      if(!hasValidDate){
+        // 매출일을 인식하지 못한 행은 "이미 반영된 거래인지" 안전하게 대조할 수
+        // 없다(날짜가 식별키의 일부라서) — 조용히 신규로 흘려보내면 재업로드할 때마다
+        // 매번 다시 "신규"로 잡히거나(중복 판정 불가), 조용히 매출 집계에서 빠질 수
+        // 있다(§요청 16 "조용히 사라지지 않고 사람이 보고 판단" 원칙) — 그래서 자동
+        // 반영 대상에서 빼고 사람이 직접 날짜를 확인하게 한다.
+        dedupStatus = '확인 필요'; dedupReason = '매출일을 인식하지 못함 — 날짜 확인 필요';
+      } else if(seenFingerprintInBatch.has(fingerprintKey)){
+        dedupStatus = '중복'; dedupReason = '같은 파일 안에 동일 거래가 이미 있음';
+      } else if(fingerprintSet.has(fingerprintKey)){
+        dedupStatus = '중복'; dedupReason = '기존 매출(정적 스냅샷 또는 이전 확정 업로드)과 완전히 동일';
+      } else if(raw.uniqueKey && uniqueKeyMap.has(String(raw.uniqueKey).trim())){
+        existingRow = uniqueKeyMap.get(String(raw.uniqueKey).trim());
+        dedupStatus = '수정'; dedupReason = `고유번호(${raw.uniqueKey}) 동일 · 금액 ${existingRow.amount.toLocaleString('ko-KR')}원 → ${raw.amount.toLocaleString('ko-KR')}원`;
+      } else {
+        const cck = D.salesTxnCorrectionCandidateKey(raw);
+        const candidates = (candidateMap.get(cck) || []).filter(r=> r.amount !== raw.amount);
+        if(candidates.length){
+          existingRow = candidates[0];
+          dedupStatus = '확인 필요'; dedupReason = '동일 조건(업체·현장·날짜·유형) 복수 거래 가능 — 고유번호로 확정 못 해 자동 수정판정 안 함';
+        } else {
+          dedupStatus = '신규'; dedupReason = '';
+        }
+      }
+      if(dedupStatus !== '중복' && hasValidDate) seenFingerprintInBatch.add(fingerprintKey);
+
+      let status = dedupStatus, matchLabel = '', matchReason = '';
+      let companyId = null, companyName = null;
+      if(raw.noCompanyColumn){
+        status = '확인 필요'; matchReason = '이 시트에는 업체명 컬럼이 없어 자동 매칭 불가(현장명으로 직접 확인 필요)';
+      } else if(dedupStatus === '신규' || dedupStatus === '수정'){
+        const nameNorm = D.normCompanyName(raw.name);
+        const match = matchCompanyForExcelRow(nameNorm, raw.code, raw.bizNo, companies, null);
+        if(match.outcome === 'notInCrm') status = 'CRM 미등록';
+        else if(match.outcome === 'needsReview'){ status = '확인 필요'; matchReason = match.reason || match.label; }
+        else { matchLabel = match.label; companyId = match.companyId || null; companyName = match.companyName || null; }
+      }
+      return {
+        status, dedupStatus, fingerprintKey, row: raw, existingRow,
+        reason: dedupReason || matchReason,
+        companyId, companyName, matchLabel
+      };
+    });
+    const counts = { total: items.length, new:0, duplicate:0, modified:0, notInCrm:0, needsReview:0 };
+    let pendingAmount = 0;
+    items.forEach(it=>{
+      if(it.status === '신규'){ counts.new++; pendingAmount += it.row.amount; }
+      else if(it.status === '중복') counts.duplicate++;
+      else if(it.status === '수정'){ counts.modified++; pendingAmount += (it.row.amount - (it.existingRow ? it.existingRow.amount : 0)); }
+      else if(it.status === 'CRM 미등록') counts.notInCrm++;
+      else counts.needsReview++;
+    });
+    return { items, counts, pendingAmount };
+  }
+  // applySalesImport: "신규"/"수정"만 ledger에 반영한다(§요청 17 — 중복은 무시, CRM
+  // 미등록/확인 필요는 반영 제외). D.saveSalesLedgerConfirmed가 identityKey 기준으로
+  // 기존 ledger와 병합 저장하고 캐시를 지운다.
+  function applySalesImport(preview, meta){
+    const toSave = preview.items
+      .filter(it=> it.status === '신규' || it.status === '수정')
+      .map(it=> Object.assign({}, it.row, {
+        importBatchId: meta.importBatchId, importedAt: meta.importedAt,
+        companyId: it.companyId, companyName: it.companyName
+      }));
+    const ok = toSave.length ? D.saveSalesLedgerConfirmed(toSave) : true;
+    return {
+      ok, savedCount: toSave.length,
+      newCount: preview.counts.new, modifiedCount: preview.counts.modified,
+      duplicateCount: preview.counts.duplicate, notInCrmCount: preview.counts.notInCrm,
+      needsReviewCount: preview.counts.needsReview, pendingAmount: preview.pendingAmount
+    };
+  }
+  function salesImportBatchId(){
+    const now = new Date();
+    return 'SALES-IMPORT-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0')
+      + '-' + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0') + String(now.getSeconds()).padStart(2,'0');
+  }
+  // §요청 23 — 업로드 이력은 별도 저장소 없이 ledger 각 행의 importBatchId로 묶어서
+  // 화면 표시 시점에 계산한다.
+  function buildSalesImportHistory(){
+    const rows = D.loadSalesLedger();
+    const byBatch = new Map();
+    rows.forEach(r=>{
+      if(!r.importBatchId) return;
+      if(!byBatch.has(r.importBatchId)) byBatch.set(r.importBatchId, { batchId:r.importBatchId, importedAt:r.importedAt, fileName:r.sourceFileName, count:0, amount:0 });
+      const b = byBatch.get(r.importBatchId);
+      b.count++; b.amount += r.amount;
+    });
+    return Array.from(byBatch.values()).sort((a,b)=> String(b.importedAt||'').localeCompare(String(a.importedAt||'')));
+  }
+
+
+  let salesImportState = null;
+  function salesImportDefaultState(){
+    return { fileName:'', sheets:[], rawRows:[], preview:null, error:null, applying:false, result:null };
+  }
+  function closeSalesImportModal(){
+    const root = document.getElementById('salesImportModalRoot');
+    if(root) root.innerHTML = '';
+    salesImportState = null;
+  }
+  function openSalesImportModal(){
+    salesImportState = salesImportDefaultState();
+    renderSalesImportModal();
+  }
+  function recomputeSalesImportPreview(){
+    const st = salesImportState;
+    st.rawRows = buildSalesExcelRows(st.sheets, st.fileName);
+    st.preview = st.rawRows.length ? previewSalesImport(st.rawRows) : null;
+    renderSalesImportModal();
+  }
+  const SALES_IMPORT_STATUS_ORDER = ['신규','수정','중복','CRM 미등록','확인 필요'];
+  function salesImportRowHtml(it){
+    const r = it.row;
+    return `<tr class="sales-import-row is-${esc(it.status === 'CRM 미등록' ? 'notincrm' : it.status === '확인 필요' ? 'review' : it.status === '중복' ? 'dup' : it.status === '수정' ? 'mod' : 'new')}">
+      <td><span class="sales-import-status-badge">${esc(it.status)}</span></td>
+      <td>${esc(r.name)}</td>
+      <td>${esc(it.companyId ? (D.findCompany(it.companyId) ? (D.findCompany(it.companyId).code || D.findCompany(it.companyId).masterCode || '—') : '—') : '—')}</td>
+      <td>${esc(r.bizNo || '—')}</td>
+      <td>${esc(r.site || '—')}</td>
+      <td>${esc(r.sourceSheet)}</td>
+      <td>${esc(r.date || '—')}</td>
+      <td class="sales-import-amount">${it.status==='수정' && it.existingRow ? `${it.existingRow.amount.toLocaleString('ko-KR')} → ` : ''}${r.amount.toLocaleString('ko-KR')}원${it.status==='수정' && it.existingRow ? ` (차이 ${(r.amount-it.existingRow.amount>=0?'+':'')}${(r.amount-it.existingRow.amount).toLocaleString('ko-KR')}원)` : ''}</td>
+      <td>${esc(r.sourceSheet)}</td>
+      <td>${r.sourceRow}</td>
+    </tr>`;
+  }
+  function renderSalesImportModal(){
+    const root = document.getElementById('salesImportModalRoot');
+    if(!root) return;
+    const st = salesImportState;
+    const p = st.preview;
+    const hasFile = st.sheets.length > 0;
+    const skippedSheets = st.sheets.filter(s=> s.skipped);
+    const history = buildSalesImportHistory();
+    const body = `
+      <div class="pi-note">매월 새 매출현황 Excel을 올리면 기존 매출(정적 스냅샷 + 이전에
+        확정한 업로드)과 자동으로 비교해 <b>신규/중복/수정</b>만 가려냅니다. 계약금액·
+        낙찰가 같은 컬럼은 매출로 읽지 않습니다. 업로드만으로는 아무것도 저장되지
+        않으며, 아래 "확정 반영"을 눌러야만 실제 매출에 반영됩니다.</div>
+      <div style="margin:10px 0;">
+        <input type="file" id="salesImportFileInput" accept=".xlsx,.xls" />
+        ${st.fileName ? `<span style="font-size:12.5px;color:var(--text-muted);margin-left:8px;">${esc(st.fileName)} · ${st.rawRows.length}건 인식</span>` : ''}
+      </div>
+      ${skippedSheets.length ? `<div class="sales-import-skip-note">건너뛴 시트: ${skippedSheets.map(s=> esc(s.sheetName) + '(' + esc(s.skipReason) + ')').join(', ')}</div>` : ''}
+      ${st.error ? `<div class="delete-co-modal-err">${esc(st.error)}</div>` : ''}
+      ${st.result ? `<div style="color:#1E7B34;margin:8px 0;">확정 반영 완료 — 신규 ${st.result.newCount}건 · 수정 ${st.result.modifiedCount}건 · 중복(무시) ${st.result.duplicateCount}건 ·
+        CRM 미등록(제외) ${st.result.notInCrmCount}건 · 확인 필요(제외) ${st.result.needsReviewCount}건 · 반영 금액 ${st.result.pendingAmount.toLocaleString('ko-KR')}원</div>` : ''}
+      ${p ? `
+      <div class="sales-import-summary">
+        <span>전체 거래 <b>${p.counts.total}</b>건</span>
+        <span class="is-new">신규 <b>${p.counts.new}</b></span>
+        <span class="is-mod">수정 <b>${p.counts.modified}</b></span>
+        <span class="is-dup">중복 <b>${p.counts.duplicate}</b></span>
+        <span class="is-notincrm">CRM 미등록 <b>${p.counts.notInCrm}</b></span>
+        <span class="is-review">확인 필요 <b>${p.counts.needsReview}</b></span>
+        <span>반영 예정 매출 <b>${p.pendingAmount.toLocaleString('ko-KR')}원</b></span>
+      </div>
+      <div class="sales-import-table-wrap">
+        <table class="sales-import-table">
+          <thead><tr>
+            <th>상태</th><th>업체명</th><th>B2B 코드</th><th>사업자번호</th><th>현장명</th>
+            <th>매출유형</th><th>매출일</th><th>매출금액</th><th>원본 시트</th><th>원본 행</th>
+          </tr></thead>
+          <tbody>${p.items.length ? p.items
+            .slice().sort((a,b)=> SALES_IMPORT_STATUS_ORDER.indexOf(a.status) - SALES_IMPORT_STATUS_ORDER.indexOf(b.status))
+            .map(salesImportRowHtml).join('') : `<tr><td colspan="10" class="pi-note">거래가 없습니다.</td></tr>`}</tbody>
+        </table>
+      </div>` : ''}
+      ${history.length ? `
+      <div class="sales-import-history">
+        <div class="sales-import-history-title">업로드 이력</div>
+        ${history.map(h=> `<div class="sales-import-history-row">${esc(h.fileName || h.batchId)} · ${esc((h.importedAt||'').slice(0,16).replace('T',' '))} · ${h.count}건 · ${h.amount.toLocaleString('ko-KR')}원 · 반영완료</div>`).join('')}
+      </div>` : ''}
+    `;
+    root.innerHTML = `
+      <div class="pi-overlay" id="salesImportOverlay">
+        <div class="pi-panel" style="max-width:1100px;max-height:90vh;" role="dialog" aria-modal="true" aria-label="매출 Excel 업로드">
+          <div class="pi-head">
+            <div class="pi-title">매출 Excel 업로드</div>
+            <button type="button" class="chart-close-btn" id="salesImportCloseBtn" aria-label="닫기">&times;</button>
+          </div>
+          <div class="pi-body" style="overflow-y:auto;">${body}</div>
+          <div class="pi-actions">
+            ${hasFile ? `<button type="button" class="co-text-action" id="salesImportRecomputeBtn">Preview 계산</button>` : ''}
+            <button type="button" class="co-text-action" id="salesImportCloseBtn2">닫기</button>
+            <button type="button" class="co-text-action primary" id="salesImportApplyBtn" ${(!p || (!p.counts.new && !p.counts.modified) || st.applying) ? 'disabled' : ''}>${st.applying ? '반영 중…' : '확정 반영'}</button>
+          </div>
+        </div>
+      </div>`;
+    const close = ()=> closeSalesImportModal();
+    document.getElementById('salesImportCloseBtn').addEventListener('click', close);
+    document.getElementById('salesImportCloseBtn2').addEventListener('click', close);
+    bindSafeBackdropClose(document.getElementById('salesImportOverlay'), close);
+    const fileInput = document.getElementById('salesImportFileInput');
+    if(fileInput) fileInput.addEventListener('change', async ()=>{
+      const file = fileInput.files && fileInput.files[0];
+      if(!file) return;
+      st.error = null; st.preview = null; st.result = null;
+      renderSalesImportModal();
+      try{
+        const XLSX = await loadXlsxSdk();
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type:'array' });
+        st.fileName = file.name;
+        st.sheets = parseSalesExcelWorkbook(wb);
+        if(st.sheets.every(s=> s.skipped)) st.error = '매출금액/업체명 컬럼을 인식한 시트가 없습니다 — 실제 헤더명을 확인해 주세요.';
+        recomputeSalesImportPreview();
+        return;
+      }catch(e){
+        st.error = '엑셀을 읽는 중 오류가 발생했습니다: ' + (e && e.message || e);
+      }
+      renderSalesImportModal();
+    });
+    const recomputeBtn = document.getElementById('salesImportRecomputeBtn');
+    if(recomputeBtn) recomputeBtn.addEventListener('click', recomputeSalesImportPreview);
+    const applyBtn = document.getElementById('salesImportApplyBtn');
+    if(applyBtn) applyBtn.addEventListener('click', ()=>{
+      if(!p || (!p.counts.new && !p.counts.modified)) return;
+      if(!confirm(`신규 ${p.counts.new}건, 수정 ${p.counts.modified}건을 매출에 반영합니다.\n중복 ${p.counts.duplicate}건은 무시, CRM 미등록 ${p.counts.notInCrm}건·확인 필요 ${p.counts.needsReview}건은 반영하지 않습니다.\n계속할까요?`)) return;
+      st.applying = true;
+      renderSalesImportModal();
+      try{
+        st.result = applySalesImport(p, { importBatchId: salesImportBatchId(), importedAt: new Date().toISOString() });
+      }catch(e){
+        st.error = '반영 중 오류가 발생했습니다: ' + (e && e.message || e);
+        st.result = null;
+      }
+      st.applying = false;
+      renderList();
+      renderSalesImportModal();
+    });
+  }
   /* ==========================================================================
      §중복 업체 병합 라운드(신규) — "관리 도구 ▸ 중복 업체 병합"이 여는 두 모달.
      ① dupListModalRoot: 전체 활성 업체를 정규화 업체명/사업자번호 기준으로 그룹화한
@@ -32819,7 +33474,7 @@ window.SHIN2_CRM_APP_INIT = function(){
                 <thead><tr>
                   <th>종합순위</th><th>시공사명</th><th>B2B 코드</th>
                   <th>실적순위</th><th>시공실적 건수</th>
-                  <th>매출순위</th><th>매출액</th>
+                  <th>매출순위 ${revenueInfoIconHtml('gift')}</th><th>매출액</th>
                   <th>종합점수</th><th>비고</th>
                 </tr></thead>
                 <tbody>${rows.map(r=>{
@@ -32846,6 +33501,7 @@ window.SHIN2_CRM_APP_INIT = function(){
     root.querySelectorAll('[data-gift-note]').forEach(inp=> inp.addEventListener('change', (e)=>{
       giftGradeState.notes[inp.getAttribute('data-gift-note')] = e.target.value;
     }));
+    bindRevenueInfoIcon('gift');
   }
   // §요청 19 — Excel 다운로드도 화면과 같은 8개 컬럼만, 과거 등급 컬럼 없음. 기존
   // SheetJS 로더(loadXlsxSdk)를 그대로 재사용 — 새 라이브러리 추가 없음.
@@ -33138,6 +33794,7 @@ window.SHIN2_CRM_APP_INIT = function(){
   document.getElementById('crmGsheetReviewBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openGsheetReviewModal(); });
   document.getElementById('crmMasterImportBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openMasterImportModal(); });
   document.getElementById('crmPartnerExcelImportBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openPartnerExcelImportModal(); });
+  document.getElementById('crmSalesImportBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openSalesImportModal(); });
   document.getElementById('crmMergeDupBtn').addEventListener('click', ()=>{ closeUpdateMenu(); openDupListModal(); });
   function closeUpdateMenu(){ document.getElementById('crmUpdateMenu').classList.remove('is-open'); }
   // §디자인 진단 P2-5: 드롭다운을 열 때만 건수를 계산해 배지에 채운다(무거운 연산을
